@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Whity\Storage\LocalStorageDriver;
 use Whity\Storage\StorageException;
 use Whity\Storage\StorageKey;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Tenant-isolation guarantees for the storage layer (WC-bd65aa0bb).
@@ -78,9 +79,8 @@ final class StorageTenantIsolationTest extends TestCase
      * A caller that stuffs traversal into the PLUGIN segment trying to climb from
      * its own prefix into another tenant's directory is neutralised: the built key
      * still parses back to the caller's own tenant id.
-     *
-     * @dataProvider maliciousPluginSegments
      */
+    #[DataProvider('maliciousPluginSegments')]
     public function testMaliciousPluginSegmentStaysWithinCallerTenant(string $evilPlugin): void
     {
         $key = StorageKey::build(1, $evilPlugin, 'file.pdf');
@@ -110,9 +110,8 @@ final class StorageTenantIsolationTest extends TestCase
     /**
      * The same guarantee for the FILENAME segment — reduced to its basename, so no
      * embedded path can point at another tenant.
-     *
-     * @dataProvider maliciousFilenames
      */
+    #[DataProvider('maliciousFilenames')]
     public function testMaliciousFilenameStaysWithinCallerTenant(string $evilFilename): void
     {
         $key = StorageKey::build(1, 'docs', $evilFilename);

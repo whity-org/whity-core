@@ -14,6 +14,7 @@ use Whity\Core\Hooks\HookManager;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Database\Database;
 use Whity\Database\Seeder;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Real-engine (in-memory SQLite) tests for CLI-driven auditing (#844).
@@ -207,9 +208,8 @@ final class CliOriginAuditTest extends TestCase
      * a DSN). The writer's key-based sanitiser cannot help with this: a raw
      * command line is one opaque string with no keys to inspect, so the guard
      * has to be a shape check on the way in.
-     *
-     * @dataProvider unusableCommandProvider
      */
+    #[DataProvider('unusableCommandProvider')]
     public function testOnlyARecognisableCommandWordIsEverRecorded(?string $typed): void
     {
         (new AuditLogger($this->pdo, null, AuditOrigin::cli($typed)))->record('user.created');

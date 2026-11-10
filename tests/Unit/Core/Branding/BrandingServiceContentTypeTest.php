@@ -6,6 +6,7 @@ namespace Tests\Unit\Core\Branding;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Storage\MimeTypes;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * A stored asset must carry its real content type (#786).
@@ -35,9 +36,7 @@ final class BrandingServiceContentTypeTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider assetProvider
-     */
+    #[DataProvider('assetProvider')]
     public function testTheValidatedExtensionResolvesToItsRealType(
         string $ext,
         string $expectedMime

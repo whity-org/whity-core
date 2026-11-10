@@ -269,7 +269,7 @@ final class PasswordResetService
      */
     public function findPendingApprovalForProfile(int $profileId): ?array
     {
-        // @tenant-guard-ignore: password_resets is a sanctioned GLOBAL table (no tenant_id); scoped to a single profile
+        // Password_resets is a sanctioned GLOBAL table (no tenant_id); scoped to a single profile
         $stmt = $this->db->prepare(
             "SELECT id, created_at
              FROM password_resets
@@ -315,7 +315,7 @@ final class PasswordResetService
     public function listPendingForTenant(int $tenantId, int $limit = PHP_INT_MAX, int $offset = 0): array
     {
         if ($tenantId === self::SYSTEM_TENANT_ID) {
-            // @tenant-guard-ignore: platform (system tenant 0) break-glass — cross-tenant by design; every other caller takes the membership-scoped branch below
+            // Platform (system tenant 0) break-glass — cross-tenant by design; every other caller takes the membership-scoped branch below
             $stmt = $this->db->prepare(
                 "SELECT pr.id, pr.profile_id, pr.created_at, pr.reason,
                         p.display_name,
@@ -328,7 +328,7 @@ final class PasswordResetService
                  LIMIT :limit OFFSET :offset"
             );
         } else {
-            // @tenant-guard-ignore: joins the global password_resets/profiles tables to memberships, scoped by the tenant_id predicate below
+            // Joins the global password_resets/profiles tables to memberships, scoped by the tenant_id predicate below
             $stmt = $this->db->prepare(
                 "SELECT DISTINCT pr.id, pr.profile_id, pr.created_at, pr.reason,
                         p.display_name,
@@ -370,13 +370,13 @@ final class PasswordResetService
     public function countPendingForTenant(int $tenantId): int
     {
         if ($tenantId === self::SYSTEM_TENANT_ID) {
-            // @tenant-guard-ignore: platform (system tenant 0) break-glass, the same scope listPendingForTenant() documents
+            // Platform (system tenant 0) break-glass, the same scope listPendingForTenant() documents
             $stmt = $this->db->prepare(
                 "SELECT COUNT(*) FROM password_resets pr WHERE pr.status = '" . self::STATUS_AWAITING_APPROVAL . "'"
             );
             $stmt->execute();
         } else {
-            // @tenant-guard-ignore: joins the global password_resets table to memberships, scoped by the tenant_id predicate below
+            // Joins the global password_resets table to memberships, scoped by the tenant_id predicate below
             $stmt = $this->db->prepare(
                 "SELECT COUNT(DISTINCT pr.id)
                  FROM password_resets pr
@@ -415,7 +415,7 @@ final class PasswordResetService
 
         try {
             if ($tenantId === self::SYSTEM_TENANT_ID) {
-                // @tenant-guard-ignore: platform (system tenant 0) break-glass — cross-tenant by design; every other caller takes the membership-scoped branch below
+                // Platform (system tenant 0) break-glass — cross-tenant by design; every other caller takes the membership-scoped branch below
                 $stmt = $this->db->prepare(
                     "SELECT pr.id, pr.profile_id, pr.staged_password_hash, pe.email
                      FROM password_resets pr
@@ -425,7 +425,7 @@ final class PasswordResetService
                 );
                 $stmt->execute([':id' => $requestId]);
             } else {
-                // @tenant-guard-ignore: joins the global password_resets table to memberships, scoped by the tenant_id predicate below
+                // Joins the global password_resets table to memberships, scoped by the tenant_id predicate below
                 $stmt = $this->db->prepare(
                     "SELECT pr.id, pr.profile_id, pr.staged_password_hash, pe.email
                      FROM password_resets pr
@@ -518,7 +518,7 @@ final class PasswordResetService
         $platform = $tenantId === self::SYSTEM_TENANT_ID;
 
         if ($platform) {
-            // @tenant-guard-ignore: platform (system tenant 0) break-glass — cross-tenant by design; every other caller takes the membership-scoped branch below
+            // Platform (system tenant 0) break-glass — cross-tenant by design; every other caller takes the membership-scoped branch below
             $lookup = $this->db->prepare(
                 "SELECT profile_id
                  FROM password_resets
@@ -527,7 +527,7 @@ final class PasswordResetService
             );
             $lookup->execute([':id' => $requestId]);
         } else {
-            // @tenant-guard-ignore: joins the global password_resets table to memberships, scoped by the tenant_id predicate below
+            // Joins the global password_resets table to memberships, scoped by the tenant_id predicate below
             $lookup = $this->db->prepare(
                 "SELECT pr.profile_id
                  FROM password_resets pr
@@ -544,7 +544,7 @@ final class PasswordResetService
         }
 
         if ($platform) {
-            // @tenant-guard-ignore: platform (system tenant 0) break-glass — cross-tenant by design; every other caller takes the membership-scoped branch below
+            // Platform (system tenant 0) break-glass — cross-tenant by design; every other caller takes the membership-scoped branch below
             $stmt = $this->db->prepare(
                 "UPDATE password_resets
                     SET status = '" . self::STATUS_REJECTED . "',
@@ -555,7 +555,7 @@ final class PasswordResetService
             );
             $stmt->execute([':id' => $requestId]);
         } else {
-            // @tenant-guard-ignore: joins the global password_resets table to memberships; tenant_id predicate is on the correlated subquery below
+            // Joins the global password_resets table to memberships; tenant_id predicate is on the correlated subquery below
             $stmt = $this->db->prepare(
                 "UPDATE password_resets
                     SET status = '" . self::STATUS_REJECTED . "',

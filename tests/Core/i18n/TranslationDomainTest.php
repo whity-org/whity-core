@@ -7,6 +7,7 @@ namespace Tests\Core\i18n;
 use PHPUnit\Framework\TestCase;
 use Whity\Core\RBAC\ResourceTypeRegistry;
 use Whity\Core\i18n\TranslationDomain;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The translation-domain naming convention.
@@ -32,9 +33,7 @@ final class TranslationDomainTest extends TestCase
         }
     }
 
-    /**
-     * @dataProvider malformedDomainProvider
-     */
+    #[DataProvider('malformedDomainProvider')]
     public function testMalformedDomainsAreRefused(string $domain): void
     {
         $this->assertFalse(TranslationDomain::isValid($domain), "'{$domain}' must be refused.");

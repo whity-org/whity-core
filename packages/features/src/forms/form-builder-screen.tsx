@@ -32,12 +32,13 @@ import {
   reorder,
   snapshot,
 } from "./builder-model"
+import { FormDocumentFit, MakeTemplateFromForm } from "./form-document-fit"
 import { FormSettingsTab, type FormSettings } from "./form-settings-tab"
 import { useStatusLabel } from "./forms-list-screen"
 import { QuestionPanel } from "./question-panel"
 import { ResponsesTab } from "./responses-tab"
 import { asMap, pickText, statusVariant } from "./text"
-import type { FieldDraft, FieldKind, FormRow, FormSectionDef, FormsScreenEnv } from "./types"
+import type { DocumentFit, DocumentFitNeed, FieldDraft, FieldKind, FinalTemplateOption, FormRow, FormSectionDef, FormsScreenEnv } from "./types"
 
 interface Loaded {
   form: FormRow
@@ -352,6 +353,118 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     }
   }
 
+  // WHIT-921: the templates a form's final document can be made with.
+  const [finalTemplates, setFinalTemplates] = useState<FinalTemplateOption[]>([])
+  useEffect(() => {
+    let live = true
+    void api.listFinalTemplates(t("builder.action.failed", "That did not work. Try again.")).then((result) => {
+      if (live && result.ok) setFinalTemplates(result.data)
+    })
+    return () => {
+      live = false
+    }
+  }, [api, t])
+
+  /** WHIT-921: the form's final document template, and whether the applicant gets the final document. */
+  async function setFinalDocument(changes: { final_template_id?: number | null; final_document_to_applicant?: boolean; document_left_out?: string[] }) {
+    if (loaded === null) return
+    setPublicBusy(true)
+    const result = await api.updateForm(formId, changes, t("builder.action.failed", "That did not work. Try again."))
+    setPublicBusy(false)
+    if (!result.ok) {
+      env.notify(result.message, "error")
+      return
+    }
+    setLoaded((current) => (current === null ? current : { ...current, form: { ...current.form, ...result.data } }))
+  }
+
+  // How the chosen template and the form fit. Fetched again when either changes.
+  const [documentFit, setDocumentFit] = useState<DocumentFit | null>(null)
+  const finalTemplateId = loaded?.form.final_template_id ?? null
+  const savedFields = loaded?.fields
+  const leftOut = loaded?.form.document_left_out
+  useEffect(() => {
+    if (finalTemplateId === null || !canManage) {
+      setDocumentFit(null)
+      return
+    }
+    let live = true
+    void api.documentFit(formId, t("builder.action.failed", "That did not work. Try again.")).then((result) => {
+      if (live) setDocumentFit(result.ok ? result.data : null)
+    })
+    return () => {
+      live = false
+    }
+  }, [api, canManage, finalTemplateId, formId, leftOut, savedFields, t])
+
+  /** Add questions for what the template asks, unsaved, as if they had been added by hand. */
+  function addQuestionsFor(needs: DocumentFitNeed[]) {
+    const language = documentFit?.template.lang === "ar" ? "ar" : "en"
+    setFields((current) => {
+      const next = [...current]
+      for (const need of needs) {
+        if (need.field_key === null) continue
+        next.push({ ...newField("text", next, null), field_key: need.field_key, label: { [language]: need.label } })
+      }
+      return next
+    })
+    env.notify(t("builder.fit.needs.added", "Added to the questions. Check them, then save."), "success", {
+      label: t("builder.fit.needs.show", "Show questions"),
+      onClick: () => setTab("questions"),
+    })
+  }
+
+  async function addToTemplate(keys: string[]) {
+    setPublicBusy(true)
+    const result = await api.addToTemplate(formId, keys, t("builder.action.failed", "That did not work. Try again."))
+    setPublicBusy(false)
+    if (!result.ok) {
+      env.notify(
+        result.status === 409 ? t("builder.fit.unused.conflict", "Someone changed the template just now. Try again.") : result.message,
+        "error"
+      )
+      return
+    }
+    setDocumentFit(result.data)
+    env.notify(t("builder.fit.unused.added", "Added to the template's draft. Publish the template for them to print."), "success")
+  }
+
+  async function setLeftOut(keys: string[]) {
+    await setFinalDocument({ document_left_out: keys })
+  }
+
+  async function makeTemplate(title: string, language: "en" | "ar"): Promise<boolean> {
+    const result = await api.makeTemplate(formId, title, language, t("builder.action.failed", "That did not work. Try again."))
+    if (!result.ok) {
+      env.notify(
+        result.status === 403 ? t("builder.fromForm.denied", "You need permission to publish document templates to do this.") : result.message,
+        "error"
+      )
+      return false
+    }
+    const made = result.data
+    setFinalTemplates((current) => [...current, made])
+    setLoaded((current) => (current === null ? current : { ...current, form: { ...current.form, final_template_id: made.id, document_left_out: [] } }))
+    env.notify(t("builder.fromForm.done", "The template is made and chosen for this form."), "success", {
+      label: t("builder.fit.draft.open", "Open the template"),
+      onClick: () => env.navigate(`/admin/document-sources/${made.id}`),
+    })
+    return true
+  }
+
+  /** WHIT-920: the public link asks visitors to sign in, so their submission can be sent back to them. */
+  async function setSignInRequired(required: boolean) {
+    if (loaded === null) return
+    setPublicBusy(true)
+    const result = await api.updateForm(formId, { public_requires_sign_in: required }, t("builder.action.failed", "That did not work. Try again."))
+    setPublicBusy(false)
+    if (!result.ok) {
+      env.notify(result.message, "error")
+      return
+    }
+    setLoaded((current) => (current === null ? current : { ...current, form: { ...current.form, ...result.data } }))
+  }
+
   async function setMemberAccess(open: boolean) {
     if (loaded === null) return
     setPublicBusy(true)
@@ -600,7 +713,37 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
             onPublicLink={(enabled) => void setPublicLink(enabled)}
             onCopyLink={copyLink}
             onMemberAccess={(open) => void setMemberAccess(open)}
+            onSignInRequired={(required) => void setSignInRequired(required)}
             onUploadBanner={uploadBanner}
+            finalTemplates={finalTemplates}
+            onFinalDocument={(changes) => void setFinalDocument(changes)}
+            documentFit={
+              <>
+                {documentFit !== null && (
+                  <FormDocumentFit
+                    fit={documentFit}
+                    fields={fields}
+                    formClosed={form.status === "archived"}
+                    formOpen={form.status === "published"}
+                    readOnly={readOnly}
+                    busy={publicBusy}
+                    dirty={dirty}
+                    onAddToForm={addQuestionsFor}
+                    onAddToTemplate={(keys) => void addToTemplate(keys)}
+                    onLeaveOut={(keys) => void setLeftOut([...(form.document_left_out ?? []), ...keys])}
+                    onAskAgain={() => void setLeftOut([])}
+                    onOpenTemplate={(id) => env.navigate(`/admin/document-sources/${id}`)}
+                  />
+                )}
+                {!readOnly && (
+                  <MakeTemplateFromForm
+                    disabled={publicBusy || dirty || fields.length === 0}
+                    defaultTitle={(language) => pickText(settings.name, language) || title}
+                    onMake={makeTemplate}
+                  />
+                )}
+              </>
+            }
           />
         </TabsContent>
       </Tabs>
@@ -629,6 +772,11 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
                 required: fields.filter((f) => f.is_required).length,
               })}
             </span>
+            {documentFit !== null && documentFit.needs.some((need) => !fields.some((f) => f.field_key === need.field_key)) && (
+              <span className="block">
+                {t("builder.publish.documentGaps", "The final document has fields this form doesn't collect, and they would print empty. You can see them in Settings.")}
+              </span>
+            )}
             {problems.length > 0 && (
               <span className="block">
                 {t("builder.publish.warnings", "Worth a look first:")} {problems.slice(0, 5).map(problemText).join(" ")}

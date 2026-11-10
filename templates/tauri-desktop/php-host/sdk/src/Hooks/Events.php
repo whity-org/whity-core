@@ -18,6 +18,12 @@ use Whity\Sdk\PluginNamespace;
  * - Notification hooks (`*.created` / `*.updated` / `*.deleted` and the
  *   `*.async` variants): listeners observe; async variants are queued.
  *
+ * Any listener can be OBSERVE-ONLY (SDK 1.89): subscribe with
+ * `['callback' => $fn, 'observe' => true]`. The host ignores what it returns,
+ * a change to its copy of the payload reaches nobody, and it cannot veto: a
+ * {@see HookVetoException} it throws is logged and the operation carries on. Use
+ * it whenever a listener only needs to know something happened.
+ *
  * `user.creating` (SDK 1.70) is the exception to the FILTER rule above: it is
  * read-only. Listeners receive `email` and `role_id`, the host ignores what they
  * return, and the only way to affect the create is to refuse it with
@@ -66,6 +72,61 @@ final class Events
     public const USER_CREATED_ASYNC = 'user.created.async';
     public const USER_UPDATED = 'user.updated';
     public const USER_DELETED = 'user.deleted';
+    // Fired after the change, the return value ignored (SDK 1.89). Payload:
+    // `profile_id`, `tenant_id`, `membership_id`, `role_id`, `role_name`, `ou_id`.
+    // `added` may also carry `status`, `kind`, `via` or `is_primary`; `removed`
+    // also carries `status` and `granted_at`.
+    public const USER_MEMBERSHIP_ADDED = 'user.membership.added';
+    public const USER_MEMBERSHIP_REMOVED = 'user.membership.removed';
+
+    // ---- registration (SDK 1.89) ----
+    // Fired after the change, the return value ignored. These carry the
+    // person's address, so treat the payload as personal data.
+    /** Payload: `email`, `name`, `tenant_name`, `approval_required`, `verification_required`. */
+    public const REGISTRATION_COMPLETED = 'registration.completed';
+    /** Payload: `email`, `name`. */
+    public const REGISTRATION_APPROVED = 'registration.approved';
+    /** Payload: `email`, `name`. */
+    public const REGISTRATION_REJECTED = 'registration.rejected';
+
+    // ---- federated sign-in (SDK 1.89) ----
+    /**
+     * Somebody signed in through a federated provider. Fired after the sign-in,
+     * the return value ignored. Payload: `profile_id`, `email`, `provider_key`,
+     * `issuer`, `subject`, `global_trust`, `provider_tenant_id`,
+     * `provisioned_tenant_id`. Never a token.
+     */
+    public const AUTH_FEDERATED_SIGNED_IN = 'auth.federated.signed_in';
+
+    // ---- resource grants (SDK 1.89) ----
+    /** After the grant. Payload: `id`, `tenant_id`, `resource_type`, `resource_id`, `role_id`, `profile_id`. */
+    public const RBAC_RESOURCE_GRANT_CREATED = 'rbac.resource_grant.created';
+    /** After the revoke. Payload: `id`, `tenant_id`. */
+    public const RBAC_RESOURCE_GRANT_REVOKED = 'rbac.resource_grant.revoked';
+    /** After every grant at one resource is revoked. Payload: `tenant_id`, `resource_type`, `resource_id`, `revoked`. */
+    public const RBAC_RESOURCE_GRANT_REVOKED_ALL = 'rbac.resource_grant.revoked_all';
+    /**
+     * A FILTER: the host asks whether a plugin-owned resource exists before
+     * granting on it. Payload: `tenant_id`, `resource_type`, `resource_id`,
+     * `exists`. Return it with `exists` true for a resource you own. An
+     * observe-only listener cannot answer.
+     */
+    public const RBAC_RESOURCE_GRANT_VERIFY_RESOURCE = 'rbac.resource_grant.verify_resource';
+
+    // ---- time windows (SDK 1.89) ----
+    /**
+     * A FILTER: the host collects what is unfinished before a period closes.
+     * Payload: `tenant_id`, `window_id`, `window_type_id`, `starts_on`, `ends_on`,
+     * `unfinished`. Append `['label' => string, 'count' => int, 'source' => string]`
+     * to `unfinished`. An observe-only listener cannot contribute.
+     */
+    public const TIME_WINDOW_CLOSE_REPORT = 'time_window.close_report';
+
+    // ---- data type lifecycle (SDK 1.89) ----
+    /** Before a declared data type's record changes state. A listener may veto. */
+    public const DATATYPE_LIFECYCLE_CHANGING = 'datatype.lifecycle.changing';
+    /** After the change, the return value ignored. */
+    public const DATATYPE_LIFECYCLE_CHANGED = 'datatype.lifecycle.changed';
 
     // ---- tenants ----
     public const TENANT_CREATING = 'tenant.creating';
@@ -148,9 +209,129 @@ final class Events
     public const DOCUMENT_REVISED = 'document.revised';
     public const DOCUMENT_REVISED_ASYNC = 'document.revised.async';
 
+    // ---- routes and forms (SDK 1.94, WHIT-923) ----
+    // Fired after the change is saved. Payloads carry ids, never content: read
+    // what you need through the API, as the person or plugin you act for.
+    // Every route payload has `route_id`, `subject_type`, `subject_id`,
+    // `document_id` (null for a form submission with no document yet),
+    // `tenant_id`, `actor_profile_id` and `event_id`.
+
+    /** A route was started on a document or a form submission. Payload also has `action`, `recipients`. */
+    public const DOCUMENT_ROUTED = 'document.routed';
+    public const DOCUMENT_ROUTED_ASYNC = 'document.routed.async';
+
+    /** Somebody acted on a route. Payload also has `action`, `verdict`, `decided`, `step_id`, `recipients`. */
+    public const DOCUMENT_ROUTE_ACTED = 'document.route_acted';
+    public const DOCUMENT_ROUTE_ACTED_ASYNC = 'document.route_acted.async';
+
+    /** A route was sent back to its author for changes. Payload also has `step_id`, `resume_from`. */
+    public const ROUTE_SENT_BACK = 'route.sent_back';
+    public const ROUTE_SENT_BACK_ASYNC = 'route.sent_back.async';
+
+    /** The author sent the changes back in, and the route went on. Payload also has `step_id`. */
+    public const ROUTE_RESUBMITTED = 'route.resubmitted';
+    public const ROUTE_RESUBMITTED_ASYNC = 'route.resubmitted.async';
+
+    /** Nothing is left open on a route. Payload also has `outcome`: `approved`, `rejected` or null. */
+    public const ROUTE_COMPLETED = 'route.completed';
+    public const ROUTE_COMPLETED_ASYNC = 'route.completed.async';
+
+    /** Somebody signed on a signing step. Payload also has `step_id`. */
+    public const ROUTE_SIGNED = 'route.signed';
+    public const ROUTE_SIGNED_ASYNC = 'route.signed.async';
+
+    /**
+     * A route's finalise step made its final document. Payload: `id` (the document),
+     * `document_id`, `route_id`, `subject_type`, `subject_id`, `artifact_id`, `tenant_id`.
+     */
+    public const DOCUMENT_FINALISED = 'document.finalised';
+    public const DOCUMENT_FINALISED_ASYNC = 'document.finalised.async';
+
+    /**
+     * Somebody sent a form. Payload: `id` (the submission), `form_id`, `tenant_id`,
+     * `actor_profile_id` (null when it was anonymous), `route_id` (null when it has none).
+     */
+    public const FORM_SUBMITTED = 'form.submitted';
+    public const FORM_SUBMITTED_ASYNC = 'form.submitted.async';
+
+    /** The office recorded its answers on a submission. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`. */
+    public const SUBMISSION_REVIEWED = 'submission.reviewed';
+    public const SUBMISSION_REVIEWED_ASYNC = 'submission.reviewed.async';
+
+    /** The person who sent a submission withdrew it. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`. */
+    public const SUBMISSION_WITHDRAWN = 'submission.withdrawn';
+    public const SUBMISSION_WITHDRAWN_ASYNC = 'submission.withdrawn.async';
+
+    // ---- agents (SDK 1.75, WHIT-990) ----
+    // A workspace's agent changed. Fired after the change is saved, and the
+    // return value is ignored: a listener can't refuse or undo it. Payload:
+    // `tenant_id`, `agent_id`, `actor_profile_id` (the person who made the
+    // change). Ids only: read the agent with {@see \Whity\Sdk\Agents\Agents}.
+    public const AGENT_CREATED = 'agent.created';
+    public const AGENT_UPDATED = 'agent.updated';
+    public const AGENT_ARCHIVED = 'agent.archived';
+    public const AGENT_RESTORED = 'agent.restored';
+    /** Paused: refused on every call, and its waiting proposals can't run, until resumed. */
+    public const AGENT_PAUSED = 'agent.paused';
+    public const AGENT_RESUMED = 'agent.resumed';
+
+    // ---- agent proposals (SDK 1.78, WHIT-991) ----
+    // Notifications only: each fires after the change is saved, the return value
+    // is ignored, and a listener can't refuse or change anything. Only the person
+    // who granted the agent decides a proposal, never a plugin. Ids and the
+    // tool's name only, never the call's arguments.
+    /**
+     * An agent asked to do something and it waits for its person. Payload:
+     * `tenant_id`, `proposal_id`, `agent_assignment_id` (null for an agent that
+     * isn't a workspace agent), `on_behalf_of_profile_id`, `tool`.
+     */
+    public const AGENT_PROPOSAL_CREATED = 'agent.proposal.created';
+    /**
+     * A proposal stopped waiting. Payload: `tenant_id`, `proposal_id`,
+     * `decision` (`approved`, `declined` or `expired`), `decided_by_profile_id`
+     * (null when it expired), `on_behalf_of_profile_id`, `tool`, `failed` (it was
+     * approved and a check refused it when it ran, so nothing changed).
+     */
+    public const AGENT_PROPOSAL_DECIDED = 'agent.proposal.decided';
+    /**
+     * A person undid what an agent did for them. Payload: `tenant_id`,
+     * `action_id`, `proposal_id` (null when it ran without asking),
+     * `on_behalf_of_profile_id`, `tool`.
+     */
+    public const AGENT_ACTION_UNDONE = 'agent.action.undone';
+
+    // ---- AI connections (SDK 1.79, WHIT-992) ----
+    // An app or agent connected over MCP. Fired after the change, the return
+    // value ignored. Payload: `tenant_id`, `connection_id` (as
+    // {@see \Whity\Sdk\Mcp\McpConnections} lists it), `profile_id` (whose
+    // connection), `kind` (`user` or `ai-agent`), `agent_assignment_id` (null
+    // unless it is a workspace agent's), `actor_profile_id` (who did it). Never
+    // the token or its id.
+    public const MCP_CONNECTION_CREATED = 'mcp.connection.created';
+    public const MCP_CONNECTION_GRANT_CHANGED = 'mcp.connection.grant_changed';
+    /** Also `by`: `owner`, `admin`, or `agent_removed` (the person stopped using the agent). */
+    public const MCP_CONNECTION_REVOKED = 'mcp.connection.revoked';
+
+    // A plugin setting changed (SDK 1.88). Fired after the change, the return
+    // value ignored. Payload: `tenant_id` (null when the deployment's own value
+    // changed, which every workspace without its own follows), `plugin` (slug),
+    // `key` (bare), `actor_profile_id` (null with no person behind it). Never
+    // the value: read your own with {@see \Whity\Sdk\Settings\PluginSettingsStore}.
+    public const PLUGIN_SETTINGS_CHANGED = 'plugin.settings.changed';
+
     // ---- platform ----
     public const NAVIGATION_REGISTER = 'navigation.register';
     public const PERMISSION_REGISTERED = 'permission.registered';
+    // Boot-time announcements (SDK 1.89). Each names the `source` that registered
+    // and what it registered; the return value is ignored.
+    public const DATATYPE_REGISTERED = 'datatype.registered';
+    public const OU_TYPE_REGISTERED = 'ou_type.registered';
+    public const ROUTING_RULE_REGISTERED = 'routing_rule.registered';
+    public const WINDOW_TYPE_REGISTERED = 'window_type.registered';
+    public const RBAC_RESOURCE_TYPES_REGISTERED = 'rbac.resource_types.registered';
+    public const HEALTH_PROBES_REGISTERED = 'health.probes.registered';
+    public const SETTINGS_DECLARED = 'settings.declared';
+    public const TENANT_TABLES_REGISTERED = 'tenant.tables.registered';
     public const WORKER_BOOT = 'worker.boot';
     public const WORKER_REQUEST_START = 'worker.request.start';
     public const WORKER_REQUEST_END = 'worker.request.end';

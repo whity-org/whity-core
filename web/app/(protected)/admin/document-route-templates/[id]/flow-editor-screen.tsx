@@ -81,7 +81,7 @@ import {
   type RouteFlowQuorum,
   type RouteFlowStep,
 } from '@whity/ui/route-flow/model';
-import { IconDeviceFloppy, IconPencil, IconPlus } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconFileCheck, IconPencil, IconPlus } from '@tabler/icons-react';
 import { useLeaveGuard } from '@whity/ui/save-bar';
 import { routeSentence } from '@/lib/documents/route-sentence';
 import type { RoutingRule } from '@/components/documents/routing-wire';
@@ -104,6 +104,15 @@ interface GroupOption {
   id: number;
   name: string;
 }
+
+/** WHIT-921: a published document template a final document stage may render with. */
+interface FinalTemplateOption {
+  id: number;
+  title: string;
+}
+
+/** The value the template picker uses for "the form's final document template". */
+const FORM_DEFAULT = 'form';
 
 /** The two core kinds whose config is `{ role_id }`. */
 const ROLE_KINDS = new Set(['role', 'role_below_actor']);
@@ -188,6 +197,17 @@ export function RouteFlowEditorScreen({
     return ((body.data ?? []) as GroupOption[]).map((g) => ({ id: g.id, name: g.name }));
   }, [apiClient]);
 
+  // WHIT-921: the published templates a final document stage may render with.
+  // Soft on a 403 like the pickers above: the stage can still use the form's.
+  const finalTemplatesResult = useFetch(async () => {
+    const response = await apiClient('/api/v1/document-sources?kind=template');
+    if (!response.ok) return [] as FinalTemplateOption[];
+    const body = await response.json();
+    return ((body.data ?? []) as Array<{ id: number; title: string; published_version: number | null }>)
+      .filter((row) => row.published_version !== null)
+      .map((row) => ({ id: row.id, title: row.title }));
+  }, [apiClient]);
+
   if (templateResult.error !== null) {
     return <p className="text-sm text-destructive">{templateResult.error}</p>;
   }
@@ -211,6 +231,7 @@ export function RouteFlowEditorScreen({
       rules={rulesResult.data ?? []}
       roles={rolesResult.data ?? []}
       groups={groupsResult.data ?? []}
+      finalTemplates={finalTemplatesResult.data ?? []}
     />
   );
 }
@@ -222,6 +243,7 @@ function RouteFlowBody({
   rules,
   roles,
   groups,
+  finalTemplates,
 }: {
   templateId: number;
   template: RouteTemplateGraphWire;
@@ -229,6 +251,7 @@ function RouteFlowBody({
   rules: RoutingRule[];
   roles: RoleOption[];
   groups: GroupOption[];
+  finalTemplates: FinalTemplateOption[];
 }) {
   const { apiClient } = useAuth();
   const { addToast } = useToast();
@@ -248,6 +271,8 @@ function RouteFlowBody({
   useLeaveGuard(dirty);
 
   const maxSteps = template.max_steps;
+  // WHIT-920: forms that send anonymous requests through this design.
+  const anonymousForms = template.anonymous_public_forms ?? [];
 
   // ── audience resolution ───────────────────────────────────────────────────
   //
@@ -321,6 +346,10 @@ function RouteFlowBody({
 
   const ruleLabelFor = useCallback(
     (step: RouteFlowStep): string => {
+      // WHIT-921: nobody is reached; the card says what happens instead.
+      if (step.kind === 'finalise') {
+        return t('routeTemplates.final.rule', 'Whity makes the final PDF');
+      }
       const rule = rules.find((r) => r.kind === step.ruleKind);
       const base = rule?.label ?? step.ruleKind;
 
@@ -339,7 +368,7 @@ function RouteFlowBody({
 
       return base;
     },
-    [groups, roles, rules]
+    [groups, roles, rules, t]
   );
 
   // ── mutation ──────────────────────────────────────────────────────────────
@@ -368,13 +397,43 @@ function RouteFlowBody({
         // its people to act; that is the ordinary case and the one an author
         // means when they drop a node without touching anything.
         satisfiedBy: 'act',
+        // WHIT-920: a new stage can send a request back for changes.
+        allowSendBack: true,
+      },
+      orientation,
+      dir
+    );
+    change(next);
+    // The new stage, wherever it went: before the final document stage when
+    // there is one.
+    const final = graph.steps.find((s) => s.kind === 'finalise');
+    setSelected(final !== undefined ? final.position : next.steps[next.steps.length - 1].position);
+  }, [change, dir, graph, orientation, rules]);
+
+  // WHIT-921: the final document stage. One per route, always last, and only
+  // where PDFs can be made.
+  const canFinalise = template.can_finalise === true;
+  const hasFinalStage = graph.steps.some((s) => s.kind === 'finalise');
+  const addFinalStage = useCallback(() => {
+    const next = appendStep(
+      graph,
+      {
+        ruleKind: 'finalise',
+        ruleConfig: {},
+        label: null,
+        decision: false,
+        decisionQuorum: null,
+        satisfiedBy: 'act',
+        allowSendBack: false,
+        kind: 'finalise',
+        finalTemplateId: null,
       },
       orientation,
       dir
     );
     change(next);
     setSelected(next.steps[next.steps.length - 1].position);
-  }, [change, dir, graph, orientation, rules]);
+  }, [change, dir, graph, orientation]);
 
   const updateSelected = useCallback(
     (patch: Partial<RouteFlowStep>) => {
@@ -444,6 +503,7 @@ function RouteFlowBody({
         return role !== undefined ? roleLabel(role.name) : null;
       }
       if (step.ruleKind === GROUP_KIND) return groups.find((g) => g.id === step.ruleConfig.group_id)?.name ?? null;
+      if (step.ruleKind === 'finalise') return t('routeTemplates.final.sentence', 'the final PDF');
       return rules.find((r) => r.kind === step.ruleKind)?.label ?? null;
     },
     {
@@ -498,6 +558,12 @@ function RouteFlowBody({
               <IconPlus className="me-1 size-4" />
               {t('routeTemplates.action.addStage', 'Add a stage')}
             </Button>
+            {canFinalise && !hasFinalStage && (
+              <Button variant="outline" onClick={addFinalStage} disabled={atCeiling}>
+                <IconFileCheck className="me-1 size-4" />
+                {t('routeTemplates.action.addFinal', 'Add the final document')}
+              </Button>
+            )}
             <Button onClick={save} disabled={!dirty || saving}>
               <IconDeviceFloppy className="me-1 size-4" />
               {t('routeTemplates.action.save', 'Save route')}
@@ -505,6 +571,19 @@ function RouteFlowBody({
           </>
         )}
       </div>
+
+      {anonymousForms.length > 0 &&
+        graph.steps.some((step) => step.allowSendBack !== false && step.satisfiedBy !== 'delivery') && (
+        <Alert>
+          <AlertDescription>
+            {t(
+              'routeTemplates.anonymousSendBack',
+              'Some stages can send a request back for changes, but {forms} takes requests from visitors who do not sign in. Nobody can send those back. Ask visitors to sign in on that form to fix this.',
+              { forms: anonymousForms.map((form) => form.name).join(', ') }
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {atCeiling && (
         <Alert>
@@ -536,6 +615,7 @@ function RouteFlowBody({
             empty: t('routeTemplates.canvas.empty', 'No stages yet. Add the first one to start the flow.'),
             decision: t('routeTemplates.canvas.decision', 'Decision'),
             delivery: t('routeTemplates.canvas.delivery', 'Sent, not asked'),
+            finalise: t('routeTemplates.canvas.finalise', 'Final PDF'),
             reaches: t('routeTemplates.canvas.reaches', 'Reaches'),
             people: t('routeTemplates.canvas.people.other', 'people'),
             person: t('routeTemplates.canvas.people.one', 'person'),
@@ -570,6 +650,15 @@ function RouteFlowBody({
                 'Select a stage to edit who it reaches and what it asks of them.'
               )}
             </p>
+          ) : selectedStep.kind === 'finalise' ? (
+            <FinalStageInspector
+              step={selectedStep}
+              templates={finalTemplates}
+              canFinalise={canFinalise}
+              readOnly={!canWrite}
+              onChange={updateSelected}
+              t={t}
+            />
           ) : (
             <StageInspector
               step={selectedStep}
@@ -611,6 +700,95 @@ function reachesRightNow(t: ReturnType<typeof useTranslation>, count: number): s
     : t('routeTemplates.inspector.reaches.other', 'Reaches {count} people right now', {
         count: count.toLocaleString(),
       });
+}
+
+/**
+ * The panel for the final document stage (WHIT-921). Nobody is reached and
+ * nobody acts, so there is no rule, quorum or send-back to set: only its name
+ * and the template the PDF is made with.
+ */
+function FinalStageInspector({
+  step,
+  templates,
+  canFinalise,
+  readOnly,
+  onChange,
+  t,
+}: {
+  step: RouteFlowStep;
+  templates: FinalTemplateOption[];
+  canFinalise: boolean;
+  readOnly: boolean;
+  onChange: (patch: Partial<RouteFlowStep>) => void;
+  t: ReturnType<typeof useTranslation>;
+}) {
+  const chosen = step.finalTemplateId ?? null;
+  const missing = chosen !== null && !templates.some((tpl) => tpl.id === chosen);
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+        {t('routeTemplates.final.heading', 'Final document')}
+      </p>
+
+      {!canFinalise && (
+        <Alert>
+          <AlertDescription className="text-xs">
+            {t(
+              'routeTemplates.final.unavailable',
+              'PDFs can\'t be made on this install, so this route can\'t be saved with a final document. Remove this stage, or ask your administrator to set up the render service.'
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">{t('routeTemplates.inspector.label', 'Label')}</span>
+        <Input
+          value={step.label ?? ''}
+          disabled={readOnly}
+          maxLength={160}
+          placeholder={t('routeTemplates.final.labelPlaceholder', 'Approval letter')}
+          onChange={(e) => onChange({ label: e.target.value === '' ? null : e.target.value })}
+        />
+      </label>
+
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">{t('routeTemplates.final.template', 'Document template')}</span>
+        <Select
+          value={chosen === null ? FORM_DEFAULT : String(chosen)}
+          disabled={readOnly}
+          onValueChange={(v) => onChange({ finalTemplateId: v === FORM_DEFAULT ? null : Number(v) })}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={FORM_DEFAULT}>
+              {t('routeTemplates.final.formDefault', 'The form\'s final document template')}
+            </SelectItem>
+            {missing && (
+              <SelectItem value={String(chosen)}>
+                {t('routeTemplates.final.unknownTemplate', 'A template you can\'t see')}
+              </SelectItem>
+            )}
+            {templates.map((tpl) => (
+              <SelectItem key={tpl.id} value={String(tpl.id)}>
+                {tpl.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+
+      <p className="text-xs text-muted-foreground">
+        {t(
+          'routeTemplates.final.explained',
+          'Nobody acts here. When everything before it is done and approved, Whity makes the final PDF from the approved version with this template, gives it its number and verification code, and keeps it on the document. If the PDF can\'t be made right away, the route still finishes and Whity tries again.'
+        )}
+      </p>
+    </div>
+  );
 }
 
 /**
@@ -874,6 +1052,19 @@ function StageInspector({
           onCheckedChange={(checked) =>
             onChange({ satisfiedBy: checked ? 'delivery' : 'act' })
           }
+        />
+      </label>
+
+      {/* WHIT-920: whether a person here may send it back to the applicant for
+          changes. Meaningless on a stage that asks nobody anything. */}
+      <label className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">
+          {t('routeTemplates.inspector.allowSendBack', 'Can be sent back to the applicant')}
+        </span>
+        <Switch
+          checked={step.allowSendBack !== false}
+          disabled={readOnly || step.satisfiedBy === 'delivery'}
+          onCheckedChange={(checked) => onChange({ allowSendBack: checked })}
         />
       </label>
 

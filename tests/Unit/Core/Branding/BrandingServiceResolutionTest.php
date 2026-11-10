@@ -78,7 +78,7 @@ final class BrandingServiceResolutionTest extends TestCase
         $settings = new SettingsService(new GlobalSettingsRepository($pdo), new TenantSettingsRepository($pdo));
         $settings->setTenant(1, 'support_email', 'secret@acme.com');
         $arr = (new BrandingService($settings))->effective(1)->toArray();
-        self::assertSame(['siteName', 'logoWideUrl', 'logoSquareUrl', 'faviconUrl', 'mainColor', 'theme'], array_keys($arr));
+        self::assertSame(['siteName', 'logoWideUrl', 'logoSquareUrl', 'faviconUrl', 'mainColor', 'theme', 'installable'], array_keys($arr));
         self::assertStringNotContainsString('secret@acme.com', (string) json_encode($arr));
     }
 
@@ -99,5 +99,54 @@ final class BrandingServiceResolutionTest extends TestCase
         self::assertNotNull($branding->theme);
         self::assertSame('#b74c05', $branding->theme['light']['primary']);
         self::assertSame('#e97c47', $branding->theme['dark']['primary'], '2.8c: the demo colour on dark');
+    }
+
+    public function testInstallableIsOnByDefaultAndAStoredChoiceTurnsItOff(): void
+    {
+        $pdo = SchemaFromMigrations::make(true);
+        $pdo->exec("INSERT INTO tenants (id, name) VALUES (1, 't1')");
+        $settings = new SettingsService(new GlobalSettingsRepository($pdo), new TenantSettingsRepository($pdo));
+        $service = new BrandingService($settings);
+
+        $previous = $_ENV['PWA_ENABLED'] ?? null;
+        unset($_ENV['PWA_ENABLED']);
+        try {
+            if (getenv('PWA_ENABLED') === false) {
+                self::assertTrue($service->effective(1)->installable, 'on unless someone turns it off');
+            }
+            $settings->setGlobal('app.installable', 'false');
+            self::assertFalse($service->effective(1)->installable);
+            self::assertFalse($service->effective(0)->installable, 'the same answer on every host');
+        } finally {
+            if ($previous !== null) {
+                $_ENV['PWA_ENABLED'] = $previous;
+            }
+        }
+    }
+
+    public function testTheInstallSwitchIsGlobalOnly(): void
+    {
+        self::assertTrue(\Whity\Core\Settings\SettingsRegistry::isGlobalOnly('app.installable'));
+    }
+
+    /**
+     * @return iterable<string, array{?string, string|false|null, bool}>
+     */
+    public static function installableCases(): iterable
+    {
+        yield 'nothing set' => [null, false, true];
+        yield 'env off' => [null, 'false', false];
+        yield 'env 0' => [null, '0', false];
+        yield 'env on' => [null, 'true', true];
+        yield 'env not a boolean is ignored' => [null, 'maybe', true];
+        yield 'env empty is unset' => [null, '', true];
+        yield 'stored off beats env on' => ['false', 'true', false];
+        yield 'stored on beats env off' => ['true', 'false', true];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('installableCases')]
+    public function testInstallableResolution(?string $stored, string|false|null $env, bool $expected): void
+    {
+        self::assertSame($expected, BrandingService::installableFrom($stored, $env));
     }
 }

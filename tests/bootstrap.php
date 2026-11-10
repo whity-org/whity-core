@@ -34,3 +34,4 @@ if (is_string($paratestToken) && $paratestToken !== '') {
 
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 require_once dirname(__DIR__) . '/src/helpers.php';
+require_once __DIR__ . '/Support/CheapPasswordHashing.php';

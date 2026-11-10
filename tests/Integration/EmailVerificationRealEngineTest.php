@@ -44,7 +44,7 @@ final class EmailVerificationRealEngineTest extends TestCase
                 (display_name, password_hash, two_factor_enabled, two_factor_secret,
                  two_factor_backup_codes_version, token_epoch, created_at, updated_at)
              VALUES (:dn, :ph, false, NULL, 0, 0, NOW(), NOW())'
-        )->execute([':dn' => 'Test User', ':ph' => password_hash('x', PASSWORD_BCRYPT)]);
+        )->execute([':dn' => 'Test User', ':ph' => password_hash('x', PASSWORD_BCRYPT, ['cost' => 4])]);
         $profileId = (int) $this->pdo->lastInsertId();
 
         $profileEmailId = $this->emails->insert($profileId, $email, false, true);

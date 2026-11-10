@@ -10,6 +10,7 @@ use Tests\Support\SchemaFromMigrations;
 use Whity\Database\SequenceCounters;
 use Whity\Sdk\Schema\SchemaInspector;
 use Whity\Sdk\Sql\Upsert;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * {@see Upsert} and {@see SequenceCounters}, exercised against whichever engine
@@ -246,9 +247,7 @@ final class PortableUpsertDualEngineTest extends TestCase
         self::assertSame(8, $allocator->next(self::TENANT, 'invoice', 3));
     }
 
-    /**
-     * @dataProvider badArguments
-     */
+    #[DataProvider('badArguments')]
     public function testMalformedArgumentsAreRefused(string $name, int $step): void
     {
         $this->expectException(\InvalidArgumentException::class);

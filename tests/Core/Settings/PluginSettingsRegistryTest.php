@@ -9,6 +9,7 @@ use Whity\Core\Settings\InvalidSettingDeclarationException;
 use Whity\Core\Settings\PluginSettingsRegistry;
 use Whity\Core\Settings\SettingDefinition;
 use Whity\Core\Settings\SettingsRegistry;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * #713 item 1: the plugin-declared half of the settings catalogue.
@@ -122,9 +123,7 @@ final class PluginSettingsRegistryTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider coreShadowAttempts
-     */
+    #[DataProvider('coreShadowAttempts')]
     public function testAPluginCannotShadowACoreKey(string $source, string $bareKey): void
     {
         $registry = $this->registry();
@@ -326,9 +325,8 @@ final class PluginSettingsRegistryTest extends TestCase
      * credential declared here would be readable by everyone holding it. Failing
      * at load time is how a plugin author finds that out before shipping, rather
      * than after.
-     *
-     * @dataProvider secretFields
      */
+    #[DataProvider('secretFields')]
     public function testSecretShapedDeclarationsAreRefusedNotDowngraded(string $field): void
     {
         $this->expectException(InvalidSettingDeclarationException::class);
@@ -460,9 +458,7 @@ final class PluginSettingsRegistryTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider validationCases
-     */
+    #[DataProvider('validationCases')]
     public function testDeclaredKeysValidateExactlyAsCoreKeysDo(string $bare, string $value, bool $valid): void
     {
         $registry = $this->registry();

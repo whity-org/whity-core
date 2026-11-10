@@ -22,7 +22,8 @@ import {
   DropdownMenuTrigger,
 } from '@whity/ui/dropdown-menu';
 import { IconMenu2, IconPlus } from '@tabler/icons-react';
-import { useTranslation } from '@whity/features/i18n';
+import { useLanguageCode, useTranslation } from '@whity/features/i18n';
+import { localizedName } from '@/lib/localized-name';
 import { useDateDisplay } from '@whity/features/datetime';
 import { CreateTenantModal } from './create-modal';
 import { DeleteTenantModal } from './delete-modal';
@@ -66,6 +67,7 @@ export default function TenantsPage() {
   const { apiClient, user } = useAuth();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
+  const currentLanguage = useLanguageCode();
   const dates = useDateDisplay();
   // The route refuses every other tenant whatever permissions they hold, so the
   // button would only lead to a 403.
@@ -139,7 +141,8 @@ export default function TenantsPage() {
           onClick={() => openRecord(tenant)}
           className="text-start font-medium text-primary underline-offset-4 hover:underline"
         >
-          {tenant.name}
+          {/* #821: the reader's language, else the original name. */}
+          {localizedName(tenant.names, currentLanguage, tenant.nameLanguage, tenant.name)}
         </button>
       ),
     },

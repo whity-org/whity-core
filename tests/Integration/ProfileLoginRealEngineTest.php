@@ -434,7 +434,11 @@ final class ProfileLoginRealEngineTest extends TestCase
         self::assertSame([self::TENANT_A, self::TENANT_B], $tenantIds);
         self::assertArrayHasKey('tenant_name', $body['data']['memberships'][0]);
         self::assertArrayHasKey('role', $body['data']['memberships'][0]);
-        self::assertSame(['tenant_id', 'tenant_name', 'role', 'kind'], array_keys($body['data']['memberships'][0]));
+        // #821: the workspace's name in every language rides with it.
+        self::assertSame(
+            ['tenant_id', 'tenant_name', 'tenant_name_language', 'tenant_names', 'role', 'kind'],
+            array_keys($body['data']['memberships'][0])
+        );
         self::assertNull($this->jwtParser->lastPayloadOfType('access'), 'Reading the choice must not mint a session.');
         // Still usable to complete the choice.
         self::assertSame(200, $this->selectTenant(self::TENANT_B)->getStatusCode());
@@ -739,7 +743,7 @@ final class ProfileLoginRealEngineTest extends TestCase
         );
         $stmt->execute([
             explode('@', $email)[0], // display name from local-part
-            password_hash(self::PASSWORD, PASSWORD_BCRYPT),
+            password_hash(self::PASSWORD, PASSWORD_BCRYPT, ['cost' => 4]),
         ]);
         $profileId = (int) $this->pdo->lastInsertId();
 

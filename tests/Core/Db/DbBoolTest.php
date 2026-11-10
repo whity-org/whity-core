@@ -6,6 +6,7 @@ namespace Tests\Core\Db;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Db\DbBool;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Unit cover for the canonical SQL-boolean coercion (#891).
@@ -69,9 +70,7 @@ final class DbBoolTest extends TestCase
         yield 'float 0.0' => [0.0, false];
     }
 
-    /**
-     * @dataProvider representations
-     */
+    #[DataProvider('representations')]
     public function testCoercesEveryRepresentationADriverCanReturn(mixed $value, bool $expected): void
     {
         self::assertSame($expected, DbBool::of($value), sprintf(

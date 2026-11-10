@@ -333,6 +333,42 @@ final class FormsApiHandler
                 }
                 $changes['route_template_id'] = $routeTemplateId;
             }
+            // WHIT-920: the public link asks visitors to sign in, so only the
+            // workspace's members and customers can send it, under their own name.
+            if (array_key_exists('public_requires_sign_in', $body)) {
+                if (!is_bool($body['public_requires_sign_in'])) {
+                    return Response::error('public_requires_sign_in must be true or false', 422);
+                }
+                $changes['public_requires_sign_in'] = $body['public_requires_sign_in'];
+            }
+            // WHIT-921: the "Final document template", which a route's finalise
+            // stage uses when it names none.
+            if (array_key_exists('final_template_id', $body)) {
+                $finalTemplateId = $body['final_template_id'];
+                if ($finalTemplateId !== null
+                    && (!is_int($finalTemplateId) || !$this->forms->documentTemplateExists($tenantId, $finalTemplateId))) {
+                    return Response::error('final_template_id must be a document template of this workspace, or null', 422);
+                }
+                $changes['final_template_id'] = $finalTemplateId;
+                // Leaving a question out was a choice about the template it was made for.
+                $current = $this->forms->find($tenantId, $id);
+                if ($current !== null && $current['final_template_id'] !== $finalTemplateId) {
+                    $changes['document_left_out'] = [];
+                }
+            }
+            if (array_key_exists('document_left_out', $body)) {
+                $leftOut = $body['document_left_out'];
+                if (!is_array($leftOut) || !array_is_list($leftOut) || count(array_filter($leftOut, 'is_string')) !== count($leftOut)) {
+                    return Response::error('document_left_out must be a list of question keys', 422);
+                }
+                $changes['document_left_out'] = array_values(array_unique($leftOut));
+            }
+            if (array_key_exists('final_document_to_applicant', $body)) {
+                if (!is_bool($body['final_document_to_applicant'])) {
+                    return Response::error('final_document_to_applicant must be true or false', 422);
+                }
+                $changes['final_document_to_applicant'] = $body['final_document_to_applicant'];
+            }
 
             if ($changes === []) {
                 return Response::error('No updatable fields supplied', 422);

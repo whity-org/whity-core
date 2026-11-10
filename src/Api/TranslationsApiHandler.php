@@ -471,7 +471,7 @@ final class TranslationsApiHandler
         $id = (int) ($params['id'] ?? 0);
 
         try {
-            $existing = $this->translationRepository->findById($id);
+            $existing = $this->translationRepository->findVisibleTo($id, $tenantId);
             if ($existing === null) {
                 return Response::error('Translation not found', 404);
             }
@@ -503,7 +503,7 @@ final class TranslationsApiHandler
 
             $this->languageRegistry->invalidateCache();
 
-            $fresh = $this->translationRepository->findById($id);
+            $fresh = $this->translationRepository->findVisibleTo($id, $tenantId);
             return Response::json(['data' => $fresh !== null ? self::translationPayload($fresh) : null], 200);
         } catch (\Throwable $e) {
             error_log('[TranslationsApiHandler] update failed: ' . $e->getMessage());
@@ -529,7 +529,7 @@ final class TranslationsApiHandler
         $id = (int) ($params['id'] ?? 0);
 
         try {
-            $existing = $this->translationRepository->findById($id);
+            $existing = $this->translationRepository->findVisibleTo($id, $tenantId);
             if ($existing === null) {
                 return Response::error('Translation not found', 404);
             }

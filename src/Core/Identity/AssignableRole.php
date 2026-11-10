@@ -64,7 +64,7 @@ final class AssignableRole
             return false;
         }
 
-        // @tenant-guard-ignore: `roles` is scoped in the predicate itself — the
+        // `roles` is scoped in the predicate itself — the
         // query's whole purpose is to ask whether this role is the tenant's own
         // OR global, so a bare `tenant_id = :tid` would answer a different and
         // wrong question by excluding every global role.
@@ -90,7 +90,7 @@ final class AssignableRole
             return $claimedRoleId;
         }
 
-        // @tenant-guard-ignore: reads the GLOBAL fallback role by definition —
+        // Reads the GLOBAL fallback role by definition —
         // `tenant_id IS NULL` is the predicate, and scoping it to a tenant would
         // select the wrong row or none.
         $stmt = $this->db->prepare(

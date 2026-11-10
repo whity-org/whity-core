@@ -66,7 +66,7 @@ class TenantIsolationTest extends TestCase
 
         // Mock the JWT parser to return Tenant A's user payload
         $jwtParserMock = $this->createMock(JwtParser::class);
-        $jwtParserMock->method('parse')
+        $jwtParserMock->expects($this->atLeastOnce())->method('parse')
             ->with('tenantA.token.here')
             ->willReturn($tokenPayloadTenantA);
 
@@ -157,7 +157,7 @@ class TenantIsolationTest extends TestCase
 
         // Test 1: Query users for Tenant A
         $jwtParserMock = $this->createMock(JwtParser::class);
-        $jwtParserMock->method('parse')
+        $jwtParserMock->expects($this->atLeastOnce())->method('parse')
             ->with('tenantA.token')
             ->willReturn($tokenPayloadTenantA);
 

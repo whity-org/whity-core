@@ -82,7 +82,7 @@ test.describe('Tenants (admin)', () => {
 
     // Pre-filled from the record the URL names — the assertion the old dialog
     // test carried.
-    await expect(page.getByTestId('tenant-record-name')).toHaveValue('Default Tenant');
+    await expect(page.locator('#tenant-record-name-en')).toHaveValue('Default Tenant');
 
     // The admin is tenant 1 looking at its OWN workspace, so the record is
     // editable and Save exists — but stays inert until something changes, which
@@ -115,7 +115,7 @@ test.describe('Tenants (admin)', () => {
     await page.reload();
     await expect(page).toHaveURL(recordUrl);
     await expect(page.getByTestId('tenant-record')).toBeVisible();
-    await expect(page.getByTestId('tenant-record-name')).toHaveValue('Default Tenant');
+    await expect(page.locator('#tenant-record-name-en')).toHaveValue('Default Tenant');
     await expect(page.getByTestId('tenant-record-stat-slug')).toBeVisible();
 
     // The back BUTTON of the browser, distinct from the page's own back link:

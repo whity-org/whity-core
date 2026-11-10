@@ -247,7 +247,7 @@ abstract class OfflinePluginHostConformanceTestCase extends TestCase
         self::assertIsArray($hooks, 'getHooks() must return an array (event => listener(s)).');
 
         foreach ($hooks as $eventName => $hookData) {
-            foreach (self::normalizeHooks($hookData) as $callback) {
+            foreach (self::normalizeHooks($hookData) as [$callback, $observe]) {
                 try {
                     $result = $callback([], $context);
                 } catch (HookVetoException) {
@@ -260,6 +260,12 @@ abstract class OfflinePluginHostConformanceTestCase extends TestCase
                     );
                 }
 
+                // An observe-only listener (SDK 1.89) may return anything: the host ignores it.
+                if ($observe) {
+                    self::addToAssertionCount(1);
+                    continue;
+                }
+
                 self::assertIsArray(
                     $result,
                     "Hook listener for '{$eventName}' must return an array (the SDK's documented filter-hook "
@@ -270,12 +276,12 @@ abstract class OfflinePluginHostConformanceTestCase extends TestCase
     }
 
     /**
-     * @return list<callable>
+     * @return list<array{0: callable, 1: bool}> Each listener and whether it is observe-only.
      */
     private static function normalizeHooks(mixed $hookData): array
     {
         if (is_callable($hookData)) {
-            return [$hookData];
+            return [[$hookData, false]];
         }
 
         if (!is_array($hookData)) {
@@ -283,15 +289,15 @@ abstract class OfflinePluginHostConformanceTestCase extends TestCase
         }
 
         if (isset($hookData['callback']) && is_callable($hookData['callback'])) {
-            return [$hookData['callback']];
+            return [[$hookData['callback'], ($hookData['observe'] ?? false) === true]];
         }
 
         $callbacks = [];
         foreach ($hookData as $item) {
             if (is_callable($item)) {
-                $callbacks[] = $item;
+                $callbacks[] = [$item, false];
             } elseif (is_array($item) && isset($item['callback']) && is_callable($item['callback'])) {
-                $callbacks[] = $item['callback'];
+                $callbacks[] = [$item['callback'], ($item['observe'] ?? false) === true];
             }
         }
 

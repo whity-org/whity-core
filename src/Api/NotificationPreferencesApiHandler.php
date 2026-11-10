@@ -32,6 +32,8 @@ final class NotificationPreferencesApiHandler
         private readonly TokenValidator $tokenValidator,
         private readonly NotificationPreferenceRepository $repo,
         private readonly NotificationPreferenceResolver $resolver,
+        /** @var (\Closure(): list<array{type: string, label: array{en: string, ar: string}, plugin: string}>)|null */
+        private readonly ?\Closure $pluginTypes = null,
     ) {}
 
     /**
@@ -50,6 +52,8 @@ final class NotificationPreferencesApiHandler
         return Response::json([
             'data'                   => $this->repo->listForProfile($tenantId, $profileId),
             'transactional_prefixes' => $this->resolver->transactionalPrefixes(),
+            // WHIT-1030: what a person can turn off for plugins, by name.
+            'plugin_types'           => $this->pluginTypes !== null ? ($this->pluginTypes)() : [],
         ], 200);
     }
 
@@ -101,6 +105,8 @@ final class NotificationPreferencesApiHandler
         return Response::json([
             'data'                   => $this->repo->listForProfile($tenantId, $profileId),
             'transactional_prefixes' => $this->resolver->transactionalPrefixes(),
+            // WHIT-1030: what a person can turn off for plugins, by name.
+            'plugin_types'           => $this->pluginTypes !== null ? ($this->pluginTypes)() : [],
         ], 200);
     }
 

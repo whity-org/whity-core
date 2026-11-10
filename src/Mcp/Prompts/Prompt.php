@@ -14,6 +14,10 @@ namespace Whity\Mcp\Prompts;
  * Access control: if either requiredRole or requiredPermission is set the
  * Dispatcher enforces it in PromptsGetHandler; PromptsListHandler filters the
  * prompt out of the listing for callers who do not hold the required grant.
+ *
+ * `plugin` names the code plugin that contributed it (null for core). The registry can hide a
+ * plugin's prompts by that name, for example while the operator requires Verified marks for
+ * prompts (WHIT-1014).
  */
 final readonly class Prompt
 {
@@ -28,6 +32,7 @@ final readonly class Prompt
         public array $messages = [],
         public ?string $requiredRole = null,
         public ?string $requiredPermission = null,
+        public ?string $plugin = null,
     ) {}
 
     public function isOpen(): bool

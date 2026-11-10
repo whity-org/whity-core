@@ -53,24 +53,59 @@ final class FlowDocumentRenderer
     ) {
     }
 
+    /** What a print says when an operator has switched rendering off. */
+    public const SWITCHED_OFF = 'Server-side document rendering is disabled on this instance';
+
     /**
      * Whether a flowing render could be attempted for this tenant: the
-     * instance-wide feature is on AND the render client is configured.
+     * instance-wide switch is on AND the render service is ready.
      *
      * Both halves matter and they fail differently. The setting is an operator
-     * DECISION (default false — a whole extra browser-bearing container is not
-     * something a sovereign deployment gets by surprise); the client being
-     * unconfigured is a deployment MISTAKE, typically a shared secret under the
-     * 32-character minimum. A caller only needs to know it cannot render, but
-     * the two are logged apart in {@see RenderServiceClient} so an operator can
-     * tell which one they are looking at.
+     * DECISION to switch printing off (default on since WHIT-1001: running the
+     * render service with a shared secret is already the opt-in, and a second
+     * switch nobody knew about left fresh installs unable to print). Readiness
+     * is the deployment's STATE: configured, reachable, the same release as the
+     * app, and accepting the app's secret. A renderer at another release would
+     * print the other release's layout without a word, so it counts as not
+     * ready rather than as a renderer.
      */
     public function isEnabled(int $tenantId): bool
     {
-        $effective = $this->settings->effective($tenantId);
+        return $this->unavailableReason($tenantId) === null;
+    }
 
-        return ($effective[SettingsRegistry::DOCUMENTS_RENDER_ENABLED] ?? 'false') === 'true'
-            && $this->renderService->isConfigured();
+    /**
+     * Null when this tenant can print, or the sentence saying why not: the
+     * switch is off, or {@see RenderReadiness::$message} for the deployment's
+     * fault. Safe to show anyone; the operator's fix is on {@see readiness()}.
+     */
+    public function unavailableReason(int $tenantId): ?string
+    {
+        $effective = $this->settings->effective($tenantId);
+        if (($effective[SettingsRegistry::DOCUMENTS_RENDER_ENABLED] ?? 'true') !== 'true') {
+            return self::SWITCHED_OFF;
+        }
+
+        $readiness = $this->renderService->readiness();
+
+        return $readiness->isReady() ? null : $readiness->message;
+    }
+
+    /**
+     * The sentence for a print that just failed with the service unavailable.
+     * The client forgets its cached readiness on such a failure, so this asks
+     * the service again and names the cause (a secret changed, the renderer
+     * went down or was swapped for another version) when there is one.
+     */
+    public function failureReason(int $tenantId): string
+    {
+        return $this->unavailableReason($tenantId) ?? 'Document rendering is temporarily unavailable';
+    }
+
+    /** The render service's state, asked afresh when `$fresh`. */
+    public function readiness(bool $fresh = false): RenderReadiness
+    {
+        return $this->renderService->readiness($fresh);
     }
 
     /**

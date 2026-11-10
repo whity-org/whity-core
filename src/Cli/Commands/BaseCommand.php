@@ -169,6 +169,8 @@ abstract class BaseCommand implements CliCommand, CommandHelp
 
         $this->kernel = new HttpKernel($router, $rbacMiddleware);
         $this->kernel->use($tenantIsolationMiddleware);
+        // WHIT-1015: a plugin route reached from the CLI reads the same context.
+        $this->kernel->use(new \Whity\Http\Middleware\StampRequestContext());
 
         // Resource-type catalogue (WC-712 §2), registered as a service exactly as
         // public/index.php does so a plugin reached through a CLI command sees
@@ -176,6 +178,18 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $resourceTypeRegistry = new \Whity\Core\RBAC\ResourceTypeRegistry($hookManager);
         $resourceTypeRegistry->registerCoreResourceTypes();
         \Whity\register_service(\Whity\Core\RBAC\ResourceTypeRegistry::class, $resourceTypeRegistry);
+
+        // #1074: the narrowing check for plugin resource types, as public/index.php
+        // registers it, over the same delegation-aware checker registered above.
+        \Whity\register_service(
+            \Whity\Sdk\Rbac\ResourceScope::class,
+            new \Whity\Core\RBAC\GrantResourceScope(
+                new RoleCheckerPermissionResolver($roleChecker, $permissionRegistry),
+                new \Whity\Core\RBAC\ResourceRoleAssignmentRepository($db->getPdo(), $resourceTypeRegistry),
+                $resourceTypeRegistry,
+                $permissionRegistry
+            )
+        );
 
         // OU-type catalogue (#822), registered as a service for exactly the same
         // reason: a plugin's contributed types must be adoptable whether the
@@ -234,6 +248,13 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         );
         \Whity\register_service(\Whity\Core\Document\Routing\RoutingRuleRegistry::class, $routingRuleRegistry);
 
+        // WHIT-918: what a route travels on, mirroring public/index.php.
+        $routeSubjectRegistry = new \Whity\Core\Document\Routing\RouteSubjectRegistry();
+        $routeSubjectRegistry->register(new \Whity\Core\Document\Routing\DocumentRouteSubject($db->getPdo()));
+        // WHIT-920: form submissions travel on their routes as themselves.
+        $routeSubjectRegistry->register(new \Whity\Core\Form\FormSubmissionRouteSubject($db->getPdo()));
+        \Whity\register_service(\Whity\Core\Document\Routing\RouteSubjectRegistry::class, $routeSubjectRegistry);
+
         // EFFECT catalogue (#1032), mirroring public/index.php exactly.
         //
         // The CATALOGUE is wired here and the RUNNER is not, and the asymmetry
@@ -262,7 +283,12 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $inboxSourceRegistry->registerCoreSource(
             \Whity\Core\Inbox\InboxSourceRegistry::CORE_DOCUMENT_ROUTING,
             new \Whity\Core\Document\Routing\DocumentRoutingInboxSource(
-                new \Whity\Core\Document\Routing\RouteRecipientRepository($db->getPdo())
+                new \Whity\Core\Document\Routing\RouteRecipientRepository($db->getPdo()),
+                // WHIT-920: whether a form's sender sees who reviewed it.
+                new \Whity\Core\Settings\SettingsService(
+                    new \Whity\Core\Settings\GlobalSettingsRepository($db->getPdo()),
+                    new \Whity\Core\Settings\TenantSettingsRepository($db->getPdo())
+                )
             )
         );
         \Whity\register_service(\Whity\Core\Inbox\InboxSourceRegistry::class, $inboxSourceRegistry);
@@ -354,7 +380,8 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $settingsService = new \Whity\Core\Settings\SettingsService(
             new \Whity\Core\Settings\GlobalSettingsRepository($db->getPdo()),
             new \Whity\Core\Settings\TenantSettingsRepository($db->getPdo()),
-            $settingsCatalog
+            $settingsCatalog,
+            $hookManager,
         );
         \Whity\register_service(\Whity\Core\Settings\SettingsService::class, $settingsService);
 
@@ -410,6 +437,21 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         // CLI serves no MCP, so nothing files a proposal here, but the registry is
         // host-wired: registered so \Whity\app() never improvises an empty one.
         \Whity\register_service(\Whity\Mcp\Tools\ProposalDiffRegistry::class, new \Whity\Mcp\Tools\ProposalDiffRegistry());
+        // WHIT-993: plugin MCP resources. The CLI serves no MCP, so it stays empty,
+        // but it is host-wired: registered so \Whity\app() never improvises one.
+        \Whity\register_service(\Whity\Mcp\Resources\PluginResourceRegistry::class, new \Whity\Mcp\Resources\PluginResourceRegistry());
+
+        // WHIT-990 (SDK 1.75): the workspace's agents for plugins, as in
+        // public/index.php. A job has no person, so it reads nothing.
+        \Whity\register_service(\Whity\Sdk\Agents\Agents::class, new \Whity\Core\Agent\SdkAgents(
+            new \Whity\Core\Agent\AgentRepository($db->getPdo()),
+            new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo()),
+            new \Whity\Core\Agent\AgentActivityRepository($db->getPdo()),
+            new \Whity\Core\Agent\AgentProposalRepository($db->getPdo()),
+            $roleChecker,
+        ));
+        // WHIT-992 (SDK 1.79): the workspace's AI connections, as in public/index.php.
+        \Whity\register_service(\Whity\Sdk\Mcp\McpConnections::class, new \Whity\Mcp\Auth\SdkMcpConnections($db->getPdo(), $roleChecker));
 
         $baseDir = dirname(__DIR__, 3);
         // The registries are passed HERE, not just constructed above: this loader
@@ -498,9 +540,24 @@ abstract class BaseCommand implements CliCommand, CommandHelp
                 static fn (int $tenant, int $profileId): ?string => $tenantRecordRepository->memberName($tenant, $profileId),
             )
         );
+        // WHIT-921: each form's submissions as a record type, as in public/index.php.
+        $documentFieldRegistry->addTenantSource(
+            static fn (int $tenantId): array => \Whity\Core\Form\FormSubmissionFieldProvider::forTenant($db->getPdo(), $tenantId)
+        );
         $templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry($liveManifests);
         $agentPresetRegistry->useManifests($liveManifests);
         \Whity\register_service(\Whity\Core\Document\Slots\TemplateSlotRegistry::class, $templateSlotRegistry);
+        // #1151: one document stack for this process, shared by issuing and
+        // the SDK's DocumentRenderer, built on first use.
+        $documentParts = new \Whity\Core\Document\Issuing\WorkerDocumentParts(
+            $db->getPdo(),
+            $settingsService,
+            $hookManager,
+            $documentFieldRegistry,
+            $documentEmbedRegistry,
+            $_ENV,
+            getenv('STORAGE_ROOT') ?: ($baseDir . '/storage'),
+        );
         \Whity\register_service(
             \Whity\Core\Document\Issuing\TemplateIssuing::class,
             \Whity\Core\Document\Issuing\WorkerDocumentIssuing::build(
@@ -514,8 +571,18 @@ abstract class BaseCommand implements CliCommand, CommandHelp
                 $templateSlotRegistry,
                 $_ENV,
                 getenv('STORAGE_ROOT') ?: ($baseDir . '/storage'),
+                $documentParts,
             )
         );
+        // The SDK rendering seam (#1151), as in public/index.php: a plugin's
+        // command renders and issues flowing documents through the same stack.
+        \Whity\register_service(
+            \Whity\Sdk\Render\DocumentRenderer::class,
+            new \Whity\Core\Document\Render\DeferredSdkDocumentRenderer(
+                static fn (): \Whity\Sdk\Render\DocumentRenderer => $documentParts->sdkRenderer()
+            )
+        );
+        \Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger);
         // WHIT-838 (SDK 1.60): plugin secrets, as in public/index.php, so a
         // plugin's job reaches the same store its routes write. The cipher is
         // built on first use: a command that touches no secret needs no key.
@@ -523,6 +590,11 @@ abstract class BaseCommand implements CliCommand, CommandHelp
             $db->getPdo(),
             static fn (): \Whity\Core\Security\EncryptedSecretStore => \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
             $auditLogger,
+        ));
+        // WHIT-1016 (SDK 1.88): a plugin's own settings, as in public/index.php.
+        \Whity\register_service(\Whity\Sdk\Settings\PluginSettings::class, new \Whity\Core\Plugin\HostPluginSettings(
+            $settingsService,
+            static fn (): array => $pluginLoader->getPlugins(),
         ));
         // SDK 1.63 (WHIT-886): plugin files and plugin documents with QR
         // tracking, as in public/index.php, so a plugin's job reaches the same
@@ -560,11 +632,28 @@ abstract class BaseCommand implements CliCommand, CommandHelp
             new \Whity\Core\Document\Qr\DocumentQrScanRepository($db->getPdo()),
             $settingsService,
         ));
+        // SDK 1.82 (WHIT-996): the template reader, as in public/index.php.
+        \Whity\register_service(\Whity\Sdk\Documents\Templates::class, \Whity\Core\Document\Issuing\SdkTemplates::build(
+            $db->getPdo(),
+            $roleChecker,
+            $resourceTypeRegistry,
+            $settingsService,
+            $templateSlotRegistry,
+        ));
         \Whity\register_service(
             \Whity\Sdk\Documents\Documents::class,
             new \Whity\Core\Document\Issuing\SdkDocuments(
                 static fn (): \Whity\Core\Document\Issuing\TemplateIssuing => \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
-                $roleChecker
+                $roleChecker,
+                // SDK 1.83 (WHIT-997): a command starts a bulk issue; queue:work runs it.
+                bulk: new \Whity\Core\Document\Issuing\BulkIssuing(
+                    $db->getPdo(),
+                    $roleChecker,
+                    static fn (): \Whity\Core\Document\Issuing\TemplateIssuing => \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
+                    new \Whity\Core\Queue\JobRepository($db->getPdo()),
+                    null,
+                    \Whity\Core\Document\Issuing\BulkIssuing::rendersPerMinuteFrom($_ENV),
+                ),
             )
         );
         $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
@@ -715,7 +804,7 @@ abstract class BaseCommand implements CliCommand, CommandHelp
      */
     private static function servicePrincipalId(Database $db): int
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $stmt = $db->getPdo()->query(
             "SELECT id FROM profiles WHERE auth_method = '" . AuthMethod::SERVICE . "' ORDER BY id ASC LIMIT 1"
         );

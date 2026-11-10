@@ -25,6 +25,7 @@ use Whity\Core\Document\Organizer\PdoSchemaPresence;
 use Whity\Core\Document\Qr\DocumentQrScanRepository;
 use Whity\Core\Document\Qr\DocumentQrService;
 use Whity\Core\Document\Qr\DocumentQrTokenRepository;
+use Whity\Core\Document\Render\RenderReadiness;
 use Whity\Core\Document\Routing\RouteRecipientRepository;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\RBAC\PermissionRegistry;
@@ -597,6 +598,43 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
         self::assertCount(1, $this->artifactRepo->listForDocument($documentId, self::TENANT));
     }
 
+    /**
+     * WHIT-1001: a record issued while the renderer is not ready says why it
+     * has no PDF, instead of a bare "no stored file". The operator's fix (env
+     * variables, image tags) is not for a workspace admin: they get the reason.
+     */
+    public function testARecordWithNoPdfSaysWhyAndKeepsTheFixForOperators(): void
+    {
+        $this->fakeRender->readiness = RenderReadiness::unreachable('0.2.27', 'http://render:8130');
+        $templateId = $this->editor->published(self::TENANT, self::OWNER, 'Pending Template');
+
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT);
+        $req = new Request('POST', '/api/documents', [], (string) json_encode(['document_source_id' => $templateId, 'title' => 'Pending']));
+        $req->user = (object) ['profile_id' => self::OWNER, 'active_tenant_id' => self::TENANT];
+        $created = $this->handler->create($req);
+        self::assertSame(201, $created->getStatusCode(), $created->getBody());
+        $documentId = (int) self::data($created)['id'];
+
+        $shown = self::data($this->call('show', self::OWNER, ['id' => (string) $documentId]));
+        self::assertSame(
+            ['reason' => 'The document renderer is not reachable', 'fix' => null],
+            $shown['pdf_pending']
+        );
+
+        $content = $this->call('content', self::OWNER, ['id' => (string) $documentId]);
+        self::assertSame(404, $content->getStatusCode());
+        self::assertStringContainsString('PDF not available yet: The document renderer is not reachable', $content->getBody());
+        self::assertStringNotContainsString('render:8130', $content->getBody() . json_encode($shown));
+    }
+
+    public function testARecordWithAPdfHasNoPendingNote(): void
+    {
+        $documentId = $this->issue(self::OWNER, 'Invoice');
+
+        self::assertArrayNotHasKey('pdf_pending', self::data($this->call('show', self::OWNER, ['id' => (string) $documentId])));
+    }
+
     public function testReRenderIsRefusedWhenPersistenceIsDisabled(): void
     {
         $documentId = $this->issue(self::OWNER, 'Invoice');
@@ -649,13 +687,13 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
         self::assertNotNull($shown['number_assigned_at']);
 
         self::assertNotEmpty($this->fakeRender->flowCalls);
-        $printed = EditorTemplateFixture::texts($this->fakeRender->flowCalls[array_key_last($this->fakeRender->flowCalls)]);
+        $printed = EditorTemplateFixture::texts($this->lastFlowCall());
         self::assertContains($number, $printed, 'issued_document.number must reach the PDF');
 
         // A correction prints the same number, and the counter doesn't move.
         self::assertSame(201, $this->call('rerender', self::OWNER, ['id' => (string) $id])->getStatusCode());
         self::assertNotEmpty($this->fakeRender->flowCalls);
-        self::assertContains($number, EditorTemplateFixture::texts($this->fakeRender->flowCalls[array_key_last($this->fakeRender->flowCalls)]));
+        self::assertContains($number, EditorTemplateFixture::texts($this->lastFlowCall()));
         self::assertSame($number, self::data($this->call('show', self::OWNER, ['id' => (string) $id]))['number']);
 
         // The next document gets the next one.
@@ -836,7 +874,7 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
         self::assertTrue($outcome['stored'] ?? false);
         self::assertCount(2, $this->artifactRepo->listForDocument($id, self::TENANT), 'the earlier PDF stays');
         self::assertNotEmpty($this->fakeRender->flowCalls);
-        self::assertContains('MIN-001', EditorTemplateFixture::texts($this->fakeRender->flowCalls[array_key_last($this->fakeRender->flowCalls)]));
+        self::assertContains('MIN-001', EditorTemplateFixture::texts($this->lastFlowCall()));
 
         // A template that doesn't print the number has nothing to change, and spends no render.
         $plain = $this->editor->published(self::TENANT, self::OWNER, 'Plain');
@@ -1240,5 +1278,19 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
             $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
         }
         @rmdir($path);
+    }
+
+    /**
+     * The most recent render call the fake received.
+     *
+     * @return array<string, mixed>
+     */
+    private function lastFlowCall(): array
+    {
+        $calls = $this->fakeRender->flowCalls;
+        $last = array_key_last($calls);
+        self::assertNotNull($last, 'Nothing was rendered.');
+
+        return $calls[$last];
     }
 }

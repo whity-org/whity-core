@@ -28,6 +28,8 @@ final class OAuth2SmtpMailer implements Mailer
 
     public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
     {
+        // WHIT-991: no mail from a proposal preview.
+        \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Sending mail');
         // Checked before any token exists, so a wrong host never receives one.
         $problem = SmtpOAuthTokenManager::connectionProblem(
             $this->tokens->provider(),

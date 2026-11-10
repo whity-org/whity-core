@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Agent\AgentActionRepository;
+use Whity\Core\Agent\AgentProposalEvents;
 use Whity\Core\Agent\AgentProposalRepository;
 use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Core\Request;
@@ -157,6 +158,7 @@ final class AgentProposalsApiHandler
             'target_id'   => $id,
             'metadata'    => ['tool' => $proposal['tool'], 'edited' => $arguments !== null, 'failed' => is_array($result) && ($result['isError'] ?? false) === true],
         ]);
+        $this->proposals->events()?->decided($tenantId, $id, AgentProposalEvents::APPROVED, $profileId, $profileId, (string) $proposal['tool'], is_array($result) && ($result['isError'] ?? false) === true);
 
         $fresh = $this->proposals->find($id, $tenantId);
         return Response::json(['data' => $fresh !== null ? self::present(
@@ -189,6 +191,7 @@ final class AgentProposalsApiHandler
             'target_id'   => $id,
             'metadata'    => ['tool' => $proposal['tool']],
         ]);
+        $this->proposals->events()?->decided($tenantId, $id, AgentProposalEvents::DECLINED, $profileId, $profileId, (string) $proposal['tool']);
 
         $fresh = $this->proposals->find($id, $tenantId);
         return Response::json(['data' => $fresh !== null ? self::present(

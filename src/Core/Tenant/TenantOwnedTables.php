@@ -204,11 +204,19 @@ final class TenantOwnedTables
         // except PublicFormKeyRepository::findLive(), the anonymous lookup that
         // resolves the tenant from a 256-bit key.
         'public_form_keys' => '217_create_public_form_keys.php',
+        // #821: names of workspaces and units in other languages. Every query
+        // binds tenant_id; a workspace's own name is stored under its own id.
+        'localized_texts' => '225_create_localized_texts.php',
         // WHIT-915: workspace customer sign-up (migration 222). Every query binds
         // tenant_id except the token lookup on the public confirm endpoint, where the
         // 256-bit single-use token is the authority and names its own tenant.
         'workspace_signup_settings' => '222_create_workspace_signup.php',
         'customer_signups' => '222_create_workspace_signup.php',
+        // WHIT-995: which plugin starter templates a workspace was seeded with (migration 228).
+        'plugin_starter_seeds' => '228_create_plugin_starter_seeds.php',
+        // WHIT-997: bulk issuing batches and their items (migration 229).
+        'document_issue_batches' => '229_create_document_issue_batches.php',
+        'document_issue_batch_items' => '229_create_document_issue_batches.php',
         // WHIT-815: the workspace's agent definitions (migration 180).
         'agents' => '180_create_agents.php',
         // WHIT-816: a person's use of a workspace agent, with their grant (migration 181).
@@ -247,6 +255,14 @@ final class TenantOwnedTables
         'document_route_steps'       => '112_create_document_routing.php',
         'document_route_events'      => '112_create_document_routing.php',
         'document_route_recipients'  => '112_create_document_routing.php',
+        // WHIT-919: the versions of whatever a route travels on.
+        'route_subject_versions'     => '226_add_route_send_back_and_versions.php',
+        // WHIT-922: signatures, saved drawn signatures and signing confirmations.
+        'route_signatures'           => '232_add_route_signatures.php',
+        'saved_signatures'           => '232_add_route_signatures.php',
+        'signing_challenges'         => '232_add_route_signatures.php',
+        // WHIT-921: what the engine did when a route reached its finalise step.
+        'route_finalisations'        => '234_add_route_finalise.php',
 
         // #1014 — where a VERDICT sends a document (migration 119). The
         // branching seam migration 112 named and deliberately left unbuilt, keyed

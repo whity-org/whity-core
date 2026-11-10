@@ -111,6 +111,44 @@ final class DocumentIssuingEntryPointWiringTest extends TestCase
         }
     }
 
+    /** WHIT-996 (SDK 1.82): the template reader, in both entry points and the worker. */
+    public function testEveryEntryPointRegistersTheSdkTemplatesReader(): void
+    {
+        $pattern = '/register_service\(\s*\\\\?Whity\\\\Sdk\\\\Documents\\\\Templates::class,\s*\\\\?(Whity\\\\Core\\\\Document\\\\Issuing\\\\)?SdkTemplates::build\(/';
+        foreach ([...self::ENTRY_POINTS, 'src/Core/Document/Issuing/WorkerDocumentServices.php'] as $relative) {
+            self::assertMatchesRegularExpression(
+                $pattern,
+                $this->read($relative),
+                "{$relative} must register the SDK's Templates, or a plugin resolving it gets an exception."
+            );
+        }
+        self::assertMatchesRegularExpression(
+            '/SdkTemplates::build\(\$pdo, \$roleChecker, \$resourceTypes, \$settings, \$slots, \$jobPlugin\)/',
+            $this->read('src/Core/Document/Issuing/WorkerDocumentServices.php'),
+            'The worker reads templates for the same caller it issues for: the job\'s plugin, from its own registry.'
+        );
+    }
+
+    /** WHIT-997 (SDK 1.83): every entry point can start a bulk issue, and only the worker runs one. */
+    public function testBulkIssuingIsWiredAndTheWorkerRunsIt(): void
+    {
+        foreach (self::ENTRY_POINTS as $relative) {
+            self::assertMatchesRegularExpression(
+                '/bulk: new \\\\?Whity\\\\Core\\\\Document\\\\Issuing\\\\BulkIssuing\(/',
+                $this->read($relative),
+                "{$relative} must give Documents its bulk issuing, or issueMany() refuses."
+            );
+        }
+        $services = $this->read('src/Core/Document/Issuing/WorkerDocumentServices.php');
+        self::assertStringContainsString('\\Whity\\register_service(BulkIssuing::class, $bulk);', $services);
+        self::assertStringContainsString('new SdkDocuments($issuing, $roleChecker, $jobPlugin, $slots, $bulk)', $services);
+        self::assertMatchesRegularExpression(
+            '/\$registry->register\(\s*\\\\Whity\\\\Core\\\\Document\\\\Issuing\\\\IssueBatchJob::NAME,\s*new \\\\Whity\\\\Core\\\\Document\\\\Issuing\\\\IssueBatchJob\(\\\\Whity\\\\app\(\\\\Whity\\\\Core\\\\Document\\\\Issuing\\\\BulkIssuing::class\)\),\s*false\s*\)/',
+            $this->read('src/Cli/Commands/QueueWorkCommand.php'),
+            'queue:work must run the batches, and the job must not be API-submittable.'
+        );
+    }
+
     public function testTheWorkerReadsAFreshSetOfPluginsForEachIssue(): void
     {
         // A worker lives for many jobs; a manifest cached from the last job

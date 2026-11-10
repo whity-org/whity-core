@@ -48,6 +48,14 @@ use Whity\Core\Store\SharedStoreInterface;
  * {@see \Whity\Core\Billing\External\EventLedger} uses. Without that, a customer
  * at their monthly limit would lose a day's allowance every time they were told
  * no, which is the bug that turns "you have 5 a day" into a lie.
+ *
+ * ── Refusing or warning ────────────────────────────────────────────────────
+ *
+ * `meters.enforcement` is `block` by default, so an install keeps the behaviour
+ * it has always had. On `warn`, an action past its limit is counted and goes
+ * ahead, and the decision says so. It is global-only for the reason
+ * {@see \Whity\Core\Seat\SeatService} gives: a workspace must not be able to
+ * switch off the limit it was sold.
  */
 final class MeterService
 {
@@ -77,7 +85,7 @@ final class MeterService
      *                           consumes — e.g. the per-day and per-month
      *                           counters for the same resource.
      *
-     * @return MeterDecision Allowed, or refused naming the limit that refused.
+     * @return MeterDecision Allowed, warned or refused, naming the limit concerned.
      */
     public function consume(int $tenantId, array $keys, int $units = 1, ?DateTimeImmutable $now = null): MeterDecision
     {
@@ -86,6 +94,7 @@ final class MeterService
 
         /** @var list<array{key: string, counter: string}> $taken */
         $taken = [];
+        $passed = null;
 
         foreach ($keys as $key) {
             $limit = $this->limitFor($effective, $key);
@@ -100,7 +109,7 @@ final class MeterService
                 continue;
             }
 
-            if ($limit === 0) {
+            if ($limit === 0 && !$this->warnsOnly($tenantId)) {
                 // Sold none of it. Refused without spending anything, and
                 // without a counter key that would never be read.
                 $this->giveBack($taken);
@@ -119,6 +128,18 @@ final class MeterService
 
             $taken[] = ['key' => $key, 'counter' => $counter, 'units' => $units];
 
+            if ($count > $limit && $this->warnsOnly($tenantId)) {
+                // Logged only on the action that crossed the line, so a
+                // workspace rendering all month past its limit is one entry
+                // per window and not one per document.
+                if ($count - $units <= $limit) {
+                    error_log(sprintf('[meter] tenant %d passed %s (limit %d)', $tenantId, $key, $limit));
+                }
+                $passed ??= MeterDecision::warned($key, $limit, $this->resetsAt($tenantId, $key, $now));
+
+                continue;
+            }
+
             if ($count > $limit) {
                 $this->giveBack($taken);
 
@@ -131,7 +152,7 @@ final class MeterService
             }
         }
 
-        return MeterDecision::allowed();
+        return $passed ?? MeterDecision::allowed();
     }
 
     /**
@@ -219,6 +240,17 @@ final class MeterService
                 $this->store->decrement($entry['counter']);
             }
         }
+    }
+
+    /**
+     * Whether this instance lets an action past its limit.
+     *
+     * Only `warn` does. A stored value nobody recognises keeps refusing, because
+     * this setting's job is to relax a limit and that has to be said on purpose.
+     */
+    private function warnsOnly(int $tenantId): bool
+    {
+        return ($this->settings->effective($tenantId)[SettingsRegistry::METERS_ENFORCEMENT] ?? 'block') === 'warn';
     }
 
     /**

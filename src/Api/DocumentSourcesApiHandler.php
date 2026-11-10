@@ -143,13 +143,29 @@ final class DocumentSourcesApiHandler
             return Response::error('Document not found', 404);
         }
 
-        $data = $this->withResolvedTheme($tenantId, $row);
+        $data = $this->withLastEditor($tenantId, $this->withResolvedTheme($tenantId, $row));
         if ($this->collab !== null) {
             $data += $this->collab->projection($tenantId, (int) $row['id']);
         }
 
         return Response::json(['data' => $data])
             ->withHeaders(['ETag' => self::etag($row['draft_version'])]);
+    }
+
+    /**
+     * The document with the name of who last edited it, for the editor's status
+     * bar. Null for a seeded starter nobody has edited, or someone who has left.
+     *
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function withLastEditor(int $tenantId, array $row): array
+    {
+        $editor = isset($row['updated_by']) ? (int) $row['updated_by'] : null;
+        $names = $editor !== null ? ($this->people?->names($tenantId, [$editor]) ?? []) : [];
+        $row['updated_by_name'] = $editor !== null ? ($names[$editor] ?? null) : null;
+
+        return $row;
     }
 
     /**
@@ -296,7 +312,7 @@ final class DocumentSourcesApiHandler
 
         $saved = $this->repo->findById($id, $tenantId);
 
-        return Response::json(['data' => $saved !== null ? $this->withResolvedTheme($tenantId, $saved) : null])
+        return Response::json(['data' => $saved !== null ? $this->withLastEditor($tenantId, $this->withResolvedTheme($tenantId, $saved)) : null])
             ->withHeaders(['ETag' => self::etag($version)]);
     }
 

@@ -204,9 +204,11 @@ final class PlanPriceRepository
     }
 
     /**
+     * Public so a whole catalogue file can be checked before any of it is written.
+     *
      * @throws PlanValidationException
      */
-    private static function assertValid(string $currency, int $unitAmount, string $billingPeriod): void
+    public static function assertValid(string $currency, int $unitAmount, string $billingPeriod): void
     {
         if (preg_match('/^[A-Z]{3}$/', $currency) !== 1) {
             throw new PlanValidationException('currency', "must be a three-letter ISO 4217 code, got '{$currency}'");

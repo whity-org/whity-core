@@ -128,6 +128,8 @@ beforeEach(() => {
 const TENANT = {
   id: 7,
   name: 'Acme',
+  nameLanguage: 'en',
+  names: { en: 'Acme' },
   slug: 'acme',
   userCount: 12,
   createdAt: '2026-02-03T09:00:00Z',
@@ -209,8 +211,8 @@ describe('/admin/tenants/[id] — the workspace record', () => {
     // always live invites a no-op PATCH on every visit.
     expect(screen.getByTestId('tenant-record-save')).toBeDisabled();
 
-    await user.clear(screen.getByTestId('tenant-record-name'));
-    await user.type(screen.getByTestId('tenant-record-name'), 'Acme Widgets');
+    await user.clear(document.getElementById('tenant-record-name-en')!);
+    await user.type(document.getElementById('tenant-record-name-en')!, 'Acme Widgets');
     await user.click(screen.getByTestId('tenant-record-save'));
 
     await waitFor(() =>
@@ -220,7 +222,11 @@ describe('/admin/tenants/[id] — the workspace record', () => {
       )
     );
     const patch = rawApiClient.mock.calls.find((call) => call[1]?.method === 'PATCH');
-    expect(JSON.parse(patch![1].body)).toEqual({ name: 'Acme Widgets', slug: 'acme' });
+    expect(JSON.parse(patch![1].body)).toEqual({
+      names: { en: 'Acme Widgets' },
+      nameLanguage: 'en',
+      slug: 'acme',
+    });
   });
 
   it('lets a workspace with no slug be renamed without inventing one', async () => {
@@ -232,14 +238,52 @@ describe('/admin/tenants/[id] — the workspace record', () => {
     render(<TenantRecordPage />);
     await screen.findByTestId('tenant-record');
 
-    await user.clear(screen.getByTestId('tenant-record-name'));
-    await user.type(screen.getByTestId('tenant-record-name'), 'Acme Widgets');
+    await user.clear(document.getElementById('tenant-record-name-en')!);
+    await user.type(document.getElementById('tenant-record-name-en')!, 'Acme Widgets');
     await user.click(screen.getByTestId('tenant-record-save'));
 
     await waitFor(() => expect(rawApiClient.mock.calls.some((call) => call[1]?.method === 'PATCH')).toBe(true));
     expect(screen.queryByTestId('tenant-record-slug-error')).not.toBeInTheDocument();
     const patch = rawApiClient.mock.calls.find((call) => call[1]?.method === 'PATCH');
-    expect(JSON.parse(patch![1].body)).toEqual({ name: 'Acme Widgets' });
+    expect(JSON.parse(patch![1].body)).toEqual({ names: { en: 'Acme Widgets' }, nameLanguage: 'en' });
+  });
+
+  it('saves an Arabic original with its English name (#821)', async () => {
+    params = { id: '7' };
+    grant(TENANTS_WRITE);
+    mockTenantBackend();
+    const user = userEvent.setup();
+
+    render(<TenantRecordPage />);
+    await screen.findByTestId('tenant-record');
+
+    await user.type(document.getElementById('tenant-record-name-ar')!, 'أكمي');
+    await user.click(document.getElementById('tenant-record-name-original-ar')!);
+    await user.click(screen.getByTestId('tenant-record-save'));
+
+    await waitFor(() => expect(rawApiClient.mock.calls.some((call) => call[1]?.method === 'PATCH')).toBe(true));
+    const patch = rawApiClient.mock.calls.find((call) => call[1]?.method === 'PATCH');
+    expect(JSON.parse(patch![1].body)).toEqual({
+      names: { en: 'Acme', ar: 'أكمي' },
+      nameLanguage: 'ar',
+      slug: 'acme',
+    });
+  });
+
+  it('refuses to save when the original language has no name (#821)', async () => {
+    params = { id: '7' };
+    grant(TENANTS_WRITE);
+    mockTenantBackend();
+    const user = userEvent.setup();
+
+    render(<TenantRecordPage />);
+    await screen.findByTestId('tenant-record');
+
+    await user.click(document.getElementById('tenant-record-name-original-ar')!);
+    await user.click(screen.getByTestId('tenant-record-save'));
+
+    expect(await screen.findByTestId('tenant-record-name-error')).toBeInTheDocument();
+    expect(rawApiClient.mock.calls.some((call) => call[1]?.method === 'PATCH')).toBe(false);
   });
 
   it('refuses a slug the backend would accept but no URL should carry', async () => {

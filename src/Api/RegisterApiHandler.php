@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use PDO;
+use Whity\Core\Plan\DefaultPlanAssigner;
+use Whity\Core\i18n\LocalizedTexts;
 use Whity\Core\Identity\AccountActivationPolicy;
 use Whity\Core\Identity\EmailVerificationPolicy;
 use Whity\Core\Identity\EmailVerificationProvider;
@@ -162,7 +164,7 @@ final class RegisterApiHandler
 
             // ── Resolve the base owner role; fail closed if the platform has not
             //    been seeded (a workspace owner cannot exist without it). ────────
-            // @tenant-guard-ignore: base roles are global (NULL tenant_id); looked up by unique name
+            // Base roles are global (NULL tenant_id); looked up by unique name
             $roleStmt = $this->db->prepare(
                 'SELECT id FROM roles WHERE name = :name AND tenant_id IS NULL LIMIT 1'
             );
@@ -185,7 +187,7 @@ final class RegisterApiHandler
 
             try {
                 // Reject an already-registered email (profile_emails.email is globally unique).
-                // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+                // Profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
                 $emailStmt = $this->db->prepare('SELECT 1 FROM profile_emails WHERE email = :email LIMIT 1');
                 $emailStmt->execute([':email' => $email]);
                 if ($emailStmt->fetchColumn() !== false) {
@@ -196,7 +198,7 @@ final class RegisterApiHandler
                 }
 
                 // Reject a taken workspace name or slug.
-                // @tenant-guard-ignore: registration provisions a NEW tenant for an unauthenticated caller; the tenants table is the tenant registry itself, not a tenant-scoped resource
+                // Registration provisions a NEW tenant for an unauthenticated caller; the tenants table is the tenant registry itself, not a tenant-scoped resource
                 $tenantStmt = $this->db->prepare('SELECT 1 FROM tenants WHERE name = :name OR slug = :slug LIMIT 1');
                 $tenantStmt->execute([':name' => $tenantName, ':slug' => $slug]);
                 if ($tenantStmt->fetchColumn() !== false) {
@@ -207,14 +209,15 @@ final class RegisterApiHandler
                 }
 
                 // 1. New tenant.
-                // @tenant-guard-ignore: registration provisions the tenant itself (the tenant registry, not a tenant-scoped row)
+                // Registration provisions the tenant itself (the tenant registry, not a tenant-scoped row)
                 $tenantId = $this->insertReturningId(
-                    'INSERT INTO tenants (name, slug, created_at) VALUES (:name, :slug, NOW())',
-                    [':name' => $tenantName, ':slug' => $slug]
+                    'INSERT INTO tenants (name, slug, name_language, created_at) VALUES (:name, :slug, :name_language, NOW())',
+                    // The name is the original; Arabic letters mean an Arabic one (#821).
+                    [':name' => $tenantName, ':slug' => $slug, ':name_language' => LocalizedTexts::guessLanguage($tenantName)]
                 );
 
                 // 2. Global profile (bcrypt password; 2FA off; token epoch 0).
-                // @tenant-guard-ignore: profiles is a sanctioned GLOBAL table (ADR 0005 §1)
+                // Profiles is a sanctioned GLOBAL table (ADR 0005 §1)
                 $profileId = $this->insertReturningId(
                     'INSERT INTO profiles
                          (display_name, password_hash, two_factor_enabled,
@@ -233,7 +236,7 @@ final class RegisterApiHandler
                 // The literal is a controlled boolean (never user input) and is
                 // portable across Postgres + the SQLite test shim.
                 $verifiedLiteral = $enforced ? 'false' : 'true';
-                // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+                // Profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
                 $this->db->prepare(
                     "INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
                      VALUES (:profile_id, :email, {$verifiedLiteral}, true, NOW())"
@@ -311,6 +314,11 @@ final class RegisterApiHandler
                 }
                 throw $e;
             }
+
+            // After the commit: applying a plan opens its own transaction, and a
+            // problem with it must not cost somebody their new account. A closed
+            // payment gate is a plan row already, so it stays closed.
+            DefaultPlanAssigner::forDatabase($this->db)->assign($tenantId);
 
             // Hand off to the verification provider AFTER commit (never inside the
             // transaction), and only when enforced. A delivery failure must not

@@ -68,6 +68,22 @@ it('saves once typing pauses, with the version it edited, then the next version'
   expect(screen.getByTestId('editor').dataset.save).toBe('saved');
 });
 
+it('moves "Last edited" to the save, with who made it', async () => {
+  const by = { kind: 'person' as const, id: '9', name: 'Lina Haddad' };
+  const { a } = adapter([{ ok: true, version: 5, updatedAt: '2026-11-08 09:30:00', updatedBy: by }]);
+  await mount(a);
+
+  edit('Payment');
+  await act(async () => {
+    jest.advanceTimersByTime(800);
+  });
+
+  const shown = lastProps.document as WhityDocument;
+  expect(shown.updatedAt).toBe('2026-11-08 09:30:00');
+  expect(shown.updatedBy).toEqual(by);
+  expect(shown.title).toBe('Payment');
+});
+
 it('on a conflict, stops saving and offers the newer version', async () => {
   const { a } = adapter([{ ok: false, conflict: true, currentVersion: 9 }]);
   await mount(a);
@@ -163,6 +179,29 @@ describe('templates (M4, the Document designer)', () => {
     expect(lastProps.letterhead).toBe(SETUP.letterhead);
     expect(lastProps.pageFields).toEqual({ reference: SETUP.fields[0].items[1], date: SETUP.fields[1].items[0] });
     expect((lastProps.publish as { publishedVersion: number }).publishedVersion).toBe(2);
+  });
+
+  it('previews a template with no record type with its fields’ examples, and says so (WHIT-1000)', async () => {
+    const { a } = templateAdapter();
+    const plain: WhityDocument = { ...TEMPLATE, recordType: undefined, ownFields: [{ key: 'slot', label: 'Delivery slot', sample: 'Tuesday' }] };
+    a.load = jest.fn(async () => ({ document: plain, version: 4 }));
+    a.loadTemplate = jest.fn(async () => ({
+      ...SETUP,
+      fields: [{ group: 'Today', items: [{ path: 'today', label: 'Today', sample: '7 November 2026' }] }],
+    }));
+    a.preview = jest.fn(async () => ({ label: '', values: { today: '8 November 2026', 'template.slot': null } }));
+    await mount(a);
+
+    await act(async () => {
+      (lastProps.onPreview as () => void)();
+    });
+    const preview = lastProps.preview as { label: string; values: Record<string, string | null>; examples?: boolean };
+    expect(a.preview).toHaveBeenCalledWith('7', null);
+    expect(preview.examples).toBe(true);
+    expect(preview.label).toBe('example values');
+    // A value the server has wins over the example; an empty one takes it.
+    expect(preview.values.today).toBe('8 November 2026');
+    expect(preview.values['template.slot']).toBe('Tuesday');
   });
 
   it('saves what is waiting before publishing, then publishes that version', async () => {
@@ -357,6 +396,16 @@ describe('issuing mode (M4c)', () => {
     await mountIssue(a);
 
     expect(lastProps.theme).toEqual(frozen.tokens);
+  });
+
+  it('says how many of its own fields are filled, and hides the formatting toolbar (WHIT-1000)', async () => {
+    const { a } = issueAdapter(TEMPLATE);
+    await mountIssue(a);
+
+    expect(lastProps.hideToolbar).toBe(true);
+    expect(screen.getByTestId('issue-filled').textContent).toBe('0 of 1 filled');
+    fireEvent.change(screen.getByLabelText('Delivery slot'), { target: { value: 'Tuesday' } });
+    expect(screen.getByTestId('issue-filled').textContent).toBe('1 of 1 filled');
   });
 
   it('issues for the record with the own fields typed, which also show in the preview, then goes to the document', async () => {

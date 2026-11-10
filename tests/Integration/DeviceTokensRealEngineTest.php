@@ -449,7 +449,7 @@ final class DeviceTokensRealEngineTest extends TestCase
                 two_factor_backup_codes_version, token_epoch, created_at, updated_at)
              VALUES (?, ?, false, 0, ?, datetime('now'), datetime('now'))"
         );
-        $stmt->execute([$email, password_hash('secret-123', PASSWORD_BCRYPT), $epoch]);
+        $stmt->execute([$email, password_hash('secret-123', PASSWORD_BCRYPT, ['cost' => 4]), $epoch]);
         $profileId = (int) $this->pdo->lastInsertId();
 
         $this->pdo->prepare(

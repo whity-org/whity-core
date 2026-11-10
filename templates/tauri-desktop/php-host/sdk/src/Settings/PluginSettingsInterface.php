@@ -110,7 +110,7 @@ namespace Whity\Sdk\Settings;
  *
  * So `admin => true` is a deliberate statement: *this key is safe for a host
  * operator to see and change*. Keys without it remain fully functional — the
- * plugin reads them through the host's settings service and manages them on its
+ * plugin reads and writes them through {@see PluginSettings} and manages them on its
  * own RBAC-gated screens, which is the right home for anything gated on the
  * plugin's own permissions.
  *

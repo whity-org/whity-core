@@ -69,37 +69,44 @@ final class DocumentRenderSeamEntryPointWiringTest extends TestCase
     }
 
     /**
-     * The gap is real and is documented in the SDK contract; this pins that the
-     * two statements agree.
-     *
-     * Issuing a document needs the per-tenant storage stack, and building a
-     * second copy of that in the CLI kernel is the split-backend hazard the
-     * storage factory's own docblock warns about — two drivers from one set of
-     * settings, disagreeing about where a tenant's files live. So the seam is
-     * HTTP-only for now, and the contract SAYS so rather than leaving a plugin
-     * author to discover it as a container error inside a queue worker.
-     *
-     * When the CLI kernel does gain the storage stack, this test is the thing
-     * that should fail — it is a reminder, not an endorsement.
+     * #1151: the CLI kernel and `queue:work` register the seam too, under the
+     * SDK interface, over the process's one document stack.
      */
-    public function testTheCliGapIsDeclaredInTheContractRatherThanLeftToBeDiscovered(): void
+    public function testTheCliKernelRegistersTheSeamOverItsDocumentStack(): void
     {
         $cli = $this->read(__DIR__ . '/../../src/Cli/Commands/BaseCommand.php');
-        $contract = $this->read(__DIR__ . '/../../sdk/src/Render/DocumentRenderer.php');
 
-        $wiredInCli = str_contains($cli, 'Whity\\Sdk\\Render\\DocumentRenderer::class');
-        $documentedAsHttpOnly = str_contains($contract, 'HTTP entry point only');
-
-        self::assertTrue(
-            $wiredInCli xor $documentedAsHttpOnly,
-            $wiredInCli
-                ? 'The CLI kernel now registers the rendering seam — remove the "HTTP entry point '
-                  . 'only" limitation from the SDK contract, and pin the CLI wiring the way the '
-                  . 'HTTP wiring is pinned above.'
-                : 'The CLI kernel does not register the rendering seam, so the SDK contract must '
-                  . 'say so. A plugin author calling this from a queue worker otherwise meets an '
-                  . 'unexplained container error.'
+        self::assertMatchesRegularExpression(
+            '/register_service\(\s*\n?\s*\\\\?Whity\\\\Sdk\\\\Render\\\\DocumentRenderer::class,\s*\n?\s*new\s+\\\\?Whity\\\\Core\\\\Document\\\\Render\\\\DeferredSdkDocumentRenderer\(\s*\n?\s*static fn \(\): \\\\?Whity\\\\Sdk\\\\Render\\\\DocumentRenderer => \$documentParts->sdkRenderer\(\)/',
+            $cli,
+            'BaseCommand::setupKernel() must register the rendering seam over $documentParts, the same '
+            . 'stack its template issuing uses.'
         );
+        self::assertMatchesRegularExpression(
+            '/WorkerDocumentIssuing::build\([^;]*\$documentParts,\s*\)/s',
+            $cli,
+            'The CLI kernel\'s template issuing must be built over the same $documentParts.'
+        );
+    }
+
+    public function testTheQueueWorkerRegistersTheSeamOverItsDocumentStack(): void
+    {
+        $worker = $this->read(__DIR__ . '/../../src/Core/Document/Issuing/WorkerDocumentServices.php');
+
+        self::assertStringContainsString('\\Whity\\Sdk\\Render\\DocumentRenderer::class', $worker);
+        self::assertStringContainsString('$parts->sdkRenderer()', $worker);
+        self::assertMatchesRegularExpression('/WorkerDocumentIssuing::build\([^;]*\$parts\)/', $worker);
+    }
+
+    public function testTheContractNoLongerCallsTheSeamHttpOnly(): void
+    {
+        foreach (['sdk/src/Render/DocumentRenderer.php', 'docs/wiki/Plugin-Development.md', 'sdk/README.md'] as $file) {
+            self::assertStringNotContainsString(
+                'HTTP entry point only',
+                $this->read(__DIR__ . '/../../' . $file),
+                "{$file} still says the rendering seam is HTTP-only; it is wired in jobs and commands (#1151)."
+            );
+        }
     }
 
     private function read(string $path): string

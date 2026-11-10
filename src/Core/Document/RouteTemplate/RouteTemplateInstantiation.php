@@ -6,6 +6,7 @@ namespace Whity\Core\Document\RouteTemplate;
 
 use Whity\Core\Db\DbBool;
 use Whity\Core\Document\Routing\RouteSatisfaction;
+use Whity\Core\Document\Routing\RouteStepKind;
 use Whity\Core\Document\Routing\RouteVerdict;
 
 /**
@@ -231,7 +232,17 @@ final class RouteTemplateInstantiation
                 'decision' => $decision,
                 'decision_quorum' => is_string($quorum) ? $quorum : null,
                 'satisfied_by' => $satisfiedBy,
+                // WHIT-919: carried like `decision`; absent reads as allowed.
+                'allow_send_back' => DbBool::of($step['allow_send_back'] ?? true),
             ];
+            if (($step['kind'] ?? null) === RouteStepKind::FINALISE) {
+                // WHIT-921: carried like everything else. The router checks it
+                // is last and fills in the subject's default template.
+                $converted['kind'] = RouteStepKind::FINALISE;
+                $converted['final_template_id'] = isset($step['final_template_id'])
+                    ? (int) $step['final_template_id']
+                    : null;
+            }
 
             foreach (RouteVerdict::all() as $verdict) {
                 if (isset($branches[$position][$verdict])) {

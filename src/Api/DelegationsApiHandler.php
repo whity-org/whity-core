@@ -421,7 +421,7 @@ class DelegationsApiHandler
             // any other tenant requires the profile to hold an ACTIVE membership
             // in that tenant.
             if ($tenantId === 0) {
-                // @tenant-guard-ignore: system-tenant (id 0) visibility branch; scoped else-branch binds tenant_id
+                // System-tenant (id 0) visibility branch; scoped else-branch binds tenant_id
                 $stmt = $this->db->prepare('SELECT 1 FROM profiles WHERE id = ?');
                 $stmt->execute([$granteeId]);
                 return $stmt->fetchColumn() !== false;

@@ -96,6 +96,7 @@ final class QueueWorkCommand implements CliCommand
             $auditLogger = new AuditLogger($pdo, $this->logger, AuditOrigin::job());
             $auditLogger->subscribe($hookManager);
             \Whity\register_service(HookManager::class, $hookManager);
+            \Whity\Core\Plugin\HostPluginServices::register($pdo, $auditLogger, $this->logger);
 
             $repo ??= new JobRepository($pdo);
             $registry = new JobRegistry();
@@ -139,10 +140,43 @@ final class QueueWorkCommand implements CliCommand
                 $jobPlugin,
             );
             $loaded->loader = PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger, $documentRegistries);
+            // WHIT-997 (SDK 1.83): runs the bulk issues Documents::issueMany() queued. Internal.
+            $registry->register(
+                \Whity\Core\Document\Issuing\IssueBatchJob::NAME,
+                new \Whity\Core\Document\Issuing\IssueBatchJob(\Whity\app(\Whity\Core\Document\Issuing\BulkIssuing::class)),
+                false
+            );
+
+            // WHIT-921: tries a route's final document again while the render
+            // service was down. Internal: never API-submittable.
+            $registry->register(
+                \Whity\Core\Document\Routing\Jobs\FinaliseRouteJob::NAME,
+                new \Whity\Core\Document\Routing\Jobs\FinaliseRouteJob(
+                    static function (): \Whity\Core\Document\Routing\RouteFinaliseService {
+                        $finaliser = \Whity\app(\Whity\Core\Document\Routing\RouteFinaliser::class);
+                        if (!$finaliser instanceof \Whity\Core\Document\Routing\RouteFinaliseService) {
+                            throw new \RuntimeException('The route finaliser is not registered in this worker.');
+                        }
+
+                        return $finaliser;
+                    }
+                ),
+                false
+            );
             // S.7: ends the 30-day keep on uninstalled plugins. Internal: never API-submittable.
             $registry->register(
                 \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob::NAME,
                 new \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob($pdo, static fn (): ?\Whity\Core\PluginLoader => $loaded->loader, $auditLogger, $this->logger),
+                false
+            );
+            // WHIT-1014: the Whity store's Verified marks for code plugins. Internal.
+            $registry->register(
+                \Whity\Core\Queue\Jobs\RefreshStoreMarksJob::NAME,
+                new \Whity\Core\Queue\Jobs\RefreshStoreMarksJob(new \Whity\Core\Plugin\Store\StoreMarks(
+                    new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                    new \Whity\Core\Plugin\PluginRecords($pdo),
+                    static fn (string $url): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url),
+                )),
                 false
             );
             $runner ??= new JobRunner($repo, $registry, $this->logger);

@@ -11,6 +11,7 @@ use Whity\Core\PluginLoader;
 use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\Request;
 use Whity\Core\Router;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * WC-242: ThemeApiHandler — GET /api/v1/theme.
@@ -72,9 +73,7 @@ final class ThemeApiHandlerTest extends TestCase
         $this->removeDirectory($dir);
     }
 
-    /**
-     * @dataProvider malformedHexValues
-     */
+    #[DataProvider('malformedHexValues')]
     public function testMalformedHexValueIsDropped(string $value): void
     {
         $dir = $this->makePluginDir(

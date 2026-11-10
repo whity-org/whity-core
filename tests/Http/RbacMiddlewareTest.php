@@ -2,6 +2,7 @@
 
 namespace Tests\Http;
 
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Whity\Http\RbacMiddleware;
 use Whity\Auth\JwtParser;
@@ -25,8 +26,8 @@ class RbacMiddlewareTest extends TestCase
     private const TENANT = 1;
 
     private RbacMiddleware $middleware;
-    private JwtParser $mockJwtParser;
-    private RoleChecker $mockRoleChecker;
+    private JwtParser&MockObject $mockJwtParser;
+    private RoleChecker&MockObject $mockRoleChecker;
     private string $secret = 'test-secret-key-padded-for-hs256-min-32-byte-key';
 
     protected function setUp(): void
@@ -84,7 +85,7 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => 'Bearer invalid.token.here']);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with('invalid.token.here')
             ->willReturn(null);
 
@@ -110,9 +111,7 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
-            ->with($validToken)
-            ->willReturn($payload);
+        $this->mockJwtParser->method('parse')->willReturn($payload);
 
         $response = $this->middleware->handle($request, $next);
 
@@ -133,7 +132,7 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
@@ -159,7 +158,7 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
@@ -182,7 +181,7 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
@@ -208,11 +207,11 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/admin', ['Authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Admin Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
-        $this->mockRoleChecker->method('hasRoleForProfile')
+        $this->mockRoleChecker->expects($this->atLeastOnce())->method('hasRoleForProfile')
             ->with(123, 'admin', self::TENANT)
             ->willReturn(true);
 
@@ -239,11 +238,11 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/admin', ['Authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Admin Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
-        $this->mockRoleChecker->method('hasRoleForProfile')
+        $this->mockRoleChecker->expects($this->atLeastOnce())->method('hasRoleForProfile')
             ->with(123, 'admin', self::TENANT)
             ->willReturn(false);
 
@@ -267,9 +266,7 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/resource', ['authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
-            ->with($validToken)
-            ->willReturn($payload);
+        $this->mockJwtParser->method('parse')->willReturn($payload);
 
         $response = $this->middleware->handle($request, $next);
 
@@ -281,7 +278,7 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => 'Bearer expired.token.here']);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with('expired.token.here')
             ->willReturn(null);
 
@@ -314,11 +311,11 @@ class RbacMiddlewareTest extends TestCase
             return new Response(200, 'Success');
         };
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
-        $this->mockRoleChecker->method('hasRoleForProfile')
+        $this->mockRoleChecker->expects($this->atLeastOnce())->method('hasRoleForProfile')
             ->with(456, 'admin', self::TENANT)
             ->willReturn(true);
 
@@ -347,12 +344,12 @@ class RbacMiddlewareTest extends TestCase
             return new Response(200, 'Success');
         };
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
         // Authoritative store: profile does NOT have the permission.
-        $this->mockRoleChecker->method('hasPermissionForProfile')
+        $this->mockRoleChecker->expects($this->atLeastOnce())->method('hasPermissionForProfile')
             ->with(99, 'users:read', self::TENANT)
             ->willReturn(false);
 
@@ -378,7 +375,7 @@ class RbacMiddlewareTest extends TestCase
         $next = fn(Request $req) => new Response(200, 'Success');
 
         $this->mockJwtParser->method('parse')->willReturn($payload);
-        $this->mockRoleChecker->method('hasPermissionForProfile')
+        $this->mockRoleChecker->expects($this->atLeastOnce())->method('hasPermissionForProfile')
             ->with(7, 'users:read', self::TENANT)
             ->willReturn(false);
 
@@ -405,7 +402,7 @@ class RbacMiddlewareTest extends TestCase
         $next = fn(Request $req) => new Response(200, 'Success');
 
         $this->mockJwtParser->method('parse')->willReturn($payload);
-        $this->mockRoleChecker->method('hasRoleForProfile')
+        $this->mockRoleChecker->expects($this->atLeastOnce())->method('hasRoleForProfile')
             ->with(8, 'admin', self::TENANT)
             ->willReturn(false);
 
@@ -429,11 +426,11 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
-        $this->mockRoleChecker->method('hasPermissionForProfile')
+        $this->mockRoleChecker->expects($this->atLeastOnce())->method('hasPermissionForProfile')
             ->with(123, 'edit:users', self::TENANT)
             ->willReturn(true);
 
@@ -457,11 +454,11 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
-        $this->mockRoleChecker->method('hasPermissionForProfile')
+        $this->mockRoleChecker->expects($this->atLeastOnce())->method('hasPermissionForProfile')
             ->with(123, 'delete:users', self::TENANT)
             ->willReturn(false);
 
@@ -485,15 +482,15 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/admin', ['Authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
-        $this->mockRoleChecker->method('hasRoleForProfile')
+        $this->mockRoleChecker->expects($this->atLeastOnce())->method('hasRoleForProfile')
             ->with(123, 'admin', self::TENANT)
             ->willReturn(true);
 
-        $this->mockRoleChecker->method('hasPermissionForProfile')
+        $this->mockRoleChecker->expects($this->atLeastOnce())->method('hasPermissionForProfile')
             ->with(123, 'manage:permissions', self::TENANT)
             ->willReturn(true);
 
@@ -515,7 +512,7 @@ class RbacMiddlewareTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
@@ -523,7 +520,7 @@ class RbacMiddlewareTest extends TestCase
         $this->mockRoleChecker->expects($this->never())
             ->method('hasRoleForProfile');
 
-        $this->mockRoleChecker->method('hasPermissionForProfile')
+        $this->mockRoleChecker->expects($this->atLeastOnce())->method('hasPermissionForProfile')
             ->with(123, 'read:reports', self::TENANT)
             ->willReturn(true);
 

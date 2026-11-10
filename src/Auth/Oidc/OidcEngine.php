@@ -87,7 +87,9 @@ final class OidcEngine
     /**
      * Build the /authorize redirect URL (Authorization Code flow + S256 PKCE).
      *
-     * @param array<string, mixed> $discovery
+     * @param array<string, mixed>  $discovery
+     * @param array<string, string> $extra Further parameters for this request only
+     *        (WHIT-922: `prompt=login` and `max_age=0` to ask for a fresh sign-in).
      */
     public function buildAuthorizationUrl(
         ExternalAuthProvider $provider,
@@ -97,6 +99,7 @@ final class OidcEngine
         string $state,
         string $nonce,
         string $codeChallenge,
+        array $extra = [],
     ): string {
         $params = array_merge(
             [
@@ -110,6 +113,7 @@ final class OidcEngine
                 'code_challenge_method' => 'S256',
             ],
             $provider->authorizationParameters(),
+            $extra,
         );
 
         $endpoint = (string) $discovery['authorization_endpoint'];

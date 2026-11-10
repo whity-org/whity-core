@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Tests\Cli;
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * #928: the CLI kernel must authorize as a real principal, at tenant 0, and
@@ -127,9 +128,8 @@ final class CliServicePrincipalWiringTest extends TestCase
      * `tenant create/update/delete` were never in this router, so they answered
      * 405 — an independent defect the 401 hid completely, because nothing
      * reached routing to discover it.
-     *
-     * @dataProvider tenantRoutes
      */
+    #[DataProvider('tenantRoutes')]
     public function testEveryTenantRouteTheCliCallsIsRegistered(string $method, string $path): void
     {
         self::assertMatchesRegularExpression(

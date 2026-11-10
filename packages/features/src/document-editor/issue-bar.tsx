@@ -83,6 +83,15 @@ export function IssueBar({
 
         <span className="min-w-0 flex-1" />
 
+        {fields.length > 0 && (
+          <span className="text-sm text-muted-foreground" data-testid="issue-filled">
+            {t('blockEditor.issue.filled', '{filled} of {total} filled', {
+              filled: fields.filter((f) => (values[f.key] ?? '').trim() !== '').length,
+              total: fields.length,
+            })}
+          </span>
+        )}
+
         {onEditCopy && (
           <Button variant="outline" size="sm" icon="edit" loading={copying} disabled={copying || issuing} onClick={onEditCopy}>
             {t('blockEditor.issue.editCopy', 'Edit before issuing')}
@@ -96,14 +105,15 @@ export function IssueBar({
       {/* The template's own fields, empty until somebody types: an example is a
           hint ("e.g. PO-0057"), never a value, so a document can't be issued with
           a sample's numbers by looking filled in. Scrolls inside itself so a long
-          list doesn't push the document off the screen. */}
+          list doesn't push the document off the screen; up to 40% of it, since
+          at 160px a starter invoice's 24 fields showed two and a half rows. */}
       {fields.length > 0 && (
         <div
-          className="grid max-h-40 grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-3 gap-y-2 overflow-y-auto py-1"
+          className="grid max-h-[40vh] grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-x-3 gap-y-2 overflow-y-auto py-1"
           data-slot="issue-fields"
         >
           {fields.map((field) => (
-            <label key={field.key} className="grid gap-1 text-xs">
+            <label key={field.key} className="grid gap-1 text-sm">
               <span className="truncate text-muted-foreground" dir="auto">
                 {field.label || field.key}
               </span>

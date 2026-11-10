@@ -1,8 +1,8 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.73.0",
-    "core_version": "0.2.26",
-    "updated": "2026-11-06",
+    "sdk_version": "1.94.0",
+    "core_version": "0.2.28",
+    "updated": "2026-11-09",
     "ratings": {
         "full": "A plugin can read, change, react to and extend this area through a published SDK contract.",
         "partial": "Some of it is in the SDK; the rest is missing or reachable only through internal core classes.",
@@ -154,6 +154,10 @@
                     "since": "1.22"
                 },
                 {
+                    "what": "ResourceScope: which records of a plugin resource type a caller may act on (narrowing only)",
+                    "since": "1.74"
+                },
+                {
                     "what": "Declared permissions and seeded roles (PluginRolesInterface)",
                     "since": "1.0"
                 },
@@ -242,10 +246,13 @@
                 {
                     "what": "membership.customer_joined when somebody joins a workspace through its own customer sign-up",
                     "since": "1.73"
+                },
+                {
+                    "what": "Constants for registration.completed, registration.approved and registration.rejected",
+                    "since": "1.89"
                 }
             ],
             "missing": [
-                "Published constants for registration.completed, registration.approved and registration.rejected (fired today, not in Events)",
                 "Invitation events",
                 "Custom registration fields",
                 "An accept-or-reject check on registration"
@@ -322,13 +329,27 @@
                 {
                     "what": "document.revised",
                     "since": "1.68"
+                },
+                {
+                    "what": "Issue in bulk from one template as a background job (Documents::issueMany)",
+                    "since": "1.83"
+                },
+                {
+                    "what": "Issue events for documents raised by form submissions",
+                    "since": "1.94"
+                },
+                {
+                    "what": "Published constants for document.routed and document.route_acted",
+                    "since": "1.94"
+                },
+                {
+                    "what": "route.sent_back, route.resubmitted, route.completed, route.signed and document.finalised events",
+                    "since": "1.94"
                 }
             ],
             "missing": [
                 "Reading and listing documents other than the plugin's own",
                 "Withdraw and revise contracts, and document.withdrawn",
-                "Issue events for documents raised by form submissions",
-                "Published constants for document.routed and document.route_acted",
                 "Embed record providers and chart sources",
                 "Collections and organizer views"
             ],
@@ -348,13 +369,19 @@
                 {
                     "what": "Template slots and merge-field providers for code plugins",
                     "since": "1.56"
+                },
+                {
+                    "what": "Starter templates shipped by a plugin, seeded per workspace",
+                    "since": "1.81"
+                },
+                {
+                    "what": "Read published templates and their merge fields (Templates)",
+                    "since": "1.82"
                 }
             ],
             "missing": [
                 "Plugin document themes",
                 "Editor blocks, toolbar items and slash-menu entries",
-                "Starter templates shipped by a plugin",
-                "Reading templates",
                 "Template and theme events"
             ],
             "security": "Merge fields and editor blocks end up in printed, immutable documents. Providers must be held to the caller's workspace and permissions by the host, and plugin block markup needs a sandbox and server-side schema checks.",
@@ -373,12 +400,15 @@
                 {
                     "what": "Inline runs in flowing text",
                     "since": "1.44"
+                },
+                {
+                    "what": "Render and issue from queue jobs and CLI commands",
+                    "since": "1.76"
                 }
             ],
             "missing": [
                 "Choosing a theme or brand when rendering",
-                "Rendering from a workspace template outside Documents::issue",
-                "Rendering from a job (the seam is HTTP-only)"
+                "Rendering from a workspace template outside Documents::issue"
             ],
             "security": "HTML or CSS input to the renderer would be an injection and server-side request surface. Keep input structured.",
             "issues": [
@@ -443,10 +473,14 @@
             "id": "core-forms",
             "group": "workflow",
             "name": "Core forms and submissions",
-            "rating": "none",
-            "has": [],
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "form.submitted, submission.reviewed and submission.withdrawn events",
+                    "since": "1.94"
+                }
+            ],
             "missing": [
-                "form.submitted, submission.reviewed and submission.withdrawn events",
                 "Reading submissions",
                 "Custom field types, validators and prefill sources",
                 "Mapping a submission to a plugin record",
@@ -618,14 +652,16 @@
                 {
                     "what": "Declared, typed, namespaced settings keys",
                     "since": "1.21"
+                },
+                {
+                    "what": "Read and write the plugin's own keys in the current workspace, and a settings-changed event",
+                    "since": "1.88"
                 }
             ],
             "missing": [
-                "An SDK reader and writer for the plugin's own keys",
-                "A settings-changed event",
                 "A settings page per plugin and per workspace"
             ],
-            "security": "The internal settings service also covers core and install-wide keys. The SDK reader must be limited to the plugin's own keys in the current workspace.",
+            "security": null,
             "plan": "0.2.27"
         },
         {
@@ -637,10 +673,13 @@
                 {
                     "what": "PluginSecrets: encrypted per plugin and workspace",
                     "since": "1.60"
+                },
+                {
+                    "what": "A host-rendered secret entry field that never returns the value",
+                    "since": "1.88"
                 }
             ],
             "missing": [
-                "A host-rendered secret entry field",
                 "Listing and rotation"
             ],
             "security": "The host, not the caller, must decide which plugin and workspace a store belongs to.",
@@ -678,15 +717,21 @@
                 {
                     "what": "NotificationTransport contract (not yet discovered from plugins)",
                     "since": "1.14"
+                },
+                {
+                    "what": "A Notifier service: send to a person, role or unit in the current workspace",
+                    "since": "1.90"
+                },
+                {
+                    "what": "Declared notification types with English and Arabic labels",
+                    "since": "1.90"
                 }
             ],
             "missing": [
-                "A Notifier service: send to a person, role or unit",
-                "Declared notification types with English and Arabic labels",
                 "Registering plugin transports",
                 "Sent and failed events"
             ],
-            "security": "Sending must be bound to the current workspace, reach only its members, and respect opt-outs; a plugin must not be able to pose as a security or billing notice.",
+            "security": null,
             "plan": "0.2.27"
         },
         {
@@ -698,12 +743,19 @@
                 {
                     "what": "English and Arabic labels on settings, data types, manifest screens and agents",
                     "since": "1.21"
+                },
+                {
+                    "what": "The request's language on the SDK Request",
+                    "since": "1.87"
+                },
+                {
+                    "what": "Translatable content fields, shown by language on CRUD screens",
+                    "since": "1.93"
                 }
             ],
             "missing": [
                 "Shipping a translation catalogue",
-                "Arabic labels on frontend features, navigation and block text",
-                "The request's language in the SDK Request"
+                "Arabic labels on frontend features, navigation and block text"
             ],
             "security": null,
             "issues": [
@@ -770,7 +822,7 @@
             "id": "audit",
             "group": "platform",
             "name": "Audit log",
-            "rating": "partial",
+            "rating": "full",
             "has": [
                 {
                     "what": "Declared audited plugin events",
@@ -779,32 +831,45 @@
                 {
                     "what": "timeline block",
                     "since": "1.31"
+                },
+                {
+                    "what": "Recording an entry with a target, attributed by the host",
+                    "since": "1.92"
+                },
+                {
+                    "what": "Reading the plugin's own audit entries",
+                    "since": "1.92"
                 }
             ],
-            "missing": [
-                "Reading the plugin's own audit entries",
-                "Recording an entry with a target and actor directly"
-            ],
-            "security": "Audit rows must be attributed by the host to the plugin that wrote them, so one plugin cannot write rows under another's or core's name.",
+            "missing": [],
+            "security": null,
             "plan": "0.2.27"
         },
         {
             "id": "jobs",
             "group": "platform",
             "name": "Jobs and scheduling",
-            "rating": "partial",
+            "rating": "full",
             "has": [
                 {
                     "what": "Plugin job handlers",
                     "since": "1.28"
+                },
+                {
+                    "what": "Enqueueing the plugin's own jobs in the current workspace",
+                    "since": "1.91"
+                },
+                {
+                    "what": "Scheduled (cron) jobs, run once per workspace",
+                    "since": "1.91"
+                },
+                {
+                    "what": "Status of the plugin's own jobs",
+                    "since": "1.91"
                 }
             ],
-            "missing": [
-                "Enqueueing through the SDK",
-                "Scheduled (cron) jobs",
-                "Job status for the UI"
-            ],
-            "security": "Enqueueing must accept only the plugin's own job names in the current workspace.",
+            "missing": [],
+            "security": null,
             "plan": "0.2.27"
         },
         {
@@ -834,6 +899,34 @@
                 {
                     "what": "Declared sellable limits in the plan catalogue (PluginEntitlementsInterface)",
                     "since": null
+                },
+                {
+                    "what": "Selling store plugin licences through one billing plugin (LicenceSales, PluginLicenceSalesInterface)",
+                    "since": "1.86"
+                },
+                {
+                    "what": "Asking the host to re-read a workspace's billing access (AccessRefresh)",
+                    "since": "1.86"
+                },
+                {
+                    "what": "Read-only plan prices (PlanCatalogue)",
+                    "since": "1.84"
+                },
+                {
+                    "what": "Read-only plan prices (PlanCatalogue)",
+                    "since": "1.84"
+                },
+                {
+                    "what": "Asking the host to re-read a workspace's billing access (AccessRefresh)",
+                    "since": "1.86"
+                },
+                {
+                    "what": "A plugin can be the deployment's billing portal: checkout, subscriptions, customer portal, refunds and verified provider notifications (PluginBillingPortalInterface)",
+                    "since": "1.77"
+                },
+                {
+                    "what": "Whether a paid Whity store plugin is licensed here: licensed, grace with an until date, or unlicensed, from the store's signed statement with a 7-day offline window (Licensing\\StoreLicence)",
+                    "since": "1.85"
                 }
             ],
             "missing": [
@@ -936,15 +1029,22 @@
                     "since": "1.5"
                 },
                 {
+                    "what": "Service routes: server-to-server calls with the trusted issuer's token, and the people they name (ServiceCall, LinkedPeople)",
+                    "since": "1.84"
+                },
+                {
                     "what": "Route schemas in the OpenAPI document",
                     "since": null
+                },
+                {
+                    "what": "Workspace, language and actor kind on Request",
+                    "since": "1.87"
                 }
             ],
             "missing": [
-                "Workspace, language and actor kind on Request",
                 "Per-route rate limits and entitlements"
             ],
-            "security": "Routes cannot tell an agent from a person today, so they cannot apply stricter rules to agents.",
+            "security": null,
             "plan": "0.2.27"
         },
         {
@@ -960,14 +1060,17 @@
                 {
                     "what": "Veto exception",
                     "since": "1.15"
+                },
+                {
+                    "what": "Observe-only listeners, a list of what each event lets a listener change, and constants for events core already fired",
+                    "since": "1.89"
                 }
             ],
             "missing": [
-                "Constants for events core already fires (membership, registration, federated sign-in, resource grants, routing, close report)",
-                "Observe-only listeners that cannot change the payload",
+                "Published constants for document.routed and document.route_acted",
                 "Events for settings, plugins, plans, notifications, files and jobs"
             ],
-            "security": "Every listener can rewrite the payload today. Observe-only listeners, and a per-event list of what may change, are needed before more events are published.",
+            "security": null,
             "plan": "0.2.27"
         },
         {
@@ -1110,11 +1213,13 @@
                 {
                     "what": "The host decides whether a tool only reads",
                     "since": "1.71"
+                },
+                {
+                    "what": "Previews of what a proposed tool call would change",
+                    "since": "1.78"
                 }
             ],
-            "missing": [
-                "Previews of what a proposed tool call would change"
-            ],
+            "missing": [],
             "security": null,
             "plan": "0.2.27"
         },
@@ -1127,13 +1232,21 @@
                 {
                     "what": "Plugin prompts",
                     "since": "1.9"
+                },
+                {
+                    "what": "Plugin resources, read with the caller's context",
+                    "since": "1.80"
+                },
+                {
+                    "what": "Prompts and resources only from plugins the operator granted agent context, each gated by permission",
+                    "since": "1.80"
                 }
             ],
             "missing": [
-                "Authored resources and subscriptions",
+                "Resource subscriptions",
                 "Workspace-specific prompts"
             ],
-            "security": "Prompt text goes straight into an agent's context. Third-party prompts should be limited to verified plugins and gated by permission.",
+            "security": null,
             "plan": "later"
         },
         {
@@ -1149,31 +1262,46 @@
                 {
                     "what": "Plugin agents",
                     "since": "1.64"
+                },
+                {
+                    "what": "Agents service: the workspace's agents and their activity, as the calling person",
+                    "since": "1.75"
+                },
+                {
+                    "what": "Agent lifecycle events",
+                    "since": "1.75"
+                },
+                {
+                    "what": "MCP connections, read without secrets, and connection events",
+                    "since": "1.79"
                 }
             ],
-            "missing": [
-                "Agent and token lifecycle events"
-            ],
+            "missing": [],
             "security": null,
-            "plan": "later"
+            "plan": "0.2.27"
         },
         {
             "id": "agent-proposals",
             "group": "agents",
             "name": "Agent proposals",
-            "rating": "partial",
+            "rating": "full",
             "has": [
                 {
                     "what": "agentPolicy propose and suggest-only on plugin tools",
                     "since": "1.52"
+                },
+                {
+                    "what": "Proposal created, decided and undone events",
+                    "since": "1.78"
+                },
+                {
+                    "what": "Plugin-provided previews of a proposal, run read-only",
+                    "since": "1.78"
                 }
             ],
-            "missing": [
-                "Proposal created, decided and undone events",
-                "Plugin-provided previews of a proposal"
-            ],
-            "security": "Only the granting person decides a proposal. Any plugin view must be read-only.",
-            "plan": "0.2.28"
+            "missing": [],
+            "security": null,
+            "plan": "0.2.27"
         },
         {
             "id": "webhooks",

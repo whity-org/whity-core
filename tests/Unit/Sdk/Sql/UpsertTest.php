@@ -7,6 +7,7 @@ namespace Tests\Unit\Sdk\Sql;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Whity\Sdk\Sql\Upsert;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The construction contract of {@see Upsert}: what statement it builds, and
@@ -151,9 +152,7 @@ final class UpsertTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider malformedIdentifiers
-     */
+    #[DataProvider('malformedIdentifiers')]
     public function testMalformedIdentifiersAreRefused(string $table): void
     {
         $this->expectException(\InvalidArgumentException::class);

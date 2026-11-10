@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Api\Exception\SystemTenantProtectedException;
+use Whity\Core\Plan\DefaultPlanAssigner;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\ProfileProvisioner;
 use Whity\Core\PasswordPolicy;
+use Whity\Core\i18n\LocalizedTextRejected;
+use Whity\Core\i18n\LocalizedTexts;
 use Whity\Http\InputLimits;
 use Whity\Http\JsonBody;
 use Whity\Http\ListQuery;
@@ -117,9 +120,25 @@ class TenantsApiHandler
                 'createdAt' => 't.created_at',
             ],
             tiebreaker: 't.id',
-            searchable: ['t.name', 't.slug'],
+            // A workspace is found by any of its names, not only the original
+            // (#821): one scalar subquery per language that matters here.
+            searchable: ['t.name', 't.slug', self::otherNameColumn('ar'), self::otherNameColumn('en')],
             defaultSort: 'createdAt',
             defaultDirection: 'desc',
+        );
+    }
+
+    /**
+     * The workspace's own name in one other language, as a column a search can
+     * match. Bound to the workspace's own row, so it reaches no other tenant.
+     */
+    private static function otherNameColumn(string $language): string
+    {
+        return sprintf(
+            "COALESCE((SELECT lt.value FROM localized_texts lt WHERE lt.tenant_id = t.id AND lt.entity_id = t.id AND lt.entity_type = '%s' AND lt.field = '%s' AND lt.language_code = '%s'), '')",
+            LocalizedTexts::ENTITY_TENANT,
+            LocalizedTexts::FIELD_NAME,
+            $language
         );
     }
 
@@ -142,7 +161,7 @@ class TenantsApiHandler
 
             if ($isSystemUser) {
                 // System user: all tenants except the system tenant itself.
-                // @tenant-guard-ignore: system-tenant (isSystemUser) lists all tenants; scoped else-branch binds t.id = :tenant_id
+                // System-tenant (isSystemUser) lists all tenants; scoped else-branch binds t.id = :tenant_id
                 $countStmt = $this->db->prepare('SELECT COUNT(*) AS cnt FROM tenants t WHERE t.id != 0' . $search);
                 // The COUNT carries the same search predicate as the SELECT —
                 // an unfiltered total would render page controls for pages that
@@ -155,9 +174,9 @@ class TenantsApiHandler
                 // ROLE/TENANT data: memberships are the authoritative per-tenant member count
                 // (ADR 0005 §3 — memberships replace users.tenant_id). Only active memberships
                 // are counted (invited/suspended do not represent active accounts).
-                // @tenant-guard-ignore: system-tenant (isSystemUser) lists all real tenants; memberships LEFT JOIN is unscoped by design — each row is a distinct tenant
+                // System-tenant (isSystemUser) lists all real tenants; memberships LEFT JOIN is unscoped by design — each row is a distinct tenant
                 $stmt = $this->db->prepare('
-                    SELECT t.id, t.name, t.slug, t.created_at,
+                    SELECT t.id, t.name, t.name_language, t.slug, t.created_at,
                            tp.status AS subscription_status, tp.current_period_end,
                            pl.plan_key, pl.name AS plan_name,
                            COUNT(DISTINCT m.profile_id) as userCount
@@ -166,7 +185,7 @@ class TenantsApiHandler
                     LEFT JOIN tenant_plan tp ON tp.tenant_id = t.id
                     LEFT JOIN plans pl ON pl.id = tp.plan_id
                     WHERE t.id != 0' . $search . '
-                    GROUP BY t.id, tp.status, tp.current_period_end, pl.plan_key, pl.name
+                    GROUP BY t.id, t.name, t.name_language, t.slug, t.created_at, tp.status, tp.current_period_end, pl.plan_key, pl.name
                     ' . $q->orderBy() . '
                     LIMIT :limit OFFSET :offset
                 ');
@@ -174,7 +193,7 @@ class TenantsApiHandler
                 $stmt->execute();
             } else {
                 // Regular user: only their own tenant (at most 1 row).
-                // @tenant-guard-ignore: caller's own tenant; WHERE t.id = :tenant_id on tenants constrains the memberships LEFT JOIN to one tenant's rows
+                // Caller's own tenant; WHERE t.id = :tenant_id on tenants constrains the memberships LEFT JOIN to one tenant's rows
                 $countStmt = $this->db->prepare('SELECT COUNT(*) AS cnt FROM tenants t WHERE t.id = :tenant_id AND t.id != 0' . $search);
                 $countStmt->bindValue(':tenant_id', $currentTenantId, PDO::PARAM_INT);
                 $q->bindSearch($countStmt);
@@ -185,9 +204,9 @@ class TenantsApiHandler
                 // ROLE/TENANT data: memberships are the authoritative per-tenant member count
                 // (ADR 0005 §3). WHERE t.id = :tenant_id pins the memberships JOIN to the
                 // caller's own tenant so no cross-tenant data leaks.
-                // @tenant-guard-ignore: caller's own tenant; WHERE t.id = :tenant_id on tenants constrains the memberships LEFT JOIN to one tenant's rows
+                // Caller's own tenant; WHERE t.id = :tenant_id on tenants constrains the memberships LEFT JOIN to one tenant's rows
                 $stmt = $this->db->prepare('
-                    SELECT t.id, t.name, t.slug, t.created_at,
+                    SELECT t.id, t.name, t.name_language, t.slug, t.created_at,
                            tp.status AS subscription_status, tp.current_period_end,
                            pl.plan_key, pl.name AS plan_name,
                            COUNT(DISTINCT m.profile_id) as userCount
@@ -196,7 +215,7 @@ class TenantsApiHandler
                     LEFT JOIN tenant_plan tp ON tp.tenant_id = t.id
                     LEFT JOIN plans pl ON pl.id = tp.plan_id
                     WHERE t.id = :tenant_id' . $search . '
-                    GROUP BY t.id, tp.status, tp.current_period_end, pl.plan_key, pl.name
+                    GROUP BY t.id, t.name, t.name_language, t.slug, t.created_at, tp.status, tp.current_period_end, pl.plan_key, pl.name
                     ' . $q->orderBy() . '
                     LIMIT :limit OFFSET :offset
                 ');
@@ -225,7 +244,14 @@ class TenantsApiHandler
             // unquoted identifiers), so the delete-tenant dialog — which reads
             // `userCount` — never saw the count; mapping here pins the casing
             // regardless of the engine, mirroring {@see UsersApiHandler::toPublicUser()}.
-            $tenants = array_map(fn (array $row): array => $this->toPublicTenant($row), $rows);
+            // Each workspace's other-language names, in one read (#821).
+            $others = (new LocalizedTexts($this->db))->forTenants(
+                array_map(static fn (array $row): int => (int) $row['id'], $rows)
+            );
+            $tenants = array_map(
+                fn (array $row): array => $this->toPublicTenant($row, $others[(int) $row['id']] ?? []),
+                $rows
+            );
 
             return Response::json(['data' => $tenants, 'pagination' => $q->meta($total)], 200);
         } catch (\Exception $e) {
@@ -245,11 +271,19 @@ class TenantsApiHandler
      * the key it reads (WC-122) and keeps the casing consistent with the users
      * payload (WC-100/WC-113).
      *
+     * `name` stays the ORIGINAL name, in `nameLanguage`; `names` carries every
+     * language the workspace has, original included (#821).
+     *
      * @param array<string, mixed> $row Raw row from the tenants SELECT.
-     * @return array{id: int, name: string, slug: string|null, userCount: int, createdAt: string|null, plan: array{key: string, name: string}|null, status: array{state: string, daysLeft: int|null}}
+     * @param array<string, string> $otherNames Its names in other languages.
+     * @return array{id: int, name: string, nameLanguage: string, names: array<string, string>|\stdClass, slug: string|null, userCount: int, createdAt: string|null, plan: array{key: string, name: string}|null, status: array{state: string, daysLeft: int|null}}
      */
-    private function toPublicTenant(array $row): array
+    private function toPublicTenant(array $row, array $otherNames = []): array
     {
+        $name = (string) ($row['name'] ?? '');
+        $nameLanguage = (string) ($row['name_language'] ?? '') !== '' ? (string) $row['name_language'] : 'en';
+        $names = LocalizedTexts::merge($name, $nameLanguage, $otherNames);
+
         // The user-count aggregate is aliased `userCount` in SQL but the database
         // folds the unquoted result-set column name to lowercase, so accept either
         // casing (and the explicit `userCount` from create()/SQLite tests).
@@ -257,7 +291,10 @@ class TenantsApiHandler
 
         return [
             'id' => (int)($row['id'] ?? 0),
-            'name' => (string)($row['name'] ?? ''),
+            'name' => $name,
+            'nameLanguage' => $nameLanguage,
+            // An empty map is `{}` on the wire, never `[]`.
+            'names' => $names === [] ? new \stdClass() : $names,
             'slug' => isset($row['slug']) ? (string)$row['slug'] : null,
             'userCount' => (int)$userCount,
             'createdAt' => isset($row['created_at']) ? (string)$row['created_at'] : null,
@@ -324,11 +361,21 @@ class TenantsApiHandler
         try {
             $body = JsonBody::parsed($request);
 
-            if (empty($body['name'])) {
+            if (empty($body['name']) && empty($body['names'])) {
                 return Response::error('Tenant name is required', 400);
             }
 
-            $name = $body['name'];
+            // `name` alone is the original, in the language its letters are
+            // written in; `names` with `nameLanguage` carries every language (#821).
+            $defaultLanguage = is_string($body['name'] ?? null)
+                ? LocalizedTexts::guessLanguage($body['name'])
+                : (is_array($body['names'] ?? null) ? (string) (array_key_first(array_filter($body['names'], 'is_string')) ?? 'en') : 'en');
+            $naming = $this->namingFromBody($body, '', $defaultLanguage, []);
+            if ($naming instanceof Response) {
+                return $naming;
+            }
+
+            $name = $naming['name'];
             $slug = $body['slug'] ?? $this->generateSlug($name);
 
             // Bound the free-text fields (VARCHAR(255)) before any DB write so an
@@ -407,6 +454,7 @@ class TenantsApiHandler
                 // resolved.
                 $tenantId = TenantProvisioner::withCoreSteps($this->db, $this->hookManager)
                     ->create($name, $slug);
+                $this->writeNaming((int) $tenantId, $naming['language'], $naming['others']);
 
                 $adminSummary = null;
                 if ($admin !== null) {
@@ -429,6 +477,10 @@ class TenantsApiHandler
                 throw $e;
             }
 
+            // After the commit: applying a plan opens its own transaction, and a
+            // problem with it must not cost the workspace that was just created.
+            DefaultPlanAssigner::forDatabase($this->db)->assign((int) $tenantId);
+
             // Post-commit, unlike `tenant.created` above — that one runs inside
             // the transaction on purpose, so a listener can seed tenant roles
             // before the initial role is resolved. This one has the opposite
@@ -447,12 +499,13 @@ class TenantsApiHandler
             $payload = $this->toPublicTenant([
                 'id' => (int)$tenantId,
                 'name' => $name,
+                'name_language' => $naming['language'],
                 'slug' => $slug,
                 // A provisioned administrator is the tenant's first member, so
                 // the count the list endpoint would report is already 1.
                 'userCount' => $adminSummary === null ? 0 : 1,
                 'created_at' => date('Y-m-d H:i:s'),
-            ]);
+            ], $naming['others']);
             if ($adminSummary !== null) {
                 $payload['admin'] = $adminSummary;
             }
@@ -515,15 +568,32 @@ class TenantsApiHandler
                 return $tooLong;
             }
 
-            // Update name
-            if (isset($body['name']) && $body['name'] !== $tenant['name']) {
+            // Names (#821). `name` alone renames the original; `names` replaces
+            // every language at once; `nameLanguage` says which one is the
+            // original. Nothing here unless one of them was sent.
+            $naming = null;
+            if (isset($body['name']) || array_key_exists('names', $body) || array_key_exists('nameLanguage', $body)) {
+                $store = new LocalizedTexts($this->db);
+                $currentLanguage = (string) ($tenant['name_language'] ?? '') !== '' ? (string) $tenant['name_language'] : 'en';
+                $naming = $this->namingFromBody(
+                    $body,
+                    (string) $tenant['name'],
+                    $currentLanguage,
+                    $store->forTenants([$id])[$id] ?? []
+                );
+                if ($naming instanceof Response) {
+                    return $naming;
+                }
+            }
+
+            if ($naming !== null && $naming['name'] !== $tenant['name']) {
                 $checkStmt = $this->db->prepare('SELECT id FROM tenants WHERE name = ? AND id != ?');
-                $checkStmt->execute([$body['name'], $id]);
+                $checkStmt->execute([$naming['name'], $id]);
                 if ($checkStmt->fetch()) {
                     return Response::error('Tenant name already exists', 409);
                 }
                 $updates[] = 'name = ?';
-                $params_array[] = $body['name'];
+                $params_array[] = $naming['name'];
             }
 
             // Update slug
@@ -546,6 +616,9 @@ class TenantsApiHandler
                 $updateStmt = $this->db->prepare($sql);
                 $updateStmt->execute($params_array);
             }
+            if ($naming !== null) {
+                $this->writeNaming($id, $naming['language'], $naming['others']);
+            }
 
             // Dispatch synchronous hook after tenant is updated
             $this->hookManager->dispatch('tenant.updated', [
@@ -558,6 +631,53 @@ class TenantsApiHandler
             error_log('[TenantsApiHandler] update failed: ' . $e->getMessage());
             return Response::error('Failed to update tenant', 500);
         }
+    }
+
+    /**
+     * Read a workspace's names from a request body (#821).
+     *
+     * `nameLanguage` is the language of the original name, `names` every
+     * language at once (it replaces them all), and `name` the original alone.
+     * The original must have text: it is the name every other language falls
+     * back to.
+     *
+     * @param array<string, mixed>  $body
+     * @param array<string, string> $currentOthers
+     * @return array{name: string, language: string, others: array<string, string>}|Response
+     */
+    private function namingFromBody(array $body, string $currentName, string $currentLanguage, array $currentOthers): array|Response
+    {
+        try {
+            return LocalizedTexts::fromBody(
+                $body,
+                $currentName,
+                $currentLanguage,
+                $currentOthers,
+                InputLimits::NAME_MAX,
+                'name',
+                'names',
+                'nameLanguage'
+            );
+        } catch (LocalizedTextRejected $e) {
+            return Response::error($e->clientMessage, 422);
+        }
+    }
+
+    /**
+     * Store which language the original name is in, and the other languages.
+     *
+     * @param array<string, string> $others
+     */
+    private function writeNaming(int $tenantId, string $language, array $others): void
+    {
+        // `tenants` is the tenant registry itself; the caller was authorised for this id
+        $this->db->prepare('UPDATE tenants SET name_language = ? WHERE id = ?')->execute([$language, $tenantId]);
+        (new LocalizedTexts($this->db))->replace(
+            $tenantId,
+            LocalizedTexts::ENTITY_TENANT,
+            $tenantId,
+            $others
+        );
     }
 
     /**
@@ -626,6 +746,10 @@ class TenantsApiHandler
                 $this->hookManager->dispatch('tenant.deleting', [
                     'id' => (int)$id,
                 ]);
+
+                // Its names in other languages (#821). The foreign key cascades
+                // on PostgreSQL; this also covers an engine that does not.
+                (new LocalizedTexts($this->db))->forgetTenant((int) $id);
 
                 // Delete tenant
                 $deleteStmt = $this->db->prepare('DELETE FROM tenants WHERE id = ?');
@@ -819,7 +943,7 @@ class TenantsApiHandler
             return (int) $id;
         }
 
-        // @tenant-guard-ignore: global roles are tenant-independent by definition (tenant_id IS NULL)
+        // Global roles are tenant-independent by definition (tenant_id IS NULL)
         $global = $this->db->prepare('SELECT id FROM roles WHERE name = ? AND tenant_id IS NULL LIMIT 1');
         $global->execute([$roleName]);
         $id = $global->fetchColumn();

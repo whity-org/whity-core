@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Http\Middleware;
 
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Stringable;
@@ -12,6 +13,7 @@ use Whity\Auth\JwtParser;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Unit tests for the EnforceTenantIsolation middleware.
@@ -25,7 +27,7 @@ use Whity\Core\Tenant\TenantContext;
 class EnforceTenantIsolationTest extends TestCase
 {
     private EnforceTenantIsolation $middleware;
-    private JwtParser $mockJwtParser;
+    private JwtParser&MockObject $mockJwtParser;
 
     protected function setUp(): void
     {
@@ -82,7 +84,7 @@ class EnforceTenantIsolationTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
@@ -120,7 +122,7 @@ class EnforceTenantIsolationTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => 'Bearer invalid.token.here']);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with('invalid.token.here')
             ->willReturn(null);
 
@@ -145,7 +147,7 @@ class EnforceTenantIsolationTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => "Bearer {$validToken}"]);
         $next = fn(Request $req) => new Response(200, 'Success');
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
@@ -182,7 +184,7 @@ class EnforceTenantIsolationTest extends TestCase
             return new Response(200, 'Success');
         };
 
-        $this->mockJwtParser->method('parse')
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')
             ->with($validToken)
             ->willReturn($payload);
 
@@ -645,9 +647,8 @@ class EnforceTenantIsolationTest extends TestCase
      * is treated as no-declared-target — it can neither escalate nor coincide
      * with a numeric tenant id. The request defers to the handler's
      * JWT-derived scoping.
-     *
-     * @dataProvider malformedTenantSelectorProvider
      */
+    #[DataProvider('malformedTenantSelectorProvider')]
     public function testMalformedHeaderIsIgnoredSafely(string $headerValue): void
     {
         $payload = ['user_id' => 5, 'tenant_id' => 1, 'email' => 'a@t1'];
@@ -694,9 +695,8 @@ class EnforceTenantIsolationTest extends TestCase
      * The whity-plugin-store READ surface (catalogue browse + registry index +
      * self-authenticating package download) must pass through WITHOUT a host
      * session — a consuming host has no session on the store. All are GET.
-     *
-     * @dataProvider pluginStorePublicReadProvider
      */
+    #[DataProvider('pluginStorePublicReadProvider')]
     public function testPluginStorePublicReadBypassesTenantIsolation(string $path): void
     {
         // No Authorization header at all — a public/consumer request.
@@ -750,9 +750,8 @@ class EnforceTenantIsolationTest extends TestCase
      * The token-management routes are a different PATH (never matched by the
      * read exemption) and must stay session-gated — even the GET list, which
      * shares the method but not the path.
-     *
-     * @dataProvider pluginStoreTokenRouteProvider
      */
+    #[DataProvider('pluginStoreTokenRouteProvider')]
     public function testPluginStoreTokenRoutesStillRequireSession(string $method, string $path): void
     {
         $request = new Request($method, $path);
@@ -785,9 +784,8 @@ class EnforceTenantIsolationTest extends TestCase
      * prefix. A GET to a DEEPER or unknown path under the store namespace must
      * NOT be auto-exempted — it stays session-gated (401), so a future store
      * route can never become unauthenticated without an explicit change here.
-     *
-     * @dataProvider pluginStoreNonExemptGetProvider
      */
+    #[DataProvider('pluginStoreNonExemptGetProvider')]
     public function testDeeperOrUnknownStoreGetPathsAreNotExempt(string $path): void
     {
         $request = new Request('GET', $path);

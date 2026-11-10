@@ -10,6 +10,8 @@ use Whity\Core\Document\Slots\BackgroundIssuing;
 use Whity\Core\Document\Slots\SlotBindings;
 use Whity\Core\Document\Theme\DocumentThemeRef;
 use Whity\Core\Identity\InvitationService;
+use Whity\Core\Plan\PlanService;
+use Whity\Core\Plan\PlanValidationException;
 
 /**
  * The code registry of known website-settings keys (Website Settings feature).
@@ -237,6 +239,11 @@ final class SettingsRegistry
     public const SEATS_ENFORCEMENT = 'seats.enforcement';
     public const SEATS_COUNT_INVITED = 'seats.count_invited';
 
+    // METERED LIMITS (documents rendered per day or month). 'block' refuses past
+    // the limit, as metering always has; 'warn' counts and lets the action go
+    // ahead. Global-only for the same reason as seats.enforcement.
+    public const METERS_ENFORCEMENT = 'meters.enforcement';
+
     // INVOICING (#billing). Every one of these differs per deployment, which
     // is exactly why none of them is a constant in the invoicing code.
     //
@@ -253,6 +260,10 @@ final class SettingsRegistry
     //
     // The seller an invoice is from is the workspace's company (COMPANY_*).
     public const BILLING_DEFAULT_CURRENCY = 'billing.default_currency';
+    // The plan_key a new workspace is put on. Empty means none, which is every
+    // install that does not sell plans. Global-only: a workspace does not get to
+    // choose what the operator gives new workspaces.
+    public const BILLING_DEFAULT_PLAN = 'billing.default_plan';
     public const BILLING_TAX_RATE_BP = 'billing.tax_rate_bp';
     public const BILLING_TAX_LABEL = 'billing.tax_label';
     public const BILLING_TAX_INCLUSIVE = 'billing.tax_inclusive';
@@ -352,9 +363,10 @@ final class SettingsRegistry
     public const AFFILIATE_WITHHOLDING_BP = 'affiliate.withholding_bp';
 
     // Plugin marketplace (WC plugin-store): comma-separated allowlist of trusted
-    // store HOSTS the install-from-store endpoint may fetch packages from. EMPTY
-    // (default) = the feature is OFF — no store is trusted. This is the PRIMARY
-    // SSRF control for server-side package fetches.
+    // store HOSTS the install-from-store endpoint may fetch packages from. The
+    // default is Whity's own store, app.whity.dev (WHIT-1003); EMPTY = the feature
+    // is OFF — no store is trusted. This is the PRIMARY SSRF control for
+    // server-side package fetches.
     public const PLUGINS_STORE_ALLOWED_HOSTS = 'plugins.store_allowed_hosts';
 
     // Plugin marketplace MASTER switch (WC-feature-flags-audit). A sovereign
@@ -371,13 +383,26 @@ final class SettingsRegistry
     // shipped.
     public const PLUGINS_STORE_ENABLED = 'plugins.store_enabled';
 
+    // Serve a code plugin's MCP prompts only while it carries a live Verified mark from the
+    // Whity store (WHIT-1014, VERIFIED-PLUGINS-SECURITY.md 4.1). Off by default, so nothing
+    // changes until the operator turns it on; mounted and uploaded plugins have no mark, so
+    // their prompts stop with it on. GLOBAL-ONLY: code plugins are install-wide. Tools are not
+    // gated by this; they keep their own permission checks.
+    public const PLUGINS_MCP_PROMPTS_REQUIRE_MARK = 'plugins.mcp_prompts_require_mark';
+
     // Document/label designer server-side render tier (ADR 0012 / WC-docdesigner
-    // Track 2). GLOBAL-ONLY operator toggle: the render endpoint calls out to the
+    // Track 2). GLOBAL-ONLY operator switch: the render endpoint calls out to the
     // separate `whity_render` Docker service (headless-Chromium + Puppeteer), a
     // heavyweight OPTIONAL add-on not every sovereign deployment wants running.
-    // Default 'false' (disabled) — opt-in, mirroring MCP_ENABLED's shape. The
-    // route checks this FIRST and returns a clean 503 (never a raw exception, and
-    // never attempts the internal HTTP call) when off.
+    //
+    // Default 'true' since WHIT-1001, and that does NOT make rendering opt-out:
+    // printing also needs a READY render service (RenderServiceClient::
+    // readiness(): configured with a >= 32-char shared secret, reachable, built
+    // for this core release, accepting the secret). Running that service is the
+    // opt-in; this setting is the operator's way to switch printing off while it
+    // runs. When either half says no, the route returns a clean 503 naming why
+    // (never a raw exception), and when the switch is off it never makes the
+    // internal HTTP call.
     public const DOCUMENTS_RENDER_ENABLED = 'documents.render_enabled';
 
     // The workspace's default document theme (editor M4d, E.44): a theme ref,
@@ -458,9 +483,9 @@ final class SettingsRegistry
     // documents while another is only previewing labels, and an operator should
     // be able to hold back the second without turning off the first.
     //
-    // Default TRUE — deliberately opt-OUT where the master switch is opt-in.
-    // Rendering is already off by default, so an instance that reaches this key
-    // has explicitly turned the subsystem on; a second off-by-default gate
+    // Default TRUE — deliberately opt-OUT, like the master switch since
+    // WHIT-1001. Rendering is off until a render service is running, so an
+    // instance that reaches this key has deliberately set one up; an off-by-default gate
     // would make a correctly-documented `persist: true` answer 503 on a
     // correctly-configured deployment, discoverable only by reading this file.
     // That is precisely the complaint #947 records about the master switch
@@ -591,6 +616,14 @@ final class SettingsRegistry
     // and some would consider the same sentence a leak. Defaulting to `minimal`
     // is defaulting to the version that cannot leak.
     public const DOCUMENTS_QR_PUBLIC_DETAIL = 'documents.qr_public_detail';
+
+    // WHIT-920 (#1724, A9). Whether the person who sent a form sees WHO reviewed
+    // it, or only the stages and their outcomes. Off: an applicant sees "Head of
+    // department: approved", not the name of the person who approved. A
+    // workspace that wants its applicants to know who is handling their request
+    // turns it on. Tenant-overridable, because it is a decision about how an
+    // organisation speaks to the people it serves.
+    public const FORMS_SHOW_REVIEWER_NAMES = 'forms.show_reviewer_names';
 
     // How many people a USER GROUP preview SHOWS (#999). Not a ceiling on
     // resolution — the count a preview reports is always exact — but the size of
@@ -725,6 +758,20 @@ final class SettingsRegistry
     public const LABELS_RESOLVE_MAX_IDS = 'labels.resolve_max_ids';
 
     /**
+     * Whether the web app offers itself as an installable app (#1733): the web
+     * manifest, the service worker and the offline page. GLOBAL-ONLY — it is
+     * a question about the whole installation, not one workspace.
+     *
+     * On by default, which is what app.whity.dev wants. A self-hosted operator
+     * turns it off here, or with the `PWA_ENABLED` environment variable, which
+     * decides only while nobody has stored a value here (an explicit choice on
+     * the settings screen wins). Off removes the manifest link, serves no
+     * service worker, and unregisters a worker a browser installed earlier.
+     * See {@see \Whity\Core\Branding\BrandingService::installableFrom()}.
+     */
+    public const APP_INSTALLABLE = 'app.installable';
+
+    /**
      * The asset-kind keys (Tenant Branding). Their stored value is a storage
      * key (or '' when unset). They are NEVER writable via the text PATCH path —
      * uploads go through BrandingService and the binary endpoints.
@@ -800,8 +847,11 @@ final class SettingsRegistry
         self::LICENSING_BILLING_BASIS,
         self::SEATS_ENFORCEMENT,
         self::SEATS_COUNT_INVITED,
+        self::METERS_ENFORCEMENT,
+        self::BILLING_DEFAULT_PLAN,
         self::PLUGINS_STORE_ALLOWED_HOSTS,
         self::PLUGINS_STORE_ENABLED,
+        self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
         // Master on/off switch for the render tier: infrastructure-level (is the
         // whole optional subsystem available on this instance), not a per-tenant
         // preference — a per-tenant override would be inert/misleading. The
@@ -813,6 +863,9 @@ final class SettingsRegistry
         // "does this instance offer more than one language" is an instance
         // question, not a tenant one.
         self::I18N_ENABLED,
+        // Installing the web app is a property of the installation, and the
+        // service worker it controls is per origin, not per workspace.
+        self::APP_INSTALLABLE,
     ];
 
     /**
@@ -842,14 +895,17 @@ final class SettingsRegistry
         self::MAIL_EVENT_DELETION,
         self::MAIL_EVENT_PASSWORD_RESET,
         self::PLUGINS_STORE_ENABLED,
+        self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
         self::DOCUMENTS_RENDER_ENABLED,
         self::DOCUMENTS_PERSIST_ENABLED,
         self::DOCUMENTS_QR_ENABLED,
+        self::FORMS_SHOW_REVIEWER_NAMES,
         self::I18N_ENABLED,
         self::UI_HIDE_DATES,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
+        self::APP_INSTALLABLE,
     ];
 
     /**
@@ -905,6 +961,7 @@ final class SettingsRegistry
         self::PLUGINS_STORE_ENABLED,
         self::DOCUMENTS_RENDER_ENABLED,
         self::I18N_ENABLED,
+        self::APP_INSTALLABLE,
     ];
 
     /**
@@ -927,6 +984,7 @@ final class SettingsRegistry
         // "block writes" and "block everything" would be the same rule.
         self::LICENSING_BILLING_BASIS => ['activated', 'provisioned', 'active_in_period'],
         self::SEATS_ENFORCEMENT => ['off', 'warn', 'block'],
+        self::METERS_ENFORCEMENT => ['block', 'warn'],
         self::BILLING_INVOICE_NUMBER_SCOPE => ['shared', 'per_tenant'],
         self::BILLING_INVOICE_NUMBER_RESET => ['never', 'yearly', 'monthly'],
         // What a STRANGER holding a printed document is told when they scan it
@@ -1033,8 +1091,10 @@ final class SettingsRegistry
         self::LICENSING_BILLING_BASIS => 'activated',
         self::SEATS_ENFORCEMENT => 'warn',
         self::SEATS_COUNT_INVITED => 'true',
+        self::METERS_ENFORCEMENT => 'block',
         // Zero tax until an operator says otherwise — see the constant.
         self::BILLING_DEFAULT_CURRENCY => 'JOD',
+        self::BILLING_DEFAULT_PLAN => '',
         self::BILLING_TAX_RATE_BP => '0',
         self::BILLING_TAX_LABEL => '',
         self::BILLING_TAX_INCLUSIVE => 'false',
@@ -1060,17 +1120,20 @@ final class SettingsRegistry
         self::DUNNING_RETRY_SCHEDULE_DAYS => '1,3,7',
         self::DUNNING_LOCK_AFTER_DAYS => '14',
         // Empty = install-from-store OFF (no trusted store); operator opts in.
-        self::PLUGINS_STORE_ALLOWED_HOSTS => '',
+        // WHIT-1003: Whity's own store, app.whity.dev, is trusted out of the box. Operators may
+        // remove it or add their own; an empty list still turns the store off.
+        self::PLUGINS_STORE_ALLOWED_HOSTS => 'app.whity.dev',
         // Master switch default TRUE (opt-out): the allowlist above is already
         // the primary off-switch (empty by default), so this only needs to
         // FLIP OFF an already-configured deployment; defaulting it false would
         // silently disable the store for every instance that configured hosts
         // before this flag existed.
         self::PLUGINS_STORE_ENABLED => 'true',
+        self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => 'false',
         // Heavyweight optional add-on (a whole separate Chromium-bearing
         // container) — opt-in, not opt-out. A sovereign deploy that never runs
         // the `render` compose profile stays disabled here regardless.
-        self::DOCUMENTS_RENDER_ENABLED => 'false',
+        self::DOCUMENTS_RENDER_ENABLED => 'true',
         self::DOCUMENTS_THEME => 'whity.standard',
         self::DOCUMENTS_THEME_BY_KIND => '',
         self::DOCUMENTS_SLOT_BINDINGS => '',
@@ -1130,6 +1193,8 @@ final class SettingsRegistry
         // The minimum that satisfies verification. See the constant, and
         // VerificationPresenter for what each level does and does not say.
         self::DOCUMENTS_QR_PUBLIC_DETAIL => 'minimal',
+        // Off: applicants see stages and outcomes, not reviewers. See the constant.
+        self::FORMS_SHOW_REVIEWER_NAMES => 'false',
         // Ten faces. Enough to recognise a group at a glance — "yes, those are
         // the instructors" — and small enough that nobody mistakes the sample
         // for the list. The COUNT beside it is exact and unbounded, which is
@@ -1158,6 +1223,8 @@ final class SettingsRegistry
         // most of them have not expressed.
         self::UI_HIDE_DATES => 'false',
         self::LABELS_RESOLVE_MAX_IDS => '100',
+        // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
+        self::APP_INSTALLABLE => 'true',
     ];
 
     /**
@@ -1452,7 +1519,9 @@ final class SettingsRegistry
             self::BILLING_ENFORCEMENT_DEFAULT => self::validateEnum($key, $value),
             self::BILLING_GRACE_DAYS => self::validateGraceDays($value),
             self::SEATS_ENFORCEMENT => self::validateEnum($key, $value),
+            self::METERS_ENFORCEMENT => self::validateEnum($key, $value),
             self::BILLING_DEFAULT_CURRENCY => self::validateCurrencyCode($value),
+            self::BILLING_DEFAULT_PLAN => self::validatePlanKey($value),
             self::BILLING_TAX_RATE_BP => self::validateTaxRateBasisPoints($value),
             self::BILLING_TAX_INCLUSIVE => self::validateBoolean($value, self::BILLING_TAX_INCLUSIVE),
             self::BILLING_PAYMENT_TERMS_DAYS => self::validatePaymentTermsDays($value),
@@ -1478,6 +1547,7 @@ final class SettingsRegistry
             self::MAIL_FOOTER_TEXT,
             self::PLUGINS_STORE_ALLOWED_HOSTS => null, // free-form strings
             self::PLUGINS_STORE_ENABLED => self::validateBoolean($value, self::PLUGINS_STORE_ENABLED),
+            self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => self::validateBoolean($value, self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK),
             self::DOCUMENTS_RENDER_ENABLED => self::validateBoolean($value, self::DOCUMENTS_RENDER_ENABLED),
             self::DOCUMENTS_RENDER_MAX_ROWS => self::validateRenderMaxRows($value),
             self::DOCUMENTS_RENDER_MAX_PAGES => self::validateRenderMaxPages($value),
@@ -1498,6 +1568,7 @@ final class SettingsRegistry
             self::DOCUMENTS_ROUTING_NOTIFICATION_CHANNELS => self::validateRoutingNotificationChannels($value),
             self::DOCUMENTS_QR_ENABLED => self::validateBoolean($value, self::DOCUMENTS_QR_ENABLED),
             self::DOCUMENTS_QR_PUBLIC_DETAIL => self::validateEnum($key, $value),
+            self::FORMS_SHOW_REVIEWER_NAMES => self::validateBoolean($value, self::FORMS_SHOW_REVIEWER_NAMES),
             self::GROUPS_PREVIEW_SAMPLE_SIZE => self::validateGroupsPreviewSampleSize($value),
             self::DATA_TYPES_BULK_MAX_IDS => self::validateBulkMaxIds($value),
             // Error tracking. These five were declared with defaults, types,
@@ -1517,6 +1588,7 @@ final class SettingsRegistry
             self::INVITATION_TTL_DAYS => self::validateInvitationTtlDays($value),
             self::UI_HIDE_DATES => self::validateBoolean($value, self::UI_HIDE_DATES),
             self::LABELS_RESOLVE_MAX_IDS => self::validateLabelsResolveMaxIds($value),
+            self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the
             // registry plainly knows were refused as "Unknown setting key" and
@@ -1785,6 +1857,26 @@ final class SettingsRegistry
         return preg_match('/^[A-Z]{3}$/', strtoupper(trim($value))) === 1
             ? null
             : 'must be a three-letter ISO 4217 currency code, such as JOD';
+    }
+
+    /**
+     * Empty, or a well-formed plan key. Whether that plan exists is not asked
+     * here: it can be retired after this is saved, so creating a workspace has
+     * to cope with a missing plan anyway.
+     */
+    private static function validatePlanKey(string $value): ?string
+    {
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            PlanService::assertValidKey($value);
+        } catch (PlanValidationException $e) {
+            return $e->getMessage();
+        }
+
+        return null;
     }
 
     /**

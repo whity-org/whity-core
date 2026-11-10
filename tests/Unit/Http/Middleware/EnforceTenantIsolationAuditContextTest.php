@@ -60,7 +60,7 @@ final class EnforceTenantIsolationAuditContextTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => "Bearer {$token}"]);
         $next = fn(Request $req) => new Response(200, 'ok');
 
-        $this->mockJwtParser->method('parse')->with($token)->willReturn($payload);
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')->with($token)->willReturn($payload);
 
         $response = $this->middleware->handle($request, $next);
 
@@ -92,7 +92,7 @@ final class EnforceTenantIsolationAuditContextTest extends TestCase
         $request = new Request('GET', '/api/resource', ['Authorization' => "Bearer {$token}"]);
         $next = fn(Request $req) => new Response(200, 'ok');
 
-        $this->mockJwtParser->method('parse')->with($token)->willReturn($payload);
+        $this->mockJwtParser->expects($this->atLeastOnce())->method('parse')->with($token)->willReturn($payload);
 
         $response = $this->middleware->handle($request, $next);
 

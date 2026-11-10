@@ -20,7 +20,7 @@ final class TenantHostRepository
 
     public function findIdByBrandingHost(string $host): ?int
     {
-        // @tenant-guard-ignore: tenants registry lookup by host; returns an id only.
+        // Tenants registry lookup by host; returns an id only.
         $stmt = $this->db->prepare('SELECT id FROM tenants WHERE LOWER(branding_host) = :h LIMIT 1');
         $stmt->execute([':h' => strtolower($host)]);
         $id = $stmt->fetchColumn();
@@ -29,7 +29,7 @@ final class TenantHostRepository
 
     public function findIdBySlug(string $slug): ?int
     {
-        // @tenant-guard-ignore: tenants registry lookup by slug; returns an id only.
+        // Tenants registry lookup by slug; returns an id only.
         $stmt = $this->db->prepare('SELECT id FROM tenants WHERE LOWER(slug) = :s LIMIT 1');
         $stmt->execute([':s' => strtolower($slug)]);
         $id = $stmt->fetchColumn();
@@ -39,7 +39,7 @@ final class TenantHostRepository
     /** The workspace's display name, for a public page that names it (WHIT-915). */
     public function findNameById(int $tenantId): ?string
     {
-        // @tenant-guard-ignore: tenants registry lookup by id; returns the display name only.
+        // Tenants registry lookup by id; returns the display name only.
         $stmt = $this->db->prepare('SELECT name FROM tenants WHERE id = :id LIMIT 1');
         $stmt->execute([':id' => $tenantId]);
         $name = $stmt->fetchColumn();
@@ -48,7 +48,7 @@ final class TenantHostRepository
 
     public function brandingHostExists(string $host, int $exceptTenantId): bool
     {
-        // @tenant-guard-ignore: uniqueness check across the tenants registry.
+        // Uniqueness check across the tenants registry.
         $stmt = $this->db->prepare(
             'SELECT 1 FROM tenants WHERE LOWER(branding_host) = :h AND id <> :id LIMIT 1'
         );
@@ -58,7 +58,7 @@ final class TenantHostRepository
 
     public function setBrandingHost(int $tenantId, ?string $host): void
     {
-        // @tenant-guard-ignore: updates the tenants registry row for the given tenant id.
+        // Updates the tenants registry row for the given tenant id.
         $stmt = $this->db->prepare('UPDATE tenants SET branding_host = :h WHERE id = :id');
         $stmt->execute([':h' => $host, ':id' => $tenantId]);
     }

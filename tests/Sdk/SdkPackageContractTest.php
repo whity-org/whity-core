@@ -242,9 +242,33 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.73.0',
+            '1.94.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.73 ADDS membership.customer_joined: a customer joined a workspace through its own sign-up (WHIT-915). '
+            'SDK 1.94 ADDS route and form events: constants for document.routed and document.route_acted, and route.*, document.finalised, form.submitted and submission.* with ids only. '
+            . 'SDK 1.93 ADDS I18n\LocalizedText, the translatable-field marker and value contract (#521). '
+            . 'SDK 1.92 ADDS Audit\\PluginAudit, entries attributed by the host and readable only by the plugin that wrote them (WHIT-1032). '
+            . 'SDK 1.91 ADDS Jobs\\PluginJobQueue and PluginScheduledJobsInterface, limited to the plugin\'s own jobs in the current workspace (WHIT-1031). '
+            . 'SDK 1.90 ADDS Notification\\PluginNotifier and PluginNotificationsInterface, bound by the host to the current workspace and its active members (WHIT-1030). '
+            . 'SDK 1.89 ADDS observe-only hook listeners and constants for events core already fired (WHIT-1033). '
+            . 'SDK 1.88 ADDS Settings\PluginSettings, a settings-changed event and the secretField block (WHIT-1016). '
+            . 'SDK 1.87 ADDS workspace, language and actor kind on Http\Request (WHIT-1015). '
+            . 'SDK 1.86 ADDS Billing\\LicenceSales and PluginLicenceSalesInterface: one billing plugin sells store plugin licences, and no other plugin can answer in its place (WHIT-1013). '
+            . 'SDK 1.85 ADDS Licensing\StoreLicence and Licensing\LicenceState: whether a paid Whity store plugin is '
+            . 'licensed here, from the store-signed statement with a 7-day offline window (store licensing PR-4). '
+            . 'SDK 1.84 ADDS service routes (Http\\ServiceCall, Identity\\LinkedPeople): server-to-server calls with the trusted issuer\'s token, and Billing\\PlanCatalogue (WHIT-1011). '
+            . 'SDK 1.83 ADDS Documents::issueMany() and Documents::batch(): bulk issuing from one template as a background job, with a result per item and an idempotent batch key (WHIT-997). '
+            . 'SDK 1.82 ADDS Documents\Templates: read the published templates the caller can see and their merge fields (WHIT-996). Purely additive. '
+            . 'SDK 1.81 ADDS documents.starters: starter templates a workspace plugin ships, seeded per workspace and never overwriting its edits (WHIT-995). Purely additive. '
+            . 'SDK 1.80 ADDS PluginMcpResourcesInterface; plugin prompts and resources need the operator\'s agent-context grant and a requiredPermission (WHIT-993). '
+            . 'SDK 1.79 ADDS Mcp\McpConnections and connection created, grant changed and revoked events, never with a token (WHIT-992). '
+            . 'SDK 1.78 ADDS proposal created, decided and undone events and a read-only preview on authored tools (WHIT-991). '
+            . 'SDK 1.77 ADDS PluginBillingPortalInterface and Billing\\BillingPortal: a plugin can be the deployment\'s '
+            . 'billing portal through one payment provider (WHIT-1010). '
+            . 'SDK 1.76: DocumentRenderer resolves in queue jobs and CLI commands, over one storage stack per process (#1151). No signature changes. '
+            . 'SDK 1.75 ADDS Agents\Agents: the workspace\'s agents and their activity, read as the calling person, and agent lifecycle events (WHIT-990). '
+            . 'SDK 1.74 ADDS Rbac\\ResourceScope and Rbac\\ResourceReach: which records of a plugin resource type a caller '
+            . 'may act on, narrowing only (#1074). '
+            . 'SDK 1.73 ADDS membership.customer_joined: a customer joined a workspace through its own sign-up (WHIT-915). '
             . 'SDK 1.72: PluginRolesInterface grants a plugin only its own declared, non-core permissions, only to roles '
             . 'it created or the operator approved, and uninstall removes only the grants it made. '
             . 'SDK 1.71: THE HOST DECIDES WHETHER A TOOL ONLY READS, from the route method; authored tools are writes '
@@ -1105,6 +1129,16 @@ final class SdkPackageContractTest extends TestCase
                 'getSettings'
             ))->getReturnType()
         );
+    }
+
+    public function testPluginMcpResourcesInterface_existsWithGetMcpResourcesMethod(): void
+    {
+        $methods = array_map(
+            static fn (\ReflectionMethod $m): string => $m->getName(),
+            (new \ReflectionClass(\Whity\Sdk\PluginMcpResourcesInterface::class))->getMethods()
+        );
+        $this->assertSame(['getMcpResources'], $methods);
+        $this->assertSame('array', (string) (new \ReflectionMethod(\Whity\Sdk\PluginMcpResourcesInterface::class, 'getMcpResources'))->getReturnType());
     }
 
     public function testPluginMcpInterface_existsWithGetMcpPromptsMethod(): void

@@ -3,12 +3,13 @@
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { IconMenu2, IconShieldLock } from '@tabler/icons-react';
+import { IconDots, IconShieldLock } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { ErrorState } from '@whity/ui/empty-state';
+import { ToggleGroup } from '@whity/ui/toggle-group';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +35,7 @@ import { CopyDialog } from './copy-dialog';
 import { describeAudience } from './audience';
 import { NewTemplateDialog } from './new-template-dialog';
 import { ForbiddenError, editorHref, listTemplates } from './api';
+import { useLocalizedUnits } from '@/hooks/useLocalizedUnits';
 import type { OuOption, PermissionOption, PermissionSource, TemplateRow } from './types';
 
 /**
@@ -56,6 +58,8 @@ import type { OuOption, PermissionOption, PermissionSource, TemplateRow } from '
  *
  * Saved blocks were part of the old designer and come back in M7.
  */
+type ShowFilter = 'all' | 'published' | 'drafts';
+
 export default function DocumentTemplatesPage() {
   const { apiClient, user } = useAuth();
   const { addToast } = useToast();
@@ -101,6 +105,7 @@ export default function DocumentTemplatesPage() {
     }
     return result.items;
   }, [apiClient]);
+  const units = useLocalizedUnits(ous.data);
 
   /**
    * Options for the permission tag: the catalogue when the caller may read it
@@ -126,6 +131,7 @@ export default function DocumentTemplatesPage() {
   const [deleting, setDeleting] = useState<TemplateRow | null>(null);
   const [creating, setCreating] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [show, setShow] = useState<ShowFilter>('all');
 
   const nameOf = useCallback(
     (row: TemplateRow) => (row.title.trim() === '' ? t('documentTemplates.untitled', 'Untitled') : row.title),
@@ -135,9 +141,9 @@ export default function DocumentTemplatesPage() {
   const ouName = useCallback(
     (ouId: number | null): string | null => {
       if (ouId === null) return null;
-      return (ous.data ?? []).find((o) => o.id === ouId)?.name ?? null;
+      return units.find((o) => o.id === ouId)?.name ?? null;
     },
-    [ous.data]
+    [units]
   );
 
   const createTemplate = async () => {
@@ -153,6 +159,21 @@ export default function DocumentTemplatesPage() {
 
   // ── table ───────────────────────────────────────────────────────────────────
 
+  /**
+   * Whity's starters are offered under New template; listed here too, every
+   * workspace's own templates sat under 24 drafts it never touched (12 in each
+   * language). A starter joins the list once somebody publishes or edits it.
+   */
+  const listed = useMemo(() => {
+    const rows = (templates.data ?? []).filter(
+      (row) => row.starter_key === null || row.published_version !== null || row.draft_version > 1
+    );
+    if (show === 'published') return rows.filter((row) => row.published_version !== null);
+    if (show === 'drafts') return rows.filter((row) => row.published_version === null);
+    return rows;
+  }, [templates.data, show]);
+  const startersAvailable = (templates.data ?? []).some((row) => row.starter_key !== null);
+
   const recordTypeNames = recordTypes.data;
 
   const columns = useMemo<DataTableColumn<TemplateRow>[]>(
@@ -161,7 +182,6 @@ export default function DocumentTemplatesPage() {
         accessorKey: 'title',
         header: t('documentTemplates.table.title', 'Template'),
         enableSorting: true,
-        enableColumnFilter: true,
         cell: (row) => (
           <span className="flex flex-wrap items-center gap-2">
             <Link
@@ -229,7 +249,7 @@ export default function DocumentTemplatesPage() {
           size="icon-sm"
           aria-label={t('documentTemplates.rowActions.label', 'Actions for {name}', { name: nameOf(row) })}
         >
-          <IconMenu2 size={16} />
+          <IconDots size={16} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-auto min-w-52">
@@ -301,9 +321,31 @@ export default function DocumentTemplatesPage() {
         </p>
       )}
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ToggleGroup
+          label={t('documentTemplates.filter.label', 'Show')}
+          value={show}
+          required
+          onChange={(value) => typeof value === 'string' && setShow(value as ShowFilter)}
+          options={[
+            { value: 'all', label: t('documentTemplates.filter.all', 'All') },
+            { value: 'published', label: t('documentTemplates.filter.published', 'Published') },
+            { value: 'drafts', label: t('documentTemplates.filter.drafts', 'Drafts') },
+          ]}
+        />
+        {canWrite && startersAvailable && (
+          <p className="text-sm text-muted-foreground">
+            {t(
+              'documentTemplates.startersHint',
+              'Whity’s starters are under New template, and join this list once you publish or change one.'
+            )}
+          </p>
+        )}
+      </div>
+
       <DataTable
         columns={columns}
-        data={templates.data ?? []}
+        data={listed}
         getRowId={(row) => String(row.id)}
         rowActions={rowActions}
         onRowClick={(row) => router.push(editorHref(row.id))}
@@ -323,13 +365,38 @@ export default function DocumentTemplatesPage() {
         ariaLabel={t('documentTemplates.title', 'Templates')}
         enableGlobalFilter
         globalFilterPlaceholder={t('documentTemplates.searchTemplates', 'Search templates…')}
-        emptyState={{
-          title: t('documentTemplates.empty.templates.title', 'No templates you can see'),
-          description: t(
-            'documentTemplates.empty.templates.description',
-            'Templates are filtered by where you stand in the organisation and what you hold, so an empty list can also mean there are templates filed elsewhere.'
-          ),
-        }}
+        emptyState={
+          show !== 'all'
+            ? {
+                title: t('documentTemplates.empty.filtered.title', 'No templates match'),
+                description: t('documentTemplates.empty.filtered.description', 'Show all templates to see the rest.'),
+                action: (
+                  <Button variant="outline" onClick={() => setShow('all')}>
+                    {t('documentTemplates.empty.filtered.clear', 'Show all')}
+                  </Button>
+                ),
+              }
+            : startersAvailable && canWrite
+              ? {
+                  title: t('documentTemplates.empty.starters.title', 'No templates of your own yet'),
+                  description: t(
+                    'documentTemplates.empty.starters.description',
+                    'Start from one of Whity’s starters, such as an invoice or a receipt, and make it yours.'
+                  ),
+                  action: (
+                    <Button variant="outline" icon="plus" onClick={() => setStarting(true)}>
+                      {t('documentTemplates.new', 'New template')}
+                    </Button>
+                  ),
+                }
+              : {
+                  title: t('documentTemplates.empty.templates.title', 'No templates you can see'),
+                  description: t(
+                    'documentTemplates.empty.templates.description',
+                    'Templates are filtered by where you stand in the organisation and what you hold, so an empty list can also mean there are templates filed elsewhere.'
+                  ),
+                }
+        }
         errorState={
           templates.error !== null && !forbidden
             ? { title: t('documentTemplates.error.templates', 'Failed to load templates'), description: templates.error }
@@ -371,7 +438,7 @@ export default function DocumentTemplatesPage() {
         <ScopeDialog
           row={scoping}
           name={nameOf(scoping)}
-          ous={ous.data ?? []}
+          ous={units}
           ousUnavailable={ous.error !== null}
           permissionNames={permissionOptions.data?.names ?? []}
           permissionSource={permissionOptions.data?.source ?? 'own'}

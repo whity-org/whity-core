@@ -33,6 +33,12 @@ jest.mock('@/hooks/useCapabilities', () => ({
 const mockGet = jest.fn();
 jest.mock('@/lib/api/client', () => ({ api: { GET: (...args: unknown[]) => mockGet(...args) } }));
 
+let mockLanguage = 'en';
+jest.mock('@whity/features/i18n', () => ({
+  ...jest.requireActual('@whity/features/i18n'),
+  useLanguageCode: () => mockLanguage,
+}));
+
 import { SettingsArea } from '@/components/settings/settings-area';
 
 function tabs(ids: string[]) {
@@ -44,10 +50,25 @@ beforeEach(() => {
   mockPathname = '/admin/settings';
   mockNavItems = [];
   mockCaps = [];
+  mockLanguage = 'en';
   mockGet.mockReset();
 });
 
 describe('SettingsArea', () => {
+  it('asks for the tabs again when the language changes, with no reload', async () => {
+    mockGet.mockResolvedValueOnce({ data: { data: [{ id: 'branding', href: '/admin/settings/branding', label: 'Branding' }] } });
+    const { rerender } = render(<SettingsArea>page</SettingsArea>);
+    expect(await screen.findByText('Branding')).toBeInTheDocument();
+
+    mockGet.mockResolvedValueOnce({ data: { data: [{ id: 'branding', href: '/admin/settings/branding', label: 'الهوية' }] } });
+    mockLanguage = 'ar';
+    rerender(<SettingsArea>page</SettingsArea>);
+
+    expect(await screen.findByText('الهوية')).toBeInTheDocument();
+    expect(screen.queryByText('Branding')).toBeNull();
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
   it('groups the pages the server allows, in the decided order', async () => {
     mockGet.mockResolvedValue(tabs(['security', 'general', 'branding', 'email', 'feature-flags', 'storage']));
     mockNavItems = [{ id: 'tags', href: '/admin/tags', label: 'Tags' }];

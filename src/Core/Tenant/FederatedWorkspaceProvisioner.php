@@ -7,6 +7,7 @@ namespace Whity\Core\Tenant;
 use PDO;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\FederatedProviderContext;
+use Whity\Core\Plan\DefaultPlanAssigner;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 
@@ -172,6 +173,10 @@ final class FederatedWorkspaceProvisioner
             throw $e;
         }
 
+        // After the commit: applying a plan opens its own transaction. A closed
+        // payment gate is a plan row already, so it stays closed.
+        DefaultPlanAssigner::forDatabase($this->db)->assign($tenantId);
+
         // Post-commit, and only because this method owned the transaction: an
         // assertion for an append-only trail must not be made before the write
         // it describes is durable. Best-effort — a listener failure must not
@@ -236,7 +241,7 @@ final class FederatedWorkspaceProvisioner
     private function lockProfile(int $profileId): ?array
     {
         $forUpdate = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql' ? ' FOR UPDATE' : '';
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL table (ADR 0005 §1)
         $stmt = $this->db->prepare('SELECT display_name, status FROM profiles WHERE id = :id' . $forUpdate);
         $stmt->execute([':id' => $profileId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -259,7 +264,7 @@ final class FederatedWorkspaceProvisioner
 
     private function ownerRoleId(): ?int
     {
-        // @tenant-guard-ignore: base roles are global (NULL tenant_id); looked up by unique name
+        // Base roles are global (NULL tenant_id); looked up by unique name
         $stmt = $this->db->prepare('SELECT id FROM roles WHERE name = :name AND tenant_id IS NULL LIMIT 1');
         $stmt->execute([':name' => self::OWNER_ROLE]);
         $id = $stmt->fetchColumn();
@@ -269,7 +274,7 @@ final class FederatedWorkspaceProvisioner
     /** $base, or "$base 2", "$base 3"… whichever no tenant holds yet. */
     private function freeName(string $base): string
     {
-        // @tenant-guard-ignore: the tenants table is the tenant registry itself, not a tenant-scoped resource
+        // The tenants table is the tenant registry itself, not a tenant-scoped resource
         $stmt = $this->db->prepare('SELECT 1 FROM tenants WHERE name = :name LIMIT 1');
         for ($n = 1; $n <= self::NAME_ATTEMPTS; $n++) {
             $name = $n === 1 ? $base : $base . ' ' . $n;
@@ -285,7 +290,7 @@ final class FederatedWorkspaceProvisioner
     /** An opaque slug no tenant holds: `ws-` and twelve hex digits. */
     private function freeSlug(): string
     {
-        // @tenant-guard-ignore: the tenants table is the tenant registry itself, not a tenant-scoped resource
+        // The tenants table is the tenant registry itself, not a tenant-scoped resource
         $stmt = $this->db->prepare('SELECT 1 FROM tenants WHERE slug = :slug LIMIT 1');
         do {
             $slug = 'ws-' . bin2hex(random_bytes(6));

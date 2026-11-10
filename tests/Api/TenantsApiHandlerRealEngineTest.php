@@ -12,6 +12,7 @@ use Whity\Api\TenantsApiHandler;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Request;
 use Whity\Core\Tenant\TenantContext;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Real-engine (in-memory SQLite) tests for {@see TenantsApiHandler::list()} (WC-122).
@@ -149,9 +150,9 @@ final class TenantsApiHandlerRealEngineTest extends TestCase
      * Every key the endpoint offers actually reorders the list, in both
      * directions, and the default is the `created_at DESC` it always used.
      *
-     * @dataProvider tenantSortCases
      * @param list<int> $expected Tenant ids in the order the endpoint must return them.
      */
+    #[DataProvider('tenantSortCases')]
     public function testEachSortKeyReordersTheList(string $query, array $expected): void
     {
         $this->seedSortableTenants();
@@ -927,9 +928,9 @@ final class TenantsApiHandlerRealEngineTest extends TestCase
      * anything left behind here could only be finished or removed by the direct
      * SQL this endpoint exists to eliminate.
      *
-     * @dataProvider badAdminProvider
      * @param array<mixed> $admin
      */
+    #[DataProvider('badAdminProvider')]
     public function testARejectedAdministratorLeavesNoTenantBehind(array $admin, int $expectedStatus): void
     {
         MockRequestFactory::setTestTenant(0);
@@ -966,6 +967,21 @@ final class TenantsApiHandlerRealEngineTest extends TestCase
      * The block is optional, so every existing caller must be unaffected —
      * including the userCount the response reports.
      */
+    public function testCreateLandsTheNewWorkspaceOnTheDefaultPlan(): void
+    {
+        $plans = new \Whity\Core\Plan\PlanRepository($this->pdo);
+        $planId = $plans->createPlan('starter', 'Starter', null, true, 0);
+        (new \Whity\Core\Settings\GlobalSettingsRepository($this->pdo))
+            ->set(\Whity\Core\Settings\SettingsRegistry::BILLING_DEFAULT_PLAN, 'starter');
+
+        MockRequestFactory::setTestTenant(0);
+        $response = $this->handler()->create($this->createRequest(['name' => 'Planned Tenant']));
+
+        $this->assertSame(201, $response->getStatusCode(), $response->getBody());
+        $tenantId = (int) json_decode($response->getBody(), true)['data']['id'];
+        $this->assertSame($planId, $plans->getTenantPlan($tenantId)['plan_id'] ?? null);
+    }
+
     public function testCreateWithoutAnAdministratorIsUnchanged(): void
     {
         MockRequestFactory::setTestTenant(0);

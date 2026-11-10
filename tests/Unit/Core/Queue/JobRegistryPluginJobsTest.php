@@ -10,6 +10,7 @@ use Whity\Core\Queue\InvalidPluginJobException;
 use Whity\Core\Queue\JobRegistry;
 use Whity\Core\Queue\Jobs\EchoJob;
 use Whity\Sdk\JobInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The SOURCE-attributed half of {@see JobRegistry}: what happens when a job
@@ -214,9 +215,7 @@ final class JobRegistryPluginJobsTest extends TestCase
         return [['Sync'], ['1sync'], [''], ['sync-job'], ['sync job'], ['_sync'], ['sync.'], ['.sync']];
     }
 
-    /**
-     * @dataProvider malformedNames
-     */
+    #[DataProvider('malformedNames')]
     public function testAMalformedJobNameIsRefused(string $name): void
     {
         $registry = new JobRegistry();

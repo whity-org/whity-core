@@ -25,7 +25,7 @@ const FALLBACK: Branding = {
  * JWT tenant). React.cache dedupes the call between generateMetadata, the
  * layout body and getBrandThemeCss within one request.
  */
-const fetchBranding = cache(async (): Promise<Record<string, unknown> | null> => {
+export const fetchBranding = cache(async (): Promise<Record<string, unknown> | null> => {
   try {
     const h = await headers();
     const cookieHeader = (await cookies())

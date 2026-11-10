@@ -6,9 +6,11 @@ namespace Whity\Api;
 
 use Whity\Auth\RoleChecker;
 use Whity\Core\CoreVersion;
+use Whity\Core\Document\Render\RenderServiceClientInterface;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Request;
 use Whity\Core\Response;
+use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Core\Update\LatestReleaseCheck;
@@ -45,7 +47,40 @@ final class PlatformVersionApiHandler
     public function __construct(
         private readonly RoleChecker $roleChecker,
         private readonly LatestReleaseCheck $releaseCheck,
+        private readonly ?RenderServiceClientInterface $renderService = null,
+        private readonly ?SettingsService $settings = null,
     ) {
+    }
+
+    /**
+     * GET /api/v1/platform/renderer — can this deployment print documents,
+     * and if not, exactly what to change (WHIT-1001).
+     *
+     * Asks the render service afresh rather than reading the cached answer
+     * the print paths use: an operator who just fixed the secret wants to see
+     * it fixed now, not in a minute. It costs one `/health` and one
+     * `/auth-check` call, neither of which spends a render.
+     *
+     * `printing` is what the document routes act on: the operator's switch
+     * (`documents.render_enabled`) AND a ready service. The switch is reported
+     * apart so "you switched it off" never reads as "it is broken".
+     */
+    public function renderer(Request $request): Response
+    {
+        if (($denied = $this->authorize($request)) !== null) {
+            return $denied;
+        }
+        if ($this->renderService === null || $this->settings === null) {
+            return Response::error('The render status is not available in this context', 503);
+        }
+
+        $switchedOn = ($this->settings->effective(SettingsService::SYSTEM_TENANT_ID)[SettingsRegistry::DOCUMENTS_RENDER_ENABLED] ?? 'true') === 'true';
+        $readiness = $this->renderService->readiness(true);
+
+        return Response::json($readiness->toArray() + [
+            'switched_on' => $switchedOn,
+            'printing' => $switchedOn && $readiness->isReady(),
+        ], 200);
     }
 
     /**

@@ -129,7 +129,7 @@ final class MeHomeApiHandler
             ['key' => 'tax', 'done' => $this->settingSet($tenantId, [SettingsRegistry::COMPANY_TAX_ID])],
         ];
 
-        // @tenant-guard-ignore: plans is a platform catalogue with no tenant column
+        // Plans is a platform catalogue with no tenant column
         $plans = $this->db->query('SELECT COUNT(*) FROM plans WHERE is_active');
         if ($plans !== false && (int) $plans->fetchColumn() > 0) {
             $steps[] = ['key' => 'plan', 'done' => $this->count('SELECT COUNT(*) FROM tenant_plan WHERE tenant_id = :tenant_id', $tenantId) > 0];

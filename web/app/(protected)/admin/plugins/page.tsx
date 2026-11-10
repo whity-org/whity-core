@@ -482,7 +482,11 @@ export default function PluginsPage() {
       cell: (plugin) => (
         <div className="space-y-1">
           <p className="font-medium text-foreground">{plugin.name}</p>
-          <Badge variant="outline" className="w-fit">{t('pluginStore.notVerified', 'Not verified')}</Badge>
+          {plugin.trust === 'verified' ? (
+            <Badge variant="default" className="w-fit">{t('pluginStore.verified', 'Verified')}</Badge>
+          ) : (
+            <Badge variant="outline" className="w-fit">{t('pluginStore.notVerified', 'Not verified')}</Badge>
+          )}
           <TechnicalDetails>
             <p className="font-mono text-xs text-muted-foreground">{plugin.id}</p>
           </TechnicalDetails>
@@ -848,6 +852,31 @@ export default function PluginsPage() {
                 <div>
                   <h4 className="font-semibold text-muted-foreground">{t('plugins.detail.version', 'Version')}</h4>
                   <p className="mt-1 font-medium">{detailPlugin.version || t('plugins.version.unknown', 'Not known')}</p>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-muted-foreground">{t('plugins.detail.trust', 'Verification')}</h4>
+                  {detailPlugin.trust === 'verified' && detailPlugin.mark ? (
+                    <div className="mt-1 space-y-1">
+                      <p className="font-medium">
+                        {t('plugins.detail.reviewed', 'Reviewed on {host} on {date}; its code runs on your server.', {
+                          host: detailPlugin.mark.host,
+                          date: dates.date(detailPlugin.mark.reviewed_at) ?? '',
+                        })}
+                      </p>
+                      {detailPlugin.mark.offline ? (
+                        <p className="text-muted-foreground">
+                          {t('plugins.detail.markOffline', 'Not confirmed since {date}: the store could not be reached.', {
+                            date: dates.date(detailPlugin.mark.checked_at) ?? '',
+                          })}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-muted-foreground">
+                      {t('plugins.detail.notVerified', 'Not verified. Its code runs on your server once it is on.')}
+                    </p>
+                  )}
                 </div>
 
                 {detailPlugin.install ? (

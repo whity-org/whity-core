@@ -410,7 +410,7 @@ class SeedCommand implements CommandHelp, CliCommand
      */
     private function defaultTenant(Database $db): ?array
     {
-        // @tenant-guard-ignore: `tenants` is the tenant registry itself, not a tenant-owned table
+        // `tenants` is the tenant registry itself, not a tenant-owned table
         $row = $db->query(
             'SELECT id, name FROM tenants WHERE name = :name',
             [':name' => Seeder::DEFAULT_TENANT_NAME]

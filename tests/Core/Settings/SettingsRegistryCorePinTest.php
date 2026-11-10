@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Whity\Core\Settings\PluginSettingsRegistry;
 use Whity\Core\Settings\SettingsCatalog;
 use Whity\Core\Settings\SettingsRegistry;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The regression net for opening the settings registry to plugins (#713 item 1).
@@ -95,12 +96,14 @@ final class SettingsRegistryCorePinTest extends TestCase
             'licensing.billing_basis',
             'seats.enforcement',
             'seats.count_invited',
+            'meters.enforcement',
             // #billing — invoicing. Eight tenant-overridable (tax treatment
             // and seller identity both differ per tenant in a white-label
             // deployment) and three global-only (numbering, whose per-tenant
             // override would make the uniqueness index mean something a tenant
             // admin can change).
             'billing.default_currency',
+            'billing.default_plan',
             'billing.tax_rate_bp',
             'billing.tax_label',
             'billing.tax_inclusive',
@@ -130,6 +133,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'dunning.lock_after_days',
             'plugins.store_allowed_hosts',
             'plugins.store_enabled',
+            'plugins.mcp_prompts_require_mark',
             'documents.render_enabled',
             'documents.theme',
             'documents.theme_by_kind',
@@ -157,6 +161,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             // them was the pin working; they are added here deliberately.
             'documents.qr_enabled',
             'documents.qr_public_detail',
+            // WHIT-920: whether an applicant sees who reviewed their form. Off.
+            'forms.show_reviewer_names',
             // #999 — how many people a USER GROUP preview SHOWS. Not a ceiling
             // on resolution: the count a preview reports is exact and unbounded,
             // this is the size of the sample beside it.
@@ -176,6 +182,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'ui.hide_dates',
             // #1019. The cap on one label-resolution request.
             'labels.resolve_max_ids',
+            // #1733. Whether the web app can be installed (instance-wide).
+            'app.installable',
         ];
     }
 
@@ -275,11 +283,13 @@ final class SettingsRegistryCorePinTest extends TestCase
             'licensing.billing_basis' => 'activated',
             'seats.enforcement' => 'warn',
             'seats.count_invited' => 'true',
+            'meters.enforcement' => 'block',
             // Tax defaults to ZERO, not to any country's rate: charging tax
             // an operator is not registered to collect is a worse failure than
             // not charging it, and a default correct for one jurisdiction and
             // wrong for every other gets shipped unnoticed.
             'billing.default_currency' => 'JOD',
+            'billing.default_plan' => '',
             'billing.tax_rate_bp' => '0',
             'billing.tax_label' => '',
             'billing.tax_inclusive' => 'false',
@@ -304,9 +314,12 @@ final class SettingsRegistryCorePinTest extends TestCase
             'affiliate.withholding_bp' => '0',
             'dunning.retry_schedule_days' => '1,3,7',
             'dunning.lock_after_days' => '14',
-            'plugins.store_allowed_hosts' => '',
+            'plugins.store_allowed_hosts' => 'app.whity.dev',
             'plugins.store_enabled' => 'true',
-            'documents.render_enabled' => 'false',
+            'plugins.mcp_prompts_require_mark' => 'false',
+            // WHIT-1001: on by default; printing also needs a ready render
+            // service, so an install without one still prints nothing.
+            'documents.render_enabled' => 'true',
             // Whity's standard theme until a workspace chooses its own (editor M4d).
             'documents.theme' => 'whity.standard',
             'documents.theme_by_kind' => '',
@@ -351,6 +364,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             // leak where a document sits internally.
             'documents.qr_enabled' => 'false',
             'documents.qr_public_detail' => 'minimal',
+            // WHIT-920: OFF. Applicants see stages and outcomes, not reviewers.
+            'forms.show_reviewer_names' => 'false',
             // Ten faces: enough to recognise a group at a glance, small enough
             // that nobody mistakes the sample for the list.
             'groups.preview_sample_size' => '10',
@@ -374,6 +389,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             // argument i18n.enabled won above, pointing the other way.
             'ui.hide_dates' => 'false',
             'labels.resolve_max_ids' => '100',
+            // #1733: on, which is what app.whity.dev wants; an operator turns
+            // it off here or with PWA_ENABLED.
+            'app.installable' => 'true',
         ];
     }
 
@@ -526,14 +544,14 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['labels.resolve_max_ids', '500', true],
             ['labels.resolve_max_ids', '501', false],
             ['labels.resolve_max_ids', '0', false],
+            ['app.installable', 'false', true],
+            ['app.installable', '1', false],
             ['branding_favicon', 'anything', false],
             ['not_a_setting_at_all', 'x', false],
         ];
     }
 
-    /**
-     * @dataProvider validationSamples
-     */
+    #[DataProvider('validationSamples')]
     public function testCoreValidationOutcomesAreUnchanged(string $key, string $value, bool $valid): void
     {
         $reason = SettingsRegistry::validate($key, $value);
@@ -549,9 +567,8 @@ final class SettingsRegistryCorePinTest extends TestCase
      * The same sample, through the UNION with a plugin loaded. This is the
      * assertion that actually protects the 330 call sites: whatever a plugin
      * declares, a core key's answer does not move.
-     *
-     * @dataProvider validationSamples
      */
+    #[DataProvider('validationSamples')]
     public function testCoreValidationOutcomesSurviveAPluginContribution(string $key, string $value, bool $valid): void
     {
         $plugins = new PluginSettingsRegistry();
@@ -593,6 +610,8 @@ final class SettingsRegistryCorePinTest extends TestCase
         // Languages are a PLATFORM catalogue with no tenant_id column, and the
         // sign-in screen resolves one before any tenant is known.
         self::assertTrue(SettingsRegistry::isGlobalOnly('i18n.enabled'));
+        // Code plugins are install-wide, so whose prompts are served is too (WHIT-1014).
+        self::assertTrue(SettingsRegistry::isGlobalOnly('plugins.mcp_prompts_require_mark'));
 
         self::assertTrue(SettingsRegistry::isFeatureFlag('mcp.enabled'));
         self::assertFalse(SettingsRegistry::isFeatureFlag('mail.events.welcome_enabled'));

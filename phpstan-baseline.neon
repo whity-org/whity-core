@@ -739,24 +739,6 @@ parameters:
 			path: tests/Http/RbacMiddlewareTest.php
 
 		-
-			message: '#^Call to an undefined method Whity\\Auth\\JwtParser\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 17
-			path: tests/Http/RbacMiddlewareTest.php
-
-		-
-			message: '#^Call to an undefined method Whity\\Auth\\RoleChecker\:\:expects\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: tests/Http/RbacMiddlewareTest.php
-
-		-
-			message: '#^Call to an undefined method Whity\\Auth\\RoleChecker\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 11
-			path: tests/Http/RbacMiddlewareTest.php
-
-		-
 			message: '#^Property Tests\\Http\\RbacMiddlewareTest\:\:\$secret is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
@@ -1174,12 +1156,6 @@ parameters:
 			message: '#^Access to an undefined property object\:\:\$user_id\.$#'
 			identifier: property.notFound
 			count: 1
-			path: tests/Unit/Http/Middleware/EnforceTenantIsolationTest.php
-
-		-
-			message: '#^Call to an undefined method Whity\\Auth\\JwtParser\:\:method\(\)\.$#'
-			identifier: method.notFound
-			count: 19
 			path: tests/Unit/Http/Middleware/EnforceTenantIsolationTest.php
 
 		-

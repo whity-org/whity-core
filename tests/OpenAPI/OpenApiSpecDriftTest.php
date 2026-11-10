@@ -97,6 +97,8 @@ final class OpenApiSpecDriftTest extends TestCase
         // plugins/.gitignore's allowlist alongside HelloWorld/UiKitShowcase, so
         // a clean CI checkout includes it too.
         self::copyDirectory($source . '/DemoCatalog', self::$referencePluginsDir . '/DemoCatalog');
+        // Glossary is the committed reference for translatable fields (#521).
+        self::copyDirectory($source . '/Glossary', self::$referencePluginsDir . '/Glossary');
     }
 
     public static function tearDownAfterClass(): void

@@ -31,6 +31,7 @@ use Whity\Core\Queue\InvalidPluginJobException;
 use Whity\Core\Queue\JobRegistry;
 use Whity\Core\Settings\InvalidSettingDeclarationException;
 use Whity\Core\Settings\PluginSettingsRegistry;
+use Whity\Sdk\Secrets\PluginSecretFieldsInterface;
 use Whity\Sdk\Settings\PluginSettingsInterface;
 use Whity\Sdk\DataType\PluginDataTypesInterface;
 use Whity\Sdk\Ou\PluginOuTypesInterface;
@@ -48,7 +49,10 @@ use Whity\Sdk\Manifest\ManifestPlugin;
 use Whity\Sdk\Http\Request;
 use Whity\Sdk\Http\Response;
 use Whity\Mcp\Prompts\Prompt;
+use Whity\Mcp\Prompts\PromptArgument;
+use Whity\Mcp\Prompts\PromptMessage;
 use Whity\Mcp\Prompts\PromptRegistry;
+use Whity\Mcp\Resources\PluginResourceRegistry;
 use Whity\Mcp\Tools\AuthoredToolRegistry;
 use Whity\Sdk\PluginAgentPresetsInterface;
 use Whity\Sdk\PluginAgentsInterface;
@@ -59,6 +63,7 @@ use Whity\Sdk\PluginFrontendInterface;
 use Whity\Sdk\PluginInterface;
 use Whity\Sdk\PluginJobsInterface;
 use Whity\Sdk\PluginMcpInterface;
+use Whity\Sdk\PluginMcpResourcesInterface;
 use Whity\Sdk\PluginMcpToolsInterface;
 use Whity\Sdk\PluginMcpToolsetsInterface;
 use Whity\Sdk\PluginRequirementsInterface;
@@ -66,6 +71,10 @@ use Whity\Core\Entitlement\PluginEntitlements;
 use Whity\Sdk\PluginEntitlementsInterface;
 use Whity\Sdk\PluginRolesInterface;
 use Whity\Sdk\PluginThemeInterface;
+use Whity\Sdk\PluginBillingPortalInterface;
+use Whity\Core\Billing\External\PluginBillingPortals;
+use Whity\Core\Billing\HostLicenceSales;
+use Whity\Sdk\PluginLicenceSalesInterface;
 use Whity\Sdk\Sdk;
 
 /**
@@ -77,6 +86,10 @@ use Whity\Sdk\Sdk;
  */
 class PluginLoader
 {
+    /** Arguments and messages kept per plugin prompt, and the length of each message (SDK 1.80). */
+    private const MAX_PROMPT_ITEMS = 20;
+    private const MAX_PROMPT_TEXT  = 8000;
+
     /**
      * The mandated `resource:action` permission pattern (WC-13/WC-169).
      *
@@ -145,6 +158,12 @@ class PluginLoader
      * here has.
      */
     private ?WindowTypeRegistry $windowTypeRegistry = null;
+
+    /** Where a plugin-provided billing portal goes (SDK 1.77); null means plugins cannot sell. */
+    private ?PluginBillingPortals $billingPortals = null;
+
+    /** Where a plugin's licence seller goes (SDK 1.86); null means plugins cannot sell licences. */
+    private ?HostLicenceSales $licenceSales = null;
 
     /**
      * Optional catalogue of plugin-contributed status-page probes.
@@ -457,6 +476,24 @@ class PluginLoader
         $this->roleSeeder = $roleSeeder;
 
         $this->registerAutoloader();
+    }
+
+    /**
+     * Accept a plugin's billing portal (SDK 1.77, WHIT-1010).
+     *
+     * A setter rather than another constructor argument: the portal slot is
+     * built beside the billing handler, and the constructor's positional list
+     * is already long enough that one more is a merge hazard for every lane.
+     */
+    public function setBillingPortals(PluginBillingPortals $billingPortals): void
+    {
+        $this->billingPortals = $billingPortals;
+    }
+
+    /** Accept a plugin's store-licence seller (SDK 1.86, WHIT-1013). One per deployment. */
+    public function setLicenceSales(HostLicenceSales $licenceSales): void
+    {
+        $this->licenceSales = $licenceSales;
     }
 
     /**
@@ -875,6 +912,7 @@ class PluginLoader
             $this->documentFieldRegistry?->removeOwner($info['plugin']->getName());
             // A reload must not leave a removed plugin's webhook public (WHIT-671).
             \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
+        \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
 
             if ($this->hookManager !== null) {
                 foreach ($info['hooks'] as $hook) {
@@ -1518,6 +1556,78 @@ class PluginLoader
     }
 
     /**
+     * The notification types active plugins declare, with their labels
+     * (WHIT-1030). A declaration that throws or is malformed costs that plugin
+     * its entries here and nothing else.
+     *
+     * @return list<array{type: string, label: array{en: string, ar: string}, plugin: string}>
+     */
+    public function declaredNotificationTypes(): array
+    {
+        $declared = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $plugin = $info['plugin'];
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if (
+                !$plugin instanceof \Whity\Sdk\Notification\PluginNotificationsInterface
+                || isset($this->administrativelyDisabled[$pluginKey])
+                || $lifecycle === null
+                || !$lifecycle->isActive()
+            ) {
+                continue;
+            }
+            try {
+                $slug = \Whity\Core\Plugin\PluginIdentity::slugOf($plugin);
+                foreach (\Whity\Core\Notification\PluginNotificationTypes::of($plugin, $slug) as $type => $label) {
+                    $declared[] = ['type' => $type, 'label' => $label, 'plugin' => $slug];
+                }
+            } catch (Throwable $e) {
+                $this->logWarning("Plugin {$pluginKey} declares invalid notification types: " . $e->getMessage());
+            }
+        }
+
+        return $declared;
+    }
+
+    /**
+     * What active plugins declare to run on a schedule (WHIT-1031). A declaration
+     * that throws or is malformed is logged and reported under `unreadable`, so
+     * the plugin's existing schedules are left alone.
+     *
+     * @return array{schedules: array<string, string>, unreadable: list<string>}
+     */
+    public function collectSchedules(): array
+    {
+        $schedules = [];
+        $unreadable = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $plugin = $info['plugin'];
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if (
+                !$plugin instanceof \Whity\Sdk\Jobs\PluginScheduledJobsInterface
+                || isset($this->administrativelyDisabled[$pluginKey])
+                || $lifecycle === null
+                || !$lifecycle->isActive()
+            ) {
+                continue;
+            }
+            try {
+                $slug = \Whity\Core\Plugin\PluginIdentity::slugOf($plugin);
+            } catch (Throwable) {
+                continue;
+            }
+            try {
+                $schedules += \Whity\Core\Scheduler\PluginSchedules::of($plugin, $slug);
+            } catch (Throwable $e) {
+                $unreadable[] = $slug;
+                $this->logWarning("Plugin {$pluginKey} declares invalid schedules: " . $e->getMessage());
+            }
+        }
+
+        return ['schedules' => $schedules, 'unreadable' => $unreadable];
+    }
+
+    /**
      * Get all registered plugins
      *
      * @return array<PluginInterface> Array of registered plugin instances
@@ -1545,12 +1655,20 @@ class PluginLoader
      *   would still be part of the platform's surface, which is not what
      *   disabling one means — and it is what made prompts/list keep advertising
      *   a plugin after it was turned off (#952).
+     * - SDK 1.80 (WHIT-993): only a plugin the operator granted agent context
+     *   contributes, and each prompt must declare `requiredPermission`. With no
+     *   $granted, no plugin is granted.
+     *
+     * @param (\Closure(string): bool)|null $granted whether the plugin of this name may reach agents
      */
-    public function collectMcpPrompts(PromptRegistry $registry): void
+    public function collectMcpPrompts(PromptRegistry $registry, ?\Closure $granted = null): void
     {
         foreach ($this->registeredPlugins as $pluginKey => $info) {
             $plugin = $info['plugin'];
             if (!$plugin instanceof PluginMcpInterface) {
+                continue;
+            }
+            if ($granted === null || !$granted($plugin->getName())) {
                 continue;
             }
 
@@ -1568,7 +1686,7 @@ class PluginLoader
                 continue;
             }
             foreach ($descriptors as $descriptor) {
-                $this->registerMcpPrompt($registry, $descriptor, $pluginKey);
+                $this->registerMcpPrompt($registry, $descriptor, $pluginKey, $plugin->getName());
             }
         }
     }
@@ -1634,7 +1752,7 @@ class PluginLoader
         }
     }
 
-    private function registerMcpPrompt(PromptRegistry $registry, mixed $descriptor, string $pluginKey): void
+    private function registerMcpPrompt(PromptRegistry $registry, mixed $descriptor, string $pluginKey, string $pluginName): void
     {
         if (!is_array($descriptor)) {
             $this->logWarning("[Plugin:{$pluginKey}] getMcpPrompts() returned a non-array descriptor — skipped.");
@@ -1645,20 +1763,89 @@ class PluginLoader
             $this->logWarning("[Plugin:{$pluginKey}] getMcpPrompts() descriptor missing or empty 'name' — skipped.");
             return;
         }
-        if ($registry->find($name) !== null) {
+        if ($registry->has($name)) {
             $this->logWarning("[Plugin:{$pluginKey}] getMcpPrompts() prompt '{$name}' already registered — skipped (first-registration-wins).");
             return;
         }
         $description        = is_string($descriptor['description'] ?? null) ? $descriptor['description'] : '';
-        $requiredRole       = is_string($descriptor['requiredRole'] ?? null) ? $descriptor['requiredRole'] : null;
-        $requiredPermission = is_string($descriptor['requiredPermission'] ?? null) ? $descriptor['requiredPermission'] : null;
+        $requiredRole       = is_string($descriptor['requiredRole'] ?? null) && $descriptor['requiredRole'] !== '' ? $descriptor['requiredRole'] : null;
+        $requiredPermission = is_string($descriptor['requiredPermission'] ?? null) && $descriptor['requiredPermission'] !== '' ? $descriptor['requiredPermission'] : null;
+        // SDK 1.80 (WHIT-993): never open to every caller.
+        if ($requiredPermission === null) {
+            $this->logWarning("[Plugin:{$pluginKey}] getMcpPrompts() prompt '{$name}' declares no requiredPermission — skipped (SDK 1.80).");
+            return;
+        }
+
+        $arguments = [];
+        foreach (array_slice(is_array($descriptor['arguments'] ?? null) ? $descriptor['arguments'] : [], 0, self::MAX_PROMPT_ITEMS) as $argument) {
+            if (is_array($argument) && is_string($argument['name'] ?? null) && preg_match('/^[A-Za-z_][A-Za-z0-9_]{0,63}$/', $argument['name']) === 1) {
+                $arguments[] = new PromptArgument(
+                    $argument['name'],
+                    is_string($argument['description'] ?? null) ? mb_substr($argument['description'], 0, 500) : '',
+                    ($argument['required'] ?? false) === true,
+                );
+            }
+        }
+        $messages = [];
+        foreach (array_slice(is_array($descriptor['messages'] ?? null) ? $descriptor['messages'] : [], 0, self::MAX_PROMPT_ITEMS) as $message) {
+            $role = is_array($message) ? ($message['role'] ?? null) : null;
+            $text = is_array($message) && is_array($message['content'] ?? null) ? ($message['content']['text'] ?? null) : null;
+            if (in_array($role, ['user', 'assistant'], true) && is_string($text)) {
+                $messages[] = new PromptMessage($role, mb_substr($text, 0, self::MAX_PROMPT_TEXT));
+            }
+        }
 
         $registry->register(new Prompt(
             name:               $name,
             description:        $description,
+            arguments:          $arguments,
+            messages:           $messages,
             requiredRole:       $requiredRole,
             requiredPermission: $requiredPermission,
+            plugin:             $pluginName,
         ));
+    }
+
+    /**
+     * Register the MCP resources plugins offer agents (SDK 1.80, WHIT-993,
+     * {@see PluginMcpResourcesInterface}). The same rules as
+     * {@see collectMcpPrompts()}: active plugins only, and only those the
+     * operator granted agent context; with no $granted, none.
+     *
+     * @param (\Closure(string): bool)|null $granted whether the plugin of this name may reach agents
+     */
+    public function collectMcpResources(PluginResourceRegistry $registry, ?\Closure $granted = null): void
+    {
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $plugin = $info['plugin'];
+            if (!$plugin instanceof PluginMcpResourcesInterface) {
+                continue;
+            }
+            if (isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive()) {
+                continue;
+            }
+            if ($granted === null || !$granted($plugin->getName())) {
+                continue;
+            }
+            try {
+                $descriptors = $plugin->getMcpResources();
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getMcpResources');
+                continue;
+            }
+            foreach ($descriptors as $descriptor) {
+                $refused = is_array($descriptor) // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                    ? $registry->register($descriptor, $plugin->getName())
+                    : 'getMcpResources() returned a non-array descriptor';
+                if ($refused !== null) {
+                    $this->logWarning("[Plugin:{$pluginKey}] {$refused} — skipped.");
+                }
+            }
+        }
     }
 
     /**
@@ -2078,6 +2265,7 @@ class PluginLoader
         // ...and its public webhook paths with them (WHIT-671), so a disabled
         // plugin leaves nothing reachable without tenant resolution.
         \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
+        \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
 
         if ($this->hookManager !== null) {
             foreach ($info['hooks'] as $hook) {
@@ -3102,6 +3290,10 @@ class PluginLoader
         string $namespacePrefix,
         string $pluginKey
     ): array {
+        // WHIT-1030: the name a plugin's own services are bound to, fixed here
+        // rather than read from the plugin each time it asks.
+        \Whity\Core\Plugin\PluginIdentity::bind($plugin, $plugin->getName());
+
         // Snapshot the declared routes ONCE so registration and the frontend
         // descriptor validation below judge the same declaration set.
         $routes = $plugin->getRoutes();
@@ -3190,6 +3382,26 @@ class PluginLoader
             $wantsPublicForm = $wantsPublic && $declared['public'] === 'form';
             // A public READ (WHIT-704): `'public' => 'read'` on a keyed GET.
             $wantsPublicRead = $wantsPublic && $declared['public'] === 'read';
+            // A SERVICE route (SDK 1.84, WHIT-1011): called server to server with
+            // the trusted issuer's token for this scope, never by a person.
+            $wantsService = array_key_exists('service', $declared);
+            $serviceScope = $wantsService && is_string($declared['service']) ? $declared['service'] : null;
+            if ($wantsService) {
+                $refusal = \Whity\Core\Plugin\PluginServiceRoutes::refusal(
+                    $declared['service'],
+                    $requiredPermission,
+                    $requiredRole,
+                    $declared['public'] ?? null,
+                );
+                if ($refusal !== null) {
+                    $this->logWarning(
+                        "Plugin {$pluginKey} route {$method} {$path} asks to be a service route: {$refusal}; "
+                        . 'the route was NOT registered (fail-closed).'
+                    );
+                    continue;
+                }
+            }
+
             if ($wantsPublic) {
                 $refusal = match (true) {
                     $declared['public'] === true => \Whity\Core\Plugin\PluginPublicRoutes::refusal(
@@ -3229,7 +3441,7 @@ class PluginLoader
                 // OpenAPI declaration through to the router/generator.
                 $schema = isset($route['schema']) && is_array($route['schema']) ? $route['schema'] : null;
 
-                $wrappedHandler = $this->wrapHandler($pluginKey, $handler, $wantsPublic, $wantsPublicForm, $wantsPublicRead);
+                $wrappedHandler = $this->wrapHandler($pluginKey, $handler, $wantsPublic, $wantsPublicForm, $wantsPublicRead, $wantsService);
                 $accepted = $this->router->register(
                     $method,
                     $path,
@@ -3251,6 +3463,21 @@ class PluginLoader
                         . 'route and was NOT registered (first registration wins).'
                     );
                     continue;
+                }
+
+                if ($serviceScope !== null) {
+                    $served = $this->router->versionedPath((string) $path);
+                    // A value every parameter pattern accepts, digits included.
+                    $probe = (string) preg_replace('/\{[^}]+\}/', '1', $served);
+                    $resolved = $this->router->match(new \Whity\Core\Request(strtoupper((string) $method), $probe, [], ''));
+                    if ($resolved !== null && ($resolved['namespacePrefix'] ?? null) === $namespacePrefix) {
+                        \Whity\Core\Plugin\PluginServiceRoutes::add($namespacePrefix, (string) $method, (string) $resolved['path'], $serviceScope);
+                    } else {
+                        $this->logWarning(
+                            "Plugin {$pluginKey} service route {$method} {$path} could not be resolved to itself; "
+                            . 'it stays registered but no token can open it.'
+                        );
+                    }
                 }
 
                 if ($wantsPublic) {
@@ -3462,6 +3689,42 @@ class PluginLoader
                 );
             } catch (Throwable $e) {
                 $this->handlePluginThrowable($pluginKey, $e, 'getHealthProbes');
+            }
+        }
+
+        // 2a-quater. Accept a plugin BILLING PORTAL (SDK 1.77, WHIT-1010). One
+        //     per deployment: the slot refuses a second and says so, because two
+        //     plugins both taking a deployment's subscription money would make
+        //     "which provider holds this customer" a question with two answers.
+        if ($this->billingPortals !== null && $plugin instanceof PluginBillingPortalInterface) {
+            try {
+                if (!$this->billingPortals->offer($plugin->getName(), $plugin->getBillingPortal())) {
+                    $this->logWarning(
+                        "Plugin {$pluginKey} offers a billing portal, but "
+                        . ($this->billingPortals->ownerName() ?? 'another plugin')
+                        . ' already provides one; it was not used.'
+                    );
+                }
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getBillingPortal');
+            }
+        }
+
+        // 2a-quinquies. Accept a plugin's STORE-LICENCE SELLER (SDK 1.86,
+        //     WHIT-1013). One per deployment, stamped with the plugin's own
+        //     name: the store must reach exactly one seller and know which, so
+        //     a second offer is refused rather than allowed to answer for it.
+        if ($this->licenceSales !== null && $plugin instanceof PluginLicenceSalesInterface) {
+            try {
+                if (!$this->licenceSales->offer($plugin->getName(), $plugin->getLicenceSales())) {
+                    $this->logWarning(
+                        "Plugin {$pluginKey} offers to sell store licences, but "
+                        . ($this->licenceSales->providerName() ?? 'another plugin')
+                        . ' already does; it was not used.'
+                    );
+                }
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getLicenceSales');
             }
         }
 
@@ -3851,6 +4114,15 @@ class PluginLoader
 
         $validated = [];
         $dropped = [];
+        // SDK 1.88: the secrets a `secretField` block may name.
+        $secretFields = [];
+        if ($plugin instanceof PluginSecretFieldsInterface) {
+            try {
+                $secretFields = $plugin->getSecretFields();
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getSecretFields');
+            }
+        }
         foreach ($declared as $descriptor) {
             $normalized = $this->validateFrontendFeature(
                 $descriptor,
@@ -3859,7 +4131,8 @@ class PluginLoader
                 $ownPermissions,
                 $registeredGetRoutes,
                 $registeredWriteRoutes,
-                $dropped
+                $dropped,
+                $secretFields
             );
             if ($normalized !== null) {
                 $validated[] = $normalized;
@@ -3971,6 +4244,7 @@ class PluginLoader
      *        method reports through the one `$drop` closure, so recording there
      *        captures the whole catalogue at once — and a rule added later
      *        cannot forget to surface itself.
+     * @param array<string, mixed> $secretFields The secrets a `secretField` block may name (SDK 1.88).
      * @return array<string, mixed>|null The normalized descriptor, or null when dropped.
      */
     private function validateFrontendFeature(
@@ -3980,7 +4254,8 @@ class PluginLoader
         array $ownPermissions,
         array $registeredGetRoutes,
         array $registeredWriteRoutes = [],
-        array &$dropped = []
+        array &$dropped = [],
+        array $secretFields = []
     ): ?array {
         $drop = function (string $reason, ?string $id) use ($pluginKey, $pluginName, &$dropped): null {
             $idLabel = $id !== null ? "'{$id}'" : '(no id)';
@@ -4283,8 +4558,12 @@ class PluginLoader
             // closure, so it has no `$this` to call `versionedPath()` on.
             $router = $this->router;
 
+            $slug = \Whity\Sdk\PluginNamespace::slug($pluginName);
+
             $walkNode = null;
             $walkNode = static function (array $node) use (
+                $slug,
+                $secretFields,
                 $registeredGetRoutes,
                 $registeredWriteRoutes,
                 $router,
@@ -4294,6 +4573,18 @@ class PluginLoader
             ): ?array {
                 $type = $node['type'] ?? null;
                 if (is_string($type)) {
+                    // SDK 1.88: the host, not the screen, decides where a secret
+                    // field reads and writes.
+                    if ($type === 'secretField') {
+                        $secret = $node['secret'] ?? null;
+                        if (!is_string($secret) || $slug === null || !array_key_exists($secret, $secretFields)) {
+                            $dropReason = "secretField '" . (is_string($secret) ? $secret : '') . "' is not a secret this plugin declares";
+
+                            return null;
+                        }
+                        $node['endpoint'] = $router->versionedPath('/api/plugin-secrets/' . $slug . '/' . $secret);
+                    }
+
                     $rule = \Whity\Sdk\Frontend\Blocks\BlockContract::rulesFor($type);
                     $sourceKind = $rule !== null ? ($rule['props']['source']['type'] ?? null) : null;
                     // `array_key_exists` and not just the kind: since `fieldArray`
@@ -4874,9 +5165,14 @@ class PluginLoader
      * @param callable $handler The raw plugin route handler.
      * @return callable(Request, array<string, string>): Response
      */
-    private function wrapHandler(string $pluginKey, callable $handler, bool $public = false, bool $publicForm = false, bool $publicRead = false): callable
+    private function wrapHandler(string $pluginKey, callable $handler, bool $public = false, bool $publicForm = false, bool $publicRead = false, bool $service = false): callable
     {
-        return function (Request $request, array $params = []) use ($pluginKey, $handler, $public, $publicForm, $publicRead): Response {
+        return function (Request $request, array $params = []) use ($pluginKey, $handler, $public, $publicForm, $publicRead, $service): Response {
+            // Defence in depth: a service route runs only once the tenant
+            // isolation middleware has verified a service token and attached the call.
+            if ($service && \Whity\Sdk\Http\ServiceCall::from($request) === null) {
+                return Response::error('Not Found', 404);
+            }
             // A public form's handler never runs on a request the gate didn't pass,
             // however that request got here (WHIT-906).
             if ($publicForm && \Whity\Sdk\Http\PublicForm::from($request) === null) {
@@ -4963,6 +5259,45 @@ class PluginLoader
             } catch (Throwable $e) {
                 $this->handlePluginThrowable($pluginKey, $e, 'hook callback');
                 return $data;
+            }
+        };
+    }
+
+    /**
+     * The error boundary for an observe-only listener (SDK 1.89).
+     *
+     * The wrapper returns nothing, so the hook manager keeps the payload it
+     * already has, and the listener only ever holds this call's own copy, even
+     * if it takes the array by reference. A veto does not cross this boundary:
+     * a listener that asked not to affect the operation cannot stop it. That is
+     * a mistake in the plugin rather than a fault at run time, so it is logged
+     * and does not count towards the three strikes that disable a plugin.
+     *
+     * @param string $pluginKey The plugin's stable identity (original FQCN).
+     * @param callable $callback The raw hook callback.
+     * @return callable(array<mixed>, array<mixed>): void
+     */
+    private function wrapObserveOnlyCallback(string $pluginKey, callable $callback): callable
+    {
+        return function (array $data, array $context = []) use ($pluginKey, $callback): void {
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+
+            if ($lifecycle !== null && $lifecycle->isFailed()) {
+                return;
+            }
+
+            try {
+                $callback($data, $context);
+                $lifecycle?->recordSuccess();
+            } catch (HookVetoException $e) {
+                $lifecycle?->recordSuccess();
+                $this->logWarning(sprintf(
+                    'Plugin "%s" threw a veto from an observe-only listener on "%s"; it was ignored.',
+                    $pluginKey,
+                    $e->eventName()
+                ));
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'hook callback');
             }
         };
     }
@@ -5060,29 +5395,28 @@ class PluginLoader
 
         $registered = [];
 
-        if (is_callable($hookData)) {
-            $wrapped = $this->wrapHookCallback($pluginKey, $hookData);
-            $this->hookManager->listen($eventName, $wrapped);
+        $hooks = $this->hookManager;
+        $subscribe = function (callable $callback, int $priority = 10, bool $observe = false) use ($hooks, $pluginKey, $eventName, &$registered): void {
+            $wrapped = $observe
+                ? $this->wrapObserveOnlyCallback($pluginKey, $callback)
+                : $this->wrapHookCallback($pluginKey, $callback);
+            $hooks->listen($eventName, $wrapped, $priority);
             $registered[] = $wrapped;
+        };
+
+        if (is_callable($hookData)) {
+            $subscribe($hookData);
         } elseif (is_array($hookData)) {
             // Check if it is a single structured subscription with a callback
             if (isset($hookData['callback']) && is_callable($hookData['callback'])) {
-                $priority = $hookData['priority'] ?? 10;
-                $wrapped = $this->wrapHookCallback($pluginKey, $hookData['callback']);
-                $this->hookManager->listen($eventName, $wrapped, $priority);
-                $registered[] = $wrapped;
+                $subscribe($hookData['callback'], $hookData['priority'] ?? 10, ($hookData['observe'] ?? false) === true);
             } else {
                 // Check if it is a list of callbacks/subscriptions
                 foreach ($hookData as $sub) {
                     if (is_array($sub) && isset($sub['callback']) && is_callable($sub['callback'])) {
-                        $priority = $sub['priority'] ?? 10;
-                        $wrapped = $this->wrapHookCallback($pluginKey, $sub['callback']);
-                        $this->hookManager->listen($eventName, $wrapped, $priority);
-                        $registered[] = $wrapped;
+                        $subscribe($sub['callback'], $sub['priority'] ?? 10, ($sub['observe'] ?? false) === true);
                     } elseif (is_callable($sub)) {
-                        $wrapped = $this->wrapHookCallback($pluginKey, $sub);
-                        $this->hookManager->listen($eventName, $wrapped);
-                        $registered[] = $wrapped;
+                        $subscribe($sub);
                     }
                 }
             }

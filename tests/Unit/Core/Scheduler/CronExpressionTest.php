@@ -9,6 +9,7 @@ use DateTimeZone;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Scheduler\CronExpression;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Unit tests for the hand-rolled 5-field cron parser (WC-scheduler): field
@@ -139,9 +140,7 @@ final class CronExpressionTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider invalidExpressions
-     */
+    #[DataProvider('invalidExpressions')]
     public function testInvalidExpressionsAreRejected(string $expression): void
     {
         self::assertFalse(CronExpression::isValid($expression), "expected invalid: '{$expression}'");

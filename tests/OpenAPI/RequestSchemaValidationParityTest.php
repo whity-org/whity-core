@@ -28,6 +28,7 @@ use Whity\Core\Taxonomy\TagRepository;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Database\Database;
 use Whity\OpenAPI\CoreApiSchemas;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Proves the declared request schemas are RIGHT, not merely present.
@@ -113,9 +114,8 @@ final class RequestSchemaValidationParityTest extends TestCase
     /**
      * The declared body, in full, must be a request the handler accepts. If this
      * fails the schema is describing an API that does not exist.
-     *
-     * @dataProvider cases
      */
+    #[DataProvider('cases')]
     public function testTheFullyPopulatedDeclaredBodyIsAccepted(string $component, string $case): void
     {
         [$invoke, $body] = $this->caseFor($case);
@@ -133,9 +133,8 @@ final class RequestSchemaValidationParityTest extends TestCase
     /**
      * Omitting a declared-REQUIRED property must be refused. An overstated
      * `required` would show up here as a 2xx.
-     *
-     * @dataProvider cases
      */
+    #[DataProvider('cases')]
     public function testOmittingEachRequiredPropertyIsRejected(string $component, string $case): void
     {
         [$invoke, $body] = $this->caseFor($case);
@@ -172,9 +171,8 @@ final class RequestSchemaValidationParityTest extends TestCase
      * half that catches an UNDERSTATED `required` — a schema that lets a
      * generated client believe an empty body is legal when the handler refuses
      * it, which is precisely what sent the downstream team probing with `{}`.
-     *
-     * @dataProvider cases
      */
+    #[DataProvider('cases')]
     public function testOmittingEachOptionalPropertyIsStillAccepted(string $component, string $case): void
     {
         [$invoke, $body] = $this->caseFor($case);
@@ -210,9 +208,8 @@ final class RequestSchemaValidationParityTest extends TestCase
     /**
      * `not: {required: [a, b]}` says the two spellings cannot be combined. The
      * handlers answer 422 to exactly that, so the constraint is not decoration.
-     *
-     * @dataProvider mutuallyExclusiveCases
      */
+    #[DataProvider('mutuallyExclusiveCases')]
     public function testSendingBothMutuallyExclusiveFieldsIsRejected(string $component, string $case): void
     {
         $schema = CoreApiSchemas::components()[$component];

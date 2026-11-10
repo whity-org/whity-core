@@ -35,6 +35,10 @@ final class DocumentNotIssuedException extends \RuntimeException
      * plugin's own, or in a workspace that hasn't allowed the plugin to.
      */
     public const BACKGROUND_NOT_ALLOWED = 'background_not_allowed';
+    /** {@see Documents::issueMany()} (SDK 1.83): the batch key already names a different batch. */
+    public const BATCH_KEY_CONFLICT = 'batch_key_conflict';
+    /** {@see Documents::issueMany()} (SDK 1.83): the person may not issue documents (`documents:issue`). */
+    public const FORBIDDEN = 'forbidden';
 
     /** @param array<string, mixed> $details */
     public function __construct(

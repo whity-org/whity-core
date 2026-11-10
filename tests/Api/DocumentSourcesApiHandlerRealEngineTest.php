@@ -11,6 +11,7 @@ use Whity\Api\DocumentEmbedsApiHandler;
 use Whity\Api\DocumentSourcesApiHandler;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Document\DocumentAccessPolicy;
+use Whity\Core\Document\DocumentPeople;
 use Whity\Core\Document\DocumentRepository;
 use Whity\Core\Document\DocumentSourceFileStore;
 use Whity\Core\Document\DocumentVisibilityPolicy;
@@ -29,6 +30,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Database\Database;
 use Whity\Sdk\Http\Response;
 use Whity\Storage\LocalStorageDriver;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Real-engine tests for {@see DocumentSourcesApiHandler} (editor M2): the
@@ -76,6 +78,7 @@ final class DocumentSourcesApiHandlerRealEngineTest extends TestCase
             new OuReachResolver($this->pdo, $resourceRoles),
             new DocumentSourceFileStore(new LocalStorageDriver($this->storageRoot), $this->pdo),
             new DocumentSourceVersionRepository($this->pdo),
+            people: new DocumentPeople($this->pdo),
         );
 
         $documents = new DocumentRepository($this->pdo);
@@ -324,6 +327,23 @@ final class DocumentSourcesApiHandlerRealEngineTest extends TestCase
         self::assertSame([], $this->data($weak)['blocks']);
     }
 
+    public function testShowAndSaveNameWhoEditedLast(): void
+    {
+        $id = $this->idOf($this->create(self::OWNER, ['kind' => 'wiki', 'title' => 'Handbook', 'scope' => 'tenant']));
+        self::assertSame('owner', $this->data($this->show(self::OWNER, $id))['updated_by_name']);
+
+        $saved = $this->save(self::OWNER, $id, '"1"', ['title' => 'Handbook, edited']);
+        self::assertSame('owner', $this->data($saved)['updated_by_name'], 'the status bar follows the save');
+    }
+
+    public function testNoNameForADocumentNobodyEdited(): void
+    {
+        $id = $this->idOf($this->create(self::OWNER, ['kind' => 'wiki', 'title' => 'Handbook', 'scope' => 'tenant']));
+        $this->pdo->exec('UPDATE document_sources SET updated_by = NULL WHERE id = ' . $id);
+
+        self::assertNull($this->data($this->show(self::OWNER, $id))['updated_by_name']);
+    }
+
     public function testASaveMadeAgainstAnOldVersionIsRefusedAndOverwritesNothing(): void
     {
         $id = $this->idOf($this->create(self::OWNER, ['kind' => 'wiki', 'title' => 'Handbook', 'scope' => 'tenant']));
@@ -355,9 +375,7 @@ final class DocumentSourcesApiHandlerRealEngineTest extends TestCase
         yield 'a string' => ['paragraph'];
     }
 
-    /**
-     * @dataProvider badBlocks
-     */
+    #[DataProvider('badBlocks')]
     public function testBlocksThatBreakTheContractAreRefused(mixed $blocks): void
     {
         self::assertSame(422, $this->create(self::WRITER, ['kind' => 'note', 'blocks' => $blocks])->getStatusCode());

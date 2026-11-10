@@ -21,6 +21,7 @@ use Whity\Core\Router;
 use Whity\Core\TimeWindow\WindowState;
 use Whity\Core\TimeWindow\WindowTypeRegistry;
 use Whity\Http\InputLimits;
+use Whity\Sdk\I18n\LocalizedText;
 
 /**
  * Typed OpenAPI declarations for the core admin resources (WC-167).
@@ -67,6 +68,11 @@ final class CoreApiSchemas
     {
         $noop = static fn (): Response => new Response(501, '');
 
+        // One array shared by every route. components() builds a new 1.2 MB
+        // array on each call, and each route keeps what it is given: 533 routes
+        // held 640 MB.
+        $components = self::components();
+
         foreach (self::routes() as $route) {
             $unversioned = $route['unversioned'] ?? false;
             if ($unversioned) {
@@ -77,7 +83,7 @@ final class CoreApiSchemas
                     $route['requiredRole'],
                     null,
                     $route['requiredPermission'],
-                    $route['schema'] + ['components' => self::components()]
+                    $route['schema'] + ['components' => $components]
                 );
             } else {
                 $router->register(
@@ -87,7 +93,7 @@ final class CoreApiSchemas
                     $route['requiredRole'],
                     null,
                     $route['requiredPermission'],
-                    $route['schema'] + ['components' => self::components()]
+                    $route['schema'] + ['components' => $components]
                 );
             }
         }
@@ -113,6 +119,7 @@ final class CoreApiSchemas
             self::delegationRoutes(),
             self::auditRoutes(),
             self::frontendFeatureRoutes(),
+            self::pluginSecretFieldRoutes(),
             self::meRoutes(),
             self::meNotificationRoutes(),
             self::tenantNotificationSettingsRoutes(),
@@ -207,6 +214,9 @@ final class CoreApiSchemas
         'DELETE /api/data-types/{type}/{id}',
         'POST /api/data-types/{type}/bulk',
         'POST /api/documents/{id:\d+}/routes/{routeId:\d+}/actions',
+        // WHIT-920: the same act on a route whatever it travels on. The engine
+        // refuses anybody without an open item on the route.
+        'POST /api/routes/{routeId:\d+}/actions',
     ];
 
     /**
@@ -1536,6 +1546,42 @@ final class CoreApiSchemas
                     409 => self::errorResponse('The form is published or has submissions'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/forms/{id:\d+}/document-fit', 'forms:manage', [
+                'summary' => 'How a form and its final document template fit',
+                'description' => 'What the template prints that the form never asks, and what the form asks that the '
+                    . 'template has no place for. Null when the form has no template; `{"hidden": true}` when the caller '
+                    . 'cannot see it.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => ['description' => 'The report, or null'],
+                    404 => self::errorResponse('Form not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/forms/{id:\d+}/document-fit/template-fields', 'forms:manage', [
+                'summary' => 'Put questions in the draft of the form\'s template',
+                'description' => 'Changes the draft only: what prints stays the same until somebody publishes the '
+                    . 'template. Also needs `documents:write`. Body: `{"field_keys": ["..."]}`.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => ['description' => 'The report, as it now stands'],
+                    404 => self::errorResponse('Form not found, or no template the caller can change'),
+                    409 => self::errorResponse('The template was changed just now'),
+                    422 => self::errorResponse('field_keys does not name questions on this form'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/forms/{id:\d+}/document-template', 'forms:manage', [
+                'summary' => 'Make a document template from a form',
+                'description' => 'A template listing every question the applicant answers, published and chosen as the '
+                    . 'form\'s final document template. Also needs `documents:write` and `documents:publish`. Body: '
+                    . '`{"lang": "en"|"ar", "title": "..."}`.',
+                'tags' => ['forms'],
+                'responses' => [
+                    201 => ['description' => 'The template that was made'],
+                    404 => self::errorResponse('Form not found'),
+                    409 => self::errorResponse('The template could not be published'),
+                    422 => self::errorResponse('The form has no questions, or the title or language is not valid'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('POST', '/api/forms/{id:\d+}/member-access', 'forms:manage', [
                 'summary' => 'Let this workspace\'s members fill in this form',
                 'description' => 'OFF BY DEFAULT on every form. Active members of the workspace can then '
@@ -2195,6 +2241,27 @@ final class CoreApiSchemas
                 ],
             ],
             [
+                'method' => 'PUT',
+                'path' => '/api/me/form-submissions/{id:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Change a submission that was sent back to the caller, and send it again',
+                    'description' => 'Only while its route is waiting for the caller\'s changes: otherwise a 409 '
+                        . 'with `details.reason` `not_sent_back`. The answers are checked as a new submission\'s '
+                        . 'are, a new version is recorded for the reviewers to compare, and the route resumes '
+                        . 'where the reviewer chose. Somebody else\'s submission is a 404.',
+                    'tags' => ['forms'],
+                    'request' => 'FormSubmissionResubmitRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('The changed submission', 'FormSubmissionResubmitResponse'),
+                        404 => self::errorResponse('Not one of the caller\'s submissions'),
+                        409 => self::errorResponse('Not waiting for the caller\'s changes'),
+                        422 => self::errorResponse('An answer failed validation'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
                 'method' => 'GET',
                 'path' => '/api/me/form-submissions/{id:\d+}/files/{fileId:\d+}',
                 'requiredRole' => null,
@@ -2207,6 +2274,23 @@ final class CoreApiSchemas
                     'responses' => [
                         200 => ['description' => 'The file, as an attachment', 'content' => ['application/octet-stream' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
                         404 => self::errorResponse('Not a file on one of the caller\'s submissions'),
+                        503 => self::errorResponse('The file could not be read from storage'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/form-submissions/{id:\d+}/final-document',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The final document of the caller\'s own submission',
+                    'description' => 'When its route made one and the form lets the person who sent it have it. '
+                        . 'Anybody else\'s submission, and a document still waiting, is a 404.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => ['description' => 'The PDF', 'content' => ['application/pdf' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                        404 => self::errorResponse('No final document the caller may open'),
                         503 => self::errorResponse('The file could not be read from storage'),
                     ] + self::authErrors(),
                 ],
@@ -2912,6 +2996,56 @@ final class CoreApiSchemas
     }
 
     /**
+     * Behind the host-drawn `secretField` block (WHIT-1016).
+     *
+     * WRITE-ONLY: every answer is {@see PluginSecretFieldStatusResponse}, whether
+     * a value is set and when, never the value. The routes carry no gate here
+     * because the permission is each plugin's own declaration for that key, and
+     * the handler enforces it. Never tools: an agent doesn't handle secrets.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function pluginSecretFieldRoutes(): array
+    {
+        $errors = [
+            400 => self::errorResponse('The caller is not in a workspace'),
+            404 => self::errorResponse('No such plugin, or the plugin does not declare this secret'),
+        ] + self::authErrors();
+        $route = static fn (string $method, array $schema): array => [
+            'method' => $method,
+            'path' => '/api/plugin-secrets/{plugin}/{key}',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => $schema + ['tags' => ['plugins'], 'mcp' => ['expose' => false]],
+        ];
+
+        return [
+            $route('GET', [
+                'summary' => 'Whether a plugin\'s secret is set for this workspace',
+                'description' => 'Answers only whether a value is set and when. The value is never returned.',
+                'responses' => [
+                    200 => self::jsonResponse('Whether the secret is set', 'PluginSecretFieldStatusResponse'),
+                ] + $errors,
+            ]),
+            $route('PUT', [
+                'summary' => 'Store a plugin\'s secret for this workspace',
+                'description' => 'Replaces any earlier value. The answer does not include the value.',
+                'request' => 'PluginSecretFieldSaveRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The secret is stored', 'PluginSecretFieldStatusResponse'),
+                    422 => self::errorResponse('The value is empty or too long'),
+                ] + $errors,
+            ]),
+            $route('DELETE', [
+                'summary' => 'Remove a plugin\'s secret for this workspace',
+                'responses' => [
+                    200 => self::jsonResponse('The secret is removed', 'PluginSecretFieldStatusResponse'),
+                ] + $errors,
+            ]),
+        ];
+    }
+
+    /**
      * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
      */
     private static function meRoutes(): array
@@ -3254,6 +3388,17 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The versions this deployment is running', 'PlatformVersionResponse'),
                 ] + self::authErrors(),
             ]),
+            // WHIT-1001: the document renderer's state and the operator's fix.
+            self::permissionRoute('GET', '/api/platform/renderer', 'settings:manage', [
+                'summary' => 'Whether the document renderer is connected, the same version and accepting the shared secret (system tenant only)',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse(
+                        'The renderer state, with a plain sentence and the exact fix when it is not ready',
+                        'PlatformRendererResponse'
+                    ),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/platform/version/latest', 'settings:manage', [
                 'summary' => 'Compare the running core against the latest published release (system tenant only)',
                 'tags' => ['platform-ops'],
@@ -3503,6 +3648,77 @@ final class CoreApiSchemas
                     422 => self::errorResponse('store_url is required or not a bare https origin'),
                     500 => self::errorResponse('Internal error'),
                     502 => self::errorResponse('The store catalogue could not be fetched'),
+                ],
+            ]),
+            // WHIT-1003: connect this installation to a store through Whity ID.
+            self::permissionRoute('GET', '/api/plugins/store/connection', 'plugins:read', [
+                'summary' => 'Whether this installation is connected to a store through Whity ID',
+                'description' => 'The connected store, the Whity ID account that connected it, and whether an '
+                    . 'operator must sign in again. Never returns a token.',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('The store connection', 'StoreConnectionResponse'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/store/connect', 'plugins:install', [
+                'summary' => 'Begin connecting this installation to a store through Whity ID',
+                'description' => 'Operator only. Registers this installation with the Whity ID issuer the store '
+                    . 'names (if it is one this installation trusts, `WHITY_ID_ISSUERS`) and returns the URL to '
+                    . 'send the operator\'s browser to. Whity ID returns them to /admin/plugins/store/connect.',
+                'tags' => ['platform-ops'],
+                'request' => 'StoreConnectRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Where to sign in', 'StoreConnectResponse'),
+                    403 => self::errorResponse('Not the operator, or the store host is not allowed'),
+                    422 => self::errorResponse('The store or this installation cannot use Whity ID sign-in'),
+                    502 => self::errorResponse('The store or Whity ID could not be reached'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/store/connect/complete', 'plugins:install', [
+                'summary' => 'Finish connecting with the code Whity ID sent back',
+                'description' => 'Operator only. Single use; the refresh token is kept encrypted and never returned.',
+                'tags' => ['platform-ops'],
+                'request' => 'StoreConnectCompleteRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The store connection', 'StoreConnectionResponse'),
+                    403 => self::errorResponse('Not the operator who started connecting'),
+                    422 => self::errorResponse('Expired, or not started here'),
+                    502 => self::errorResponse('Whity ID did not connect this installation'),
+                ],
+            ]),
+            // PR-4: buy a paid store plugin or start its trial; this installation's licence.
+            self::permissionRoute('POST', '/api/plugins/store/checkout', 'plugins:install', [
+                'summary' => 'Buy a paid store plugin, or start its trial, for this installation',
+                'description' => 'Operator only, and only while connected to the store through Whity ID. Buying returns '
+                    . 'the Whity Pay checkout to send the operator to; a trial starts at once.',
+                'tags' => ['platform-ops'],
+                'request' => 'StoreCheckoutRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Checkout URL, or the trial started', 'StoreCheckoutResponse'),
+                    403 => self::errorResponse('Not the operator, or the store host is not allowed'),
+                    409 => self::errorResponse('Not connected to the store'),
+                    422 => self::errorResponse('Invalid slug'),
+                    502 => self::errorResponse('The store could not start the purchase'),
+                ],
+            ]),
+            self::permissionRoute('GET', '/api/plugins/store/licences/{slug}', 'plugins:read', [
+                'summary' => "This installation's licence for a store plugin",
+                'description' => 'licensed, grace (with an until date) or unlicensed, from the store\'s signed statement '
+                    . 'or, when the store cannot be reached, from the last one within the offline window.',
+                'tags' => ['platform-ops'],
+                'parameters' => [
+                    ['name' => 'slug', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string'], 'description' => 'The plugin\'s slug in the store.'],
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The licence state', 'StoreLicenceResponse'),
+                ],
+            ]),
+            self::permissionRoute('DELETE', '/api/plugins/store/connection', 'plugins:install', [
+                'summary' => 'Disconnect this installation from the store',
+                'description' => 'Operator only. Revokes the refresh token at Whity ID (best effort) and forgets it.',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Disconnected', 'StoreConnectionResponse'),
                 ],
             ]),
         ];
@@ -4212,7 +4428,10 @@ final class CoreApiSchemas
 
         $tenant = self::object([
             'id' => self::int(),
-            'name' => self::str(),
+            'name' => self::str() + ['description' => 'The original name, in `nameLanguage`.'],
+            // #821: the original name's language, and every language the name has.
+            'nameLanguage' => self::str() + ['description' => 'Language code of the original name. For many institutions this is Arabic, not English.'],
+            'names' => self::localizedText() + ['description' => 'The name in every language it has, original included. A reader with no name in their language sees the original.'],
             'slug' => self::str(true),
             'userCount' => self::int(),
             'createdAt' => self::str(true),
@@ -4224,7 +4443,7 @@ final class CoreApiSchemas
                 'state' => ['type' => 'string', 'enum' => ['active', 'trial', 'overdue', 'suspended']],
                 'daysLeft' => self::int(true),
             ], ['state', 'daysLeft']),
-        ], ['id', 'name', 'slug', 'userCount', 'createdAt', 'plan', 'status']);
+        ], ['id', 'name', 'nameLanguage', 'names', 'slug', 'userCount', 'createdAt', 'plan', 'status']);
 
         // #822: a unit's KIND travels with it as both the per-tenant id and the
         // stable key a consumer's rule is written against. All three are nullable
@@ -4234,6 +4453,8 @@ final class CoreApiSchemas
             'tenant_id' => self::int(),
             'parent_id' => self::int(true),
             'name' => self::str(),
+            'name_language' => self::str() + ['description' => 'Language code of the original name (`name`). For many institutions this is Arabic.'],
+            'names' => self::localizedText() + ['description' => 'The name in every language it has, original included. A reader with no name in their language sees the original.'],
             'slug' => self::str(),
             'description' => self::str(true),
             'created_at' => self::str(true),
@@ -4243,7 +4464,7 @@ final class CoreApiSchemas
             // Active people directly in this unit, not counting the units below.
             'member_count' => self::int(),
         ], [
-            'id', 'tenant_id', 'parent_id', 'name', 'slug', 'description', 'created_at',
+            'id', 'tenant_id', 'parent_id', 'name', 'name_language', 'names', 'slug', 'description', 'created_at',
             'ou_type_id', 'ou_type_key', 'ou_type_label', 'member_count',
         ]);
 
@@ -4351,6 +4572,8 @@ final class CoreApiSchemas
         $membershipEntry = self::object([
             'tenant_id' => self::int(),
             'tenant_name' => self::str(),
+            'tenant_name_language' => self::str(),
+            'tenant_names' => self::localizedText(),
             'role' => self::str(),
         ], ['tenant_id', 'tenant_name', 'role']);
 
@@ -4406,8 +4629,65 @@ final class CoreApiSchemas
                     'hosts' => ['type' => 'array', 'items' => ['type' => 'string']],
                     'can_install' => self::bool(),
                     'can_install_declarative' => self::bool(),
+                    'connection' => ['$ref' => '#/components/schemas/StoreConnection'],
                 ], ['enabled', 'hosts', 'can_install', 'can_install_declarative']),
             ], ['data']),
+
+            // WHIT-1003: this installation's Whity ID connection to a store.
+            'StoreConnection' => self::object([
+                'connected' => self::bool(),
+                'store_host' => self::str(),
+                'issuer' => self::str(),
+                'account' => array_merge(self::object([
+                    'sub' => self::str(true),
+                    'name' => self::str(true),
+                    'email' => self::str(true),
+                ], []), ['nullable' => true]),
+                'connected_at' => self::str(),
+                'needs_reconnect' => self::bool(),
+            ], ['connected']),
+            'StoreConnectionResponse' => self::object([
+                'data' => ['$ref' => '#/components/schemas/StoreConnection'],
+            ], ['data']),
+            'StoreConnectRequest' => self::object([
+                'store_url' => array_merge(self::str(), [
+                    'description' => 'A bare https origin on the allowlist. Defaults to the first allowed host.',
+                ]),
+            ], []),
+            'StoreConnectResponse' => self::object([
+                'data' => self::object(['authorize_url' => self::str()], ['authorize_url']),
+            ], ['data']),
+            'StoreCheckoutRequest' => self::object([
+                'store_url' => array_merge(self::str(), ['description' => 'The store, a bare https origin on the allowlist.']),
+                'slug' => array_merge(self::str(), ['description' => 'The plugin to buy.']),
+                'plan' => array_merge(self::str(), ['description' => 'The plan; standard when left out.']),
+                'period' => array_merge(self::str(), ['description' => 'month, year or once.']),
+                'currency' => array_merge(self::str(), ['description' => 'A 3-letter currency the store sells in; optional.']),
+                'trial' => array_merge(self::bool(), ['description' => 'Start the free trial instead of paying.']),
+            ], ['store_url', 'slug', 'period']),
+            'StoreCheckoutResponse' => self::object([
+                'data' => self::object([
+                    'checkout_url' => self::str(),
+                    'status' => self::str(),
+                ], []),
+            ], ['data']),
+            'StoreLicenceResponse' => self::object([
+                'data' => self::object([
+                    'state' => ['type' => 'string', 'enum' => ['licensed', 'grace', 'unlicensed']],
+                    'until' => self::str(true),
+                    'message' => self::str(),
+                    'offline' => self::bool(),
+                    'checked_at' => self::str(true),
+                ], ['state', 'message']),
+            ], ['data']),
+            'StoreConnectCompleteRequest' => self::object([
+                'code' => array_merge(self::str(), [
+                    'description' => 'The authorization code Whity ID sent back to /admin/plugins/store/connect.',
+                ]),
+                'state' => array_merge(self::str(), [
+                    'description' => 'The state Whity ID sent back with the code; it must match the connect this operator started.',
+                ]),
+            ], ['code', 'state']),
 
             // GET /api/plugins/store/catalog — a store's public catalogue entry.
             'StoreCataloguePlugin' => self::object([
@@ -4420,6 +4700,14 @@ final class CoreApiSchemas
                 // S.4. Always `unverified` until the Verified design is approved; a store can't set it.
                 'trust' => ['type' => 'string', 'enum' => ['unverified']],
                 'kind' => ['type' => 'string', 'enum' => ['declarative', 'code']],
+                'paid' => self::bool(),
+                'prices' => ['type' => 'array', 'items' => self::object([
+                    'plan' => self::str(),
+                    'period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                    'currency' => self::str(),
+                    'amount' => self::str(),
+                    'trial_days' => ['type' => 'integer', 'nullable' => true],
+                ], ['plan', 'period', 'currency', 'amount'])],
                 'price' => array_merge(self::object([
                     'amount' => self::str(),
                     'currency' => self::str(),
@@ -4932,7 +5220,7 @@ final class CoreApiSchemas
                 'id' => self::int(),
                 'tenant_id' => self::int(),
                 'key' => self::str(),
-                'display_name' => ['type' => 'object', 'x-whity-localized-text' => true, 'properties' => ['ar' => self::str(), 'en' => self::str()]],
+                'display_name' => self::localizedText(),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
             ], ['id', 'tenant_id', 'key', 'display_name', 'created_at', 'updated_at']),
@@ -5650,6 +5938,23 @@ final class CoreApiSchemas
                     'type' => 'object',
                     'additionalProperties' => SchemaBuilder::ref('RecordSectionVerdict'),
                 ],
+                // WHIT-1001: sent by `GET /{id}` when the record has no PDF.
+                // `reason` is safe for anyone (renderer not set up, not
+                // reachable, version mismatch, switched off); `fix` is the
+                // operator's change and is null unless the caller holds
+                // settings:manage in the system tenant.
+                'pdf_pending' => self::object([
+                    'reason' => self::str(),
+                    'fix' => self::str(true),
+                ], ['reason', 'fix']),
+                // WHIT-922: the signatures standing on the current version, on
+                // GET /api/documents/{id} only. A signature on an earlier
+                // version is not carried over.
+                'signatures' => [
+                    'type' => 'array',
+                    'items' => SchemaBuilder::ref('DocumentSignature'),
+                    'description' => 'Who signed the current version, in what capacity and when. Electronic signatures with an audit trail.',
+                ],
             ], ['id', 'tenant_id', 'template_name', 'title', 'created_at', 'artifacts']),
             // Not paginatedListEnvelope: the organizer echoes back WHICH view it
             // ran and what anchor it resolved to, so a client rendering a rail
@@ -5747,7 +6052,7 @@ final class CoreApiSchemas
             // Why the render outcome is a SIBLING of `data` rather than a status
             // code, and why `reason` is a closed vocabulary: a 201 means the
             // document exists, which it does on an instance with no render tier
-            // at all (`documents.render_enabled` defaults to false). A client
+            // at all (no render service running, WHIT-1001). A client
             // deciding whether to offer a "render now" button has to tell
             // `disabled` (never going to work here) from `unavailable`
             // (transient, retry) from `declined` (you asked for this), and a
@@ -5819,6 +6124,20 @@ final class CoreApiSchemas
                 // straight on. A client needs this before it renders anything —
                 // on such a step Forward, Acknowledge and Return are all 422s.
                 'satisfied_by' => ['type' => 'string', 'enum' => ['act', 'delivery']],
+                // WHIT-918 (#1722). What the step IS, in one word. `decide` and
+                // `deliver` say what `decision` and `satisfied_by` say; `sign`,
+                // `stamp` and `finalise` arrive with later steps of the plan.
+                'kind' => ['type' => 'string', 'enum' => ['review', 'decide', 'deliver', 'sign', 'stamp', 'finalise']],
+                // WHIT-919: whether a person on this step may send it back to the
+                // author for changes.
+                'allow_send_back' => self::bool(),
+                // WHIT-922: on a `sign` step, the capacity the signer signs in and
+                // whom they sign for. Null on every other step.
+                'sign_capacity' => self::str(true),
+                'sign_on_behalf_of' => self::str(true),
+                // WHIT-921: the template a `finalise` step renders the final
+                // document with. Null on every other step.
+                'final_template_id' => self::int(true),
                 // #1037. HOW MANY TIMES A REJECTION HAS SENT THE DOCUMENT BACK
                 // FROM HERE. A backwards reject edge - "to the author, to fix" -
                 // is the most common approval design there is, and nothing
@@ -5845,7 +6164,14 @@ final class CoreApiSchemas
             ], ['id', 'route_id', 'from_step_id', 'to_step_id', 'verdict']),
             'DocumentRoute' => self::object([
                 'id' => self::int(),
-                'document_id' => self::int(),
+                // WHIT-920: null on a route whose subject has no document yet.
+                'document_id' => self::int(true),
+                // WHIT-918 (#1722). What the route travels on: a document, or a
+                // form submission (WHIT-920); plugin records later.
+                'subject' => self::object([
+                    'type' => self::str(),
+                    'id' => self::int(),
+                ], ['type', 'id']),
                 'title' => self::str(),
                 'created_by' => self::int(true),
                 // #1031, migration 123. WHICH DESIGN THIS CIRCULATION CAME FROM.
@@ -5926,7 +6252,20 @@ final class CoreApiSchemas
                             'type' => 'string',
                             'enum' => ['act', 'delivery'],
                         ],
-                    ], ['rule_kind']),
+                        // WHIT-919: false turns off sending back to the author
+                        // at this step. True when absent.
+                        'allow_send_back' => self::bool(),
+                        // WHIT-922: `sign` makes the step a signing step, answered
+                        // by signing or declining. Its quorum is `all` (the
+                        // default) or `any`; it takes no edges.
+                        // WHIT-921: `finalise` makes the final document. It
+                        // must be the last step, at most one, and needs a render
+                        // service; it names no rule and nobody acts on it.
+                        'kind' => ['type' => 'string', 'enum' => ['sign', 'finalise'], 'nullable' => true],
+                        'sign_capacity' => self::str(true) + ['description' => 'On a signing step: the capacity the signer signs in, such as "Director". At most 200 characters.'],
+                        'sign_on_behalf_of' => self::str(true) + ['description' => 'On a signing step: whom the signer signs for, such as the workspace. At most 200 characters.'],
+                        'final_template_id' => self::int(true) + ['description' => 'On a `finalise` step: the document template to render with. Absent uses the template the subject names: the final document template of a form, or the template of a document.'],
+                    ], []),
                     'description' => 'Ordered steps, at least one. Each names a `rule_kind` (see GET /api/routing-rules) and its `rule_config`, deciding who receives the document at that step. A step with `decision: true` is an approval gate whose `on_approved`/`on_rejected` name 1-based step positions.',
                 ],
             ], ['steps']),
@@ -5951,13 +6290,13 @@ final class CoreApiSchemas
             // the argument for the table existing at all.
             'DocumentTrailEvent' => self::object([
                 'id' => self::int(),
-                'document_id' => self::int(),
+                'document_id' => self::int(true),
                 'route_id' => self::int(),
                 // Null on an `issued` event, which is about the route rather than
                 // any one step.
                 'step_id' => self::int(true),
                 'actor_profile_id' => self::int(true),
-                'action' => ['type' => 'string', 'enum' => ['issued', 'forwarded', 'acknowledged', 'returned', 'noted']],
+                'action' => ['type' => 'string', 'enum' => ['issued', 'forwarded', 'acknowledged', 'returned', 'noted', 'sent_back', 'resubmitted', 'signed', 'stamped', 'declined']],
                 'from_ou_id' => self::int(true),
                 // Null whenever the act named no SINGLE unit - a tenant-wide
                 // fan-out has no destination, and naming one would make the
@@ -5972,7 +6311,21 @@ final class CoreApiSchemas
                 'verdict' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true],
                 // S5: this row closed the route because the document was withdrawn.
                 'withdrawal' => self::bool(),
+                // WHIT-919: the subject version this act was made on, and its
+                // SHA-256. Null on acts recorded before versions were kept.
+                'subject_version' => self::int(true),
+                'content_hash' => self::str(true),
+                // A note meant for the author. Internal notes are false.
+                'to_author' => self::bool(),
+                // On a `sent_back`: where the route resumes when the author
+                // resubmits.
+                'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true],
                 'occurred_at' => self::str(),
+                // WHIT-922, on the audit page only: the hash of the entry before
+                // this one on the document, and this entry's own. Null on
+                // entries written before the chain began.
+                'prev_hash' => self::str(true),
+                'entry_hash' => self::str(true),
             ], ['id', 'document_id', 'route_id', 'action', 'occurred_at']),
             'DocumentTrailListResponse' => self::paginatedListEnvelope('DocumentTrailEvent'),
 
@@ -5983,7 +6336,7 @@ final class CoreApiSchemas
             // check it.
             'DocumentRouteRecipient' => self::object([
                 'id' => self::int(),
-                'document_id' => self::int(),
+                'document_id' => self::int(true),
                 'route_id' => self::int(),
                 'step_id' => self::int(),
                 'profile_id' => self::int(),
@@ -5993,6 +6346,9 @@ final class CoreApiSchemas
                 'parent_recipient_id' => self::int(true),
                 'created_by_event_id' => self::int(),
                 'closed_by_event_id' => self::int(true),
+                // WHIT-919: `author` for the item a send-back opens for the
+                // subject's author; `step` for every other item.
+                'role' => ['type' => 'string', 'enum' => ['step', 'author']],
                 'open' => self::bool(),
                 // #1054. TRUE when this row was closed by the document reaching
                 // the person rather than by their acting — the rows a
@@ -6010,7 +6366,7 @@ final class CoreApiSchemas
             'DocumentRouteRecipientListResponse' => self::listEnvelope('DocumentRouteRecipient'),
 
             'DocumentRouteActionRequest' => self::object([
-                'action' => ['type' => 'string', 'enum' => ['forwarded', 'acknowledged', 'returned', 'noted'], 'description' => 'What you did with the document: `forwarded`, `acknowledged`, `returned` or `noted`.'],
+                'action' => ['type' => 'string', 'enum' => ['forwarded', 'acknowledged', 'returned', 'noted', 'sent_back', 'resubmitted', 'declined'], 'description' => 'What you did with the document: `forwarded`, `acknowledged`, `returned`, `noted`, `sent_back` (to the author for changes, with a note), `resubmitted` (by the author, after a send-back) or `declined` (declining to sign, with a reason). Signing has its own endpoint.'],
                 // Required for `noted` (an empty note records nothing), optional
                 // on the other three.
                 'note' => self::str(true) + ['description' => 'Comment for the trail. Required for `noted`.'],
@@ -6019,6 +6375,9 @@ final class CoreApiSchemas
                 // where a recorded verdict nothing routes on would read later as
                 // an authorisation that was never asked for.
                 'verdict' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true, 'description' => '`approved` or `rejected`. Required with `acknowledged` on a decision step; refused anywhere else.'],
+                // WHIT-919.
+                'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true, 'description' => 'With `sent_back` only: where the route resumes when the author resubmits. `sender` (this step, the default) or `start` (step 1).'],
+                'to_author' => self::bool() + ['description' => 'With `noted`: the note is meant for the author. Notes are internal by default.'],
             ], ['action']),
             'DocumentRouteActionResponse' => self::object([
                 'data' => SchemaBuilder::ref('DocumentTrailEvent'),
@@ -6031,6 +6390,146 @@ final class CoreApiSchemas
                 // describes what this request did, not a property of the record.
                 'decided' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true],
             ], ['data', 'resolved', 'delivered']),
+
+            // -- Electronic signatures (WHIT-922, #1726) ----------------------
+            // A drawn signature, as the strokes a person drew inside a box.
+            'SignatureAppearance' => self::object([
+                'width' => self::int(),
+                'height' => self::int(),
+                'strokes' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'array', 'items' => ['type' => 'array', 'items' => ['type' => 'number'], 'minItems' => 2, 'maxItems' => 2]],
+                    'description' => 'Each stroke is a list of [x, y] points inside the box.',
+                ],
+            ], ['width', 'height', 'strokes']),
+            'SavedSignatureRequest' => self::object([
+                'appearance' => SchemaBuilder::ref('SignatureAppearance'),
+            ], ['appearance']),
+            'SavedSignatureResponse' => self::object([
+                'data' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('SignatureAppearance')]],
+            ], ['data']),
+            // A signature standing on a subject's current version.
+            'DocumentSignature' => self::object([
+                'id' => self::int(),
+                'capacity' => self::str(true),
+                'on_behalf_of' => self::str(true),
+                'by' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name']),
+                'at' => self::str() + ['description' => 'Server time, UTC, to the second.'],
+                'subject_version' => self::int(),
+            ], ['id', 'by', 'at', 'subject_version']),
+            'SigningContext' => self::object([
+                'route_id' => self::int(),
+                'can_sign' => self::bool(),
+                'step' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'id' => self::int(),
+                        'position' => self::int(),
+                        'label' => self::str(true),
+                        'capacity' => self::str(true),
+                        'on_behalf_of' => self::str(true),
+                        'quorum' => ['type' => 'string', 'enum' => ['all', 'any']],
+                    ],
+                    'required' => ['id', 'position', 'quorum'],
+                ],
+                'subject' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'type' => self::str(),
+                        'id' => self::int(),
+                        'title' => self::str(true),
+                        'version' => self::int(),
+                        'content_hash' => self::str() + ['description' => 'SHA-256 of the content as it is now. Send it back when signing.'],
+                    ],
+                    'required' => ['type', 'id', 'version', 'content_hash'],
+                ],
+                'consent_version' => self::str(),
+                'second_factor' => self::object([
+                    'method' => ['type' => 'string', 'enum' => ['totp', 'email_code', 'fresh_sign_in']],
+                    'provider_key' => self::str(true),
+                    'email_hint' => self::str(true),
+                    'signed_in_again' => self::bool(),
+                ], ['method', 'signed_in_again']),
+                'saved_signature' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('SignatureAppearance')]],
+            ], ['route_id', 'can_sign', 'consent_version', 'second_factor']),
+            'SigningContextResponse' => self::dataEnvelope(SchemaBuilder::ref('SigningContext')),
+            'SigningCodeResponse' => self::dataEnvelope(self::object(['email_hint' => self::str(true)], [])),
+            'SignRequest' => self::object([
+                'content_hash' => self::str() + ['description' => 'The `subject.content_hash` the signer was shown. Refused (409) when the content changed since.'],
+                'consent' => self::bool() + ['description' => 'The signer ticked the consent line. Must be true.'],
+                'consent_version' => self::str() + ['description' => 'The version of the consent wording shown, from the signing context.'],
+                'appearance' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('SignatureAppearance')]],
+                'use_saved_signature' => self::bool(),
+                'save_signature' => self::bool(),
+                'second_factor' => self::object([
+                    'method' => ['type' => 'string', 'enum' => ['totp', 'email_code', 'fresh_sign_in']],
+                    'code' => self::str(true),
+                ], ['method']),
+            ], ['content_hash', 'consent', 'consent_version', 'second_factor']),
+            // A signature record, as the audit page shows it.
+            'SignatureRecord' => self::object([
+                'id' => self::int(),
+                'route_id' => self::int(),
+                'event_id' => self::int(),
+                'step_id' => self::int(),
+                'subject_type' => self::str(),
+                'subject_id' => self::int(),
+                'subject_version' => self::int(),
+                'content_hash' => self::str(),
+                'by' => self::object([
+                    'profile_id' => self::int(),
+                    'name' => self::str(),
+                    'email' => self::str(true),
+                ], ['profile_id', 'name']),
+                'capacity' => self::str(true),
+                'on_behalf_of' => self::str(true),
+                'confirmed_by' => ['type' => 'string', 'enum' => ['totp', 'passkey', 'email_code', 'fresh_sign_in']],
+                'at' => self::str(),
+                'ip_address' => self::str(true),
+                'user_agent' => self::str(true),
+                'consent_version' => self::str(),
+                'consent_wording' => self::str(true),
+                'appearance' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('SignatureAppearance')]],
+                'record_hash' => self::str(),
+                'seal' => self::str() + ['description' => 'Ed25519 signature, base64, by the published key `seal_key_id`.'],
+                'seal_key_id' => self::str(),
+                'seal_valid' => self::bool(),
+                'details_withheld' => self::bool() + ['description' => 'True when the email address, IP address and browser are left out because the reader does not hold audit:read.'],
+            ], ['id', 'route_id', 'event_id', 'subject_version', 'content_hash', 'by', 'confirmed_by', 'at', 'consent_version', 'record_hash', 'seal', 'seal_key_id']),
+            'SignResponse' => self::object([
+                'data' => SchemaBuilder::ref('SignatureRecord'),
+                'event' => SchemaBuilder::ref('DocumentTrailEvent'),
+                'decided' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true],
+                'resolved' => self::int(),
+                'delivered' => self::int(),
+            ], ['data', 'event', 'resolved', 'delivered']),
+            'SigningKey' => self::object([
+                'key_id' => self::str(),
+                'algorithm' => ['type' => 'string', 'enum' => ['Ed25519']],
+                'public_key' => self::str() + ['description' => 'Base64.'],
+                'created_at' => self::str(),
+                'retired_at' => self::str(true),
+            ], ['key_id', 'algorithm', 'public_key', 'created_at']),
+            'SigningKeyListResponse' => self::listEnvelope('SigningKey'),
+            'DocumentAudit' => self::object([
+                'document_id' => self::int(),
+                'chain' => self::object([
+                    'intact' => self::bool(),
+                    'entries' => self::int(),
+                    'linked' => self::int(),
+                    'earlier' => self::int() + ['description' => 'Entries written before the chain began; the first linked entry commits to them.'],
+                    'detached' => self::int() + ['description' => 'Linked entries whose person, unit or step was removed later. Not a break.'],
+                    'broken_at_event_id' => self::int(true),
+                    'last_hash' => self::str(true),
+                    'signed_without_record' => ['type' => 'array', 'items' => self::int(), 'description' => 'Signing entries with no signature record. Any here means the trail is not intact.'],
+                ], ['intact', 'entries', 'linked', 'earlier', 'detached', 'signed_without_record']),
+                'events' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentTrailEvent')],
+                'signatures' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignatureRecord')],
+                'keys' => ['type' => 'array', 'items' => SchemaBuilder::ref('SigningKey')],
+            ], ['document_id', 'chain', 'events', 'signatures', 'keys']),
+            'DocumentAuditResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentAudit')),
 
             // -- The inbox (#881, first source contributed by #947 item 3) -----
             // Field names are the props the `inbox` block type declares (#868),
@@ -6559,6 +7058,12 @@ final class CoreApiSchemas
                 // silently loses: a delivery stage flattened into a circulation
                 // hands every instructor in a faculty an item nothing can close.
                 'satisfied_by' => ['type' => 'string', 'enum' => ['act', 'delivery']],
+                // WHIT-919: whether people at this stage may send it back to the author.
+                'allow_send_back' => self::bool(),
+                // WHIT-921: `finalise` on the stage that makes the final document
+                // (last, at most one, no rule); null on every other stage.
+                'kind' => ['type' => 'string', 'enum' => ['finalise'], 'nullable' => true],
+                'final_template_id' => self::int(true),
                 'canvas_x' => self::int(),
                 'canvas_y' => self::int(),
                 // NOT in the required list, unlike `DocumentRouteStep` above.
@@ -6604,6 +7109,16 @@ final class CoreApiSchemas
                 'updated_at' => self::str(),
                 'steps' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteTemplateStep')],
                 'edges' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteTemplateEdge')],
+                // WHIT-920: published forms whose public link takes anonymous
+                // submissions through this design. Nobody can send those back
+                // for changes, so the editor warns while a stage allows it.
+                'anonymous_public_forms' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::int(),
+                    'name' => self::str(),
+                ], ['id', 'name'])],
+                // WHIT-921: whether a stage may make the final document here (a
+                // render service is configured).
+                'can_finalise' => self::bool(),
             ], ['id', 'name', 'default_quorum', 'max_steps', 'steps', 'edges'])),
             'RouteTemplateCreateRequest' => self::object([
                 'name' => self::str(),
@@ -6728,6 +7243,7 @@ final class CoreApiSchemas
                 'created_by' => self::int(true),
                 'owner_ou_id' => self::int(true),
                 'updated_by' => self::int(true),
+                'updated_by_name' => self::str(true) + ['description' => 'Who last edited it, on the single-document answers. Null when nobody has, or they have left this workspace.'],
                 'starter_key' => self::str(true) + ['description' => 'Which of Whity\'s starters this is, or null for anything a person made'],
                 'legacy_template_id' => self::int(true) + ['description' => 'The old Document designer template this was converted from (migration 165), or null'],
                 'theme' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('DocumentThemeRef')], 'description' => 'The document\'s own theme choice: a ref and overrides of the print colour and letterhead. Null follows the workspace defaults.'],
@@ -7566,10 +8082,12 @@ final class CoreApiSchemas
             // a user targets the caller's tenant, and switching to the new one
             // requires the very membership that cannot yet be made.
             'TenantCreateRequest' => self::object([
-                'name' => self::str() + ['description' => 'Display name of the new tenant (workspace).'],
+                'name' => self::str() + ['description' => 'Original name of the new tenant (workspace). Required unless `names` is sent.'],
+                'names' => self::localizedText() + ['description' => 'The name in every language, for example `{"ar": "...", "en": "..."}`.'],
+                'nameLanguage' => self::str() + ['description' => 'Language code of the original name. Defaults to `ar` for a name in Arabic letters, `en` otherwise.'],
                 'slug' => ['type' => 'string', 'pattern' => '^[a-z0-9-]+$', 'description' => 'URL-safe identifier: lower-case letters, digits and dashes. Generated from the name when omitted; must be unique.'],
                 'admin' => SchemaBuilder::ref('TenantInitialAdmin') + ['description' => 'Optional first administrator, created in the same transaction: `{email, password, role?}`. Without it no one can sign in to the new tenant.'],
-            ], ['name']),
+            ], []),
             // `role` names a role the new tenant can see: one it owns (seeded by
             // a tenant.created listener) or a global one. Defaults to `admin`.
             'TenantInitialAdmin' => self::object([
@@ -7578,7 +8096,9 @@ final class CoreApiSchemas
                 'role' => self::str(),
             ], ['email', 'password']),
             'TenantUpdateRequest' => self::object([
-                'name' => self::str() + ['description' => 'New display name.'],
+                'name' => self::str() + ['description' => 'New original name, in `nameLanguage`.'],
+                'names' => self::localizedText() + ['description' => 'The name in every language; replaces them all. A blank language is removed.'],
+                'nameLanguage' => self::str() + ['description' => 'Language code of the original name. The original must have text.'],
                 'slug' => ['type' => 'string', 'pattern' => '^[a-z0-9-]+$', 'description' => 'New URL-safe identifier (lower-case letters, digits, dashes); must be unique.'],
             ], []),
 
@@ -7590,6 +8110,8 @@ final class CoreApiSchemas
                 'tenant_id' => self::int(),
                 'parent_id' => self::int(true),
                 'name' => self::str(),
+                'name_language' => self::str() + ['description' => 'Language code of the original name (`name`). For many institutions this is Arabic.'],
+                'names' => self::localizedText() + ['description' => 'The name in every language it has, original included. A reader with no name in their language sees the original.'],
                 'slug' => self::str(),
                 'description' => self::str(true),
                 'created_at' => self::str(true),
@@ -7601,12 +8123,14 @@ final class CoreApiSchemas
                     'items' => self::object(['id' => self::int()], ['id']),
                 ],
             ], [
-                'id', 'tenant_id', 'parent_id', 'name', 'slug', 'description', 'created_at',
+                'id', 'tenant_id', 'parent_id', 'name', 'name_language', 'names', 'slug', 'description', 'created_at',
                 'ou_type_id', 'ou_type_key', 'ou_type_label', 'children',
             ]),
             'OuDetailResponse' => self::dataEnvelope(SchemaBuilder::ref('OuDetail')),
             'OuCreateRequest' => self::object([
-                'name' => self::name(nonEmpty: true) + ['description' => 'Name of the organizational unit.'],
+                'name' => self::name(nonEmpty: true) + ['description' => 'Original name of the organizational unit, in `name_language`.'],
+                'names' => self::localizedText() + ['description' => 'The name in every language, for example `{"ar": "...", "en": "..."}`.'],
+                'name_language' => self::str() + ['description' => 'Language code of the original name. Defaults to `ar` for a name in Arabic letters, `en` otherwise.'],
                 'description' => self::text() + ['description' => 'What the unit is.'],
                 // Omitted or null makes the unit a root. A parent outside the
                 // caller's tenant is a 403, not a 404.
@@ -7618,7 +8142,9 @@ final class CoreApiSchemas
                 'type' => self::ouTypeKey() + ['description' => 'Kind of unit, by its stable key (see GET /api/ou-types). Send this or `ou_type_id`, not both.'],
             ], ['name']) + self::mutuallyExclusive('ou_type_id', 'type'),
             'OuUpdateRequest' => self::object([
-                'name' => self::name(nonEmpty: true) + ['description' => 'New name.'],
+                'name' => self::name(nonEmpty: true) + ['description' => 'New original name, in `name_language`.'],
+                'names' => self::localizedText() + ['description' => 'The name in every language; replaces them all. A blank language is removed.'],
+                'name_language' => self::str() + ['description' => 'Language code of the original name. The original must have text.'],
                 'description' => self::text() + ['description' => 'New description.'],
                 // array_key_exists, not isset: an explicit null moves the unit
                 // to the root, and an explicit null `ou_type_id`/`type` untypes
@@ -7746,6 +8272,15 @@ final class CoreApiSchemas
                 // somebody holding `forms:manage` called
                 // POST /api/v1/forms/{id}/public-link.
                 'public_enabled' => self::bool(),
+                // WHIT-920: the public link asks visitors to sign in, so only the
+                // workspace's members and customers send it, under their own name.
+                'public_requires_sign_in' => self::bool(),
+                // WHIT-921: the "Final document template" a route's finalise
+                // stage uses when it names none, and whether the person who sent
+                // the form can open the final document.
+                'final_template_id' => self::int(true),
+                'final_document_to_applicant' => self::bool(),
+                'document_left_out' => ['type' => 'array', 'items' => ['type' => 'string']],
                 // 64 hex characters — 256 bits from a CSPRNG. It is the ONLY
                 // credential the public endpoints have, so treat it as one: it is
                 // returned to tenant members (who must be able to hand the link
@@ -7869,28 +8404,30 @@ final class CoreApiSchemas
                 'id' => self::int(),
                 'plugin' => self::str(),
                 'form' => self::str(),
+                'kind' => self::str(true) + ['description' => 'What the key opens: `form` takes submissions, `read` shows something to whoever holds the link. Null when no loaded plugin has this route.'],
                 'label' => self::str(),
                 'key_hint' => self::str(),
                 'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'created_at' => self::str(),
                 'revoked_at' => self::str(true),
-            ], ['id', 'plugin', 'form', 'label', 'key_hint', 'allowed_origins', 'created_at', 'revoked_at']),
+            ], ['id', 'plugin', 'form', 'kind', 'label', 'key_hint', 'allowed_origins', 'created_at', 'revoked_at']),
             'PublicFormKeyResponse' => self::dataEnvelope(SchemaBuilder::ref('PublicFormKey')),
             'PublicFormKeyIssuedResponse' => self::dataEnvelope(self::object([
                 'id' => self::int(),
                 'plugin' => self::str(),
                 'form' => self::str(),
+                'kind' => self::str(true) + ['description' => 'What the key opens: `form` takes submissions, `read` shows something to whoever holds the link. Null when no loaded plugin has this route.'],
                 'label' => self::str(),
                 'key_hint' => self::str(),
                 'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'created_at' => self::str(),
                 'revoked_at' => self::str(true),
                 'key' => self::str(),
-            ], ['id', 'plugin', 'form', 'label', 'key_hint', 'allowed_origins', 'created_at', 'revoked_at', 'key'])),
+            ], ['id', 'plugin', 'form', 'kind', 'label', 'key_hint', 'allowed_origins', 'created_at', 'revoked_at', 'key'])),
             'PublicFormKeyListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('PublicFormKey')],
                 'meta' => self::object([
-                    'forms' => ['type' => 'array', 'items' => self::object(['plugin' => self::str(), 'form' => self::str()], ['plugin', 'form'])],
+                    'forms' => ['type' => 'array', 'items' => self::object(['plugin' => self::str(), 'form' => self::str(), 'kind' => self::str(true)], ['plugin', 'form', 'kind'])],
                     'bot_check_ready' => ['type' => 'boolean'],
                 ], ['forms', 'bot_check_ready']),
             ], ['data', 'meta']),
@@ -7900,6 +8437,14 @@ final class CoreApiSchemas
                 'label' => self::str(),
                 'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
             ], ['plugin', 'form', 'label']),
+            // Closed on purpose: nothing may be added to this answer that could carry the value.
+            'PluginSecretFieldStatusResponse' => self::object([
+                'is_set' => self::bool(),
+                'updated_at' => self::str(nullable: true),
+            ], ['is_set', 'updated_at']) + ['additionalProperties' => false],
+            'PluginSecretFieldSaveRequest' => self::object([
+                'value' => ['type' => 'string', 'format' => 'password', 'writeOnly' => true, 'minLength' => 1],
+            ], ['value']),
             'PublicFormKeyUpdateRequest' => self::object([
                 'label' => self::str(),
                 'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
@@ -8012,6 +8557,10 @@ final class CoreApiSchemas
                 'banner' => SchemaBuilder::ref('FormBannerInput') + ['nullable' => true, 'description' => 'A drawn pattern, `{"kind": "image"}` to keep the uploaded picture, or null for none. Upload a picture with POST /api/v1/forms/{id}/banner.'],
                 'sections' => ['type' => 'array', 'maxItems' => 100, 'items' => SchemaBuilder::ref('FormSectionText'), 'description' => 'The title and description of each section, by `section_key`.'],
                 'reference_format' => ['type' => 'string', 'maxLength' => 64, 'nullable' => true, 'description' => 'The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none.'],
+                'public_requires_sign_in' => self::bool() + ['description' => 'The public link asks visitors to sign in: only the workspace\'s members and customers can send it, under their own name, so it can be sent back to them for changes.'],
+                'final_template_id' => self::int(true) + ['description' => 'The document template a route\'s final document stage uses when it names none; null for none.'],
+                'final_document_to_applicant' => self::bool() + ['description' => 'Whether the person who sent the form can open its final document from My submissions.'],
+                'document_left_out' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Questions, by key, accepted as staying out of the final document. Emptied when the template changes.'],
             ], []) + ['minProperties' => 1],
             'FormFieldCreateRequest' => self::object([
                 'field_key' => [
@@ -8142,6 +8691,9 @@ final class CoreApiSchemas
                 'accepts_submissions' => self::bool(),
                 'opens_at' => self::str(true),
                 'closes_at' => self::str(true),
+                // WHIT-920: sign in first, then fill it in at /forms/{form_id}.
+                'sign_in_required' => self::bool(),
+                'form_id' => self::int(true) + ['description' => 'Given only when sign-in is required: the form to fill in once signed in.'],
             ], ['slug', 'name', 'fields', 'sections', 'accepts_submissions'])),
             // A field, reduced to what drawing it requires. `id`, `tenant_id` and
             // `form_id` are internal identifiers a stranger has no use for and
@@ -8303,6 +8855,11 @@ final class CoreApiSchemas
                 // fetched by this read", never "empty".
                 'form_key' => self::str(),
                 'form_name' => self::localizedText(),
+                // Where it is, from its route. WHIT-920 adds `sent back` (waiting
+                // for its author's changes) and `not approved` (the route ended
+                // on a rejection).
+                'state' => ['type' => 'string', 'enum' => ['not routed', 'in progress', 'sent back', 'not approved', 'completed', 'withdrawn']],
+                'current_step' => self::str(true),
             ], ['id', 'tenant_id', 'form_id', 'form_version', 'data', 'submitted_at']),
             'FormSubmissionListResponse' => self::listEnvelope('FormSubmission'),
             'FormSubmissionDetailResponse' => self::dataEnvelope([
@@ -8318,9 +8875,104 @@ final class CoreApiSchemas
                             'filename' => self::str(true),
                         ], ['id', 'field_key', 'content_type', 'byte_size', 'filename'])],
                         'form_version_now' => self::int(true),
+                        // WHIT-920: on the caller's own submission only.
+                        'progress' => SchemaBuilder::ref('FormSubmissionProgress') + ['nullable' => true],
                     ], []),
                 ],
             ]),
+            // WHIT-920 (A9): where a submission is, as the person who sent it
+            // sees it. Stages and outcomes, and the notes written for them;
+            // reviewer names only when the workspace shows them.
+            'FormSubmissionProgress' => self::object([
+                'state' => self::str(),
+                'stages' => ['type' => 'array', 'items' => self::object([
+                    'position' => self::int(),
+                    'label' => self::str(true),
+                    'status' => ['type' => 'string', 'enum' => ['done', 'current', 'waiting', 'sent_back', 'not_approved']],
+                    'outcome' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true],
+                    'reviewers' => ['type' => 'array', 'items' => ['type' => 'string']],
+                    // WHIT-921: `finalise` on the stage that makes the final document.
+                    'kind' => ['type' => 'string', 'enum' => ['finalise']],
+                ], ['position', 'label', 'status', 'outcome'])],
+                'notes' => ['type' => 'array', 'items' => self::object([
+                    'kind' => ['type' => 'string', 'enum' => ['sent_back', 'not_approved', 'note']],
+                    'note' => self::str(),
+                    'stage' => self::str(true),
+                    'stage_position' => self::int(true),
+                    'at' => self::str(),
+                    'from' => self::str(true),
+                ], ['kind', 'note', 'stage', 'at'])],
+                'can_resubmit' => self::bool(),
+                'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true],
+                'shows_reviewers' => self::bool(),
+                // WHIT-921: the route's final document, when it has a finalise
+                // stage that was reached. `can_open`: the PDF exists and the form
+                // lets the applicant have it (GET .../final-document).
+                'final_document' => self::object([
+                    'status' => ['type' => 'string', 'enum' => ['waiting', 'ready', 'failed']],
+                    'can_open' => self::bool(),
+                ], ['status', 'can_open']) + ['nullable' => true],
+            ], ['state', 'stages', 'notes', 'can_resubmit', 'resume_from', 'shows_reviewers']),
+            'FormSubmissionResubmitRequest' => self::object([
+                'data' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The changed answers, keyed by field key. A file question left unanswered keeps the file already attached.'],
+                'note' => self::str(true) + ['description' => 'An optional note for the reviewers.'],
+            ], ['data']),
+            'FormSubmissionResubmitResponse' => self::object([
+                'data' => SchemaBuilder::ref('FormSubmission'),
+                'meta' => self::object([
+                    'ignored_keys' => ['type' => 'array', 'items' => ['type' => 'string']],
+                ], ['ignored_keys']),
+            ], ['data', 'meta']),
+            // WHIT-920: a subject and its routes, for a reviewer.
+            'RoutesBySubjectResponse' => self::dataEnvelope(self::object([
+                'subject' => self::object([
+                    'type' => self::str(),
+                    'id' => self::int(),
+                    'title' => self::str(true),
+                    'document_id' => self::int(true),
+                    'version' => self::int(true),
+                    'content_hash' => self::str(true),
+                    'can_send_back' => self::bool(),
+                    'form' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => true, 'description' => 'On a form submission: its questions, its answers and its files.'],
+                ], ['type', 'id', 'title', 'document_id', 'version', 'can_send_back']),
+                'routes' => ['type' => 'array', 'items' => [
+                    'allOf' => [
+                        SchemaBuilder::ref('DocumentRoute'),
+                        self::object([
+                            'trail' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentTrailEvent')],
+                            'recipients' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentRouteRecipient')],
+                            'changes' => self::object([
+                                'seen_version' => self::int(true),
+                                'current_version' => self::int(true),
+                                'changes' => ['type' => 'array', 'items' => self::object([
+                                    'key' => self::str(),
+                                    'before' => ['nullable' => true],
+                                    'after' => ['nullable' => true],
+                                ], ['key'])],
+                            ], ['seen_version', 'current_version', 'changes']),
+                            'can_send_back' => self::bool(),
+                            // WHIT-921: what the finalise step did - the engine's
+                            // own act, so not a trail entry. Null until reached.
+                            'finalisation' => SchemaBuilder::ref('RouteFinalisation') + ['nullable' => true],
+                        ], ['trail', 'recipients', 'changes']),
+                    ],
+                ]],
+                'people' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Display names by profile id, for the people on these routes.'],
+            ], ['subject', 'routes', 'people'])),
+            // WHIT-921: what a route's finalise step did.
+            'RouteFinalisation' => self::object([
+                'step_id' => self::int(),
+                'status' => ['type' => 'string', 'enum' => ['waiting', 'done', 'failed'], 'description' => '`waiting`: being made, or the render service is down and it will be tried again.'],
+                'reason' => self::str(true) + ['description' => 'Why it waits or failed. Waiting: `render_unavailable`, `error`. Failed: `pdfs_off`, `limit`, `template_missing`, `template_unpublished`, `render_refused`, `refused_by_plugin`, `document_conflict`, `withdrawn`, `no_subject`, `not_approved`, `gave_up`.'],
+                'subject_version' => self::int(true),
+                'content_hash' => self::str(true) + ['description' => 'SHA-256 of the approved version the final document was made from.'],
+                'document_id' => self::int(true),
+                'has_pdf' => self::bool(),
+                'reached_at' => self::str(),
+                'finalised_at' => self::str(true),
+                'can_retry' => self::bool() + ['description' => 'On GET /api/routes: the caller may ask for another try (POST .../final-document/retry).'],
+            ], ['step_id', 'status', 'reason', 'subject_version', 'content_hash', 'document_id', 'has_pdf', 'reached_at', 'finalised_at']),
+            'RouteFinalisationResponse' => self::dataEnvelope(SchemaBuilder::ref('RouteFinalisation')),
             'FormSubmissionWithdrawnResponse' => self::object(['data' => SchemaBuilder::ref('FormSubmission')], ['data']),
             'FormSubmissionCreateResponse' => self::object([
                 'data' => SchemaBuilder::ref('FormSubmission'),
@@ -9076,7 +9728,12 @@ final class CoreApiSchemas
             'NotificationPreferencesResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationPreferenceEntry')],
                 'transactional_prefixes' => ['type' => 'array', 'items' => self::str()],
-            ], ['data', 'transactional_prefixes']),
+                'plugin_types' => ['type' => 'array', 'items' => self::object([
+                    'type' => self::str(),
+                    'label' => self::object(['en' => self::str(), 'ar' => self::str()], ['en', 'ar']),
+                    'plugin' => self::str(),
+                ], ['type', 'label', 'plugin'])],
+            ], ['data', 'transactional_prefixes', 'plugin_types']),
             'DisplayPreferences' => self::object([
                 'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
                 'showTechnicalDetails' => self::bool(),
@@ -9197,6 +9854,19 @@ final class CoreApiSchemas
                 'php_version' => self::str(),
             ], ['core_version', 'sdk_version', 'php_version']),
 
+            // GET /api/platform/renderer (WHIT-1001). `printing` is what the
+            // document routes act on: the switch AND a ready renderer.
+            'PlatformRendererResponse' => self::object([
+                'state' => ['type' => 'string', 'enum' => ['ready', 'not_configured', 'secret_missing', 'unreachable', 'secret_mismatch', 'version_mismatch']],
+                'ready' => self::bool(),
+                'app_version' => self::str(),
+                'render_version' => self::str(true),
+                'message' => self::str(),
+                'fix' => self::str(),
+                'switched_on' => self::bool(),
+                'printing' => self::bool(),
+            ], ['state', 'ready', 'app_version', 'render_version', 'message', 'fix', 'switched_on', 'printing']),
+
             // GET /api/platform/version/latest (WHIT-587). `check_failed` is a
             // 200 verdict, not an HTTP error — "could not tell" must never be
             // read as "up to date".
@@ -9271,7 +9941,14 @@ final class CoreApiSchemas
                 'version' => self::str(),
                 'routes_count' => self::int(),
                 'permissions_count' => self::int(),
-                'trust' => ['type' => 'string', 'enum' => ['unverified']],
+                'trust' => ['type' => 'string', 'enum' => ['verified', 'unverified'], 'description' => 'verified only while the Whity store has a live, signed Verified mark for the exact installed package (WHIT-1014)'],
+                // The store's mark behind `verified`; null otherwise.
+                'mark' => array_merge(self::object([
+                    'host' => self::str(),
+                    'reviewed_at' => self::str(true),
+                    'checked_at' => self::str(),
+                    'offline' => self::bool(),
+                ], ['host', 'reviewed_at', 'checked_at', 'offline']), ['nullable' => true]),
                 // Operators only.
                 'install' => self::object([
                     'source' => self::str(),
@@ -9545,7 +10222,9 @@ final class CoreApiSchemas
                     ],
                     'required' => ['light', 'dark'],
                 ],
-            ], ['siteName', 'logoWideUrl', 'logoSquareUrl', 'faviconUrl', 'mainColor', 'theme']),
+                // #1733: the instance switch for installing the web app.
+                'installable' => ['type' => 'boolean', 'description' => 'Whether the web app offers a manifest and service worker so it can be installed as an app. An instance setting (app.installable, else the PWA_ENABLED environment variable, else on).'],
+            ], ['siteName', 'logoWideUrl', 'logoSquareUrl', 'faviconUrl', 'mainColor', 'theme', 'installable']),
             // GET /api/branding — the standard data envelope around Branding.
             'BrandingResponse' => self::dataEnvelope(SchemaBuilder::ref('Branding')),
             // PUT /api/tenants/{id}/branding-host request body.
@@ -11604,6 +12283,94 @@ final class CoreApiSchemas
                     ],
                 ],
             ],
+            [
+                'method' => 'POST',
+                'path' => '/api/billing/provider-webhook',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Payment provider notifications through the billing plugin (signed, not user-authenticated)',
+                    'description' =>
+                        'For a deployment that sells through a payment-provider plugin (Stripe, Paddle, '
+                        . 'Polar) instead of the hosted billing service. Point the provider\'s webhook '
+                        . 'here. The plugin verifies the provider\'s own signature over the RAW bytes '
+                        . 'before anything is decoded and returns only the delivery id and which '
+                        . 'workspace changed; the delivery id is recorded so a replay is acted on once, '
+                        . 'and what is true is then read back from the provider. The body is never a '
+                        . 'write path. 404 when no billing plugin is in use.',
+                    'tags' => ['billing'],
+                    'responses' => [
+                        200 => self::jsonResponse('Received, or deliberately ignored', self::object([
+                            'received' => self::bool(),
+                        ], ['received'])),
+                        401 => self::errorResponse('The signature did not verify'),
+                        404 => self::errorResponse('No billing plugin is in use'),
+                        503 => self::errorResponse('Temporarily could not be acted on — retry'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/billing/checkout-page',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The page a payment provider link opens, for checkouts that run on the seller page',
+                    'description' =>
+                        'Public: the payer arrives from the provider (Paddle) with only the query string. '
+                        . 'The billing plugin writes the HTML and its Content-Security-Policy and checks the '
+                        . 'transaction in the query with its provider first. Answers HTML, uncached; 404 when '
+                        . 'no billing plugin is in use or the reference is not valid.',
+                    'tags' => ['billing'],
+                    'responses' => [
+                        200 => ['description' => 'The checkout page (text/html)'],
+                        404 => self::errorResponse('No such checkout'),
+                        503 => self::errorResponse('The payment provider is temporarily unreachable'),
+                    ],
+                ],
+            ],
+            self::permissionRoute('POST', '/api/billing/portal', 'billing:pay', [
+                'summary' => 'A link to the payment provider\'s self-service page for this workspace',
+                'description' =>
+                    'Where the workspace updates its card, downloads invoices or cancels, on the '
+                    . 'payment provider\'s own page. Short-lived. Only a payment-provider plugin has '
+                    . 'one; the hosted billing service answers 404.',
+                'tags' => ['billing'],
+                'responses' => [
+                    200 => self::jsonResponse('Where to send the customer', self::object([
+                        'url' => self::str(),
+                    ], ['url'])),
+                    404 => self::errorResponse('This deployment has no self-service billing page'),
+                    409 => self::errorResponse('This workspace has not bought anything yet'),
+                    502 => self::errorResponse('The payment provider refused the request'),
+                    503 => self::errorResponse('The payment provider is temporarily unreachable'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/billing/refunds', 'plans:manage', [
+                'summary' => 'Refund a workspace\'s payment (operator only)',
+                'description' =>
+                    'System workspace only. Names the workspace (`tenant_id`), the receipt\'s '
+                    . '`reference`, and optionally `amount_minor` for a partial refund in minor units. '
+                    . 'Some providers review a refund before it happens, so the answer is 202 and the '
+                    . 'receipt shows the outcome later.',
+                'tags' => ['billing'],
+                'request' => self::object([
+                    'tenant_id' => self::int() + ['description' => 'The workspace whose payment is refunded'],
+                    'receipt' => self::str() + ['description' => 'The receipt\'s `reference` from GET /api/billing/receipts'],
+                    'amount_minor' => self::int() + ['description' => 'For a partial refund, the amount in minor units (fils for JOD). Leave it out to refund what is left'],
+                ], ['tenant_id', 'receipt']),
+                // Money leaves the deployment: a person does this, never an agent.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    202 => self::jsonResponse('The refund was requested', self::object([
+                        'requested' => self::bool(),
+                    ], ['requested'])),
+                    404 => self::errorResponse('This deployment cannot refund through its payment provider'),
+                    422 => self::errorResponse('Validation failed, or the provider refused the refund'),
+                    502 => self::errorResponse('The payment provider refused the request'),
+                    503 => self::errorResponse('The payment provider is temporarily unreachable'),
+                ] + self::authErrors(),
+            ]),
         ];
     }
 
@@ -12161,7 +12928,8 @@ final class CoreApiSchemas
                 'mcp' => ['agentPolicy' => 'propose'],
                 'description' =>
                     'The record is the deliverable and the rendered artifact is opportunistic. '
-                    . '`documents.render_enabled` defaults to FALSE, so on a default install this '
+                    . 'An instance without a ready render service (one reachable, at this release, '
+                    . 'accepting the shared secret) or with `documents.render_enabled` switched off '
                     . 'returns a document with no artifact and `content_url: null` — which is a '
                     . 'complete, routable document, not a degraded one: the values it was raised with '
                     . 'are stored on the record, and POST /api/documents/{id}/render mints the '
@@ -12533,6 +13301,144 @@ final class CoreApiSchemas
                             . 'first, an empty note, or an unknown action'
                         ),
                     ] + self::authErrors(),
+                ],
+            ],
+            // WHIT-922 (#1726): electronic signatures. Session-gated with no
+            // permission, like acting: being the person the step reached is the
+            // authorization. Off the agent surface, except the audit read.
+            [
+                'method' => 'GET',
+                'path' => '/api/documents/{id:\\d+}/routes/{routeId:\\d+}/signing',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'What you see before signing: the step, its capacity, the content hash, the consent version and how you will confirm',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        200 => self::jsonResponse('The signing context', 'SigningContextResponse'),
+                        404 => self::errorResponse('Document or route not found, or not visible to the caller'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/documents/{id:\\d+}/routes/{routeId:\\d+}/signing/code',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Email yourself a one-time code to confirm a signature',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        202 => self::jsonResponse('The code was sent', 'SigningCodeResponse'),
+                        404 => self::errorResponse('Document or route not found, or not visible to the caller'),
+                        422 => self::errorResponse('Nothing here waits for your signature, or the account confirms another way'),
+                        429 => self::errorResponse('Too many codes were sent'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/documents/{id:\\d+}/routes/{routeId:\\d+}/sign',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Sign your open item on a signing step: electronic signature with audit trail',
+                    'description' => 'Needs the consent line ticked in its current wording, a drawn signature (or your saved one), '
+                        . 'the content hash you were shown, and the second check your account uses. The act and a '
+                        . 'sealed signature record are written together. The record is bound to the hash of this '
+                        . 'version and does not carry over to a new one.',
+                    'tags' => ['documents'],
+                    'request' => 'SignRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The signature record and the trail entry', 'SignResponse'),
+                        404 => self::errorResponse('Document or route not found, or not visible to the caller'),
+                        409 => self::errorResponse('The content changed since you opened it'),
+                        422 => self::errorResponse('Consent, drawn signature or second check missing or not correct, or nothing here waits for your signature'),
+                        429 => self::errorResponse('Too many tries'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/documents/{id:\\d+}/audit',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The audit of a document: every act and signature, whether each seal checks, and whether the trail is intact',
+                    'description' => 'Email addresses, IP addresses and browsers of signers are included only for callers holding audit:read.',
+                    'tags' => ['documents'],
+                    'mcp' => true,
+                    'responses' => [
+                        200 => self::jsonResponse('The audit', 'DocumentAuditResponse'),
+                        404 => self::errorResponse('Document not found or not visible to the caller'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/routes/{routeId:\d+}/final-document/retry',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Try again to make the final document of a route',
+                    'description' => 'For a failed or waiting final document. The caller may read the route and either '
+                        . 'started it, or may route documents (a document) or manage forms (a form submission). '
+                        . 'The queue makes it.',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        202 => self::jsonResponse('Queued again', 'RouteFinalisationResponse'),
+                        403 => self::errorResponse('The caller may not manage this route'),
+                        404 => self::errorResponse('Route not found, or not visible to the caller'),
+                        409 => self::errorResponse('There is no final document to try again'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/signature',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Your saved drawn signature, or null',
+                    'tags' => ['documents'],
+                    'responses' => [200 => self::jsonResponse('Your saved signature', 'SavedSignatureResponse')] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/signature',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Save your drawn signature for reuse',
+                    'tags' => ['documents'],
+                    'request' => 'SavedSignatureRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('The saved signature', 'SavedSignatureResponse'),
+                        422 => self::errorResponse('The drawing could not be used as a signature'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'DELETE',
+                'path' => '/api/me/signature',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Forget your saved drawn signature. Signatures already made keep their own copy.',
+                    'tags' => ['documents'],
+                    'responses' => [204 => ['description' => 'Forgotten']] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/signing-keys',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The public keys that seal signature records on this instance (public)',
+                    'tags' => ['documents'],
+                    'responses' => [200 => self::jsonResponse('The published keys', 'SigningKeyListResponse')],
                 ],
             ],
         ];
@@ -12939,6 +13845,80 @@ final class CoreApiSchemas
                         200 => self::jsonResponse('The card and its new state', 'HomeCardHiddenResponse'),
                         404 => self::errorResponse('No card by that name that the caller may see'),
                         422 => self::errorResponse('hidden is missing or not true or false'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            // WHIT-920 (#1724). Routes by SUBJECT: a route on a form submission
+            // has no document, so these reach any route. Session-gated with no
+            // permission, like the document routes above.
+            [
+                'method' => 'GET',
+                'path' => '/api/routes',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'A subject and its routes, with their trails, items and what changed',
+                    'description' => 'For a person a route on the subject reached, or who may otherwise read it '
+                        . '(a document they can see; a form submission with `forms:read`). The person who sent '
+                        . 'a form reads their own through My submissions instead. Everybody else gets a 404.',
+                    'tags' => ['documents'],
+                    'parameters' => [
+                        self::queryParam('subject_type', 'string', '`document` or `form_submission`.'),
+                        self::queryParam('subject_id', 'integer', 'The subject\'s id.'),
+                    ],
+                    'responses' => [
+                        200 => self::jsonResponse('The subject and its routes', 'RoutesBySubjectResponse'),
+                        404 => self::errorResponse('Not found, or not visible to the caller'),
+                        422 => self::errorResponse('The subject type and id are required'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/routes/{routeId:\d+}/actions',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Act on a route, whatever it travels on',
+                    'description' => 'The same body as acting on a document\'s route. On a form submission a '
+                        . 'rejection needs its reason, which the person who sent it reads.',
+                    'tags' => ['documents'],
+                    'request' => 'DocumentRouteActionRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The appended trail event', 'DocumentRouteActionResponse'),
+                        404 => self::errorResponse('Route not found, or not visible to the caller'),
+                        422 => self::errorResponse('The act is not available to the caller on this route'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/routes/{routeId:\d+}/files/{fileId:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Download a file attached to the form submission a route travels on',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        200 => ['description' => 'The file, as an attachment', 'content' => ['application/octet-stream' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                        404 => self::errorResponse('Not a file the caller may read'),
+                        503 => self::errorResponse('The file could not be read from storage'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/routes/{routeId:\d+}/final-document',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The final document a route\'s finalise step made',
+                    'description' => 'For a person who may read the route. A 404 while the final document is still waiting.',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        200 => ['description' => 'The PDF', 'content' => ['application/pdf' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                        404 => self::errorResponse('No final document yet, or the route is not visible to the caller'),
+                        503 => self::errorResponse('The file could not be read from storage'),
                     ] + self::authErrors(),
                 ],
             ],
@@ -15343,17 +16323,14 @@ final class CoreApiSchemas
 
     /**
      * The bilingual `{ar?, en?}` label object (WC-532), marked for the
-     * schema-driven CRUD screen's LocalizedText renderer.
+     * schema-driven CRUD screen's LocalizedText renderer. The contract is the
+     * SDK's, so core and plugins declare the same thing (#521).
      *
      * @return array<string, mixed>
      */
     private static function localizedText(): array
     {
-        return [
-            'type' => 'object',
-            'x-whity-localized-text' => true,
-            'properties' => ['ar' => self::str(), 'en' => self::str()],
-        ];
+        return LocalizedText::schema();
     }
 
     /**

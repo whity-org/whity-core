@@ -4,11 +4,18 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Form\SubmissionEvents;
+use Whity\Core\Hooks\HookManager;
+use Whity\Sdk\Hooks\Events;
 use PDO;
 use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Document\DocumentRepository;
 use Whity\Core\Document\DocumentWithdrawal;
+use Whity\Core\Document\Routing\RouteEventRepository;
+use Whity\Core\Document\Routing\RouteRecipientRepository;
+use Whity\Core\Document\Routing\RouteRepository;
 use Whity\Core\Form\FormSubmissionRepository;
+use Whity\Core\Form\FormSubmissionRouteSubject;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
@@ -33,6 +40,12 @@ final class FormSubmissionWithdrawalApiHandler
         private readonly DocumentRepository $documents,
         private readonly DocumentWithdrawal $documentWithdrawal,
         private readonly ?AuditLogger $audit = null,
+        // WHIT-920: a submission routed on itself has no document to withdraw;
+        // its own routes' open items are closed instead.
+        private readonly ?RouteRepository $routes = null,
+        private readonly ?RouteRecipientRepository $recipients = null,
+        private readonly ?RouteEventRepository $events = null,
+        private readonly ?HookManager $hooks = null,
     ) {
     }
 
@@ -71,6 +84,7 @@ final class FormSubmissionWithdrawalApiHandler
             if ($document !== null) {
                 $this->documentWithdrawal->withdraw($tenantId, $profileId, $document);
             }
+            $this->closeSubjectRoutes($tenantId, $id, $profileId);
 
             $this->audit?->record('forms.submission_withdrawn', [
                 'tenant_id' => $tenantId,
@@ -81,6 +95,10 @@ final class FormSubmissionWithdrawalApiHandler
 
             $this->db->commit();
 
+            if ($submission !== null) {
+                SubmissionEvents::announce($this->hooks, Events::SUBMISSION_WITHDRAWN, $tenantId, $id, (int) $submission['form_id'], $profileId);
+            }
+
             return Response::json(['data' => $this->submissions->find($tenantId, $id, $profileId)]);
         } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
@@ -89,6 +107,27 @@ final class FormSubmissionWithdrawalApiHandler
             error_log('[FormSubmissionWithdrawalApiHandler] withdraw failed: ' . $e->getMessage());
 
             return Response::error('Could not withdraw this submission', 500);
+        }
+    }
+
+    /**
+     * Close every open item on the routes that travel on the submission itself
+     * (WHIT-920), with the same withdrawal row a document's withdrawal appends.
+     * A route that also names a document was closed with the document above.
+     */
+    private function closeSubjectRoutes(int $tenantId, int $submissionId, int $profileId): void
+    {
+        if ($this->routes === null || $this->recipients === null || $this->events === null) {
+            return;
+        }
+
+        foreach ($this->routes->listForSubject(FormSubmissionRouteSubject::TYPE, $submissionId, $tenantId) as $route) {
+            $routeId = (int) $route['id'];
+            if (!$this->recipients->hasOpenOnRoute($tenantId, $routeId)) {
+                continue;
+            }
+            $eventId = $this->events->appendWithdrawal($tenantId, $route['document_id'], $routeId, $profileId);
+            $this->recipients->closeOpenOnRoute($tenantId, $routeId, $eventId);
         }
     }
 

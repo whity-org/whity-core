@@ -230,6 +230,21 @@ final class FakeDocumentIssuer implements Documents
         return new \Whity\Sdk\Documents\PreflightResult(true, []);
     }
 
+    public function issueMany(\Whity\Sdk\Documents\BulkIssueRequest $request): \Whity\Sdk\Documents\BulkIssueStatus
+    {
+        throw new \LogicException('not used here');
+    }
+
+    public function batch(int $batchId): ?\Whity\Sdk\Documents\BulkIssueStatus
+    {
+        return null;
+    }
+
+    public function cancelBatch(int $batchId): ?\Whity\Sdk\Documents\BulkIssueStatus
+    {
+        return null;
+    }
+
     public function issue(IssueRequest $request): IssueResult
     {
         $this->lastOriginKey = $request->originKey;

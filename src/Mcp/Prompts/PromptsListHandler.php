@@ -29,6 +29,9 @@ final class PromptsListHandler implements MethodHandler
         private readonly PromptRegistry $registry,
         private readonly RoleChecker    $roleChecker,
         private readonly TokenValidator $tokenValidator,
+        // SDK 1.80 (WHIT-993): whether a plugin is still granted agent context,
+        // asked on every call so a revoke applies at once. Null: trust the registry.
+        private readonly ?\Closure $pluginGranted = null,
     ) {}
 
     /** @param array<string, mixed>|null $params */
@@ -42,6 +45,9 @@ final class PromptsListHandler implements MethodHandler
         $result = [];
         foreach ($this->registry->all() as $prompt) {
             if (!$this->callerCanSee($prompt, $principal, $tenantId)) {
+                continue;
+            }
+            if ($prompt->plugin !== null && $this->pluginGranted !== null && !($this->pluginGranted)($prompt->plugin)) {
                 continue;
             }
             $result[] = [

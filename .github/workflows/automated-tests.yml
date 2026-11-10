@@ -1001,6 +1001,18 @@ jobs:
           ENCRYPTION_KEY: ci_encryption_key_min_32_chars_bbbbbbbb
         run: vendor/bin/phpunit --testsuite Security
 
+      # Every step above starts from an empty database. An existing install does
+      # not: it starts the new code on the last release's schema and migrates
+      # from inside that container, and v0.2.27 crash-looped doing exactly that.
+      # Runs this tree in the last release's image, with the real FrankenPHP
+      # worker. Last in the job because the container writes into the checkout
+      # as root.
+      - name: Upgrade from the last release boots and migrates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WHITY_UPGRADE_APP_ARGS: -v ${{ github.workspace }}:/app
+        run: bash scripts/ci-upgrade-boot-check.sh
+
   postgres-integration:
     # Keep the `/5` here in step with the matrix below; the shard arithmetic
     # itself reads `strategy.job-total`, so only this label is manual.
