@@ -27,6 +27,8 @@ use Whity\Http\JsonBody;
  *   PUT    /api/plans/{id}/entitlements     → setEntitlements()
  *   POST   /api/tenants/{id}/plan           → applyToTenant()
  *   GET    /api/tenants/{id}/plan           → getTenantPlan()
+ *   GET    /api/tenants/{id}/addons         → listTenantAddons()   (WHIT-932)
+ *   PUT    /api/tenants/{id}/addons         → setTenantAddon()     (WHIT-932)
  *
  * Plans are a PLATFORM catalog. `plans:manage` is necessary but NOT sufficient:
  * authorize() additionally requires the caller to be acting in the SYSTEM tenant
@@ -408,6 +410,62 @@ final class PlansApiHandler
         }
 
         return Response::json(['data' => $this->plans->getTenantPlan($targetTenant)]);
+    }
+
+    /**
+     * The add-on packs a tenant holds (WHIT-932).
+     *
+     * @param array<string, string> $params
+     */
+    public function listTenantAddons(Request $request, array $params): Response
+    {
+        if (($r = $this->authorize($request)) instanceof Response) {
+            return $r;
+        }
+        $targetTenant = (int) ($params['id'] ?? 0);
+        if (!$this->tenantExists($targetTenant)) {
+            return Response::error('Tenant not found', 404);
+        }
+
+        return Response::json(['data' => $this->plans->listTenantAddons($targetTenant)]);
+    }
+
+    /**
+     * Set how many packs of one add-on a tenant holds. Body:
+     * `{ "plan_id": <int>, "quantity": <int> }`; a quantity of 0 removes it.
+     * Answers with the tenant's packs after the change.
+     *
+     * @param array<string, string> $params
+     */
+    public function setTenantAddon(Request $request, array $params): Response
+    {
+        $ctx = $this->authorize($request);
+        if ($ctx instanceof Response) {
+            return $ctx;
+        }
+        ['userId' => $userId] = $ctx;
+
+        $targetTenant = (int) ($params['id'] ?? 0);
+        if (!$this->tenantExists($targetTenant)) {
+            return Response::error('Tenant not found', 404);
+        }
+
+        $body = JsonBody::parsed($request);
+        $planId = isset($body['plan_id']) && is_int($body['plan_id']) ? $body['plan_id'] : 0;
+        if ($planId <= 0) {
+            return Response::error('Validation failed', 422, ['plan_id' => 'plan_id is required.']);
+        }
+        if (!isset($body['quantity']) || !is_int($body['quantity'])) {
+            return Response::error('Validation failed', 422, ['quantity' => 'quantity must be a whole number.']);
+        }
+
+        try {
+            $this->plans->setTenantAddon($targetTenant, $planId, $body['quantity'], $userId);
+        } catch (PlanValidationException $e) {
+            return Response::error('Validation failed', 422, [$e->field() => $e->reason()]);
+        }
+
+        return Response::json(['data' => $this->plans->listTenantAddons($targetTenant)]);
     }
 
     /**

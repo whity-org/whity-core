@@ -91,6 +91,57 @@ final class EntitlementRegistry
      */
     public const MCP_ACCESS = 'mcp.access';
 
+    // -- Customers (WHIT-932) ------------------------------------------------
+    /**
+     * Distinct customers a workspace serves in one calendar month.
+     *
+     * Counted by {@see \Whity\Core\Usage\CustomerUsage}, which says what a
+     * customer is. Never refused: passing it is recorded and shown to the
+     * workspace's admins, because a business must not have to turn a customer
+     * away in the middle of serving them.
+     */
+    public const CUSTOMERS_PER_MONTH = 'customers.per_month';
+
+    // -- Brand (WHIT-932) ----------------------------------------------------
+    /** The workspace may be reached on its own web address (`tenants.branding_host`). */
+    public const BRAND_CUSTOM_DOMAIN = 'brand.custom_domain';
+    /** The workspace's public pages leave out "Built on Whity". */
+    public const BRAND_REMOVE_BADGE = 'brand.remove_badge';
+    /**
+     * The workspace may send email from its own address. Its own sign-in is
+     * {@see SSO_TENANT_IDP}, which already existed; a tier that sells both
+     * sets both.
+     */
+    public const BRAND_OWN_EMAIL_SENDER = 'brand.own_email_sender';
+    /** The workspace may publish its own app in the app stores. */
+    public const BRAND_OWN_APP = 'brand.own_app';
+
+    // -- Agents (WHIT-932) ---------------------------------------------------
+    /**
+     * Agent tool calls included each calendar month.
+     *
+     * An ALLOWANCE, not a cap: work past it is counted as usage and goes ahead.
+     * {@see \Whity\Core\Entitlement\MeterService::record()} never refuses, whatever
+     * `meters.enforcement` says. Agents never take a staff seat.
+     */
+    public const AGENTS_RUNS_PER_MONTH = 'agents.runs.per_month';
+
+    /**
+     * Limits that only ever warn: passing one is recorded and shown, never
+     * refused, whatever an enforcement setting says. The business model's
+     * promise ("passing a limit warns first; nothing is locked") applies to
+     * every limit added from WHIT-932 on.
+     *
+     * @var list<string>
+     */
+    public const WARN_ONLY = [
+        self::CUSTOMERS_PER_MONTH,
+        self::BRAND_CUSTOM_DOMAIN,
+        self::BRAND_OWN_EMAIL_SENDER,
+        self::BRAND_OWN_APP,
+        self::AGENTS_RUNS_PER_MONTH,
+    ];
+
     /**
      * Which core limits are METERED, and on what calendar window.
      *
@@ -103,6 +154,8 @@ final class EntitlementRegistry
     private const METER_PERIODS = [
         self::DOCUMENTS_RENDER_PER_DAY   => EntitlementDefinition::PERIOD_DAY,
         self::DOCUMENTS_RENDER_PER_MONTH => EntitlementDefinition::PERIOD_MONTH,
+        self::CUSTOMERS_PER_MONTH        => EntitlementDefinition::PERIOD_MONTH,
+        self::AGENTS_RUNS_PER_MONTH      => EntitlementDefinition::PERIOD_MONTH,
     ];
 
     /**
@@ -127,6 +180,16 @@ final class EntitlementRegistry
         self::DOCUMENTS_RENDER_PER_DAY   => '-1',
         self::DOCUMENTS_RENDER_PER_MONTH => '-1',
         self::MCP_ACCESS             => 'true',
+        // Neutral defaults: what an install that sells nothing does today. It
+        // counts no customers against anything, may set its own web address
+        // and mail sender, may ship its own app, and shows "Built on Whity" on
+        // its public pages. A hosted tier sets these on purpose.
+        self::CUSTOMERS_PER_MONTH    => '-1',
+        self::BRAND_CUSTOM_DOMAIN    => 'true',
+        self::BRAND_REMOVE_BADGE     => 'false',
+        self::BRAND_OWN_EMAIL_SENDER => 'true',
+        self::BRAND_OWN_APP          => 'true',
+        self::AGENTS_RUNS_PER_MONTH  => '-1',
     ];
 
     /**
@@ -145,6 +208,12 @@ final class EntitlementRegistry
         self::DOCUMENTS_RENDER_PER_DAY   => 'int',
         self::DOCUMENTS_RENDER_PER_MONTH => 'int',
         self::MCP_ACCESS             => 'bool',
+        self::CUSTOMERS_PER_MONTH    => 'int',
+        self::BRAND_CUSTOM_DOMAIN    => 'bool',
+        self::BRAND_REMOVE_BADGE     => 'bool',
+        self::BRAND_OWN_EMAIL_SENDER => 'bool',
+        self::BRAND_OWN_APP          => 'bool',
+        self::AGENTS_RUNS_PER_MONTH  => 'int',
     ];
 
     /**
@@ -162,6 +231,12 @@ final class EntitlementRegistry
         self::DOCUMENTS_RENDER_PER_DAY   => 'Documents this workspace may render each day. Resets at midnight (-1 for unlimited).',
         self::DOCUMENTS_RENDER_PER_MONTH => 'Documents this workspace may render each calendar month. Resets on the 1st (-1 for unlimited).',
         self::MCP_ACCESS             => 'Allow this workspace to use the MCP and AI endpoints.',
+        self::CUSTOMERS_PER_MONTH    => 'Customers this workspace may serve each calendar month. Passing it warns and never turns a customer away (-1 for unlimited).',
+        self::BRAND_CUSTOM_DOMAIN    => 'Allow this workspace to be reached on its own web address.',
+        self::BRAND_REMOVE_BADGE     => 'Leave "Built on Whity" off this workspace\'s public pages.',
+        self::BRAND_OWN_EMAIL_SENDER => 'Allow this workspace to send email from its own address. Its own sign-in is "sso.tenant_idp".',
+        self::BRAND_OWN_APP          => 'Allow this workspace to publish its own app in the app stores.',
+        self::AGENTS_RUNS_PER_MONTH  => 'Agent tool calls included each calendar month. Work past it is counted as usage and goes ahead (-1 for unlimited).',
     ];
 
     /**

@@ -231,6 +231,10 @@
     "en": "See one invoice, its lines and its payments",
     "ar": "عرض فاتورة وبنودها ومدفوعاتها"
   },
+  "get_api_billing_limits": {
+    "en": "See where your workspace stands against its plan's limits",
+    "ar": "عرض استخدام مساحة العمل مقارنة بحدود باقتها"
+  },
   "get_api_billing_methods": {
     "en": "See which ways of paying are available",
     "ar": "عرض طرق الدفع المتاحة"
@@ -730,6 +734,10 @@
   "get_api_tenants": {
     "en": "List workspaces",
     "ar": "عرض مساحات العمل"
+  },
+  "get_api_tenants_id_addons": {
+    "en": "See a workspace's add-on packs",
+    "ar": "عرض الحزم الإضافية لمساحة عمل"
   },
   "get_api_tenants_id_entitlements": {
     "en": "See the limits and features of a workspace",
@@ -1473,6 +1481,10 @@
   "put_api_storage_config": {
     "en": "Set or replace where your workspace stores files",
     "ar": "تعيين مكان تخزين الملفات أو استبداله"
+  },
+  "put_api_tenants_id_addons": {
+    "en": "Set a workspace's add-on packs",
+    "ar": "تعديل الحزم الإضافية لمساحة عمل"
   },
   "put_api_tenants_id_branding_host": {
     "en": "Set or clear a workspace's own web address",

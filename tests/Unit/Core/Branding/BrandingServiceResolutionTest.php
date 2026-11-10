@@ -78,7 +78,7 @@ final class BrandingServiceResolutionTest extends TestCase
         $settings = new SettingsService(new GlobalSettingsRepository($pdo), new TenantSettingsRepository($pdo));
         $settings->setTenant(1, 'support_email', 'secret@acme.com');
         $arr = (new BrandingService($settings))->effective(1)->toArray();
-        self::assertSame(['siteName', 'logoWideUrl', 'logoSquareUrl', 'faviconUrl', 'mainColor', 'theme', 'installable'], array_keys($arr));
+        self::assertSame(['siteName', 'logoWideUrl', 'logoSquareUrl', 'faviconUrl', 'mainColor', 'theme', 'installable', 'builtOnWhity'], array_keys($arr));
         self::assertStringNotContainsString('secret@acme.com', (string) json_encode($arr));
     }
 

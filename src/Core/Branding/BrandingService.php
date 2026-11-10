@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Branding;
 
+use Whity\Core\Entitlement\EntitlementRegistry;
+use Whity\Core\Entitlement\EntitlementService;
 use Whity\Storage\MimeTypes;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
@@ -24,7 +26,28 @@ final class BrandingService
         private readonly SettingsService $settings,
         private readonly ?StorageDriverInterface $storage = null,
         private readonly ?BrandingAssetValidator $validator = null,
+        // WHIT-932: whether the plan removes "Built on Whity". Null: it shows.
+        private readonly ?EntitlementService $entitlements = null,
     ) {
+    }
+
+    /**
+     * Whether this workspace's public pages show "Built on Whity".
+     *
+     * The system tenant (Whity's own layer) answers true: whether its pages
+     * carry the credit is the page's own choice, not a plan's.
+     */
+    public function showsBuiltOnWhity(int $tenantId): bool
+    {
+        if ($tenantId === 0 || $this->entitlements === null) {
+            return true;
+        }
+
+        try {
+            return !$this->entitlements->isGranted($tenantId, EntitlementRegistry::BRAND_REMOVE_BADGE);
+        } catch (\Throwable) {
+            return true;
+        }
     }
 
     /**
@@ -61,6 +84,7 @@ final class BrandingService
                 $this->settings->storedGlobals()[SettingsRegistry::APP_INSTALLABLE] ?? null,
                 $_ENV['PWA_ENABLED'] ?? getenv('PWA_ENABLED'),
             ),
+            builtOnWhity: $this->showsBuiltOnWhity($tenantId),
         );
     }
 

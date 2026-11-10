@@ -89,7 +89,32 @@ final class MeterService
      */
     public function consume(int $tenantId, array $keys, int $units = 1, ?DateTimeImmutable $now = null): MeterDecision
     {
+        return $this->spend($tenantId, $keys, $units, $now, false);
+    }
+
+    /**
+     * Count usage against an ALLOWANCE that never refuses (WHIT-932).
+     *
+     * For limits sold as "this much included, the rest is usage" — agent work
+     * is the first. The action always goes ahead; past the allowance the
+     * decision is warned and the count keeps going, so the overage is on record
+     * for whoever bills it. `meters.enforcement` is not consulted: a limit on
+     * {@see EntitlementRegistry::WARN_ONLY} is never a wall, on any instance.
+     *
+     * @param list<string> $keys
+     */
+    public function record(int $tenantId, array $keys, int $units = 1, ?DateTimeImmutable $now = null): MeterDecision
+    {
+        return $this->spend($tenantId, $keys, $units, $now, true);
+    }
+
+    /**
+     * @param list<string> $keys
+     */
+    private function spend(int $tenantId, array $keys, int $units, ?DateTimeImmutable $now, bool $neverRefuse): MeterDecision
+    {
         $now ??= new DateTimeImmutable();
+        $warnsOnly = $neverRefuse || $this->warnsOnly($tenantId);
         $effective = $this->entitlements->effective($tenantId);
 
         /** @var list<array{key: string, counter: string}> $taken */
@@ -109,7 +134,10 @@ final class MeterService
                 continue;
             }
 
-            if ($limit === 0 && !$this->warnsOnly($tenantId)) {
+            // A WARN_ONLY limit never refuses, through whichever door it is spent.
+            $keyWarns = $warnsOnly || in_array($key, EntitlementRegistry::WARN_ONLY, true);
+
+            if ($limit === 0 && !$keyWarns) {
                 // Sold none of it. Refused without spending anything, and
                 // without a counter key that would never be read.
                 $this->giveBack($taken);
@@ -128,7 +156,7 @@ final class MeterService
 
             $taken[] = ['key' => $key, 'counter' => $counter, 'units' => $units];
 
-            if ($count > $limit && $this->warnsOnly($tenantId)) {
+            if ($count > $limit && $keyWarns) {
                 // Logged only on the action that crossed the line, so a
                 // workspace rendering all month past its limit is one entry
                 // per window and not one per document.

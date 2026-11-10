@@ -5347,6 +5347,83 @@
                 ]
             }
         },
+        "/api/v1/billing/limits": {
+            "get": {
+                "operationId": "get_api_v1_billing_limits",
+                "summary": "Where this workspace stands against its plan's limits",
+                "tags": [
+                    "billing"
+                ],
+                "description": "Staff, customers this month, agent work and documents, each with what is used, the limit (null when unlimited) and whether it has been passed; plus any brand feature in use that the plan does not include. Passing a limit never locks anything: this is how the workspace's admins are told.",
+                "responses": {
+                    "200": {
+                        "description": "This workspace's limits",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PlanLimitListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/billing/methods": {
             "get": {
                 "operationId": "get_api_v1_billing_methods",
@@ -47977,6 +48054,207 @@
                 ]
             }
         },
+        "/api/v1/tenants/{id}/addons": {
+            "get": {
+                "operationId": "get_api_v1_tenants_id_addons",
+                "summary": "List the add-on packs a tenant holds (operator)",
+                "tags": [
+                    "plans"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The tenant's add-on packs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TenantAddonListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Tenant not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "operationId": "put_api_v1_tenants_id_addons",
+                "summary": "Set how many packs of an add-on a tenant holds (operator)",
+                "tags": [
+                    "plans"
+                ],
+                "description": "Packs stack onto the tier: each pack's numbers are added to the tier's, and its features are granted. A quantity of 0 removes the add-on. Lowering it removes nobody and nothing; limits only warn.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TenantAddonSetRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The tenant's add-on packs after the change",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TenantAddonListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Tenant not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "plan_id missing, unknown or not an add-on, or a bad quantity",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/tenants/{id}/branding-host": {
             "put": {
                 "operationId": "put_api_v1_tenants_id_branding_host",
@@ -57596,6 +57874,10 @@
                     "installable": {
                         "type": "boolean",
                         "description": "Whether the web app offers a manifest and service worker so it can be installed as an app. An instance setting (app.installable, else the PWA_ENABLED environment variable, else on)."
+                    },
+                    "builtOnWhity": {
+                        "type": "boolean",
+                        "description": "Whether this workspace's public pages show \"Built on Whity\". False when its plan removes the credit."
                     }
                 },
                 "required": [
@@ -57626,6 +57908,10 @@
                             "branding_host": {
                                 "type": "string",
                                 "nullable": true
+                            },
+                            "warning": {
+                                "type": "string",
+                                "description": "Present when the workspace's plan does not include its own web address. The address is still set."
                             }
                         },
                         "required": [
@@ -70374,6 +70660,59 @@
                     "entitlements"
                 ]
             },
+            "PlanLimit": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "count",
+                            "feature"
+                        ]
+                    },
+                    "used": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Null when unlimited, and for a feature."
+                    },
+                    "over": {
+                        "type": "boolean"
+                    },
+                    "resets_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "key",
+                    "kind",
+                    "used",
+                    "limit",
+                    "over",
+                    "resets_at"
+                ]
+            },
+            "PlanLimitListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PlanLimit"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "PlanListResponse": {
                 "type": "object",
                 "properties": {
@@ -71842,6 +72181,10 @@
                                 "type": "integer",
                                 "nullable": true,
                                 "description": "Given only when sign-in is required: the form to fill in once signed in."
+                            },
+                            "built_on_whity": {
+                                "type": "boolean",
+                                "description": "Whether the page shows \"Built on Whity\"."
                             }
                         },
                         "required": [
@@ -75873,6 +76216,69 @@
                     "createdAt",
                     "plan",
                     "status"
+                ]
+            },
+            "TenantAddon": {
+                "type": "object",
+                "properties": {
+                    "plan_id": {
+                        "type": "integer"
+                    },
+                    "plan_key": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "integer"
+                    },
+                    "assigned_by": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "assigned_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "plan_id",
+                    "plan_key",
+                    "name",
+                    "quantity",
+                    "assigned_at"
+                ]
+            },
+            "TenantAddonListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/TenantAddon"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "TenantAddonSetRequest": {
+                "type": "object",
+                "properties": {
+                    "plan_id": {
+                        "type": "integer",
+                        "description": "The add-on plan (a plan with is_addon set)."
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "How many packs; 0 removes the add-on."
+                    }
+                },
+                "required": [
+                    "plan_id",
+                    "quantity"
                 ]
             },
             "TenantCreateRequest": {

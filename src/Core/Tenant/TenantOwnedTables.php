@@ -112,6 +112,11 @@ final class TenantOwnedTables
         // unregistered like `permissions`.)
         'tenant_plan' => '055_create_plans.php',
 
+        // WHIT-932 — add-on packs a workspace holds beside its tier, and the
+        // distinct customers it served each month. Every query binds tenant_id.
+        'tenant_plan_addons' => '241_create_tenant_plan_addons.php',
+        'tenant_monthly_customers' => '242_create_tenant_monthly_customers.php',
+
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says
         // which workspace a referrer brought, which is tenant data. `affiliates`,

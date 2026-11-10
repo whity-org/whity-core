@@ -30,7 +30,7 @@ final class BillingCatalogueCommandTest extends TestCase
         [$code, $output] = $this->run_(__DIR__ . '/../../ops/billing-catalogue.example.json', '--check');
 
         self::assertSame(0, $code, $output);
-        self::assertStringContainsString('3 plan(s)', $output);
+        self::assertStringContainsString('4 plan(s)', $output);
     }
 
     public function testEveryProblemIsListed(): void

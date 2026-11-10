@@ -106,13 +106,14 @@ final class PlanRepository
     {
         $stmt = $this->db->prepare('
             SELECT
-                (SELECT COUNT(*) FROM tenant_plan       WHERE plan_id = :p1) AS subscribers,
+                (SELECT COUNT(*) FROM tenant_plan       WHERE plan_id = :p1)
+              + (SELECT COUNT(*) FROM tenant_plan_addons WHERE plan_id = :p6) AS subscribers,
                 (SELECT COUNT(*) FROM invoices          WHERE plan_id = :p2) AS invoices,
                 (SELECT COUNT(*) FROM plan_prices       WHERE plan_id = :p3) AS prices,
                 (SELECT COUNT(*) FROM plan_entitlements WHERE plan_id = :p4) AS limits,
                 (SELECT COUNT(*) FROM promotion_plans   WHERE plan_id = :p5) AS promotions
         ');
-        foreach (['p1', 'p2', 'p3', 'p4', 'p5'] as $name) {
+        foreach (['p1', 'p2', 'p3', 'p4', 'p5', 'p6'] as $name) {
             $stmt->bindValue(':' . $name, $planId, PDO::PARAM_INT);
         }
         $stmt->execute();
@@ -327,16 +328,91 @@ final class PlanRepository
      * sentence is the difference between a confirmation somebody reads and one
      * they click through.
      *
-     * @tenant-guard-ignore: "how many tenants does this pricing change affect"
+     * Cross-tenant on purpose: "how many tenants does this pricing change affect"
      * is inherently cross-tenant and is asked by an operator screen. It returns
      * a count and reads no tenant data.
      */
     public function countTenantsOnPlan(int $planId): int
     {
-        $stmt = $this->db->prepare('SELECT COUNT(*) FROM tenant_plan WHERE plan_id = :plan_id');
-        $stmt->execute([':plan_id' => $planId]);
+        // A workspace holding the plan as an ADD-ON is affected by a change to
+        // it exactly as a subscriber is (WHIT-932).
+        // @tenant-guard-ignore: counts workspaces on a plan across tenants for the operator's downgrade guard; returns a count only.
+        $stmt = $this->db->prepare(
+            'SELECT (SELECT COUNT(*) FROM tenant_plan WHERE plan_id = :p1)
+                  + (SELECT COUNT(*) FROM tenant_plan_addons WHERE plan_id = :p2)'
+        );
+        $stmt->execute([':p1' => $planId, ':p2' => $planId]);
 
         return (int) $stmt->fetchColumn();
+    }
+
+    /** Whether the plan is an add-on pack rather than a tier. False when unknown. */
+    public function isAddon(int $planId): bool
+    {
+        $stmt = $this->db->prepare('SELECT is_addon FROM plans WHERE id = :id');
+        $stmt->execute([':id' => $planId]);
+        $value = $stmt->fetchColumn();
+
+        return $value !== false && self::toBool($value);
+    }
+
+    // ── tenant_plan_addons (tenant-owned, WHIT-932) ────────────────────────
+
+    /**
+     * The packs a tenant holds, with the plan's key and name.
+     *
+     * @return list<array{plan_id: int, plan_key: string, name: string, quantity: int, assigned_by: int|null, assigned_at: string}>
+     */
+    public function listTenantAddons(int $tenantId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT ta.plan_id, p.plan_key, p.name, ta.quantity, ta.assigned_by, ta.assigned_at
+               FROM tenant_plan_addons ta
+               JOIN plans p ON p.id = ta.plan_id
+              WHERE ta.tenant_id = :tenant_id
+              ORDER BY p.sort_order, p.plan_key'
+        );
+        $stmt->execute([':tenant_id' => $tenantId]);
+
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $out[] = [
+                'plan_id'     => (int) $row['plan_id'],
+                'plan_key'    => (string) $row['plan_key'],
+                'name'        => (string) $row['name'],
+                'quantity'    => (int) $row['quantity'],
+                'assigned_by' => $row['assigned_by'] !== null ? (int) $row['assigned_by'] : null,
+                'assigned_at' => (string) $row['assigned_at'],
+            ];
+        }
+
+        return $out;
+    }
+
+    public function setTenantAddon(int $tenantId, int $planId, int $quantity, ?int $assignedBy): void
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO tenant_plan_addons (tenant_id, plan_id, quantity, assigned_by, assigned_at)
+             VALUES (:tenant_id, :plan_id, :quantity, :assigned_by, NOW())
+             ON CONFLICT (tenant_id, plan_id) DO UPDATE SET
+                 quantity = EXCLUDED.quantity, assigned_by = EXCLUDED.assigned_by, assigned_at = NOW()'
+        );
+        $stmt->execute([
+            ':tenant_id'   => $tenantId,
+            ':plan_id'     => $planId,
+            ':quantity'    => $quantity,
+            ':assigned_by' => $assignedBy,
+        ]);
+    }
+
+    public function removeTenantAddon(int $tenantId, int $planId): int
+    {
+        $stmt = $this->db->prepare(
+            'DELETE FROM tenant_plan_addons WHERE tenant_id = :tenant_id AND plan_id = :plan_id'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':plan_id' => $planId]);
+
+        return $stmt->rowCount();
     }
 
     /**
