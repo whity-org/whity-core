@@ -12368,6 +12368,7 @@ export interface components {
             is_active: boolean;
             provider?: string | null;
             sort_order: number;
+            is_addon?: boolean;
             created_at: string;
             updated_at: string;
             entitlements: {
@@ -12457,6 +12458,7 @@ export interface components {
             is_active: boolean;
             provider?: string | null;
             sort_order: number;
+            is_addon?: boolean;
             created_at: string;
             updated_at: string;
         };

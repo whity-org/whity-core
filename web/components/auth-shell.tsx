@@ -83,7 +83,8 @@ export function AuthShell({
               {children}
             </div>
           </div>
-          {partner ? (
+          {/* WHIT-932: the workspace's plan may remove the credit. */}
+          {partner && branding.builtOnWhity ? (
             <footer className="flex justify-center">
               <BuiltOnWhity label={t('join.builtOn', 'Built on Whity')} />
             </footer>

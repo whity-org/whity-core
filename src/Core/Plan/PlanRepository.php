@@ -459,6 +459,10 @@ final class PlanRepository
             'description' => $row['description'] !== null ? (string) $row['description'] : null,
             'is_active'   => self::toBool($row['is_active']),
             'sort_order'  => (int) $row['sort_order'],
+            // WHIT-932: the pricing screen tells tiers from add-on packs by
+            // these, and neither was ever sent, so every pack showed as a tier.
+            'is_addon'    => self::toBool($row['is_addon'] ?? false),
+            'provider'    => isset($row['provider']) && $row['provider'] !== '' ? (string) $row['provider'] : null,
             'created_at'  => (string) $row['created_at'],
             'updated_at'  => (string) $row['updated_at'],
         ];

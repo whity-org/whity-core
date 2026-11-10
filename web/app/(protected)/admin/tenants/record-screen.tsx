@@ -63,6 +63,7 @@ import {
   type NameLanguage,
 } from '@/lib/localized-name';
 import { IconBuildingCommunity } from '@tabler/icons-react';
+import { AddonPacksPanel } from './addon-packs-panel';
 
 export type Tenant = components['schemas']['Tenant'];
 type Subscription = components['schemas']['Subscription'];
@@ -576,6 +577,7 @@ export function TenantRecordScreen({
       side={
         <>
           <BillingPanel subscription={subscription} />
+          <AddonPacksPanel tenantId={tenantId} />
           <EntitlementOverridesPanel entitlements={entitlements} />
         </>
       }

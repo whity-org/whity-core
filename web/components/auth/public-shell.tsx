@@ -29,7 +29,8 @@ export function PublicShell({ children }: { children: ReactNode }) {
         {children}
       </div>
       <footer className="mt-10 flex w-full max-w-md flex-wrap items-center justify-between gap-3">
-        <BuiltOnWhity label={t('join.builtOn', 'Built on Whity')} />
+        {/* WHIT-932: the workspace's plan may remove the credit. */}
+        {branding.builtOnWhity && <BuiltOnWhity label={t('join.builtOn', 'Built on Whity')} />}
         <LanguageSwitcher
           variant="dropdown"
           className="h-10 cursor-pointer rounded-control border border-input bg-card px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"

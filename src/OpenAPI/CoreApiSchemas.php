@@ -5307,6 +5307,8 @@ final class CoreApiSchemas
                 // groups by it so nobody wonders where a tier came from.
                 'provider' => self::str(true),
                 'sort_order' => self::int(),
+                // WHIT-932: an add-on pack, held beside the tier and stacked onto it.
+                'is_addon' => self::bool(),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
             ], ['id', 'plan_key', 'name', 'is_active', 'sort_order', 'created_at', 'updated_at']),
@@ -5323,6 +5325,8 @@ final class CoreApiSchemas
                 // groups by it so nobody wonders where a tier came from.
                 'provider' => self::str(true),
                 'sort_order' => self::int(),
+                // WHIT-932: an add-on pack, held beside the tier and stacked onto it.
+                'is_addon' => self::bool(),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
                 'entitlements' => [
