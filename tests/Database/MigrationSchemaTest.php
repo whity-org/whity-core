@@ -184,6 +184,14 @@ final class MigrationSchemaTest extends TestCase
         // 43 remote branches, so nothing is holding it.
         $permanentlySkipped = [
             129 => 'allocated on a branch that was renumbered or abandoned; present in no commit and on no branch',
+            // Confirmed by the orchestrator that allocates numbers (2026-11-10):
+            // Whity Pay released 230 and the routes lane took 233 instead; 235
+            // to 237 were reserved for #1775, #1776 and #1778, which needed none.
+            // None of them is in any commit or on any remote branch.
+            230 => 'released by the Whity Pay lane; the routes lane took 233 instead',
+            235 => 'reserved for #1775, which needed no migration',
+            236 => 'reserved for #1776, which needed no migration',
+            237 => 'reserved for #1778, which needed no migration',
         ];
 
         $deleted = array_values(array_filter(
