@@ -43,6 +43,18 @@ function unwrapData<T>(body: unknown): T | undefined {
   return undefined;
 }
 
+/** A guard against a server that never reports its last page. */
+const MAX_PERMISSION_PAGES = 20;
+
+/** `pagination.totalPages` from a paginated body, when it carries one. */
+function paginationTotalPages(body: unknown): number | undefined {
+  if (typeof body !== 'object' || body === null || !('pagination' in body)) return undefined;
+  const pagination = (body as { pagination: unknown }).pagination;
+  if (typeof pagination !== 'object' || pagination === null) return undefined;
+  const totalPages = (pagination as { totalPages?: unknown }).totalPages;
+  return typeof totalPages === 'number' ? totalPages : undefined;
+}
+
 /** A server-supplied error message, when the body carries one. */
 function serverMessage(body: unknown): string {
   if (typeof body === 'object' && body !== null && 'message' in body) {
@@ -227,12 +239,25 @@ export function createRolesAdapter(transport: Transport): RolesAdapter {
     },
 
     async listPermissions(): Promise<Permission[]> {
-      // per_page=100 — same ceiling/cap as listRoles (the picker source).
-      const { status, body } = await transport.request('GET', '/api/v1/permissions?per_page=100');
-      if (!isOk(status)) {
-        throw new Error(serverMessage(body) || `Failed to fetch permissions (${status})`);
+      // The picker needs the whole catalogue, and the server caps a page at
+      // 100 (PaginationParams::MAX_PER_PAGE). Core alone passes 100 once
+      // Calendar and Messages are in, so a single page silently dropped the
+      // permissions sorting last (users:*). Read every page.
+      const all: Permission[] = [];
+      for (let page = 1; page <= MAX_PERMISSION_PAGES; page += 1) {
+        const { status, body } = await transport.request(
+          'GET',
+          `/api/v1/permissions?per_page=100&page=${page}`
+        );
+        if (!isOk(status)) {
+          throw new Error(serverMessage(body) || `Failed to fetch permissions (${status})`);
+        }
+        const rows = unwrapData<Permission[]>(body) ?? [];
+        all.push(...rows);
+        const totalPages = paginationTotalPages(body);
+        if (rows.length === 0 || totalPages === undefined || page >= totalPages) break;
       }
-      return unwrapData<Permission[]>(body) ?? [];
+      return all;
     },
 
     async createRole(input: RoleCreateInput): Promise<void> {
