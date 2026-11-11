@@ -1112,7 +1112,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'href' => '/admin/messages',
         'icon' => 'messages',
         'group' => 'overview',
-        'order' => 6,
+        'order' => 7,
+        // After Calendar (6).
         // ADR 0016: conversations with customers. Gated like its routes: the list
         // is the workspace's, not the caller's own.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::MESSAGES_READ,
@@ -1123,7 +1124,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'href' => '/messages',
         'icon' => 'messages',
         'group' => 'overview',
-        'order' => 7,
+        'order' => 8,
         // A customer's own conversations (/api/me/messages): ownership is the check.
         'visibleIf' => 'messages-for-customer',
     ];
