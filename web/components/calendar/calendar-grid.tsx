@@ -257,7 +257,7 @@ export function TimeGrid({ days, items, timeZone, weekendDays, today, showPerson
                       <span className="block truncate font-medium">{item.title}</span>
                       {height >= 40 && (
                         <span className="block truncate opacity-90">
-                          {from !== null && <span dir="ltr" className="tabular-nums">{from} </span>}
+                          {from !== null && <><bdi dir="ltr" className="tabular-nums">{from}</bdi>{' '}</>}
                           {item.subtitle}
                           {showPerson && ` · ${item.person}`}
                         </span>
@@ -435,7 +435,7 @@ export function MonthGrid({
                           aria-label={itemLabel(item, from, item.allDay ? null : dates.time(item.ends_at))}
                           className={cn('block w-full truncate rounded px-1.5 py-0.5 text-start text-xs', toneClass(item.tone))}
                         >
-                          {from !== null && <span dir="ltr" className="tabular-nums">{from} </span>}
+                          {from !== null && <><bdi dir="ltr" className="tabular-nums">{from}</bdi>{' '}</>}
                           {item.title}
                         </button>
                       </li>

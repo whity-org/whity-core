@@ -225,7 +225,7 @@ function CalendarBody({
             <Icon name="chevron-right" />
           </Button>
         </div>
-        <h2 className="min-w-0 flex-1 truncate text-lg font-semibold text-foreground" data-testid="calendar-title" aria-live="polite">
+        <h2 className="min-w-0 flex-1 text-lg font-semibold text-foreground [overflow-wrap:anywhere]" data-testid="calendar-title" aria-live="polite">
           {title ?? ''}
         </h2>
         {access.canWrite && (
