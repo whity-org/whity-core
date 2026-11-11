@@ -52,7 +52,41 @@ final class CalendarApiHandler
         private readonly BookingService $booking,
         private readonly SettingsService $settings,
         private readonly RoleChecker $roleChecker,
+        private readonly ?\Whity\Core\Calendar\CalendarFeed $feed = null,
+        private readonly string $feedUrlBase = '',
     ) {
+    }
+
+    /**
+     * Turn on a person's ICS feed, or replace its URL (the old one stops
+     * working). The URL is shown once.
+     *
+     * @param array<string, string> $params
+     */
+    public function enableFeed(Request $request, array $params): Response
+    {
+        return $this->run($request, 'feed', function (int $tenantId, int $actor) use ($params): Response {
+            $profileId = $this->staffOr404($tenantId, (int) $params['profileId']);
+            $this->assertOwnOrManage($tenantId, $actor, $profileId);
+            if ($this->feed === null) {
+                throw new CalendarRejectedException('Calendar feeds are not available here', 503);
+            }
+            $token = $this->feed->issue($tenantId, $profileId);
+
+            return Response::json(['data' => ['url' => rtrim($this->feedUrlBase, '/') . '/api/v1/public/calendar/feeds/' . $token . '.ics']], 201);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function disableFeed(Request $request, array $params): Response
+    {
+        return $this->run($request, 'feed', function (int $tenantId, int $actor) use ($params): Response {
+            $profileId = $this->staffOr404($tenantId, (int) $params['profileId']);
+            $this->assertOwnOrManage($tenantId, $actor, $profileId);
+            $this->feed?->revoke($tenantId, $profileId);
+
+            return Response::json(['data' => ['url' => null]]);
+        });
     }
 
     // ── settings ────────────────────────────────────────────────────────
@@ -328,6 +362,8 @@ final class CalendarApiHandler
                 'public' => false,
             ]);
 
+            unset($booking['manage_token']);
+
             return Response::json(['data' => $booking], 201);
         });
     }
@@ -340,6 +376,8 @@ final class CalendarApiHandler
             $start = Interval::fromApi($body['starts_at'] ?? null) ?? throw new CalendarRejectedException('starts_at must be a date and time with an offset', 422);
             $profileId = is_int($body['profile_id'] ?? null) ? $body['profile_id'] : null;
             $booking = $this->booking->move($tenantId, (int) $params['id'], $start, $profileId, self::isAgent($request) || ($body['keep_to_hours'] ?? false) === true);
+            // The customer's new link goes to the customer, by email, not to staff.
+            unset($booking['manage_token']);
 
             return Response::json(['data' => $booking]);
         });
@@ -562,7 +600,7 @@ final class CalendarApiHandler
                 throw CalendarRejectedException::notFound('Customer');
             }
             if ($name === '') {
-                $name = $this->displayName($profileId);
+                $name = $this->calendar->displayName($profileId);
             }
         }
         if ($name === '' || mb_strlen($name) > 200) {
@@ -576,15 +614,6 @@ final class CalendarApiHandler
         }
 
         return ['profile_id' => $profileId, 'name' => $name, 'email' => $email, 'phone' => $phone, 'note' => $note];
-    }
-
-    private function displayName(int $profileId): string
-    {
-        $stmt = $this->calendar->db()->prepare('SELECT display_name FROM profiles WHERE id = :id');
-        $stmt->execute([':id' => $profileId]);
-        $name = $stmt->fetchColumn();
-
-        return is_string($name) ? $name : '';
     }
 
     /**

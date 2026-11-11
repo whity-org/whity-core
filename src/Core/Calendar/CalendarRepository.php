@@ -38,6 +38,16 @@ final class CalendarRepository
         return $stmt->fetchColumn() !== false;
     }
 
+    /** A person's display name ('' when unknown). Profiles are global, not tenant-owned. */
+    public function displayName(int $profileId): string
+    {
+        $stmt = $this->db->prepare('SELECT display_name FROM profiles WHERE id = :id');
+        $stmt->execute([':id' => $profileId]);
+        $name = $stmt->fetchColumn();
+
+        return is_string($name) ? $name : '';
+    }
+
     /** The membership kind this person holds here, or null. */
     public function membershipKind(int $tenantId, int $profileId): ?string
     {

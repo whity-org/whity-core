@@ -117,6 +117,7 @@ final class CoreApiSchemas
             self::formRoutes(),
             self::conveningRoutes(),
             self::calendarRoutes(),
+            self::publicBookingRoutes(),
             self::delegationRoutes(),
             self::auditRoutes(),
             self::frontendFeatureRoutes(),
@@ -9444,6 +9445,56 @@ final class CoreApiSchemas
                     ], ['body', 'agenda', 'decisions', 'invitations', 'attendance']),
                 ]]
             ),
+            'PublicBookingPage' => self::object([
+                'workspace' => self::object(['name' => self::str(), 'slug' => self::str()], ['name', 'slug']),
+                'settings' => self::object([
+                    'time_zone' => self::str(),
+                    'min_notice_minutes' => self::int(),
+                    'max_advance_days' => self::int(),
+                    'week_start' => self::str(),
+                    'weekend_days' => ['type' => 'array', 'items' => self::str()],
+                ], ['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days']),
+                'services' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::int(),
+                    'name' => SchemaBuilder::ref('LocalizedLabel'),
+                    'description' => SchemaBuilder::ref('LocalizedLabel'),
+                    'duration_minutes' => self::int(),
+                    'price_minor' => self::int(true),
+                    'currency' => self::str(),
+                    'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
+                ], ['id', 'name', 'duration_minutes', 'price_minor', 'currency', 'staff_profile_ids'])],
+                'staff' => ['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'display_name' => self::str()], ['profile_id', 'display_name'])],
+                'bot_check' => ['type' => 'object', 'nullable' => true, 'properties' => ['provider' => self::str(), 'site_key' => self::str()]],
+            ], ['workspace', 'settings', 'services', 'staff', 'bot_check']),
+            'PublicBookingRequest' => self::object([
+                'service_id' => self::int() + ['description' => 'The service.'],
+                'profile_id' => self::int() + ['description' => 'One person; leave out for anyone.'],
+                'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
+                'name' => self::str() + ['maxLength' => 200, 'description' => 'The customer\'s name.'],
+                'email' => self::str() + ['maxLength' => 320, 'description' => 'Where the confirmation and link go.'],
+                'phone' => self::str() + ['maxLength' => 40, 'description' => 'Optional.'],
+                'note' => self::str() + ['maxLength' => 1000, 'description' => 'Optional note for the business.'],
+                'website' => self::str() + ['description' => 'Leave empty. A hidden field people never fill.'],
+                'elapsed_ms' => self::int() + ['description' => 'Milliseconds the page was open before sending.'],
+                'bot_token' => self::str() + ['description' => 'The bot-check token, when the page shows one.'],
+            ], ['service_id', 'starts_at', 'name', 'email', 'elapsed_ms']),
+            'PublicBookingMoveRequest' => self::object([
+                'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
+            ], ['starts_at']),
+            'PublicBooking' => self::object([
+                'id' => self::int(),
+                'status' => self::str() + ['enum' => ['pending_payment', 'confirmed', 'cancelled', 'expired']],
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'service' => self::object(['id' => self::int(true), 'name' => SchemaBuilder::ref('LocalizedLabel'), 'duration_minutes' => self::int(true)], ['id', 'name']),
+                'staff_name' => self::str(),
+                'price_minor' => self::int(true),
+                'currency' => self::str(),
+                'customer' => self::object(['name' => self::str(), 'email' => self::str()], ['name', 'email']),
+                'manage_token' => self::str(true) + ['description' => 'Only after booking or moving: the token of the new manage link.'],
+                'workspace' => self::object(['name' => self::str()], ['name']),
+                'time_zone' => self::str(),
+            ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
             'CalendarSettings' => self::object([
                 'time_zone' => self::str() + ['description' => 'The workspace time zone (IANA).'],
                 'booking_page_enabled' => self::bool(),
@@ -15943,6 +15994,113 @@ final class CoreApiSchemas
     }
 
     /**
+     * The public booking page, the customer's manage link and the staff ICS
+     * feed (WHIT-942, ADR 0017 section 6). Unauthenticated; never MCP tools.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function publicBookingRoutes(): array
+    {
+        $workspace = ['name' => 'workspace', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string'], 'description' => 'The workspace slug.'];
+        $token = ['name' => 'token', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string'], 'description' => 'The 64-character token from the customer\'s email.'];
+        $range = [
+            self::queryParam('from', 'string', 'Start, ISO 8601 with an offset.', true),
+            self::queryParam('to', 'string', 'End (exclusive), with an offset. At most 14 days after `from`.', true),
+        ];
+        $limits = [429 => self::errorResponse('Too many attempts')];
+        $route = static fn (string $method, string $path, array $schema): array => [
+            'method' => $method, 'path' => $path, 'requiredRole' => null, 'requiredPermission' => null,
+            'schema' => $schema + ['tags' => ['calendar']],
+        ];
+
+        return [
+            $route('GET', '/api/public/booking/{workspace}', [
+                'summary' => 'A workspace\'s booking page: services, staff and the booking window (public)',
+                'description' => 'An unknown workspace, one whose booking page is off, and a host naming another workspace all answer the same 404.',
+                'parameters' => [$workspace],
+                'responses' => [
+                    200 => self::jsonResponse('The page', self::dataEnvelope(SchemaBuilder::ref('PublicBookingPage'))),
+                    404 => self::errorResponse('This booking page is not available'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/booking/{workspace}/slots', [
+                'summary' => 'Free times for a service on the booking page (public)',
+                'parameters' => array_merge([$workspace, self::queryParam('service_id', 'integer', 'The service.', true), self::queryParam('profile_id', 'integer', 'One person; leave out for anyone.')], $range),
+                'responses' => [
+                    200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
+                    404 => self::errorResponse('This booking page is not available'),
+                    422 => self::errorResponse('A missing or unreadable range'),
+                ] + $limits,
+            ]),
+            $route('POST', '/api/public/booking/{workspace}/bookings', [
+                'summary' => 'Book on the public page (public)',
+                'description' => 'Protected by per-IP and per-workspace limits, a hidden field, a minimum time on the page, a cap of three open bookings per email, and the instance\'s bot check when set up. The answer carries `manage_token` for the manage page; the same link is emailed.',
+                'parameters' => [$workspace],
+                'request' => 'PublicBookingRequest',
+                'responses' => [
+                    201 => self::jsonResponse('Booked', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
+                    404 => self::errorResponse('This booking page is not available'),
+                    409 => self::errorResponse('That time was just taken'),
+                    422 => self::errorResponse('Missing details, outside the booking window, or refused as spam'),
+                    503 => self::errorResponse('The bot check could not be reached'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/bookings/{token:[a-f0-9]{64}}', [
+                'summary' => 'The customer\'s booking, by the link in their email (public)',
+                'parameters' => [$token],
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/bookings/{token:[a-f0-9]{64}}/slots', [
+                'summary' => 'Free times the customer can move their booking to (public)',
+                'parameters' => array_merge([$token], $range),
+                'responses' => [
+                    200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                ] + $limits,
+            ]),
+            $route('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/move', [
+                'summary' => 'Move the booking (public); the old link stops working and a new one is emailed',
+                'parameters' => [$token],
+                'request' => 'PublicBookingMoveRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Moved', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                    409 => self::errorResponse('That time was just taken'),
+                ] + $limits,
+            ]),
+            $route('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/cancel', [
+                'summary' => 'Cancel the booking (public); the link stops working',
+                'parameters' => [$token],
+                'request' => 'CalendarBookingCancelRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Cancelled', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                    422 => self::errorResponse('Already cancelled'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/bookings/{token:[a-f0-9]{64}}/ics', [
+                'summary' => 'The booking as an .ics file to add to a calendar (public)',
+                'parameters' => [$token],
+                'responses' => [
+                    200 => ['description' => 'iCalendar', 'content' => ['text/calendar' => ['schema' => ['type' => 'string']]]],
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/calendar/feeds/{token:[a-f0-9]{64}\.ics}', [
+                'summary' => 'A person\'s calendar feed (public, secret address)',
+                'parameters' => [['name' => 'token', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string'], 'description' => 'The token followed by `.ics`.']],
+                'responses' => [
+                    200 => ['description' => 'iCalendar', 'content' => ['text/calendar' => ['schema' => ['type' => 'string']]]],
+                    404 => self::errorResponse('Not found'),
+                ] + $limits,
+            ]),
+        ];
+    }
+
+    /**
      * Calendar and bookings (WHIT-941, ADR 0017). Instants are ISO 8601 with
      * an offset on the way in and UTC with `Z` on the way out. Create, move and
      * cancel declare no undo window, so an agent's call always becomes a
@@ -15985,6 +16143,24 @@ final class CoreApiSchemas
                 'request' => 'CalendarStaffRequest',
                 'responses' => [
                     200 => self::jsonResponse('Staff with calendars', self::listEnvelope('CalendarStaff')),
+                    404 => self::errorResponse('Not a member of staff here'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/staff/{profileId:\d+}/feed', 'calendar:write', [
+                'summary' => 'Turn on a person\'s calendar feed, or replace its address',
+                'description' => 'Returns an ICS address a calendar app can subscribe to. It is shown once; turning it on again replaces it and the old one stops working. The feed includes customer names. Your own with `calendar:write`; anybody else\'s needs `calendar:manage`.',
+                'tags' => ['calendar'],
+                'responses' => [
+                    201 => self::jsonResponse('The feed address', self::dataEnvelope(self::object(['url' => self::str()], ['url']))),
+                    403 => self::errorResponse('Another person\'s calendar without calendar:manage'),
+                    404 => self::errorResponse('Not a member of staff here'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/calendar/staff/{profileId:\d+}/feed', 'calendar:write', [
+                'summary' => 'Turn off a person\'s calendar feed',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Off', self::dataEnvelope(self::object(['url' => self::str(true)], ['url']))),
                     404 => self::errorResponse('Not a member of staff here'),
                 ] + self::authErrors(),
             ]),

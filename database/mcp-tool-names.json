@@ -19,6 +19,10 @@
     "en": "Remove a calendar event",
     "ar": "حذف حدث من التقويم"
   },
+  "delete_api_calendar_staff_profileid_feed": {
+    "en": "Turn off someone's calendar feed",
+    "ar": "إيقاف رابط تقويم موظف"
+  },
   "delete_api_calendar_time_off_id": {
     "en": "Remove time off or extra hours",
     "ar": "حذف إجازة أو ساعات إضافية"
@@ -1068,6 +1072,10 @@
   "post_api_calendar_services": {
     "en": "Add a service",
     "ar": "إضافة خدمة"
+  },
+  "post_api_calendar_staff_profileid_feed": {
+    "en": "Turn on someone's calendar feed",
+    "ar": "تفعيل رابط تقويم موظف"
   },
   "post_api_calendar_time_off": {
     "en": "Add time off or extra hours",
