@@ -741,6 +741,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // and the plain member's sidebar would otherwise have no way home.
     ];
     $items[] = [
+        'id' => 'calendar',
+        'label' => 'Calendar',
+        'href' => '/calendar',
+        'icon' => 'calendar',
+        'group' => 'overview',
+        // After Dashboard (1), Inbox (2), Approvals (3) and the form entries (4, 5):
+        // a surface opened daily, about the team's own time (WHIT-944, ADR 0017).
+        'order' => 6,
+        // Mirrors GET /api/calendar/settings and the rest of the read routes.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CALENDAR_READ,
+    ];
+    $items[] = [
         'id' => 'users',
         'label' => 'Users',
         'href' => '/admin/users',
@@ -1093,6 +1105,28 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // on the CALLER's behalf (GET /api/me/agent-proposals), and only the
         // granting person may decide them, so there is nobody a permission
         // could usefully keep out.
+    ];
+    $items[] = [
+        'id' => 'messages',
+        'label' => 'Messages',
+        'href' => '/admin/messages',
+        'icon' => 'messages',
+        'group' => 'overview',
+        'order' => 7,
+        // After Calendar (6).
+        // ADR 0016: conversations with customers. Gated like its routes: the list
+        // is the workspace's, not the caller's own.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::MESSAGES_READ,
+    ];
+    $items[] = [
+        'id' => 'my-messages',
+        'label' => 'Messages',
+        'href' => '/messages',
+        'icon' => 'messages',
+        'group' => 'overview',
+        'order' => 8,
+        // A customer's own conversations (/api/me/messages): ownership is the check.
+        'visibleIf' => 'messages-for-customer',
     ];
     $items[] = [
         'id' => 'document-library',
@@ -2042,6 +2076,8 @@ $formsNavConditions = new \Whity\Core\Form\FormsNavConditions($db->getPdo(), $ro
 $navigationHandler = new NavigationApiHandler($hookManager, $roleChecker, [
     'forms-open-to-member' => [$formsNavConditions, 'hasFormsOpenToThem'],
     'forms-own-submissions' => [$formsNavConditions, 'hasOwnSubmissionsToSee'],
+    // ADR 0016: a customer's own conversations with the workspace.
+    'messages-for-customer' => [new \Whity\Core\Messaging\MessagesNavConditions($db->getPdo()), 'isCustomerWithMessages'],
 ]);
 $router->register('GET', '/api/navigation', [$navigationHandler, 'list']);
 
@@ -4571,6 +4607,8 @@ $meInboxHandler = new \Whity\Api\MeInboxApiHandler($tokenValidator, $inboxSource
 // already names exactly one person.
 $router->register('GET', '/api/me/inbox/sources', [$meInboxHandler, 'sources'], null);
 $router->register('GET', '/api/me/inbox',         [$meInboxHandler, 'list'],    null);
+// #881, ADR 0016: every source as one list, urgent first then newest, keyset-paged.
+$router->register('GET', '/api/me/inbox/merged',  [$meInboxHandler, 'merged'],  null);
 
 // WHIT-783: one search across documents, forms, people, units and plugin
 // records that opted in, for the "search records" MCP tool and ⌘K. Session-
@@ -4948,6 +4986,66 @@ $router->register('GET',    '/api/convening-bodies/{id:\d+}/members',       [$co
 $router->register('POST',   '/api/convening-bodies/{id:\d+}/members',       [$conveningBodiesHandler, 'addMember'],    null, null, CorePermissions::CONVENING_MANAGE);
 $router->register('DELETE', '/api/convening-bodies/{id:\d+}/members/{profileId:\d+}', [$conveningBodiesHandler, 'removeMember'], null, null, CorePermissions::CONVENING_MANAGE);
 
+// ── Calendar and bookings (WHIT-941, ADR 0017) ─────────────────────────────
+// Staff calendars, services, availability and bookings. Every write that can
+// take time on a person's calendar runs under that person's lock row, so two
+// requests can never book the same time (BookingService). Reading on
+// calendar:read; booking and one's own events, hours and time off on
+// calendar:write (the handler checks calendar:manage when the person is not
+// the caller); services, settings and the staff list on calendar:manage.
+$calendarRepository = new \Whity\Core\Calendar\CalendarRepository($db->getPdo());
+$calendarServiceRepository = new \Whity\Core\Calendar\ServiceRepository($db->getPdo());
+$calendarBookingRepository = new \Whity\Core\Calendar\BookingRepository($db->getPdo());
+// Customer emails (with the manage link) and reminders are wired here and in
+// CoreJobs the same way, through CalendarServices (WHIT-942).
+$calendarBookingService = \Whity\Core\Calendar\CalendarServices::bookingService(
+    $db->getPdo(),
+    $settingsService,
+    $hookManager,
+    $mailer,
+    $frontendUrls,
+    $queueService,
+    $logger,
+);
+$calendarFeed = new \Whity\Core\Calendar\CalendarFeed($db->getPdo(), $calendarRepository, $calendarBookingRepository);
+$calendarHandler = new \Whity\Api\CalendarApiHandler(
+    $calendarRepository,
+    $calendarServiceRepository,
+    $calendarBookingRepository,
+    $calendarBookingService,
+    $settingsService,
+    $roleChecker,
+    $calendarFeed,
+    $frontendUrls->base(),
+);
+$router->register('GET',    '/api/calendar/settings',                       [$calendarHandler, 'getSettings'],     null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/settings',                       [$calendarHandler, 'putSettings'],     null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('GET',    '/api/calendar/staff',                          [$calendarHandler, 'listStaff'],       null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/staff/{profileId:\d+}',          [$calendarHandler, 'putStaff'],        null, null, CorePermissions::CALENDAR_MANAGE);
+// A person's ICS feed URL: shown once when turned on; turning it on again
+// replaces it. Own feed on calendar:write, anyone's with calendar:manage.
+$router->register('POST',   '/api/calendar/staff/{profileId:\d+}/feed',     [$calendarHandler, 'enableFeed'],      null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('DELETE', '/api/calendar/staff/{profileId:\d+}/feed',     [$calendarHandler, 'disableFeed'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/staff/{profileId:\d+}/hours',    [$calendarHandler, 'getHours'],        null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/staff/{profileId:\d+}/hours',    [$calendarHandler, 'putHours'],        null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/time-off',                       [$calendarHandler, 'listExceptions'],  null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/time-off',                       [$calendarHandler, 'createException'], null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('DELETE', '/api/calendar/time-off/{id:\d+}',              [$calendarHandler, 'deleteException'], null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/services',                       [$calendarHandler, 'listServices'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/services',                       [$calendarHandler, 'createService'],   null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('GET',    '/api/calendar/services/{id:\d+}',              [$calendarHandler, 'showService'],     null, null, CorePermissions::CALENDAR_READ);
+$router->register('PATCH',  '/api/calendar/services/{id:\d+}',              [$calendarHandler, 'updateService'],   null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('GET',    '/api/calendar/availability',                   [$calendarHandler, 'availability'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('GET',    '/api/calendar/bookings',                       [$calendarHandler, 'listBookings'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/bookings',                       [$calendarHandler, 'createBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/bookings/{id:\d+}',              [$calendarHandler, 'showBooking'],     null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/move',         [$calendarHandler, 'moveBooking'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/cancel',       [$calendarHandler, 'cancelBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/events',                         [$calendarHandler, 'listEvents'],      null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/events',                         [$calendarHandler, 'createEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('PATCH',  '/api/calendar/events/{id:\d+}',                [$calendarHandler, 'updateEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('DELETE', '/api/calendar/events/{id:\d+}',                [$calendarHandler, 'deleteEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
+
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,
     $meetingRepository,
@@ -5150,6 +5248,33 @@ $hostResolver = new \Whity\Core\Branding\HostResolver(
     $brandingHostRepo,
     getenv('BRANDING_BASE_DOMAIN') ?: ''
 );
+
+// ── Public booking page, manage links, staff feed (WHIT-942, ADR 0017) ─────
+// UNAUTHENTICATED (null, null). The workspace comes from the path slug,
+// checked against the host, or from a 256-bit token naming its own row; each
+// path is an anchored pattern in EnforceTenantIsolation. The handler throttles
+// per IP before it looks anything up.
+$publicBookingHandler = new \Whity\Api\PublicBookingApiHandler(
+    $calendarBookingService,
+    $calendarRepository,
+    $calendarServiceRepository,
+    $calendarBookingRepository,
+    new \Whity\Core\Calendar\ManageLinks($db->getPdo()),
+    $calendarFeed,
+    $brandingHostRepo,
+    $hostResolver,
+    $publicFormBotCheck,
+    new DatabaseSharedStore($db->getPdo()),
+);
+$router->register('GET',  '/api/public/booking/{workspace}',                       [$publicBookingHandler, 'page'],        null);
+$router->register('GET',  '/api/public/booking/{workspace}/slots',                 [$publicBookingHandler, 'slots'],       null);
+$router->register('POST', '/api/public/booking/{workspace}/bookings',              [$publicBookingHandler, 'book'],        null);
+$router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}',             [$publicBookingHandler, 'showBooking'], null);
+$router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/slots',       [$publicBookingHandler, 'manageSlots'], null);
+$router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/move',        [$publicBookingHandler, 'move'],        null);
+$router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/cancel',      [$publicBookingHandler, 'cancel'],      null);
+$router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/ics',         [$publicBookingHandler, 'ics'],         null);
+$router->register('GET',  '/api/public/calendar/feeds/{token:[a-f0-9]{64}\.ics}', [$publicBookingHandler, 'feed'],        null);
 $brandingHandler = new \Whity\Api\BrandingApiHandler(
     $brandingService,
     $hostResolver,
@@ -5208,7 +5333,75 @@ $router->register('GET',  '/api/public/signup/confirm',               [$publicSi
 $router->register('POST', '/api/public/signup/confirm',               [$publicSignupHandler, 'confirm'], null);
 $router->register('GET',  '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'info'],    null);
 $router->register('POST', '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'request'], null);
-$workspaceSignupHandler = new \Whity\Api\WorkspaceSignupApiHandler(
+
+// MESSAGES (ADR 0016, WHIT-938): conversations with customers by email and web
+// chat, one send API for every core module (the calendar's reminders use it),
+// channels a store plugin can add, and outbound messages metered in warn mode.
+// Plugin channels join this registry when plugins load below.
+$messageChannelRegistry = new \Whity\Core\Messaging\MessageChannelRegistry();
+\Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannelRegistry);
+$messagingService = \Whity\Core\Messaging\CoreMessaging::build(
+    $db->getPdo(),
+    $messageChannelRegistry,
+    $mailer,
+    $secretStore,
+    static fn (string $name, array $payload, array $opts): ?int => $queueService->dispatch($name, $payload, $opts),
+    $planLimitMeters,
+    (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+);
+\Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messagingService);
+$jobsRegistry->register(
+    \Whity\Core\Messaging\Jobs\DeliverMessageJob::NAME,
+    new \Whity\Core\Messaging\Jobs\DeliverMessageJob(static fn (): \Whity\Core\Messaging\MessagingService => $messagingService),
+    false
+);
+$inboxSourceRegistry->registerCoreSource(
+    \Whity\Core\Messaging\MessagesInboxSource::KEY,
+    new \Whity\Core\Messaging\MessagesInboxSource($messagingService->conversations())
+);
+$messagingSettings = new \Whity\Core\Messaging\MessagingSettings($db->getPdo(), $secretStore);
+$messagesHandler = new \Whity\Api\MessagesApiHandler($messagingService, $messagingSettings);
+$router->register('GET',   '/api/messages/conversations',                 [$messagesHandler, 'list'],   null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_READ);
+$router->register('POST',  '/api/messages/conversations',                 [$messagesHandler, 'start'],  null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_REPLY);
+$router->register('GET',   '/api/messages/conversations/{id:\d+}',        [$messagesHandler, 'show'],   null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_READ);
+$router->register('PATCH', '/api/messages/conversations/{id:\d+}',        [$messagesHandler, 'update'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
+$router->register('POST',  '/api/messages/conversations/{id:\d+}/replies', [$messagesHandler, 'reply'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_REPLY);
+$router->register('POST',  '/api/messages/conversations/{id:\d+}/notes',  [$messagesHandler, 'note'],   null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_REPLY);
+$router->register('POST',  '/api/messages/{id:\d+}/cancel',               [$messagesHandler, 'cancel'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_REPLY);
+$router->register('GET',   '/api/messages/channels',                      [$messagesHandler, 'channels'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_READ);
+$router->register('GET',   '/api/messages/settings',                      [$messagesHandler, 'getSettings'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
+$router->register('PUT',   '/api/messages/settings',                      [$messagesHandler, 'putSettings'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
+$router->register('POST',  '/api/messages/settings/inbound-secret',       [$messagesHandler, 'rotateInboundSecret'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
+// A signed-in customer's own conversations: ownership is the check, like /api/me/forms.
+$meMessagesHandler = new \Whity\Api\MeMessagesApiHandler($messagingService);
+$router->register('GET',  '/api/me/messages',            [$meMessagesHandler, 'list'],  null);
+$router->register('POST', '/api/me/messages',            [$meMessagesHandler, 'start'], null);
+$router->register('GET',  '/api/me/messages/{id:\d+}',   [$meMessagesHandler, 'show'],  null);
+$router->register('POST', '/api/me/messages/{id:\d+}',   [$meMessagesHandler, 'send'],  null);
+// Public: web chat for visitors, and the providers' inbound webhook. Both find the
+// workspace from its slug; each path is listed in EnforceTenantIsolation one by one.
+$publicChatHandler = new \Whity\Api\PublicChatApiHandler(
+    $db->getPdo(),
+    $messagingService,
+    $messagingSettings,
+    $brandingHostRepo,
+    $hostResolver,
+    $publicFormBotCheck,
+    new DatabaseSharedStore($db->getPdo()),
+    hash('sha256', 'whity.webchat.ip|' . $jwtSecret),
+);
+$router->register('GET',  '/api/public/chat/{workspace}',               [$publicChatHandler, 'info'],  null);
+$router->register('POST', '/api/public/chat/{workspace}/conversations', [$publicChatHandler, 'start'], null);
+$router->register('POST', '/api/public/chat/{workspace}/messages',      [$publicChatHandler, 'send'],  null);
+$router->register('GET',  '/api/public/chat/{workspace}/messages',      [$publicChatHandler, 'poll'],  null);
+$inboundMessagesHandler = new \Whity\Api\InboundMessagesApiHandler(
+    $messagingService,
+    $brandingHostRepo,
+    new DatabaseSharedStore($db->getPdo()),
+);
+$router->register('POST', '/api/public/messages/inbound/{channel}/{workspace}', [$inboundMessagesHandler, 'receive'], null);
+
+$workspaceSignupHandler =new \Whity\Api\WorkspaceSignupApiHandler(
     $db->getPdo(),
     $roleChecker,
     $signupSettings,
@@ -5888,6 +6081,10 @@ $router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'prev
 $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
 // A plugin's billing portal goes into its slot (SDK 1.77, WHIT-1010).
 $pluginLoader->setBillingPortals($pluginBillingPortals);
+// Plugins' inbox sources and message channels (SDK 1.97, #881, ADR 0016). The
+// channel registry is built with Messages above, holding core's email and web chat.
+$pluginLoader->setInboxSources($inboxSourceRegistry);
+$pluginLoader->setMessageChannels($messageChannelRegistry);
 // WHIT-1011: plugin SERVICE routes accept a client-credentials token from the
 // trusted issuer (SERVICE_TOKEN_ISSUER, else MCP_OAUTH_ISSUER) for a client on
 // SERVICE_TOKEN_CLIENTS. Off, so no service route opens, until both are set.

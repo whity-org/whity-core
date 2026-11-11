@@ -121,6 +121,15 @@ final class SettingsRegistryTest extends TestCase
              'ui.hide_dates',
              // #1019: how many ids one label-resolution request may name.
              'labels.resolve_max_ids',
+             // WHIT-941: calendar and bookings (ADR 0017).
+             'calendar.booking_page_enabled',
+             'calendar.min_notice_minutes',
+             'calendar.max_advance_days',
+             'calendar.slot_step_minutes',
+             'calendar.reminder_hours_before',
+             'calendar.payment_hold_minutes',
+             'calendar.week_start',
+             'calendar.weekend_days',
              'app.installable'],
             SettingsRegistry::keys()
         );
@@ -286,7 +295,8 @@ final class SettingsRegistryTest extends TestCase
         // 42 since #1019: labels.resolve_max_ids, each workspace's own cap.
         // 43 since WHIT-920: forms.show_reviewer_names, each workspace's choice
         // of whether applicants see who reviewed their form.
-        self::assertCount(43, SettingsRegistry::tenantTextKeys());
+        // 51 since WHIT-941: eight calendar.* keys.
+        self::assertCount(51, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -448,7 +458,8 @@ final class SettingsRegistryTest extends TestCase
         // 103 since WHIT-1014: plugins.mcp_prompts_require_mark.
         // 104 since WHIT-920: forms.show_reviewer_names.
         // 106 since WHIT-925: meters.enforcement and billing.default_plan.
-        self::assertCount(106, $describe);
+        // 114 since WHIT-941: eight calendar.* keys.
+        self::assertCount(114, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

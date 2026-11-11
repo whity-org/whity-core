@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Document\Routing;
 
 use Whity\Core\Identity\PersonName;
-use Whity\Core\Inbox\InboxItem;
+use Whity\Sdk\Inbox\InboxItem;
 use Whity\Core\Inbox\InboxSourceInterface;
 use Whity\Core\RBAC\ResourceTypeRegistry;
 use Whity\Core\Settings\SettingsRegistry;

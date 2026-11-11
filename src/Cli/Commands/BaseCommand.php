@@ -291,6 +291,11 @@ abstract class BaseCommand implements CliCommand, CommandHelp
                 )
             )
         );
+        // Messages (ADR 0016): open conversations assigned to the person.
+        $inboxSourceRegistry->registerCoreSource(
+            \Whity\Core\Messaging\MessagesInboxSource::KEY,
+            new \Whity\Core\Messaging\MessagesInboxSource(new \Whity\Core\Messaging\ConversationRepository($db->getPdo()))
+        );
         \Whity\register_service(\Whity\Core\Inbox\InboxSourceRegistry::class, $inboxSourceRegistry);
 
         // The editor's live Record and Chart blocks (editor M3), mirroring
@@ -657,6 +662,11 @@ abstract class BaseCommand implements CliCommand, CommandHelp
             )
         );
         $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
+        // Plugins' inbox sources and message channels (SDK 1.97), as in public/index.php.
+        $messageChannelRegistry = new \Whity\Core\Messaging\MessageChannelRegistry();
+        \Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannelRegistry);
+        $pluginLoader->setInboxSources($inboxSourceRegistry);
+        $pluginLoader->setMessageChannels($messageChannelRegistry);
         $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
         $pluginLoader->load();
 

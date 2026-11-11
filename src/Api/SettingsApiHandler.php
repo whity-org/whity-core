@@ -103,6 +103,7 @@ final class SettingsApiHandler
      *   settings.tab.email = Email
      *   settings.tab.email_domains = Email domains
      *   settings.tab.public_forms = Public forms
+     *   settings.tab.messages = Messages
      *   settings.tab.storage = Storage
      *   settings.tab.feature_flags = Feature flags
      *   settings.tab.security = Security
@@ -163,6 +164,8 @@ final class SettingsApiHandler
         // Email-domain policy (WC-ac35b6cf): follows the route's own permission,
         // so a deployment with a renamed administrative role still sees it.
         ['id' => 'public-forms', 'href' => '/admin/settings/public-forms', 'label' => 'Public forms', 'requiredPermission' => CorePermissions::PUBLIC_FORM_KEYS_MANAGE],
+        // Messages (ADR 0016): web chat on or off, and where email replies come back.
+        ['id' => 'messages', 'href' => '/admin/settings/messages', 'label' => 'Messages', 'requiredPermission' => CorePermissions::MESSAGES_MANAGE, 'workspaceOnly' => true],
         ['id' => 'email-domains', 'href' => '/admin/settings/email-domains', 'label' => 'Email domains', 'requiredPermission' => CorePermissions::EMAIL_DOMAINS_MANAGE],
         ['id' => 'storage', 'href' => '/admin/settings/storage', 'label' => 'Storage', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
         // Feature Flags (WC-feature-flags-settings-page): a generic admin

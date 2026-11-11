@@ -507,6 +507,7 @@
         "inbox.from.public": "نموذج عام",
         "inbox.noSources": "لا يوجد في هذا التثبيت ما يُرسل عملاً إلى الوارد بعد، فلا شيء لعرضه.",
         "inbox.source.documentRouting": "مستندات في انتظارك",
+        "inbox.source.messages": "المحادثات المُسندة إليك",
         "inbox.sources": "مصادر الوارد",
         "inbox.state.approved": "وافقت",
         "inbox.state.decision": "قرارك",

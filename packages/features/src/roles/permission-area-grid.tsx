@@ -22,6 +22,7 @@
  *   permissions.area.groups = User groups
  *   permissions.area.languages = Languages and translations
  *   permissions.area.licensing = Licensing
+ *   permissions.area.messages = Messages
  *   permissions.area.notifications = Notifications
  *   permissions.area.plugins = Plugins
  *   permissions.area.relations = Family relations

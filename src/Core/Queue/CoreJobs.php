@@ -103,6 +103,38 @@ final class CoreJobs
             // it, never a public caller.
             \Whity\Core\Plugin\Tenant\Automation\AutomationJobs::register($registry, $pdo, $transports, $logger);
 
+            // WHIT-942: one reminder per booking (ADR 0017). Internal: the
+            // booking service queues it, never a public caller. The mailer is
+            // built per send, as the web app's is, so a worker boot never
+            // reads mail settings.
+            $calendarSettings = new \Whity\Core\Settings\SettingsService(
+                new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                new \Whity\Core\Settings\TenantSettingsRepository($pdo)
+            );
+            $calendarLogger = $logger ?? new \Psr\Log\NullLogger();
+            $calendarQueue = new QueueService(new JobRepository($pdo));
+            $registry->register(
+                \Whity\Core\Calendar\BookingReminderJob::NAME,
+                new \Whity\Core\Calendar\BookingReminderJob(
+                    \Whity\Core\Calendar\CalendarServices::bookingService(
+                        $pdo,
+                        $calendarSettings,
+                        null,
+                        new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
+                            $calendarSettings,
+                            new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                            \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+                            $calendarLogger
+                        )),
+                        \Whity\Core\Http\FrontendUrls::fromEnv(),
+                        $calendarQueue,
+                        $calendarLogger
+                    ),
+                    $calendarQueue
+                ),
+                false
+            );
+
             // #billing — the two scheduled runs. INTERNAL, both of them, and
             // registered without the submittable flag deliberately: one issues
             // invoices (so it spends the number sequence and puts debts in

@@ -116,6 +116,8 @@ final class CoreApiSchemas
             self::timeWindowRoutes(),
             self::formRoutes(),
             self::conveningRoutes(),
+            self::calendarRoutes(),
+            self::publicBookingRoutes(),
             self::delegationRoutes(),
             self::auditRoutes(),
             self::frontendFeatureRoutes(),
@@ -149,6 +151,7 @@ final class CoreApiSchemas
             self::documentRoutingRoutes(),
             self::documentQrRoutes(),
             self::meInboxRoutes(),
+            self::messagingRoutes(),
             self::searchRoutes(),
             self::agentProposalRoutes(),
             self::agentRoutes(),
@@ -6588,12 +6591,166 @@ final class CoreApiSchemas
                 ],
                 // Source-specific extras a client may use and must not depend on.
                 'meta' => ['type' => 'object', 'additionalProperties' => true],
+                // Shown before every item that is not, across all sources (SDK 1.97).
+                'urgent' => ['type' => 'boolean'],
             ], ['id', 'title', 'timestamp']),
+            // GET /api/me/inbox/merged: every source as one list, keyset-paged (#881).
+            'MergedInboxResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => [
+                    'allOf' => [
+                        SchemaBuilder::ref('InboxItem'),
+                        self::object(['source' => self::str()], ['source']),
+                    ],
+                ]],
+                'next_cursor' => self::str(true),
+                'unavailable' => ['type' => 'array', 'items' => self::str()],
+                'truncated' => ['type' => 'array', 'items' => self::str()],
+            ], ['data', 'next_cursor', 'unavailable', 'truncated']),
             'InboxItemListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('InboxItem')],
                 'pagination' => SchemaBuilder::ref('Pagination'),
                 'source' => self::str(),
             ], ['data', 'pagination', 'source']),
+
+            // -- Messages (ADR 0016, WHIT-938) ------------------------------------
+            // People are id and name, never a bare id.
+            'MessagingPerson' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']),
+            'MessagingConversation' => self::object([
+                'id' => self::int(),
+                'channel' => self::str(),
+                'subject' => self::str(true),
+                'status' => ['type' => 'string', 'enum' => ['open', 'pending', 'closed']],
+                'contact' => self::object(['name' => self::str(true), 'address' => self::str()], ['address']),
+                'customer' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('MessagingPerson')]],
+                'assignee' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('MessagingPerson')]],
+                'last_message_at' => self::str(),
+                'last_inbound_at' => self::str(true),
+                'preview' => self::str(true),
+                'created_at' => self::str(),
+                'closed_at' => self::str(true),
+            ], ['id', 'channel', 'status', 'contact', 'last_message_at']),
+            'MessagingMessage' => self::object([
+                'id' => self::int(),
+                'conversation_id' => self::int(),
+                'kind' => ['type' => 'string', 'enum' => ['inbound', 'outbound', 'note']],
+                'body' => self::str(),
+                'has_html' => self::bool(),
+                'author' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('MessagingPerson')]],
+                'by_agent' => self::bool(),
+                'source' => self::str(true),
+                'status' => ['type' => 'string', 'enum' => ['received', 'queued', 'sent', 'delivered', 'read', 'failed', 'cancelled', 'noted']],
+                'status_detail' => self::str(true),
+                'attachments_not_shown' => self::int(),
+                // Set while an agent's reply is held; it can be cancelled until then.
+                'send_after' => self::str(true),
+                'sent_at' => self::str(true),
+                'created_at' => self::str(),
+            ], ['id', 'conversation_id', 'kind', 'body', 'status', 'created_at']),
+            'MessagingConversationListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingConversation')],
+                'next_cursor' => self::str(true),
+                'total' => self::int(),
+                'counts' => self::object(['open' => self::int(), 'pending' => self::int(), 'closed' => self::int()], []),
+            ], ['data', 'next_cursor', 'total']),
+            'MessagingConversationDetailResponse' => self::dataEnvelope([
+                'allOf' => [
+                    SchemaBuilder::ref('MessagingConversation'),
+                    self::object(['messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingMessage')]], ['messages']),
+                ],
+            ]),
+            'MessagingConversationResponse' => self::dataEnvelope(SchemaBuilder::ref('MessagingConversation')),
+            'MessagingMessageResponse' => self::dataEnvelope(SchemaBuilder::ref('MessagingMessage')),
+            'MessagingStartRequest' => self::object([
+                'to' => self::str() + ['description' => 'The address to write to: an email address for the email channel.'],
+                'name' => self::str() + ['description' => 'Their name, if known.'],
+                'subject' => self::str() + ['description' => 'The subject line, for email.'],
+                'body' => self::str() + ['description' => 'The message, in plain text.'],
+                'channel' => self::str() + ['description' => 'email (the default), webchat, or a plugin channel from GET /api/messages/channels.'],
+            ], ['to', 'body']),
+            'MessagingBodyRequest' => self::object([
+                'body' => self::str() + ['description' => 'The text, in plain words. Replies go to the customer; notes stay inside the workspace.'],
+            ], ['body']),
+            'MessagingUpdateRequest' => self::object([
+                'status' => ['type' => 'string', 'enum' => ['open', 'pending', 'closed'], 'description' => 'open, pending (waiting for the customer) or closed.'],
+                'assigned_profile_id' => self::int(true) + ['description' => 'The staff member to assign it to (a user id from GET /api/users), or null to unassign.'],
+            ], []),
+            'MessagingChannelListResponse' => self::dataEnvelope(['type' => 'array', 'items' => self::object([
+                'key' => self::str(),
+                'label' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                'origin' => self::str(),
+                'enabled' => self::bool(),
+                'capabilities' => ['type' => 'object', 'additionalProperties' => true],
+            ], ['key', 'label', 'origin', 'enabled'])]),
+            'MessagingSettings' => self::object([
+                'webchat_enabled' => self::bool(),
+                'webchat_greeting' => self::str(true),
+                'inbound_email_address' => self::str(true),
+                'has_inbound_secret' => self::bool(),
+                'updated_at' => self::str(true),
+                // For the chat link (/chat/{slug}) and the inbound webhook address.
+                'workspace_slug' => self::str(true),
+            ], ['webchat_enabled', 'has_inbound_secret']),
+            'MessagingSettingsResponse' => self::dataEnvelope(SchemaBuilder::ref('MessagingSettings')),
+            'MessagingSettingsUpdateRequest' => self::object([
+                'webchat_enabled' => self::bool() + ['description' => 'Whether visitors and customers can chat with the workspace.'],
+                'webchat_greeting' => self::str(true) + ['description' => 'The first line the chat box shows, at most 500 characters.'],
+                'inbound_email_address' => self::str(true) + ['description' => 'The address replies from customers come back to; its forwarder posts to the inbound webhook.'],
+            ], []),
+            'MessagingSecretResponse' => self::dataEnvelope(self::object([
+                'secret' => self::str(),
+                'header' => self::str(),
+                'algorithm' => self::str(),
+            ], ['secret', 'header', 'algorithm'])),
+            // What a customer or visitor sees: no notes, nothing held, no internal status.
+            'CustomerMessage' => self::object([
+                'id' => self::int(),
+                'from' => ['type' => 'string', 'enum' => ['you', 'workspace']],
+                'author_name' => self::str(true),
+                'body' => self::str(),
+                'created_at' => self::str(),
+            ], ['id', 'from', 'body', 'created_at']),
+            'CustomerMessageListResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CustomerMessage')]),
+            'CustomerMessageResponse' => self::dataEnvelope(['nullable' => true, 'allOf' => [SchemaBuilder::ref('CustomerMessage')]]),
+            'CustomerChatRequest' => self::object([
+                'message' => self::str(),
+                'name' => self::str(),
+                'email' => self::str(),
+                // Left empty by people. Anything here is treated as a bot.
+                'website' => self::str(),
+                'bot_token' => self::str(),
+            ], ['message']),
+            'PublicChatInfoResponse' => self::dataEnvelope(self::object([
+                'workspace_name' => self::str(),
+                'greeting' => self::str(true),
+                'max_length' => self::int(),
+                'bot_check' => ['type' => 'object', 'nullable' => true, 'properties' => [
+                    'provider' => self::str(),
+                    'site_key' => self::str(),
+                ]],
+            ], ['workspace_name', 'max_length'])),
+            'PublicChatStartResponse' => self::dataEnvelope(self::object([
+                'token' => self::str(),
+                'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('CustomerMessage')],
+            ], ['token', 'messages'])),
+            'MyConversationListResponse' => self::dataEnvelope(['type' => 'array', 'items' => self::object([
+                'id' => self::int(),
+                'channel' => self::str(),
+                'subject' => self::str(true),
+                'status' => self::str(),
+                'last_message_at' => self::str(),
+            ], ['id', 'channel', 'status', 'last_message_at'])]),
+            'MyConversationResponse' => self::dataEnvelope(self::object([
+                'id' => self::int(),
+                'channel' => self::str(),
+                'subject' => self::str(true),
+                'status' => self::str(),
+                'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('CustomerMessage')],
+            ], ['id', 'channel', 'status', 'messages'])),
+            'MyConversationStartResponse' => self::dataEnvelope(['type' => 'object', 'nullable' => true, 'properties' => [
+                'conversation_id' => self::int(),
+                'message' => SchemaBuilder::ref('CustomerMessage'),
+            ]]),
+            'InboundAcceptedResponse' => self::dataEnvelope(self::object(['accepted' => self::bool()], ['accepted'])),
             // One row of GET /api/me/waiting: an inbox item or an agent proposal.
             'WaitingRow' => self::object([
                 'key' => self::str(),
@@ -9429,6 +9586,210 @@ final class CoreApiSchemas
                     ], ['body', 'agenda', 'decisions', 'invitations', 'attendance']),
                 ]]
             ),
+            'PublicBookingPage' => self::object([
+                'workspace' => self::object(['name' => self::str(), 'slug' => self::str()], ['name', 'slug']),
+                'settings' => self::object([
+                    'time_zone' => self::str(),
+                    'min_notice_minutes' => self::int(),
+                    'max_advance_days' => self::int(),
+                    'week_start' => self::str(),
+                    'weekend_days' => ['type' => 'array', 'items' => self::str()],
+                ], ['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days']),
+                'services' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::int(),
+                    'name' => SchemaBuilder::ref('LocalizedLabel'),
+                    'description' => SchemaBuilder::ref('LocalizedLabel'),
+                    'duration_minutes' => self::int(),
+                    'price_minor' => self::int(true),
+                    'currency' => self::str(),
+                    'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
+                ], ['id', 'name', 'duration_minutes', 'price_minor', 'currency', 'staff_profile_ids'])],
+                'staff' => ['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'display_name' => self::str()], ['profile_id', 'display_name'])],
+                'bot_check' => ['type' => 'object', 'nullable' => true, 'properties' => ['provider' => self::str(), 'site_key' => self::str()]],
+            ], ['workspace', 'settings', 'services', 'staff', 'bot_check']),
+            'PublicBookingRequest' => self::object([
+                'service_id' => self::int() + ['description' => 'The service.'],
+                'profile_id' => self::int() + ['description' => 'One person; leave out for anyone.'],
+                'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
+                'name' => self::str() + ['maxLength' => 200, 'description' => 'The customer\'s name.'],
+                'email' => self::str() + ['maxLength' => 320, 'description' => 'Where the confirmation and link go.'],
+                'phone' => self::str() + ['maxLength' => 40, 'description' => 'Optional.'],
+                'note' => self::str() + ['maxLength' => 1000, 'description' => 'Optional note for the business.'],
+                'website' => self::str() + ['description' => 'Leave empty. A hidden field people never fill.'],
+                'elapsed_ms' => self::int() + ['description' => 'Milliseconds the page was open before sending.'],
+                'bot_token' => self::str() + ['description' => 'The bot-check token, when the page shows one.'],
+            ], ['service_id', 'starts_at', 'name', 'email', 'elapsed_ms']),
+            'PublicBookingMoveRequest' => self::object([
+                'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
+            ], ['starts_at']),
+            'PublicBooking' => self::object([
+                'id' => self::int(),
+                'status' => self::str() + ['enum' => ['pending_payment', 'confirmed', 'cancelled', 'expired']],
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'service' => self::object(['id' => self::int(true), 'name' => SchemaBuilder::ref('LocalizedLabel'), 'duration_minutes' => self::int(true)], ['id', 'name']),
+                'staff_name' => self::str(),
+                'price_minor' => self::int(true),
+                'currency' => self::str(),
+                'customer' => self::object(['name' => self::str(), 'email' => self::str()], ['name', 'email']),
+                'manage_token' => self::str(true) + ['description' => 'Only after booking or moving: the token of the new manage link.'],
+                'workspace' => self::object(['name' => self::str()], ['name']),
+                'time_zone' => self::str(),
+            ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
+            'CalendarSettings' => self::object([
+                'time_zone' => self::str() + ['description' => 'The workspace time zone (IANA).'],
+                'booking_page_enabled' => self::bool(),
+                'min_notice_minutes' => self::int(),
+                'max_advance_days' => self::int(),
+                'slot_step_minutes' => self::int(),
+                'reminder_hours_before' => self::int() + ['description' => '0 means no reminder.'],
+                'payment_hold_minutes' => self::int(),
+                'week_start' => self::str(),
+                'weekend_days' => ['type' => 'array', 'items' => self::str()],
+                'currency' => self::str(),
+            ], ['time_zone', 'booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'payment_hold_minutes', 'week_start', 'weekend_days', 'currency']),
+            'CalendarSettingsRequest' => self::object([
+                'booking_page_enabled' => self::bool() + ['description' => 'Turn the public booking page on or off.'],
+                'min_notice_minutes' => self::int() + ['minimum' => 0, 'maximum' => 43200, 'description' => 'Least time between booking and start, in minutes.'],
+                'max_advance_days' => self::int() + ['minimum' => 1, 'maximum' => 730, 'description' => 'How many days ahead a booking may be made.'],
+                'slot_step_minutes' => self::int() + ['minimum' => 5, 'maximum' => 240, 'description' => 'Free times are offered every this many minutes.'],
+                'reminder_hours_before' => self::int() + ['minimum' => 0, 'maximum' => 168, 'description' => 'Send one reminder this many hours before; 0 sends none.'],
+                'payment_hold_minutes' => self::int() + ['minimum' => 1, 'maximum' => 1440, 'description' => 'How long a payment step holds a slot.'],
+                'week_start' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], 'description' => 'The first day of the week in calendar views.'],
+                'weekend_days' => ['type' => 'array', 'items' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']], 'description' => 'Days shown as the weekend.'],
+            ], []),
+            'CalendarStaff' => self::object([
+                'profile_id' => self::int(),
+                'display_name' => self::str(),
+                'bookable' => self::bool() + ['description' => 'Offered on the public booking page.'],
+                'sort_order' => self::int(),
+                'feed_enabled' => self::bool(),
+            ], ['profile_id', 'display_name', 'bookable', 'sort_order', 'feed_enabled']),
+            'CalendarStaffRequest' => self::object([
+                'bookable' => self::bool() + ['description' => 'Offer this person on the public booking page.'],
+                'sort_order' => self::int() + ['description' => 'Position in lists and in "anyone" order; lower comes first.'],
+            ], []),
+            'CalendarHours' => self::object([
+                'weekday' => self::int() + ['minimum' => 1, 'maximum' => 7, 'description' => 'ISO weekday: 1 Monday to 7 Sunday.'],
+                'start_time' => self::str() + ['description' => 'Local `HH:MM`.'],
+                'end_time' => self::str() + ['description' => 'Local `HH:MM`; `24:00` is midnight.'],
+            ], ['weekday', 'start_time', 'end_time']),
+            'CalendarHoursRequest' => self::object([
+                'hours' => ['type' => 'array', 'maxItems' => 70, 'items' => SchemaBuilder::ref('CalendarHours'), 'description' => 'Every working-hours row for the week; the list replaces what is there.'],
+            ], ['hours']),
+            'CalendarTimeOff' => self::object([
+                'id' => self::int(),
+                'profile_id' => self::int(),
+                'kind' => self::str() + ['enum' => ['off', 'open']],
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'note' => self::str(),
+            ], ['id', 'profile_id', 'kind', 'starts_at', 'ends_at', 'note']),
+            'CalendarTimeOffRequest' => self::object([
+                'profile_id' => self::int() + ['description' => 'Whose calendar. Default: yours.'],
+                'kind' => self::str() + ['enum' => ['off', 'open'], 'description' => '`off` is time off; `open` adds hours on a day that is normally closed. Default `off`.'],
+                'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
+                'ends_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
+                'note' => self::str() + ['maxLength' => 500, 'description' => 'A short note for the team.'],
+            ], ['starts_at', 'ends_at']),
+            'CalendarService' => self::object([
+                'id' => self::int(),
+                'name' => SchemaBuilder::ref('LocalizedLabel'),
+                'description' => SchemaBuilder::ref('LocalizedLabel'),
+                'duration_minutes' => self::int(),
+                'buffer_before_minutes' => self::int(),
+                'buffer_after_minutes' => self::int(),
+                'price_minor' => self::int(true) + ['description' => 'Minor units (JOD 12.500 is 12500); null when no price is shown.'],
+                'currency' => self::str(),
+                'bookable_online' => self::bool(),
+                'active' => self::bool(),
+                'sort_order' => self::int(),
+                'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
+            ], ['id', 'name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_minor', 'currency', 'bookable_online', 'active', 'sort_order', 'staff_profile_ids']),
+            'CalendarServiceRequest' => self::object([
+                'name' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],
+                'description' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],
+                'duration_minutes' => self::int() + ['minimum' => 5, 'maximum' => 1440, 'description' => 'How long the service takes.'],
+                'buffer_before_minutes' => self::int() + ['minimum' => 0, 'maximum' => 240, 'description' => 'Time kept free before it.'],
+                'buffer_after_minutes' => self::int() + ['minimum' => 0, 'maximum' => 240, 'description' => 'Time kept free after it.'],
+                'price_minor' => self::int(true) + ['minimum' => 0, 'description' => 'Price shown to customers, in minor units (JOD 12.500 is 12500); null shows no price.'],
+                'currency' => self::str() + ['pattern' => '^[A-Z]{3}$', 'description' => 'Three-letter currency code; default the workspace currency.'],
+                'bookable_online' => self::bool() + ['description' => 'Offer it on the public booking page.'],
+                'active' => self::bool() + ['description' => 'Inactive services cannot be booked.'],
+                'sort_order' => self::int() + ['minimum' => 0, 'description' => 'Position in lists; lower comes first.'],
+                'staff_profile_ids' => ['type' => 'array', 'maxItems' => 200, 'items' => self::int(), 'description' => 'The staff who provide it; the list replaces what is there.'],
+            ], []),
+            'CalendarSlot' => self::object([
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'profile_ids' => ['type' => 'array', 'items' => self::int(), 'description' => 'Who is free then.'],
+            ], ['starts_at', 'ends_at', 'profile_ids']),
+            'CalendarBookingCustomer' => self::object([
+                'profile_id' => self::int() + ['description' => 'An existing customer or member of this workspace.'],
+                'name' => self::str() + ['maxLength' => 200],
+                'email' => self::str() + ['maxLength' => 320],
+                'phone' => self::str() + ['maxLength' => 40],
+                'note' => self::str() + ['maxLength' => 1000],
+            ], []),
+            'CalendarBooking' => self::object([
+                'id' => self::int(),
+                'service_id' => self::int(),
+                'profile_id' => self::int() + ['description' => 'The member of staff.'],
+                'customer_profile_id' => self::int(true),
+                'customer' => SchemaBuilder::ref('CalendarBookingCustomer'),
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'blocks_from' => self::str() + ['description' => 'Start including the buffer before.'],
+                'blocks_until' => self::str() + ['description' => 'End including the buffer after.'],
+                'status' => self::str() + ['enum' => ['pending_payment', 'confirmed', 'cancelled', 'expired']],
+                'hold_expires_at' => self::str(true),
+                'source' => self::str() + ['enum' => ['staff', 'public', 'agent']],
+                'price_minor' => self::int(true),
+                'currency' => self::str(),
+                'cancelled_by' => self::str(true),
+                'cancel_reason' => self::str(),
+                'created_at' => self::str(true),
+            ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
+            'CalendarBookingCreateRequest' => self::object([
+                'service_id' => self::int() + ['description' => 'The service to book.'],
+                'profile_id' => self::int() + ['description' => 'Leave out for whoever is free.'],
+                'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
+                'customer' => ['allOf' => [SchemaBuilder::ref('CalendarBookingCustomer')], 'description' => 'Who the booking is for: an existing customer by profile_id, or a name with an email or phone.'],
+                'keep_to_hours' => self::bool() + ['description' => 'Refuse a time outside working hours. Always on for agents.'],
+            ], ['service_id', 'starts_at', 'customer']),
+            'CalendarBookingMoveRequest' => self::object([
+                'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
+                'profile_id' => self::int() + ['description' => 'Move to another person. Default: the same one.'],
+                'keep_to_hours' => self::bool() + ['description' => 'Refuse a time outside working hours. Always on for agents.'],
+            ], ['starts_at']),
+            'CalendarBookingCancelRequest' => self::object([
+                'reason' => self::str() + ['maxLength' => 500, 'description' => 'Why, in a few words; shown to the customer.'],
+            ], []),
+            'CalendarEvent' => self::object([
+                'id' => self::int(),
+                'profile_id' => self::int(),
+                'title' => self::str(),
+                'notes' => self::str(),
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'all_day' => self::bool(),
+                'busy' => self::bool(),
+                'status' => self::str(),
+                'external_ref' => self::str(true),
+            ], ['id', 'profile_id', 'title', 'starts_at', 'ends_at', 'all_day', 'busy', 'status']),
+            'CalendarEventRequest' => self::object([
+                'profile_id' => self::int() + ['description' => 'Whose calendar. Default: yours.'],
+                'title' => self::str() + ['maxLength' => 200, 'description' => 'What it is.'],
+                'notes' => self::str() + ['maxLength' => 5000, 'description' => 'More detail, for the team.'],
+                'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
+                'ends_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
+                'all_day' => self::bool() + ['description' => 'Shown as an all-day event.'],
+                'busy' => self::bool() + ['description' => 'Blocks bookings. Default true.'],
+            ], []),
+            'CalendarEventResponse' => self::object([
+                'data' => SchemaBuilder::ref('CalendarEvent'),
+                'overlapping_bookings' => ['type' => 'array', 'items' => self::int()],
+            ], ['data', 'overlapping_bookings']),
             'MeetingCreateRequest' => self::object([
                 'body_id' => self::int() + ['description' => 'Convening body holding the meeting (see GET /api/convening-bodies).'],
                 'title' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Meeting title, as text or as a `{language: text}` map.'],
@@ -11493,6 +11854,273 @@ final class CoreApiSchemas
      * Workspace-controlled customer sign-up (WHIT-915): four public routes and
      * the workspace admin's five.
      *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function messagingRoutes(): array
+    {
+        $slug = [
+            'name' => 'workspace',
+            'in' => 'path',
+            'required' => true,
+            'description' => 'The workspace\'s slug. When the request\'s host names a workspace too, they must agree.',
+            'schema' => ['type' => 'string'],
+        ];
+        $notFound = [404 => self::errorResponse('Conversation not found')];
+        $refused = [422 => self::errorResponse('The message cannot be sent: empty, too long, the channel is off, or the address is not valid')];
+        // An agent's message is held for this long and can be cancelled meanwhile,
+        // so Allowed does not make a send irreversible (ADR 0016 §6).
+        $cancelHeld = ['undo' => [
+            'windowSeconds' => \Whity\Core\Messaging\MessagingService::AGENT_HOLD_SECONDS,
+            'operation' => 'post_api_messages_id_cancel',
+            'arguments' => ['id' => '/result/data/id'],
+        ]];
+
+        return [
+            self::permissionRoute('GET', '/api/messages/conversations', 'messages:read', [
+                'summary' => 'List conversations with customers',
+                'description' => 'Newest activity first, paged by `cursor`. Filter by `status`, `assignee` (a person\'s id, `me` or '
+                    . '`none`), `channel`, or `q` (searches names, addresses, subjects and message text).',
+                'tags' => ['messages'],
+                'parameters' => [
+                    self::queryParam('status', 'string', 'open, pending or closed'),
+                    self::queryParam('assignee', 'string', 'A person\'s id, me, or none'),
+                    self::queryParam('channel', 'string', 'email, webchat or a plugin channel'),
+                    self::queryParam('q', 'string', 'Search text'),
+                    self::queryParam('cursor', 'string', 'next_cursor from the previous page'),
+                    self::queryParam('limit', 'integer', 'Page size (default 30, max 100)'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('A page of conversations', 'MessagingConversationListResponse'),
+                    422 => self::errorResponse('The cursor is not one this endpoint returned'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/messages/conversations', 'messages:reply', [
+                'mcp' => $cancelHeld,
+                'summary' => 'Write to someone in a new conversation',
+                'description' => 'Email by default. Sent from a background job; an agent\'s message waits five minutes first and can be cancelled.',
+                'tags' => ['messages'],
+                'request' => 'MessagingStartRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The queued message', 'MessagingMessageResponse'),
+                ] + $refused + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/messages/conversations/{id:\d+}', 'messages:read', [
+                'summary' => 'Read a conversation and its messages, notes included',
+                'tags' => ['messages'],
+                'responses' => [
+                    200 => self::jsonResponse('The conversation and its messages, oldest first', 'MessagingConversationDetailResponse'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/messages/conversations/{id:\d+}', 'messages:manage', [
+                'summary' => 'Change a conversation\'s status or who it is assigned to',
+                'tags' => ['messages'],
+                'request' => 'MessagingUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The conversation', 'MessagingConversationResponse'),
+                    422 => self::errorResponse('Unknown status, or the person is not staff of this workspace'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/messages/conversations/{id:\d+}/replies', 'messages:reply', [
+                'mcp' => $cancelHeld,
+                'summary' => 'Reply to the customer in a conversation',
+                'description' => 'Sent on the conversation\'s channel from a background job. An agent\'s reply waits five minutes '
+                    . 'and can be cancelled in that time.',
+                'tags' => ['messages'],
+                'request' => 'MessagingBodyRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The queued reply', 'MessagingMessageResponse'),
+                ] + $refused + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/messages/conversations/{id:\d+}/notes', 'messages:reply', [
+                'summary' => 'Add an internal note to a conversation (never sent to the customer)',
+                'tags' => ['messages'],
+                'request' => 'MessagingBodyRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The note', 'MessagingMessageResponse'),
+                ] + $refused + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/messages/{id:\d+}/cancel', 'messages:reply', [
+                'summary' => 'Cancel a message that has not been sent yet',
+                'tags' => ['messages'],
+                'responses' => [
+                    200 => self::jsonResponse('The cancelled message', 'MessagingMessageResponse'),
+                    409 => self::errorResponse('The message has already been sent or does not exist'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/messages/channels', 'messages:read', [
+                'summary' => 'The channels messages can use, and whether each is on here',
+                'tags' => ['messages'],
+                'responses' => [200 => self::jsonResponse('Every channel', 'MessagingChannelListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/messages/settings', 'messages:manage', [
+                'summary' => 'Web chat and inbound email settings',
+                'tags' => ['messages'],
+                'responses' => [200 => self::jsonResponse('The settings', 'MessagingSettingsResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/messages/settings', 'messages:manage', [
+                'summary' => 'Turn web chat on or off and set the inbound email address',
+                'tags' => ['messages'],
+                'request' => 'MessagingSettingsUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The settings', 'MessagingSettingsResponse'),
+                    422 => self::errorResponse('A value is not valid'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/messages/settings/inbound-secret', 'messages:manage', [
+                // A secret is shown once, to a person, never to an agent.
+                'mcp' => ['expose' => false],
+                'summary' => 'Make a new inbound email secret (shown once)',
+                'tags' => ['messages'],
+                'responses' => [201 => self::jsonResponse('The new secret', 'MessagingSecretResponse')] + self::authErrors(),
+            ]),
+            [
+                'method' => 'GET',
+                'path' => '/api/me/messages',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The caller\'s own conversations with the workspace',
+                    'tags' => ['messages'],
+                    'responses' => [200 => self::jsonResponse('Their conversations', 'MyConversationListResponse')] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/messages',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Write to the workspace (continues the caller\'s open chat, or starts one)',
+                    'tags' => ['messages'],
+                    'request' => 'CustomerChatRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The message', 'MyConversationStartResponse'),
+                        404 => self::errorResponse('The workspace does not take messages here'),
+                    ] + $refused + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/messages/{id:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'One of the caller\'s own conversations',
+                    'tags' => ['messages'],
+                    'parameters' => [self::queryParam('after', 'integer', 'Only messages after this id')],
+                    'responses' => [200 => self::jsonResponse('The conversation', 'MyConversationResponse')] + $notFound + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/messages/{id:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Write in one of the caller\'s own conversations',
+                    'tags' => ['messages'],
+                    'request' => 'CustomerChatRequest',
+                    'responses' => [201 => self::jsonResponse('The message', 'CustomerMessageResponse')] + $notFound + $refused + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/public/chat/{workspace}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'What a workspace\'s chat box needs (public)',
+                    'description' => 'An unknown workspace and one with web chat off answer the same 404.',
+                    'tags' => ['messages'],
+                    'parameters' => [$slug],
+                    'responses' => [
+                        200 => self::jsonResponse('The chat box settings', 'PublicChatInfoResponse'),
+                        404 => self::errorResponse('Chat is not available here'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/public/chat/{workspace}/conversations',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Start a chat with a workspace (public); returns the chat\'s token once',
+                    'description' => 'Limited per address and per workspace, checked by the instance\'s bot check when one is set up, '
+                        . 'and at most three chats from one address a day.',
+                    'tags' => ['messages'],
+                    'parameters' => [$slug],
+                    'request' => 'CustomerChatRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The chat token and the first message', 'PublicChatStartResponse'),
+                        404 => self::errorResponse('Chat is not available here'),
+                        422 => self::errorResponse('Empty or too long, an invalid email, or a failed bot check'),
+                        429 => self::errorResponse('Too many chats or messages'),
+                        503 => self::errorResponse('The bot check could not be reached'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/public/chat/{workspace}/messages',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Write in a chat (public; `Authorization: Bearer <chat token>`)',
+                    'tags' => ['messages'],
+                    'parameters' => [$slug],
+                    'request' => 'CustomerChatRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The message', 'CustomerMessageResponse'),
+                        401 => self::errorResponse('The chat token is missing or unknown'),
+                        404 => self::errorResponse('Chat is not available here'),
+                        422 => self::errorResponse('Empty or too long'),
+                        429 => self::errorResponse('Too many messages'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/public/chat/{workspace}/messages',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Read a chat (public; `Authorization: Bearer <chat token>`)',
+                    'tags' => ['messages'],
+                    'parameters' => [$slug, self::queryParam('after', 'integer', 'Only messages after this id')],
+                    'responses' => [
+                        200 => self::jsonResponse('The chat\'s messages, oldest first', 'CustomerMessageListResponse'),
+                        401 => self::errorResponse('The chat token is missing or unknown'),
+                        404 => self::errorResponse('Chat is not available here'),
+                        429 => self::errorResponse('Too many requests'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/public/messages/inbound/{channel}/{workspace}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Where a provider delivers messages and delivery news for a channel (public)',
+                    'description' => 'The channel checks the provider\'s signature with the workspace\'s own secret. For core\'s '
+                        . '`email` channel: the raw RFC 822 message (or `{"raw": "..."}`) with `X-Whity-Signature: sha256=<hex '
+                        . 'HMAC-SHA256 of the body>`. Every request gets the same 202.',
+                    'tags' => ['messages'],
+                    'parameters' => [
+                        ['name' => 'channel', 'in' => 'path', 'required' => true, 'description' => 'email, or a plugin channel such as acme:whatsapp', 'schema' => ['type' => 'string']],
+                        $slug,
+                    ],
+                    'responses' => [
+                        202 => self::jsonResponse('Received', 'InboundAcceptedResponse'),
+                        429 => self::errorResponse('Too many requests'),
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /**
      * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
      */
     private static function customerSignupRoutes(): array
@@ -13841,6 +14469,28 @@ final class CoreApiSchemas
             ],
             [
                 'method' => 'GET',
+                'path' => '/api/me/inbox/merged',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => "Every inbox source's items awaiting the caller, as one list",
+                    'description' => 'Urgent items first, then the newest. Paged by position: pass `next_cursor` back as '
+                        . '`cursor`. A source that fails is named in `unavailable`; a source read past its scan limit is '
+                        . 'named in `truncated`.',
+                    'tags' => ['inbox'],
+                    'parameters' => [
+                        self::queryParam('cursor', 'string', 'The next_cursor of the previous page; omit for the first'),
+                        self::queryParam('limit', 'integer', 'Page size (default 25, max 100)'),
+                        self::queryParam('open', 'boolean', 'Falsey to include the caller\'s history as well (default open-only)'),
+                    ],
+                    'responses' => [
+                        200 => self::jsonResponse('One page of the merged inbox', 'MergedInboxResponse'),
+                        422 => self::errorResponse("'cursor' is not one this endpoint returned"),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
                 'path' => '/api/me/waiting',
                 'requiredRole' => null,
                 'requiredPermission' => null,
@@ -15748,6 +16398,346 @@ final class CoreApiSchemas
             'requiredRole' => 'admin',
             'requiredPermission' => null,
             'schema' => $schema,
+        ];
+    }
+
+    /**
+     * The public booking page, the customer's manage link and the staff ICS
+     * feed (WHIT-942, ADR 0017 section 6). Unauthenticated; never MCP tools.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function publicBookingRoutes(): array
+    {
+        $workspace = ['name' => 'workspace', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string'], 'description' => 'The workspace slug.'];
+        $token = ['name' => 'token', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string'], 'description' => 'The 64-character token from the customer\'s email.'];
+        $range = [
+            self::queryParam('from', 'string', 'Start, ISO 8601 with an offset.', true),
+            self::queryParam('to', 'string', 'End (exclusive), with an offset. At most 14 days after `from`.', true),
+        ];
+        $limits = [429 => self::errorResponse('Too many attempts')];
+        $route = static fn (string $method, string $path, array $schema): array => [
+            'method' => $method, 'path' => $path, 'requiredRole' => null, 'requiredPermission' => null,
+            'schema' => $schema + ['tags' => ['calendar']],
+        ];
+
+        return [
+            $route('GET', '/api/public/booking/{workspace}', [
+                'summary' => 'A workspace\'s booking page: services, staff and the booking window (public)',
+                'description' => 'An unknown workspace, one whose booking page is off, and a host naming another workspace all answer the same 404.',
+                'parameters' => [$workspace],
+                'responses' => [
+                    200 => self::jsonResponse('The page', self::dataEnvelope(SchemaBuilder::ref('PublicBookingPage'))),
+                    404 => self::errorResponse('This booking page is not available'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/booking/{workspace}/slots', [
+                'summary' => 'Free times for a service on the booking page (public)',
+                'parameters' => array_merge([$workspace, self::queryParam('service_id', 'integer', 'The service.', true), self::queryParam('profile_id', 'integer', 'One person; leave out for anyone.')], $range),
+                'responses' => [
+                    200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
+                    404 => self::errorResponse('This booking page is not available'),
+                    422 => self::errorResponse('A missing or unreadable range'),
+                ] + $limits,
+            ]),
+            $route('POST', '/api/public/booking/{workspace}/bookings', [
+                'summary' => 'Book on the public page (public)',
+                'description' => 'Protected by per-IP and per-workspace limits, a hidden field, a minimum time on the page, a cap of three open bookings per email, and the instance\'s bot check when set up. The answer carries `manage_token` for the manage page; the same link is emailed.',
+                'parameters' => [$workspace],
+                'request' => 'PublicBookingRequest',
+                'responses' => [
+                    201 => self::jsonResponse('Booked', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
+                    404 => self::errorResponse('This booking page is not available'),
+                    409 => self::errorResponse('That time was just taken'),
+                    422 => self::errorResponse('Missing details, outside the booking window, or refused as spam'),
+                    503 => self::errorResponse('The bot check could not be reached'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/bookings/{token:[a-f0-9]{64}}', [
+                'summary' => 'The customer\'s booking, by the link in their email (public)',
+                'parameters' => [$token],
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/bookings/{token:[a-f0-9]{64}}/slots', [
+                'summary' => 'Free times the customer can move their booking to (public)',
+                'parameters' => array_merge([$token], $range),
+                'responses' => [
+                    200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                ] + $limits,
+            ]),
+            $route('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/move', [
+                'summary' => 'Move the booking (public); the old link stops working and a new one is emailed',
+                'parameters' => [$token],
+                'request' => 'PublicBookingMoveRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Moved', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                    409 => self::errorResponse('That time was just taken'),
+                ] + $limits,
+            ]),
+            $route('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/cancel', [
+                'summary' => 'Cancel the booking (public); the link stops working',
+                'parameters' => [$token],
+                'request' => 'CalendarBookingCancelRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Cancelled', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                    422 => self::errorResponse('Already cancelled'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/bookings/{token:[a-f0-9]{64}}/ics', [
+                'summary' => 'The booking as an .ics file to add to a calendar (public)',
+                'parameters' => [$token],
+                'responses' => [
+                    200 => ['description' => 'iCalendar', 'content' => ['text/calendar' => ['schema' => ['type' => 'string']]]],
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/calendar/feeds/{token:[a-f0-9]{64}\.ics}', [
+                'summary' => 'A person\'s calendar feed (public, secret address)',
+                'parameters' => [['name' => 'token', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string'], 'description' => 'The token followed by `.ics`.']],
+                'responses' => [
+                    200 => ['description' => 'iCalendar', 'content' => ['text/calendar' => ['schema' => ['type' => 'string']]]],
+                    404 => self::errorResponse('Not found'),
+                ] + $limits,
+            ]),
+        ];
+    }
+
+    /**
+     * Calendar and bookings (WHIT-941, ADR 0017). Instants are ISO 8601 with
+     * an offset on the way in and UTC with `Z` on the way out. Create, move and
+     * cancel declare no undo window, so an agent's call always becomes a
+     * proposal its person approves.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function calendarRoutes(): array
+    {
+        $range = [
+            self::queryParam('from', 'string', 'Start of the range, ISO 8601 with an offset, such as `2026-11-16T00:00:00+03:00`.', true),
+            self::queryParam('to', 'string', 'End of the range (exclusive), with an offset. At most 62 days after `from`.', true),
+        ];
+        $person = self::queryParam('profile_id', 'integer', 'Only this member of staff.');
+
+        return [
+            self::permissionRoute('GET', '/api/calendar/settings', 'calendar:read', [
+                'summary' => 'Read the calendar settings: time zone, booking window, slot step, reminders, week layout',
+                'tags' => ['calendar'],
+                'responses' => [200 => self::jsonResponse('The settings', self::dataEnvelope(SchemaBuilder::ref('CalendarSettings')))] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/calendar/settings', 'calendar:manage', [
+                'summary' => 'Change the calendar settings; fields left out keep their value',
+                'description' => 'The time zone is the workspace setting `timezone`, changed in Settings, not here.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarSettingsRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The settings', self::dataEnvelope(SchemaBuilder::ref('CalendarSettings'))),
+                    422 => self::errorResponse('A value out of range'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/staff', 'calendar:read', [
+                'summary' => 'List the staff who have a calendar',
+                'tags' => ['calendar'],
+                'responses' => [200 => self::jsonResponse('Staff with calendars', self::listEnvelope('CalendarStaff'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/calendar/staff/{profileId:\d+}', 'calendar:manage', [
+                'summary' => 'Give a member of staff a calendar, or change whether customers can book them online',
+                'tags' => ['calendar'],
+                'request' => 'CalendarStaffRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Staff with calendars', self::listEnvelope('CalendarStaff')),
+                    404 => self::errorResponse('Not a member of staff here'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/staff/{profileId:\d+}/feed', 'calendar:write', [
+                'summary' => 'Turn on a person\'s calendar feed, or replace its address',
+                'description' => 'Returns an ICS address a calendar app can subscribe to. It is shown once; turning it on again replaces it and the old one stops working. The feed includes customer names. Your own with `calendar:write`; anybody else\'s needs `calendar:manage`.',
+                'tags' => ['calendar'],
+                'responses' => [
+                    201 => self::jsonResponse('The feed address', self::dataEnvelope(self::object(['url' => self::str()], ['url']))),
+                    403 => self::errorResponse('Another person\'s calendar without calendar:manage'),
+                    404 => self::errorResponse('Not a member of staff here'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/calendar/staff/{profileId:\d+}/feed', 'calendar:write', [
+                'summary' => 'Turn off a person\'s calendar feed',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Off', self::dataEnvelope(self::object(['url' => self::str(true)], ['url']))),
+                    404 => self::errorResponse('Not a member of staff here'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/staff/{profileId:\d+}/hours', 'calendar:read', [
+                'summary' => 'Read a person\'s weekly working hours',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Weekly hours, local wall-clock time', self::listEnvelope('CalendarHours')),
+                    404 => self::errorResponse('Not a member of staff here'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/calendar/staff/{profileId:\d+}/hours', 'calendar:write', [
+                'summary' => 'Replace a person\'s weekly working hours',
+                'description' => 'Your own hours with `calendar:write`; anybody else\'s needs `calendar:manage`. Times are local wall-clock `HH:MM` in the workspace time zone; `24:00` ends at midnight.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarHoursRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Weekly hours', self::listEnvelope('CalendarHours')),
+                    403 => self::errorResponse('Another person\'s hours without calendar:manage'),
+                    422 => self::errorResponse('A row out of order or unreadable'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/time-off', 'calendar:read', [
+                'summary' => 'List time off and extra opening hours in a range',
+                'tags' => ['calendar'],
+                'parameters' => array_merge($range, [$person]),
+                'responses' => [200 => self::jsonResponse('Exceptions', self::listEnvelope('CalendarTimeOff'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/time-off', 'calendar:write', [
+                'summary' => 'Add time off (`off`) or extra hours (`open`) for a person',
+                'tags' => ['calendar'],
+                'request' => 'CalendarTimeOffRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The exception', self::dataEnvelope(SchemaBuilder::ref('CalendarTimeOff'))),
+                    403 => self::errorResponse('Another person\'s calendar without calendar:manage'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/calendar/time-off/{id:\d+}', 'calendar:write', [
+                'summary' => 'Remove time off or extra hours',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Removed', self::dataEnvelope(self::object(['id' => self::int(), 'deleted' => self::bool()], ['id', 'deleted']))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/services', 'calendar:read', [
+                'summary' => 'List services',
+                'tags' => ['calendar'],
+                'responses' => [200 => self::jsonResponse('Services', self::listEnvelope('CalendarService'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/services', 'calendar:manage', [
+                'summary' => 'Add a service',
+                'description' => 'The price is shown only; charging is a payment plugin\'s job. `price_minor` is in minor units: JOD 12.500 is 12500.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarServiceRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The service', self::dataEnvelope(SchemaBuilder::ref('CalendarService'))),
+                    422 => self::errorResponse('A missing or out-of-range value'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/services/{id:\d+}', 'calendar:read', [
+                'summary' => 'Get one service',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The service', self::dataEnvelope(SchemaBuilder::ref('CalendarService'))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/calendar/services/{id:\d+}', 'calendar:manage', [
+                'summary' => 'Change a service; fields left out keep their value',
+                'tags' => ['calendar'],
+                'request' => 'CalendarServiceRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The service', self::dataEnvelope(SchemaBuilder::ref('CalendarService'))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/availability', 'calendar:read', [
+                'summary' => 'List free times for a service',
+                'description' => 'Each slot lists the people free then. Working hours, time off, existing bookings with their buffers, busy events, the minimum notice and the booking window are all applied.',
+                'tags' => ['calendar'],
+                'parameters' => array_merge([self::queryParam('service_id', 'integer', 'The service.', true)], $range, [$person]),
+                'responses' => [
+                    200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
+                    404 => self::errorResponse('No such service'),
+                    422 => self::errorResponse('A missing or unreadable range'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/bookings', 'calendar:read', [
+                'summary' => 'List bookings in a range',
+                'tags' => ['calendar'],
+                'parameters' => array_merge($range, [$person, self::queryParam('status', 'string', 'Comma-separated statuses. Default: `confirmed,pending_payment`.')]),
+                'responses' => [200 => self::jsonResponse('Bookings', self::listEnvelope('CalendarBooking'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings', 'calendar:write', [
+                'summary' => 'Book a service for a customer',
+                'description' => 'Leave `profile_id` out to take whoever is free. Refused with 409 when the time was just taken. '
+                    . 'An agent\'s call becomes a proposal its person approves, and keeps to the working hours.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarBookingCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('No such service, person or customer'),
+                    409 => self::errorResponse('That time was just taken'),
+                    422 => self::errorResponse('Outside the booking window, or missing customer details'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/bookings/{id:\d+}', 'calendar:read', [
+                'summary' => 'Get one booking',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/move', 'calendar:write', [
+                'summary' => 'Move a booking to another time, or another person',
+                'tags' => ['calendar'],
+                'request' => 'CalendarBookingMoveRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('That time was just taken'),
+                    422 => self::errorResponse('A cancelled booking, or outside the booking window'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/cancel', 'calendar:write', [
+                'summary' => 'Cancel a booking',
+                'tags' => ['calendar'],
+                'request' => 'CalendarBookingCancelRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Already cancelled'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/events', 'calendar:read', [
+                'summary' => 'List staff events in a range',
+                'tags' => ['calendar'],
+                'parameters' => array_merge($range, [$person]),
+                'responses' => [200 => self::jsonResponse('Events', self::listEnvelope('CalendarEvent'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/events', 'calendar:write', [
+                'summary' => 'Add an event to a person\'s calendar',
+                'description' => 'Your own with `calendar:write`; anybody else\'s needs `calendar:manage`. A busy event blocks bookings. `overlapping_bookings` lists bookings it sits over.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarEventRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The event', SchemaBuilder::ref('CalendarEventResponse')),
+                    403 => self::errorResponse('Another person\'s calendar without calendar:manage'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/calendar/events/{id:\d+}', 'calendar:write', [
+                'summary' => 'Change an event; fields left out keep their value',
+                'tags' => ['calendar'],
+                'request' => 'CalendarEventRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The event', SchemaBuilder::ref('CalendarEventResponse')),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/calendar/events/{id:\d+}', 'calendar:write', [
+                'summary' => 'Remove an event',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Removed', self::dataEnvelope(self::object(['id' => self::int(), 'deleted' => self::bool()], ['id', 'deleted']))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
         ];
     }
 

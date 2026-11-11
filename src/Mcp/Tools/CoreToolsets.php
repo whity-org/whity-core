@@ -74,10 +74,20 @@ final class CoreToolsets
             'titleAr'     => 'أنساق المستندات',
             'description' => "The workspace's document themes: print colour and letterhead, how a theme resolves, and where it is used.",
         ],
+        'core.messages' => [
+            'title'       => 'Messages',
+            'titleAr'     => 'الرسائل',
+            'description' => 'Conversations with customers by email and web chat: read them, reply, add notes, assign and close.',
+        ],
         'core.forms' => [
             'title'       => 'Forms',
             'titleAr'     => 'النماذج',
             'description' => 'Forms, their fields and their submissions.',
+        ],
+        'core.calendar' => [
+            'title'       => 'Calendar and bookings',
+            'titleAr'     => 'التقويم والحجوزات',
+            'description' => 'Staff calendars, services, working hours, time off, free times and customer bookings.',
         ],
         'core.convening' => [
             'title'       => 'Meetings',
@@ -132,7 +142,8 @@ final class CoreToolsets
         'search'                   => 'core.search',
         'inbox'                    => 'core.inbox',
         'notifications'            => 'core.inbox',
-        'users'                    => 'core.people',
+        'messages'                 => 'core.messages',
+        'users'                  => 'core.people',
         'user-groups'              => 'core.people',
         'roles'                    => 'core.people',
         'rbac'                     => 'core.people',
@@ -147,6 +158,7 @@ final class CoreToolsets
         'reports'                  => 'core.documents',
         'forms'                    => 'core.forms',
         'convening'                => 'core.convening',
+        'calendar'                 => 'core.calendar',
         'taxonomy'                 => 'core.taxonomy',
         'data-types'               => 'core.taxonomy',
         'time-windows'             => 'core.time',

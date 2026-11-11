@@ -51,10 +51,12 @@ import type { DataTableColumn } from '@whity/ui/data-table'
 import { useFormattingLocale } from '../i18n/useFormattingLocale'
 import { useDateDisplayPreferences } from './date-display-context'
 import {
+  formatCalendarLabel,
   formatDate,
   formatDateTime,
   formatTime,
   relativeAge,
+  type CalendarLabelStyle,
   type RelativeAge,
   type RelativeAgeUnit,
 } from './format'
@@ -101,27 +103,49 @@ export interface DateDisplay {
   relative(value: string | null | undefined, labels: RelativeAgeLabels): string | null
   /** The given date columns, or none of them when dates are hidden. */
   dateColumns<TData>(specs: DateColumnSpec<TData>[]): DataTableColumn<TData>[]
+  /**
+   * A calendar heading ("Sat 14", "November 2026"), under the same rule.
+   * {@see CalendarLabelStyle}.
+   */
+  calendarLabel(value: string | null | undefined, style: CalendarLabelStyle): string | null
+}
+
+/**
+ * How to read instants. Left out, the runtime's zone is used, as before; the
+ * calendar passes the WORKSPACE's zone (ADR 0017), because a booking at 09:00
+ * in Amman is 09:00 to everyone at the shop, whatever their laptop says.
+ */
+export interface DateDisplayOptions {
+  /** An IANA zone name such as `Asia/Amman`. */
+  timeZone?: string
 }
 
 const EM_DASH = '—'
 
-export function useDateDisplay(): DateDisplay {
+export function useDateDisplay(options: DateDisplayOptions = {}): DateDisplay {
   const { hidden } = useDateDisplayPreferences()
   const locale = useFormattingLocale()
+  const timeZone = options.timeZone
 
   const date = useCallback(
-    (value: string | null | undefined): string | null => (hidden ? null : formatDate(value, locale)),
-    [hidden, locale]
+    (value: string | null | undefined): string | null => (hidden ? null : formatDate(value, locale, timeZone)),
+    [hidden, locale, timeZone]
   )
 
   const dateTime = useCallback(
-    (value: string | null | undefined): string | null => (hidden ? null : formatDateTime(value, locale)),
-    [hidden, locale]
+    (value: string | null | undefined): string | null => (hidden ? null : formatDateTime(value, locale, timeZone)),
+    [hidden, locale, timeZone]
   )
 
   const time = useCallback(
-    (value: string | null | undefined): string | null => (hidden ? null : formatTime(value, locale)),
-    [hidden, locale]
+    (value: string | null | undefined): string | null => (hidden ? null : formatTime(value, locale, timeZone)),
+    [hidden, locale, timeZone]
+  )
+
+  const calendarLabel = useCallback(
+    (value: string | null | undefined, style: CalendarLabelStyle): string | null =>
+      hidden ? null : formatCalendarLabel(value, style, locale, timeZone),
+    [hidden, locale, timeZone]
   )
 
   const age = useCallback(
@@ -151,18 +175,18 @@ export function useDateDisplay(): DateDisplay {
         // `2026-08-25 14:02:11` at readers long before this setting existed.
         cell: (row: TData) =>
           (spec.withTime === false
-            ? formatDate(spec.value(row), locale)
-            : formatDateTime(spec.value(row), locale)) ?? spec.empty ?? EM_DASH,
+            ? formatDate(spec.value(row), locale, timeZone)
+            : formatDateTime(spec.value(row), locale, timeZone)) ?? spec.empty ?? EM_DASH,
         enableSorting: spec.enableSorting,
         size: spec.size,
         className: spec.className,
       }))
     },
-    [hidden, locale]
+    [hidden, locale, timeZone]
   )
 
   return useMemo<DateDisplay>(
-    () => ({ hidden, date, dateTime, time, age, relative, dateColumns }),
-    [hidden, date, dateTime, time, age, relative, dateColumns]
+    () => ({ hidden, date, dateTime, time, age, relative, dateColumns, calendarLabel }),
+    [hidden, date, dateTime, time, age, relative, dateColumns, calendarLabel]
   )
 }

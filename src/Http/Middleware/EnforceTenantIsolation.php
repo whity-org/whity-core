@@ -349,8 +349,31 @@ class EnforceTenantIsolation
         // the host. PublicSignupApiHandler throttles before examining anything
         // and answers the same 202 for every address it accepts.
         '#^/api/v1/public/signup/workspaces/[a-z0-9-]+$#',
+        // WHIT-942 (ADR 0017): the public booking page names its workspace by
+        // slug, checked against the host; the manage link and the staff feed
+        // name their own row by a 256-bit token. PublicBookingApiHandler
+        // throttles per IP before looking anything up.
+        '#^/api/v1/public/booking/[a-z0-9-]+$#',
+        '#^/api/v1/public/booking/[a-z0-9-]+/slots$#',
+        '#^/api/v1/public/booking/[a-z0-9-]+/bookings$#',
+        '#^/api/v1/public/bookings/[a-f0-9]{64}$#',
+        '#^/api/v1/public/bookings/[a-f0-9]{64}/(slots|move|cancel|ics)$#',
+        '#^/api/v1/public/calendar/feeds/[a-f0-9]{64}\.ics$#',
         '#^/api/v1/public/forms/[^/]+/uploads$#',
         '#^/api/v1/public/forms/[^/]+/submissions$#',
+
+        // Messages web chat (ADR 0016 §5). A visitor has no session; the workspace
+        // is the slug, checked against the host, and web chat must be on.
+        // PublicChatApiHandler throttles per address, per chat and per workspace
+        // before writing anything, and a chat's token reaches only that chat.
+        '#^/api/v1/public/chat/[a-z0-9-]+$#',
+        '#^/api/v1/public/chat/[a-z0-9-]+/conversations$#',
+        '#^/api/v1/public/chat/[a-z0-9-]+/messages$#',
+        // Providers delivering to a message channel (ADR 0016 §3). A provider
+        // cannot hold a session: the channel checks the provider's signature with
+        // the workspace's own secret before anything is read, and every answer is
+        // the same 202. Anchored to exactly the channel key and the slug.
+        '#^/api/v1/public/messages/inbound/[a-z][a-z0-9_]*(?::|%3A)?[a-z0-9_]*/[a-z0-9-]+$#',
 
         // What the page of a plugin's public form needs to show its bot check
         // (WHIT-906). The key in the path is the only thing it answers to.

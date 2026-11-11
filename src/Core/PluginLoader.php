@@ -72,6 +72,10 @@ use Whity\Sdk\PluginEntitlementsInterface;
 use Whity\Sdk\PluginRolesInterface;
 use Whity\Sdk\PluginThemeInterface;
 use Whity\Sdk\PluginBillingPortalInterface;
+use Whity\Sdk\PluginInboxSourcesInterface;
+use Whity\Sdk\PluginMessageChannelsInterface;
+use Whity\Core\Inbox\InboxSourceRegistry;
+use Whity\Core\Messaging\MessageChannelRegistry;
 use Whity\Core\Billing\External\PluginBillingPortals;
 use Whity\Core\Billing\HostLicenceSales;
 use Whity\Sdk\PluginLicenceSalesInterface;
@@ -161,6 +165,8 @@ class PluginLoader
 
     /** Where a plugin-provided billing portal goes (SDK 1.77); null means plugins cannot sell. */
     private ?PluginBillingPortals $billingPortals = null;
+    private ?InboxSourceRegistry $inboxSources = null;
+    private ?MessageChannelRegistry $messageChannels = null;
 
     /** Where a plugin's licence seller goes (SDK 1.86); null means plugins cannot sell licences. */
     private ?HostLicenceSales $licenceSales = null;
@@ -488,6 +494,18 @@ class PluginLoader
     public function setBillingPortals(PluginBillingPortals $billingPortals): void
     {
         $this->billingPortals = $billingPortals;
+    }
+
+    /** Accept plugins' inbox sources (SDK 1.97, #881), stored as `<plugin>:<key>`. */
+    public function setInboxSources(InboxSourceRegistry $inboxSources): void
+    {
+        $this->inboxSources = $inboxSources;
+    }
+
+    /** Accept plugins' message channels (SDK 1.97, ADR 0016), stored as `<plugin>:<key>`. */
+    public function setMessageChannels(MessageChannelRegistry $messageChannels): void
+    {
+        $this->messageChannels = $messageChannels;
     }
 
     /** Accept a plugin's store-licence seller (SDK 1.86, WHIT-1013). One per deployment. */
@@ -3707,6 +3725,30 @@ class PluginLoader
                 }
             } catch (Throwable $e) {
                 $this->handlePluginThrowable($pluginKey, $e, 'getBillingPortal');
+            }
+        }
+
+        // 2a-quater-bis. Accept a plugin's INBOX SOURCES and MESSAGE CHANNELS
+        //     (SDK 1.97, #881, ADR 0016). Both registries namespace by the
+        //     plugin's own name. A malformed declaration is the plugin's mistake
+        //     and is logged; a getter that throws goes through the lifecycle
+        //     error boundary like every other contribution point.
+        if ($this->inboxSources !== null && $plugin instanceof PluginInboxSourcesInterface) {
+            try {
+                $this->inboxSources->register($plugin->getName(), $plugin->getInboxSources());
+            } catch (\Whity\Core\Inbox\InvalidInboxSourceException $e) {
+                $this->logWarning("Plugin {$pluginKey} declares an invalid inbox source: " . $e->getMessage());
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getInboxSources');
+            }
+        }
+        if ($this->messageChannels !== null && $plugin instanceof PluginMessageChannelsInterface) {
+            try {
+                $this->messageChannels->register($plugin->getName(), $plugin->getMessageChannels());
+            } catch (\InvalidArgumentException $e) {
+                $this->logWarning("Plugin {$pluginKey} declares an invalid message channel: " . $e->getMessage());
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getMessageChannels');
             }
         }
 

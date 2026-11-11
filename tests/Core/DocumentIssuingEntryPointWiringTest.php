@@ -71,7 +71,7 @@ final class DocumentIssuingEntryPointWiringTest extends TestCase
     {
         $worker = $this->read('src/Cli/Commands/QueueWorkCommand.php');
         self::assertMatchesRegularExpression('/\$documentRegistries = \\\\?Whity\\\\Core\\\\Document\\\\Issuing\\\\WorkerDocumentServices::register\(/', $worker);
-        self::assertMatchesRegularExpression('/PluginJobs::register\([^;]*\$documentRegistries\);/', $worker);
+        self::assertMatchesRegularExpression('/PluginJobs::register\([^;]*\$documentRegistries(, \$messageChannels)?\);/', $worker);
         self::assertStringContainsString(
             "\$loader->setDocumentRegistries(\$documentRegistries['slots'], \$documentRegistries['fields']);",
             $this->read('src/Core/Queue/PluginJobs.php'),

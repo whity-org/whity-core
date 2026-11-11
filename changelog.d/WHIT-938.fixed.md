@@ -1,0 +1,1 @@
+- **The role permission picker shows every permission again.** It read only the first 100, so once the catalogue grew past that the last ones (such as `users:*`) could no longer be granted from Roles. The permission tag on document templates had the same limit. Both now read the whole catalogue (WHIT-938).
