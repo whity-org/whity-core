@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.97.0",
+    "sdk_version": "1.98.0",
     "core_version": "0.2.28",
     "updated": "2026-11-11",
     "ratings": {
@@ -1344,6 +1344,40 @@
                 342
             ],
             "plan": "later"
+        },
+        {
+            "id": "calendar",
+            "group": "people",
+            "name": "Calendar and bookings",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Booking payment step (PluginBookingPaymentInterface, Calendar\\BookingPaymentStep): require a payment such as a deposit before a booking is confirmed; core holds the slot as pending_payment and the plugin settles it through the Calendar\\Bookings host service",
+                    "since": "1.98"
+                },
+                {
+                    "what": "Busy times from outside core (PluginCalendarBusyInterface): read when free times are listed and again inside the lock before a booking is written; failures fail open",
+                    "since": "1.98"
+                },
+                {
+                    "what": "Calendar\\CalendarEvents host service: keep events from an outside calendar on a person's calendar, keyed by the plugin's own reference",
+                    "since": "1.98"
+                },
+                {
+                    "what": "calendar.event.created|updated|deleted and booking.created|confirmed|rescheduled|cancelled|expired events with ids only",
+                    "since": "1.98"
+                }
+            ],
+            "missing": [
+                "Reading a person's bookings and services from a plugin",
+                "Locations and resources (rooms, equipment)",
+                "A slot on the booking page for plugin fields"
+            ],
+            "security": "A payment step and a sync plugin act only for the workspace they are called for, through host services that re-apply it; they never write calendar tables. Core never takes card details.",
+            "issues": [
+                1815
+            ],
+            "plan": "0.2.28"
         }
     ],
     "roadmap": {

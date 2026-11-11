@@ -72,6 +72,9 @@ use Whity\Sdk\PluginEntitlementsInterface;
 use Whity\Sdk\PluginRolesInterface;
 use Whity\Sdk\PluginThemeInterface;
 use Whity\Sdk\PluginBillingPortalInterface;
+use Whity\Sdk\PluginBookingPaymentInterface;
+use Whity\Sdk\PluginCalendarBusyInterface;
+use Whity\Core\Calendar\CalendarPlugins;
 use Whity\Sdk\PluginInboxSourcesInterface;
 use Whity\Sdk\PluginMessageChannelsInterface;
 use Whity\Core\Inbox\InboxSourceRegistry;
@@ -166,6 +169,7 @@ class PluginLoader
     /** Where a plugin-provided billing portal goes (SDK 1.77); null means plugins cannot sell. */
     private ?PluginBillingPortals $billingPortals = null;
     private ?InboxSourceRegistry $inboxSources = null;
+    private ?CalendarPlugins $calendarPlugins = null;
     private ?MessageChannelRegistry $messageChannels = null;
 
     /** Where a plugin's licence seller goes (SDK 1.86); null means plugins cannot sell licences. */
@@ -494,6 +498,12 @@ class PluginLoader
     public function setBillingPortals(PluginBillingPortals $billingPortals): void
     {
         $this->billingPortals = $billingPortals;
+    }
+
+    /** Accept a booking payment step and calendar busy times (SDK 1.98, ADR 0017). */
+    public function setCalendarPlugins(CalendarPlugins $calendarPlugins): void
+    {
+        $this->calendarPlugins = $calendarPlugins;
     }
 
     /** Accept plugins' inbox sources (SDK 1.97, #881), stored as `<plugin>:<key>`. */
@@ -3708,6 +3718,23 @@ class PluginLoader
             } catch (Throwable $e) {
                 $this->handlePluginThrowable($pluginKey, $e, 'getHealthProbes');
             }
+        }
+
+        // 2a-ter-bis. Accept a plugin's BOOKING PAYMENT STEP and CALENDAR BUSY
+        //     TIMES (SDK 1.98, ADR 0017). One payment step per deployment: a
+        //     second is refused and logged by the registry. Busy sources are
+        //     wrapped so a slow or failing plugin never stops bookings.
+        if ($this->calendarPlugins !== null && $plugin instanceof PluginBookingPaymentInterface) {
+            try {
+                if (!$this->calendarPlugins->offerPaymentStep($plugin->getName(), $plugin->getBookingPaymentStep())) {
+                    $this->logWarning("Plugin {$pluginKey} offers a booking payment step, but another plugin already provides one; it was not used.");
+                }
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getBookingPaymentStep');
+            }
+        }
+        if ($this->calendarPlugins !== null && $plugin instanceof PluginCalendarBusyInterface) {
+            $this->calendarPlugins->addBusyPlugin($plugin->getName(), $plugin);
         }
 
         // 2a-quater. Accept a plugin BILLING PORTAL (SDK 1.77, WHIT-1010). One

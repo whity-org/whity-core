@@ -28,4 +28,12 @@ interface BookingMessenger
 
     /** @param array<string, mixed> $booking */
     public function remind(int $tenantId, array $booking): void;
+
+    /**
+     * The booking is held while a payment step runs (SDK 1.98). It carries the
+     * manage link; the confirmation that follows payment does not.
+     *
+     * @param array<string, mixed> $booking
+     */
+    public function awaitingPayment(int $tenantId, array $booking): void;
 }

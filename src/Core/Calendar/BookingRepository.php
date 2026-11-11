@@ -230,6 +230,7 @@ final class BookingRepository
             'currency' => trim((string) $r['currency']),
             'cancelled_by' => $r['cancelled_by'] !== null ? (string) $r['cancelled_by'] : null,
             'cancel_reason' => (string) $r['cancel_reason'],
+            'payment_ref' => $r['payment_ref'] !== null ? (string) $r['payment_ref'] : null,
             'created_at' => $at($r['created_at']),
         ];
         if (array_key_exists('service_name', $r)) {

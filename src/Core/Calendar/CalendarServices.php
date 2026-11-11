@@ -29,6 +29,7 @@ final class CalendarServices
         FrontendUrls $urls,
         ?QueueService $queue,
         ?LoggerInterface $logger = null,
+        ?CalendarPlugins $plugins = null,
     ): BookingService {
         $service = new BookingService(
             $pdo,
@@ -39,6 +40,10 @@ final class CalendarServices
             $hooks,
         );
         $service->setLinks(new ManageLinks($pdo));
+        $service->setManageUrlBase($urls->linkOrPath(FrontendUrls::BOOKING_MANAGE));
+        if ($plugins !== null) {
+            $service->setPlugins($plugins);
+        }
         $service->setMessenger(new EmailBookingMessenger(
             $mailer,
             new EmailLayout(),

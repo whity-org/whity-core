@@ -262,6 +262,32 @@ final class Events
     public const SUBMISSION_WITHDRAWN = 'submission.withdrawn';
     public const SUBMISSION_WITHDRAWN_ASYNC = 'submission.withdrawn.async';
 
+    // ---- calendar and bookings (SDK 1.98, ADR 0017) ----
+    // Fired after the write commits; the return value is ignored, so a
+    // listener cannot refuse or change anything. Each has an `.async` twin on
+    // the event spine. Ids only: `id`, `tenant_id`, `profile_id` (the member
+    // of staff whose calendar it is), and for bookings `service_id` and
+    // `status`. A sync plugin writes outwards from these.
+    public const CALENDAR_EVENT_CREATED = 'calendar.event.created';
+    public const CALENDAR_EVENT_CREATED_ASYNC = 'calendar.event.created.async';
+    public const CALENDAR_EVENT_UPDATED = 'calendar.event.updated';
+    public const CALENDAR_EVENT_UPDATED_ASYNC = 'calendar.event.updated.async';
+    public const CALENDAR_EVENT_DELETED = 'calendar.event.deleted';
+    public const CALENDAR_EVENT_DELETED_ASYNC = 'calendar.event.deleted.async';
+    /** A booking was made: `status` is `confirmed`, or `pending_payment` while a payment step runs. */
+    public const BOOKING_CREATED = 'booking.created';
+    public const BOOKING_CREATED_ASYNC = 'booking.created.async';
+    /** A booking became confirmed: at once, or when its payment came in. */
+    public const BOOKING_CONFIRMED = 'booking.confirmed';
+    public const BOOKING_CONFIRMED_ASYNC = 'booking.confirmed.async';
+    public const BOOKING_RESCHEDULED = 'booking.rescheduled';
+    public const BOOKING_RESCHEDULED_ASYNC = 'booking.rescheduled.async';
+    public const BOOKING_CANCELLED = 'booking.cancelled';
+    public const BOOKING_CANCELLED_ASYNC = 'booking.cancelled.async';
+    /** A payment hold lapsed and the time is free again. */
+    public const BOOKING_EXPIRED = 'booking.expired';
+    public const BOOKING_EXPIRED_ASYNC = 'booking.expired.async';
+
     // ---- agents (SDK 1.75, WHIT-990) ----
     // A workspace's agent changed. Fired after the change is saved, and the
     // return value is ignored: a listener can't refuse or undo it. Payload:

@@ -4998,6 +4998,7 @@ $calendarServiceRepository = new \Whity\Core\Calendar\ServiceRepository($db->get
 $calendarBookingRepository = new \Whity\Core\Calendar\BookingRepository($db->getPdo());
 // Customer emails (with the manage link) and reminders are wired here and in
 // CoreJobs the same way, through CalendarServices (WHIT-942).
+$calendarPlugins = new \Whity\Core\Calendar\CalendarPlugins($logger);
 $calendarBookingService = \Whity\Core\Calendar\CalendarServices::bookingService(
     $db->getPdo(),
     $settingsService,
@@ -5006,7 +5007,12 @@ $calendarBookingService = \Whity\Core\Calendar\CalendarServices::bookingService(
     $frontendUrls,
     $queueService,
     $logger,
+    $calendarPlugins,
 );
+// SDK 1.98: a payment step settles held bookings, a sync plugin keeps outside
+// events, through these host services.
+\Whity\register_service(\Whity\Sdk\Calendar\Bookings::class, new \Whity\Core\Calendar\HostBookings($calendarBookingService));
+\Whity\register_service(\Whity\Sdk\Calendar\CalendarEvents::class, new \Whity\Core\Calendar\HostCalendarEvents($calendarBookingService, $calendarRepository));
 $calendarFeed = new \Whity\Core\Calendar\CalendarFeed($db->getPdo(), $calendarRepository, $calendarBookingRepository);
 $calendarHandler = new \Whity\Api\CalendarApiHandler(
     $calendarRepository,
@@ -6085,6 +6091,8 @@ $pluginLoader->setBillingPortals($pluginBillingPortals);
 // channel registry is built with Messages above, holding core's email and web chat.
 $pluginLoader->setInboxSources($inboxSourceRegistry);
 $pluginLoader->setMessageChannels($messageChannelRegistry);
+// A plugin's booking payment step and calendar busy times (SDK 1.98, ADR 0017).
+$pluginLoader->setCalendarPlugins($calendarPlugins);
 // WHIT-1011: plugin SERVICE routes accept a client-credentials token from the
 // trusted issuer (SERVICE_TOKEN_ISSUER, else MCP_OAUTH_ISSUER) for a client on
 // SERVICE_TOKEN_CLIENTS. Off, so no service route opens, until both are set.

@@ -113,6 +113,21 @@ final class CoreJobs
             );
             $calendarLogger = $logger ?? new \Psr\Log\NullLogger();
             $calendarQueue = new QueueService(new JobRepository($pdo));
+            $calendarBookings = \Whity\Core\Calendar\CalendarServices::bookingService(
+                $pdo,
+                $calendarSettings,
+                null,
+                new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
+                    $calendarSettings,
+                    new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+                    $calendarLogger
+                )),
+                \Whity\Core\Http\FrontendUrls::fromEnv(),
+                $calendarQueue,
+                $calendarLogger
+            );
+            $registry->register(\Whity\Core\Calendar\BookingHoldExpiryJob::NAME, new \Whity\Core\Calendar\BookingHoldExpiryJob($calendarBookings), false);
             $registry->register(
                 \Whity\Core\Calendar\BookingReminderJob::NAME,
                 new \Whity\Core\Calendar\BookingReminderJob(
