@@ -139,7 +139,38 @@ final class QueueWorkCommand implements CliCommand
                 $this->logger,
                 $jobPlugin,
             );
-            $loaded->loader = PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger, $documentRegistries);
+            // Messages (ADR 0016): the worker hands queued messages to their
+            // channels. Core's email and web chat are built here; a plugin's
+            // channel joins the same registry as the plugins load below.
+            $messageChannels = new \Whity\Core\Messaging\MessageChannelRegistry();
+            \Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannels);
+            $workerSecrets = \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV);
+            $workerSettings = new \Whity\Core\Settings\SettingsService(
+                new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                new \Whity\Core\Settings\TenantSettingsRepository($pdo)
+            );
+            $workerLogger = $this->logger;
+            $messaging = \Whity\Core\Messaging\CoreMessaging::build(
+                $pdo,
+                $messageChannels,
+                new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
+                    $workerSettings,
+                    new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                    $workerSecrets,
+                    $workerLogger
+                )),
+                $workerSecrets,
+                static fn (string $name, array $payload, array $opts): ?int => (new \Whity\Core\Queue\QueueService($repo))->dispatch($name, $payload, $opts),
+                null,
+                (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+            );
+            \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messaging);
+            $registry->register(
+                \Whity\Core\Messaging\Jobs\DeliverMessageJob::NAME,
+                new \Whity\Core\Messaging\Jobs\DeliverMessageJob(static fn (): \Whity\Core\Messaging\MessagingService => $messaging),
+                false
+            );
+            $loaded->loader = PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger, $documentRegistries, $messageChannels);
             // WHIT-997 (SDK 1.83): runs the bulk issues Documents::issueMany() queued. Internal.
             $registry->register(
                 \Whity\Core\Document\Issuing\IssueBatchJob::NAME,

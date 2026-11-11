@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Auth\TokenValidator;
-use Whity\Core\Inbox\InboxItem;
+use Whity\Sdk\Inbox\InboxItem;
+use Whity\Core\Inbox\InboxAggregate;
 use Whity\Core\Inbox\InboxSourceRegistry;
+use Whity\Sdk\Inbox\InboxCursor;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Http\PaginationParams;
@@ -142,6 +144,48 @@ final class MeInboxApiHandler
             // Echoed so a client rendering several sources can tell which
             // response it is holding without tracking the request.
             'source' => $key,
+        ]);
+    }
+
+    /**
+     * Every source as one list (#881, ADR 0016 §7): urgent first, then newest,
+     * paged by an opaque `cursor` rather than page numbers so an item arriving
+     * between two requests never shifts a page already read. A failing source
+     * is named in `unavailable`; the rest is still served.
+     */
+    public function merged(Request $request): Response
+    {
+        $ctx = $this->resolveClaims($request);
+        if ($ctx === null) {
+            return Response::error('Unauthenticated', 401);
+        }
+        [$profileId, $tenantId] = $ctx;
+
+        $query = self::queryParams($request);
+        $openOnly = !self::isFalsey($query['open'] ?? null);
+
+        $cursor = null;
+        $rawCursor = $query['cursor'] ?? '';
+        if ($rawCursor !== '') {
+            $cursor = InboxCursor::decode($rawCursor);
+            if ($cursor === null) {
+                return Response::error("'cursor' is not one this endpoint returned. Start again without it.", 422);
+            }
+        }
+
+        $limitRaw = $query['limit'] ?? '';
+        $limit = ctype_digit($limitRaw) ? (int) $limitRaw : 25;
+
+        $page = (new InboxAggregate($this->sources))->page($tenantId, $profileId, $openOnly, $cursor, $limit);
+
+        return Response::json([
+            'data' => array_map(
+                static fn (array $row): array => ['source' => $row['source']] + $row['item']->toArray(),
+                $page['items']
+            ),
+            'next_cursor' => $page['next'],
+            'unavailable' => $page['unavailable'],
+            'truncated' => $page['truncated'],
         ]);
     }
 

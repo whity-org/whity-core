@@ -36,13 +36,26 @@ export {
   useDateDisplay,
   type DateColumnSpec,
   type DateDisplay,
+  type DateDisplayOptions,
   type RelativeAgeLabels,
 } from './useDateDisplay'
 export {
   isDateFieldName,
   parseWireDate,
   relativeAge,
+  type CalendarLabelStyle,
   type DateLocale,
   type RelativeAge,
   type RelativeAgeUnit,
 } from './format'
+export {
+  isValidTimeZone,
+  offsetMinutesAt,
+  safeTimeZone,
+  toZonedIso,
+  wallClockAt,
+  zonedDate,
+  zonedInstant,
+  type CalendarDate,
+  type WallClock,
+} from './zoned'

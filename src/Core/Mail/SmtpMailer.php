@@ -19,7 +19,7 @@ use Closure;
  * on any unexpected reply and the caller (verification flow, hook notifications)
  * treats mail as non-critical and catches it.
  */
-final class SmtpMailer implements Mailer
+final class SmtpMailer implements Mailer, ThreadedMailer
 {
     /** @var Closure(SmtpConfig): SmtpConnection */
     private Closure $connector;
@@ -36,6 +36,18 @@ final class SmtpMailer implements Mailer
     }
 
     public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
+    {
+        $this->deliver($toEmail, $subject, $textBody, $htmlBody, null, []);
+    }
+
+    /** Messages (ADR 0016): the same dialogue, with the conversation's headers. */
+    public function sendThreaded(OutgoingEmail $email): void
+    {
+        $this->deliver($email->to, $email->subject, $email->textBody, $email->htmlBody, $email->fromName, $email->extraHeaders());
+    }
+
+    /** @param list<string> $extraHeaders already checked for line breaks by {@see OutgoingEmail} */
+    private function deliver(string $toEmail, string $subject, string $textBody, ?string $htmlBody, ?string $fromName, array $extraHeaders): void
     {
         // WHIT-991: no mail from a proposal preview.
         \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Sending mail');
@@ -69,7 +81,7 @@ final class SmtpMailer implements Mailer
             $this->command($conn, 'DATA', 354);
             // Dot-stuff the WHOLE payload (headers + body) once, so a body line
             // starting with '.' — in either MIME part — cannot end DATA early.
-            $message = self::dotStuff($this->buildMessage($toEmail, $fromEmail, $subject, $textBody, $htmlBody));
+            $message = self::dotStuff($this->buildMessage($toEmail, $fromEmail, $subject, $textBody, $htmlBody, $fromName, $extraHeaders));
             $conn->write($message . "\r\n.\r\n");
             $this->expect($conn, 250);            // message accepted
 
@@ -188,6 +200,8 @@ final class SmtpMailer implements Mailer
      * $htmlBody is null, otherwise multipart/alternative (text + HTML). Bodies use
      * CRLF; the caller dot-stuffs the whole payload once. $fromEmail/$toEmail are
      * already CRLF-validated by send().
+     *
+     * @param list<string> $extraHeaders already checked for line breaks by {@see OutgoingEmail}
      */
     private function buildMessage(
         string $toEmail,
@@ -195,9 +209,13 @@ final class SmtpMailer implements Mailer
         string $subject,
         string $textBody,
         ?string $htmlBody,
+        ?string $fromName = null,
+        array $extraHeaders = [],
     ): string {
-        $from = $this->config->fromName !== ''
-            ? sprintf('%s <%s>', self::encodeHeader($this->config->fromName), $fromEmail)
+        // A conversation names the workspace as the sender, on the instance's address.
+        $displayName = $fromName !== null && $fromName !== '' ? $fromName : $this->config->fromName;
+        $from = $displayName !== ''
+            ? sprintf('%s <%s>', self::encodeHeader($displayName), $fromEmail)
             : $fromEmail;
 
         $headers = [
@@ -206,6 +224,7 @@ final class SmtpMailer implements Mailer
             'Subject: ' . self::encodeHeader($subject),
             'Date: ' . gmdate('D, d M Y H:i:s') . ' +0000',
             'MIME-Version: 1.0',
+            ...$extraHeaders,
         ];
 
         if ($htmlBody === null) {

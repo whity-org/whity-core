@@ -506,6 +506,7 @@
         "inbox.from.public": "Public form",
         "inbox.noSources": "Nothing on this installation sends work to an inbox yet, so there is nothing to show.",
         "inbox.source.documentRouting": "Documents awaiting you",
+        "inbox.source.messages": "Conversations assigned to you",
         "inbox.sources": "Inbox sources",
         "inbox.state.approved": "You approved",
         "inbox.state.decision": "Your decision",

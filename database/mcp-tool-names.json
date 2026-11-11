@@ -15,6 +15,18 @@
     "en": "Remove the default logo or brand image for all workspaces",
     "ar": "إزالة شعار أو صورة افتراضية لكل المساحات"
   },
+  "delete_api_calendar_events_id": {
+    "en": "Remove a calendar event",
+    "ar": "حذف حدث من التقويم"
+  },
+  "delete_api_calendar_staff_profileid_feed": {
+    "en": "Turn off someone's calendar feed",
+    "ar": "إيقاف رابط تقويم موظف"
+  },
+  "delete_api_calendar_time_off_id": {
+    "en": "Remove time off or extra hours",
+    "ar": "حذف إجازة أو ساعات إضافية"
+  },
   "delete_api_convening_bodies_id": {
     "en": "Delete a body that holds meetings",
     "ar": "حذف هيئة"
@@ -250,6 +262,46 @@
   "get_api_billing_return": {
     "en": "Check the result of a payment",
     "ar": "التحقق من نتيجة عملية دفع"
+  },
+  "get_api_calendar_availability": {
+    "en": "Find free times for a service",
+    "ar": "البحث عن أوقات متاحة لخدمة"
+  },
+  "get_api_calendar_bookings": {
+    "en": "List bookings",
+    "ar": "عرض الحجوزات"
+  },
+  "get_api_calendar_bookings_id": {
+    "en": "Get a booking",
+    "ar": "عرض حجز"
+  },
+  "get_api_calendar_events": {
+    "en": "List calendar events",
+    "ar": "عرض أحداث التقويم"
+  },
+  "get_api_calendar_services": {
+    "en": "List services",
+    "ar": "عرض الخدمات"
+  },
+  "get_api_calendar_services_id": {
+    "en": "Get a service",
+    "ar": "عرض خدمة"
+  },
+  "get_api_calendar_settings": {
+    "en": "Read the calendar settings",
+    "ar": "عرض إعدادات التقويم"
+  },
+  "get_api_calendar_staff": {
+    "en": "List staff who have a calendar",
+    "ar": "عرض الموظفين الذين لديهم تقويم"
+  },
+  "get_api_calendar_staff_profileid_hours": {
+    "en": "Read someone's working hours",
+    "ar": "عرض ساعات عمل موظف"
+  },
+  "get_api_calendar_time_off": {
+    "en": "List time off and extra hours",
+    "ar": "عرض الإجازات والساعات الإضافية"
   },
   "get_api_convening_bodies": {
     "en": "List the bodies that hold meetings",
@@ -534,6 +586,22 @@
   },
   "get_api_meetings_id": {
     "ar": "عرض اجتماع وجدول أعماله وقراراته"
+  },
+  "get_api_messages_channels": {
+    "en": "See the channels messages can use",
+    "ar": "عرض قنوات الرسائل المتاحة"
+  },
+  "get_api_messages_conversations": {
+    "en": "List conversations with customers",
+    "ar": "عرض المحادثات مع العملاء"
+  },
+  "get_api_messages_conversations_id": {
+    "en": "Read a conversation",
+    "ar": "قراءة محادثة"
+  },
+  "get_api_messages_settings": {
+    "en": "See the web chat and inbound email settings",
+    "ar": "عرض إعدادات الدردشة والبريد الوارد"
   },
   "get_api_migrations": {
     "en": "See database updates and whether they have run",
@@ -834,6 +902,14 @@
     "en": "Change an agent's instructions, tools or permissions",
     "ar": "تعديل تعليمات وكيل وأدواته وصلاحياته"
   },
+  "patch_api_calendar_events_id": {
+    "en": "Change a calendar event",
+    "ar": "تعديل حدث في التقويم"
+  },
+  "patch_api_calendar_services_id": {
+    "en": "Change a service",
+    "ar": "تعديل خدمة"
+  },
   "patch_api_convening_bodies_id": {
     "en": "Rename a body, move it, retire it or bring it back",
     "ar": "تعديل هيئة أو إيقافها أو إعادتها"
@@ -870,6 +946,10 @@
   "patch_api_languages_id": {
     "en": "Change a language's name or switch it on or off",
     "ar": "تعديل اسم لغة أو تشغيلها وإيقافها"
+  },
+  "patch_api_messages_conversations_id": {
+    "en": "Change a conversation's status or who it is assigned to",
+    "ar": "تغيير حالة المحادثة أو المسؤول عنها"
   },
   "patch_api_ou_types_id": {
     "en": "Rename or reorder a unit type",
@@ -992,6 +1072,34 @@
   "post_api_branding_global_assets_key": {
     "en": "Upload the default logo or brand image for all workspaces",
     "ar": "رفع شعار أو صورة افتراضية لكل المساحات"
+  },
+  "post_api_calendar_bookings": {
+    "en": "Book a service for a customer",
+    "ar": "حجز خدمة لعميل"
+  },
+  "post_api_calendar_bookings_id_cancel": {
+    "en": "Cancel a booking",
+    "ar": "إلغاء حجز"
+  },
+  "post_api_calendar_bookings_id_move": {
+    "en": "Move a booking",
+    "ar": "تغيير موعد حجز"
+  },
+  "post_api_calendar_events": {
+    "en": "Add a calendar event",
+    "ar": "إضافة حدث إلى التقويم"
+  },
+  "post_api_calendar_services": {
+    "en": "Add a service",
+    "ar": "إضافة خدمة"
+  },
+  "post_api_calendar_staff_profileid_feed": {
+    "en": "Turn on someone's calendar feed",
+    "ar": "تفعيل رابط تقويم موظف"
+  },
+  "post_api_calendar_time_off": {
+    "en": "Add time off or extra hours",
+    "ar": "إضافة إجازة أو ساعات إضافية"
   },
   "post_api_convening_bodies": {
     "en": "Set up a body that holds meetings",
@@ -1245,6 +1353,22 @@
     "en": "Set a meeting's date and place",
     "ar": "تحديد موعد اجتماع ومكانه"
   },
+  "post_api_messages_conversations": {
+    "en": "Write to someone in a new conversation",
+    "ar": "مراسلة شخص في محادثة جديدة"
+  },
+  "post_api_messages_conversations_id_notes": {
+    "en": "Add an internal note to a conversation",
+    "ar": "إضافة ملاحظة داخلية إلى محادثة"
+  },
+  "post_api_messages_conversations_id_replies": {
+    "en": "Reply to a customer",
+    "ar": "الرد على عميل"
+  },
+  "post_api_messages_id_cancel": {
+    "en": "Cancel a message that has not been sent yet",
+    "ar": "إلغاء رسالة لم تُرسل بعد"
+  },
   "post_api_ou_types": {
     "en": "Add a unit type, or adopt a built-in one",
     "ar": "إضافة نوع وحدة تنظيمية"
@@ -1424,6 +1548,18 @@
     "en": "Check a workspace plugin's definition",
     "ar": "التحقق من تعريف إضافة"
   },
+  "put_api_calendar_settings": {
+    "en": "Change the calendar settings",
+    "ar": "تغيير إعدادات التقويم"
+  },
+  "put_api_calendar_staff_profileid": {
+    "en": "Give someone a calendar or change online booking for them",
+    "ar": "إضافة تقويم لموظف أو تغيير الحجز عبر الإنترنت له"
+  },
+  "put_api_calendar_staff_profileid_hours": {
+    "en": "Change someone's working hours",
+    "ar": "تغيير ساعات عمل موظف"
+  },
   "put_api_document_background_issuing_plugin": {
     "en": "Allow or stop a plugin issuing documents on its own",
     "ar": "السماح لإضافة بإصدار مستندات تلقائيًا أو إيقافه"
@@ -1461,6 +1597,10 @@
   },
   "put_api_meetings_id_attendance": {
     "ar": "تسجيل من حضر اجتماعًا"
+  },
+  "put_api_messages_settings": {
+    "en": "Change the web chat and inbound email settings",
+    "ar": "تغيير إعدادات الدردشة والبريد الوارد"
   },
   "put_api_notification_settings_channel": {
     "en": "Change how a notification channel sends messages",

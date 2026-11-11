@@ -49,6 +49,9 @@ final class PluginJobs
      *                                      with no manager has nothing to hear.
      * @param array{slots: \Whity\Core\Document\Slots\TemplateSlotRegistry, fields: \Whity\Core\Document\Fields\DocumentFieldRegistry}|null $documentRegistries
      *                                      The worker's document registries (WHIT-742).
+     * @param \Whity\Core\Messaging\MessageChannelRegistry|null $messageChannels
+     *                                      The worker's channels, so a plugin's channel
+     *                                      can send what Messages queued (ADR 0016).
      * @return PluginLoader|null The loader, or null when plugins couldn't load.
      */
     public static function register(
@@ -58,6 +61,7 @@ final class PluginJobs
         ?HookManager $hooks = null,
         ?AuditLogger $auditLogger = null,
         ?array $documentRegistries = null,
+        ?\Whity\Core\Messaging\MessageChannelRegistry $messageChannels = null,
     ): ?PluginLoader {
         $pluginDir ??= dirname(__DIR__, 3) . '/plugins';
 
@@ -81,6 +85,9 @@ final class PluginJobs
             );
             if ($documentRegistries !== null) {
                 $loader->setDocumentRegistries($documentRegistries['slots'], $documentRegistries['fields']);
+            }
+            if ($messageChannels !== null) {
+                $loader->setMessageChannels($messageChannels);
             }
             $loader->load();
             $loader->collectJobs($registry);

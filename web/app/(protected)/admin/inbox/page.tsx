@@ -139,7 +139,9 @@ export default function InboxPage() {
   const sourceLabel = (source: InboxSource): string =>
     source.key === DOCUMENT_ROUTING_SOURCE
       ? t('inbox.source.documentRouting', 'Documents awaiting you')
-      : source.label;
+      : source.key === 'messages'
+        ? t('inbox.source.messages', 'Conversations assigned to you')
+        : source.label;
   const activeSourceLabel = sourceList.find((s) => s.key === activeSource);
 
   /**
@@ -307,6 +309,11 @@ export default function InboxPage() {
           isLoading={items.loading || sources.loading}
           ariaLabel={t('inbox.table.label', 'Inbox items')}
           onRowClick={(row) => {
+            // Messages (ADR 0016): a conversation assigned to the caller.
+            if (row.resource_type === 'conversation' && row.resource_id) {
+              router.push(`/admin/messages?c=${encodeURIComponent(row.resource_id)}`);
+              return;
+            }
             const meta = routingMeta(row);
             if (meta !== null) router.push(routingHref(meta));
           }}

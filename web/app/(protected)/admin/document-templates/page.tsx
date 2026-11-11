@@ -113,12 +113,22 @@ export default function DocumentTemplatesPage() {
    * written is the slug, never an id.
    */
   const permissionOptions = useFetch<{ source: PermissionSource; names: string[] }>(async () => {
-    const response = await apiClient('/api/v1/permissions?per_page=100');
-    if (response.ok) {
-      const body = (await response.json()) as { data?: PermissionOption[] };
-      const names = (body.data ?? []).map((p) => p.name).filter((n): n is string => typeof n === 'string' && n !== '');
-      if (names.length > 0) return { source: 'catalogue' as const, names: names.sort() };
+    // A page holds at most 100 and the catalogue is longer, so read every page.
+    const catalogue: PermissionOption[] = [];
+    for (let page = 1; page <= 20; page += 1) {
+      const response = await apiClient(`/api/v1/permissions?per_page=100&page=${page}`);
+      if (!response.ok) break;
+      const body = (await response.json()) as {
+        data?: PermissionOption[];
+        pagination?: { totalPages?: number };
+      };
+      const rows = body.data ?? [];
+      catalogue.push(...rows);
+      const totalPages = body.pagination?.totalPages;
+      if (rows.length === 0 || typeof totalPages !== 'number' || page >= totalPages) break;
     }
+    const names = catalogue.map((p) => p.name).filter((n): n is string => typeof n === 'string' && n !== '');
+    if (names.length > 0) return { source: 'catalogue' as const, names: names.sort() };
     return { source: 'own' as const, names: [...permissions].sort() };
   }, [apiClient, permissions]);
 
