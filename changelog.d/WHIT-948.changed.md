@@ -1,0 +1,1 @@
+- CI: refreshed `scripts/ci-test-timings.json` from the latest develop run, so the shard-plan check passes again after the messages and calendar tests were added.
