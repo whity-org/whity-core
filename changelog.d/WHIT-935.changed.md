@@ -1,0 +1,1 @@
+- **The E2E shards finish sooner.** Each Playwright shard now starts the backend stack while it installs dependencies, and the shards are split by recorded test time instead of test count (WHIT-935).
