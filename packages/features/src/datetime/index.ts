@@ -51,6 +51,7 @@ export {
 export {
   isValidTimeZone,
   offsetMinutesAt,
+  deviceTimeZone,
   safeTimeZone,
   toZonedIso,
   wallClockAt,

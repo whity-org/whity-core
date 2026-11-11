@@ -21,6 +21,7 @@ Sidebar groups: (top) Dashboard · Inbox · Approvals — People — AI — Docu
 | A04b | Calendar services · service | `/calendar/services`, `/calendar/services/[id]` | none yet (ask WHIT-946) | section 21; Overview only (no access list or history in the API yet) |
 | A04c | Hours and time off | `/calendar/hours` | none yet (ask WHIT-946) | section 21; own hours on `calendar:write`, anyone's on `calendar:manage` |
 | A04d | Calendar settings | `/calendar/settings` | none yet (ask WHIT-946) | section 21; `calendar:manage` |
+| A04e | Public booking page · the customer's booking (move, cancel) | `/book/[workspace]`, `/booking/[token]` | none yet (WHIT-945, in the WHIT-946 brief) | built on the `/f/[slug]` frame (`TplFormPublic`); no sign-in; times in the workspace's zone, and the visitor's too when it differs; ADR 0017 section 6 |
 | **People** | | | | |
 | A10 | Users · user | `/admin/users`, `/admin/users/[id]` | `TplUsers`, `TplUserRecord`, `TplUserRecordAr` | section 21 |
 | A11 | User groups | `/admin/user-groups` | `TplUserGroups` | section 21 |

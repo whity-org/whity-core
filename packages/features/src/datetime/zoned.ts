@@ -153,6 +153,20 @@ export function toZonedIso(instant: Date, timeZone: string): string {
   )
 }
 
+/**
+ * The zone the visitor's device is set to, or null when the runtime does not
+ * say. The public booking page (WHIT-945) names the workspace's zone and, when
+ * this one differs, shows a chosen time in both.
+ */
+export function deviceTimeZone(): string | null {
+  try {
+    const zone = new Intl.DateTimeFormat().resolvedOptions().timeZone
+    return isValidTimeZone(zone) ? zone : null
+  } catch {
+    return null
+  }
+}
+
 /** The calendar date it is in `timeZone` at `instant` (default now). */
 export function zonedDate(timeZone: string, instant: Date = new Date()): CalendarDate {
   const wall = wallClockAt(instant, timeZone)
