@@ -75769,6 +75769,10 @@
                     "updated_at": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "workspace_slug": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "required": [

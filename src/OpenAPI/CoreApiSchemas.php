@@ -6687,6 +6687,8 @@ final class CoreApiSchemas
                 'inbound_email_address' => self::str(true),
                 'has_inbound_secret' => self::bool(),
                 'updated_at' => self::str(true),
+                // For the chat link (/chat/{slug}) and the inbound webhook address.
+                'workspace_slug' => self::str(true),
             ], ['webchat_enabled', 'has_inbound_secret']),
             'MessagingSettingsResponse' => self::dataEnvelope(SchemaBuilder::ref('MessagingSettings')),
             'MessagingSettingsUpdateRequest' => self::object([

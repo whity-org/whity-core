@@ -73,6 +73,16 @@ final class MessagingSettings
         $stmt->execute();
     }
 
+    /** The workspace's slug, for its chat link and webhook address. */
+    public function workspaceSlug(int $tenantId): ?string
+    {
+        $stmt = $this->db->prepare('SELECT slug FROM tenants WHERE id = :tid');
+        $stmt->execute([':tid' => $tenantId]);
+        $slug = $stmt->fetchColumn();
+
+        return is_string($slug) && $slug !== '' ? $slug : null;
+    }
+
     /** Make a new inbound secret, replacing any old one. Returned once; only the ciphertext is kept. */
     public function rotateInboundSecret(int $tenantId): string
     {

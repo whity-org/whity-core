@@ -95,7 +95,12 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
         title: row.item.title,
         from: row.item.subtitle ?? '',
         waited: dates.relative(row.at, ageLabels),
-        href: meta === null ? undefined : routingHref(meta),
+        href:
+          row.item.resource_type === 'conversation' && row.item.resource_id
+            ? `/admin/messages?c=${encodeURIComponent(row.item.resource_id)}`
+            : meta === null
+              ? undefined
+              : routingHref(meta),
       }];
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
