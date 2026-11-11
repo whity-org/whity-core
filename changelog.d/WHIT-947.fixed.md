@@ -1,0 +1,2 @@
+- **Free times stay on the hour grid.** When the minimum notice ended part-way through a slot, the booking page offered odd times such as 11:47; it now offers 12:00, 12:15 and so on (WHIT-947).
+- **A mistyped booking link says it is invalid.** It answered "Authentication required" before; now it gets the same "invalid or expired" answer as an old link (WHIT-947).

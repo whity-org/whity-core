@@ -27,7 +27,14 @@ final class OutgoingEmail
         public readonly ?string $inReplyTo = null,
         public readonly array $references = [],
         public readonly ?string $replyTo = null,
+        /** @var list<MailAttachment> Files sent with it (WHIT-947), such as a booking's .ics. */
+        public readonly array $attachments = [],
     ) {
+        foreach ($attachments as $attachment) {
+            if (!$attachment instanceof MailAttachment) { // @phpstan-ignore instanceof.alwaysTrue
+                throw new MailException('An attachment must be a MailAttachment');
+            }
+        }
         // The subject and display name are encoded by the transport as they always were.
         foreach ([$to, $messageId, $inReplyTo, $replyTo, ...$references] as $value) {
             if ($value !== null && strpbrk($value, "\r\n") !== false) {

@@ -1,0 +1,1 @@
+- **Booking confirmations carry the booking as a calendar file.** The confirmation and the email after a move attach `booking.ics`, so the customer adds it to their calendar in one tap; a move replaces the earlier entry instead of adding a second. Emails can now carry attachments in general (`OutgoingEmail::$attachments`, sent as multipart/mixed) (WHIT-947).

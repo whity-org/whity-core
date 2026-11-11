@@ -191,7 +191,7 @@ final class PublicBookingApiHandler
             }
 
             if ($this->bookingRows->openForEmail($tenantId, $email, $this->booking->now()) >= self::OPEN_PER_EMAIL_MAX) {
-                return Response::error('You already have several bookings coming up here. Cancel one first, or contact the business.', 422, ['field' => 'email']);
+                return Response::error('You already have several bookings coming up here. Cancel one first, or contact the business.', 422, ['field' => 'email', 'code' => 'too_many_open_bookings']);
             }
 
             $booking = $this->booking->book($tenantId, [

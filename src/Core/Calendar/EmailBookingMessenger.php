@@ -10,7 +10,10 @@ use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Mail\EmailBranding;
 use Whity\Core\Mail\EmailContent;
 use Whity\Core\Mail\EmailLayout;
+use Whity\Core\Mail\MailAttachment;
 use Whity\Core\Mail\Mailer;
+use Whity\Core\Mail\OutgoingEmail;
+use Whity\Core\Mail\ThreadedMailer;
 use Whity\Core\Money\Currency;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
@@ -20,9 +23,10 @@ use Whity\Core\Settings\SettingsService;
  * move, cancellation and the reminder, in the workspace's language (English
  * or Arabic), with times in the workspace's zone named in the text.
  *
- * Until the core messages API carries attachments (ADR 0016), this sends
- * through the Mailer; the confirmation's `.ics` is offered as a link to the
- * manage page, which serves it, rather than attached.
+ * Sends through the Mailer. The confirmation and the move carry the booking
+ * as an `.ics` attachment when the mailer can send one ({@see ThreadedMailer},
+ * WHIT-947); a mailer that cannot sends the same email without it, and the
+ * manage page still serves the file.
  *
  * A booking with no email address gets nothing. Delivery failures are
  * logged and never thrown.
@@ -127,10 +131,51 @@ final class EmailBookingMessenger implements BookingMessenger
                 return;
             }
             $customer = is_array($booking['customer'] ?? null) ? $booking['customer'] : [];
-            $this->mailer->send((string) ($customer['email'] ?? ''), $message['subject'], $message['text'], $message['html']);
+            $to = (string) ($customer['email'] ?? '');
+            $ics = in_array($kind, ['confirmed', 'rescheduled'], true) ? $this->icsFor($tenantId, $booking) : null;
+            if ($ics !== null && $this->mailer instanceof ThreadedMailer) {
+                $this->mailer->sendThreaded(new OutgoingEmail(
+                    $to,
+                    $message['subject'],
+                    $message['text'],
+                    $message['html'],
+                    attachments: [new MailAttachment('booking.ics', 'text/calendar; charset=utf-8; method=PUBLISH', $ics)],
+                ));
+
+                return;
+            }
+            $this->mailer->send($to, $message['subject'], $message['text'], $message['html']);
         } catch (\Throwable $e) {
             $this->logger?->warning('[calendar] could not send a booking email', ['kind' => $kind, 'booking' => $booking['id'] ?? null, 'error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * The booking as iCalendar. The UID is the same one the manage page's
+     * .ics uses, so a moved booking replaces the earlier one in the customer's
+     * calendar instead of adding a second.
+     *
+     * @param array<string, mixed> $booking
+     */
+    public function icsFor(int $tenantId, array $booking): ?string
+    {
+        $start = Interval::fromApi($booking['starts_at'] ?? null);
+        $end = Interval::fromApi($booking['ends_at'] ?? null);
+        if ($start === null || $end === null || !is_int($booking['id'] ?? null)) {
+            return null;
+        }
+        $service = is_array($booking['service'] ?? null) ? $booking['service'] : [];
+        $name = self::label(is_array($service['name'] ?? null) ? $service['name'] : [], false);
+        $workspace = $this->tenants->findNameById($tenantId) ?? '';
+
+        return Ics::calendar([[
+            'uid' => 'booking-' . $booking['id'] . '-' . $tenantId . '@whity',
+            'start' => $start,
+            'end' => $end,
+            'summary' => trim($name . ($workspace !== '' ? ' · ' . $workspace : '')),
+            'description' => is_string($booking['staff_name'] ?? null) ? $booking['staff_name'] : '',
+            'sequence' => time(),
+        ]]);
     }
 
     /** @param array<string, mixed> $label */
@@ -184,7 +229,7 @@ final class EmailBookingMessenger implements BookingMessenger
         'line.price' => 'Price: %s',
         'line.where' => 'At: %s',
         'cta' => 'Move or cancel',
-        'footnote' => 'The link works until the booking starts. It also lets you add the booking to your calendar.',
+        'footnote' => 'The link works until the booking starts. The booking is attached as a calendar file, and the link offers it too.',
     ];
 
     private const AR = [
@@ -201,6 +246,6 @@ final class EmailBookingMessenger implements BookingMessenger
         'line.price' => 'السعر: %s',
         'line.where' => 'لدى: %s',
         'cta' => 'تغيير الموعد أو الإلغاء',
-        'footnote' => 'يعمل الرابط حتى بدء الموعد، ويمكنك منه إضافة الحجز إلى تقويمك.',
+        'footnote' => 'يعمل الرابط حتى بدء الموعد. الحجز مرفق بملف تقويم، ويمكنك تنزيله من الرابط أيضاً.',
     ];
 }

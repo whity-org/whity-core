@@ -34,6 +34,7 @@ final class LogMailer implements Mailer, ThreadedMailer
             'message_id'  => $email->messageId,
             'in_reply_to' => $email->inReplyTo,
             'reply_to'    => $email->replyTo,
+            'attachments' => array_map(static fn (MailAttachment $a): string => $a->filename, $email->attachments),
         ]);
     }
 
