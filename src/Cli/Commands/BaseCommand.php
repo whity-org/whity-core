@@ -657,12 +657,12 @@ abstract class BaseCommand implements CliCommand, CommandHelp
             )
         );
         $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
-        $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
         // Plugins' inbox sources and message channels (SDK 1.97), as in public/index.php.
         $messageChannelRegistry = new \Whity\Core\Messaging\MessageChannelRegistry();
         \Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannelRegistry);
         $pluginLoader->setInboxSources($inboxSourceRegistry);
         $pluginLoader->setMessageChannels($messageChannelRegistry);
+        $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
         $pluginLoader->load();
 
 
