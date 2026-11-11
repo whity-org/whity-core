@@ -427,7 +427,7 @@ final class CalendarApiHandler
         } catch (CalendarRejectedException $e) {
             return Response::error($e->clientMessage, $e->status, $e->extra);
         } catch (FormRejectedException $e) {
-            return Response::error($e->getMessage(), 422);
+            return Response::error($e->clientMessage, 422);
         } catch (\Throwable $e) {
             error_log('[CalendarApiHandler] ' . $area . ' failed: ' . $e->getMessage());
 
