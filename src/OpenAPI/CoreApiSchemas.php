@@ -151,6 +151,7 @@ final class CoreApiSchemas
             self::documentRoutingRoutes(),
             self::documentQrRoutes(),
             self::meInboxRoutes(),
+            self::messagingRoutes(),
             self::searchRoutes(),
             self::agentProposalRoutes(),
             self::agentRoutes(),
@@ -6610,6 +6611,144 @@ final class CoreApiSchemas
                 'pagination' => SchemaBuilder::ref('Pagination'),
                 'source' => self::str(),
             ], ['data', 'pagination', 'source']),
+
+            // -- Messages (ADR 0016, WHIT-938) ------------------------------------
+            // People are id and name, never a bare id.
+            'MessagingPerson' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']),
+            'MessagingConversation' => self::object([
+                'id' => self::int(),
+                'channel' => self::str(),
+                'subject' => self::str(true),
+                'status' => ['type' => 'string', 'enum' => ['open', 'pending', 'closed']],
+                'contact' => self::object(['name' => self::str(true), 'address' => self::str()], ['address']),
+                'customer' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('MessagingPerson')]],
+                'assignee' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('MessagingPerson')]],
+                'last_message_at' => self::str(),
+                'last_inbound_at' => self::str(true),
+                'preview' => self::str(true),
+                'created_at' => self::str(),
+                'closed_at' => self::str(true),
+            ], ['id', 'channel', 'status', 'contact', 'last_message_at']),
+            'MessagingMessage' => self::object([
+                'id' => self::int(),
+                'conversation_id' => self::int(),
+                'kind' => ['type' => 'string', 'enum' => ['inbound', 'outbound', 'note']],
+                'body' => self::str(),
+                'has_html' => self::bool(),
+                'author' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('MessagingPerson')]],
+                'by_agent' => self::bool(),
+                'source' => self::str(true),
+                'status' => ['type' => 'string', 'enum' => ['received', 'queued', 'sent', 'delivered', 'read', 'failed', 'cancelled', 'noted']],
+                'status_detail' => self::str(true),
+                'attachments_not_shown' => self::int(),
+                // Set while an agent's reply is held; it can be cancelled until then.
+                'send_after' => self::str(true),
+                'sent_at' => self::str(true),
+                'created_at' => self::str(),
+            ], ['id', 'conversation_id', 'kind', 'body', 'status', 'created_at']),
+            'MessagingConversationListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingConversation')],
+                'next_cursor' => self::str(true),
+                'total' => self::int(),
+                'counts' => self::object(['open' => self::int(), 'pending' => self::int(), 'closed' => self::int()], []),
+            ], ['data', 'next_cursor', 'total']),
+            'MessagingConversationDetailResponse' => self::dataEnvelope([
+                'allOf' => [
+                    SchemaBuilder::ref('MessagingConversation'),
+                    self::object(['messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingMessage')]], ['messages']),
+                ],
+            ]),
+            'MessagingConversationResponse' => self::dataEnvelope(SchemaBuilder::ref('MessagingConversation')),
+            'MessagingMessageResponse' => self::dataEnvelope(SchemaBuilder::ref('MessagingMessage')),
+            'MessagingStartRequest' => self::object([
+                'to' => self::str() + ['description' => 'The address to write to: an email address for the email channel.'],
+                'name' => self::str() + ['description' => 'Their name, if known.'],
+                'subject' => self::str() + ['description' => 'The subject line, for email.'],
+                'body' => self::str() + ['description' => 'The message, in plain text.'],
+                'channel' => self::str() + ['description' => 'email (the default), webchat, or a plugin channel from GET /api/messages/channels.'],
+            ], ['to', 'body']),
+            'MessagingBodyRequest' => self::object([
+                'body' => self::str() + ['description' => 'The text, in plain words. Replies go to the customer; notes stay inside the workspace.'],
+            ], ['body']),
+            'MessagingUpdateRequest' => self::object([
+                'status' => ['type' => 'string', 'enum' => ['open', 'pending', 'closed'], 'description' => 'open, pending (waiting for the customer) or closed.'],
+                'assigned_profile_id' => self::int(true) + ['description' => 'The staff member to assign it to (a user id from GET /api/users), or null to unassign.'],
+            ], []),
+            'MessagingChannelListResponse' => self::dataEnvelope(['type' => 'array', 'items' => self::object([
+                'key' => self::str(),
+                'label' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                'origin' => self::str(),
+                'enabled' => self::bool(),
+                'capabilities' => ['type' => 'object', 'additionalProperties' => true],
+            ], ['key', 'label', 'origin', 'enabled'])]),
+            'MessagingSettings' => self::object([
+                'webchat_enabled' => self::bool(),
+                'webchat_greeting' => self::str(true),
+                'inbound_email_address' => self::str(true),
+                'has_inbound_secret' => self::bool(),
+                'updated_at' => self::str(true),
+            ], ['webchat_enabled', 'has_inbound_secret']),
+            'MessagingSettingsResponse' => self::dataEnvelope(SchemaBuilder::ref('MessagingSettings')),
+            'MessagingSettingsUpdateRequest' => self::object([
+                'webchat_enabled' => self::bool() + ['description' => 'Whether visitors and customers can chat with the workspace.'],
+                'webchat_greeting' => self::str(true) + ['description' => 'The first line the chat box shows, at most 500 characters.'],
+                'inbound_email_address' => self::str(true) + ['description' => 'The address replies from customers come back to; its forwarder posts to the inbound webhook.'],
+            ], []),
+            'MessagingSecretResponse' => self::dataEnvelope(self::object([
+                'secret' => self::str(),
+                'header' => self::str(),
+                'algorithm' => self::str(),
+            ], ['secret', 'header', 'algorithm'])),
+            // What a customer or visitor sees: no notes, nothing held, no internal status.
+            'CustomerMessage' => self::object([
+                'id' => self::int(),
+                'from' => ['type' => 'string', 'enum' => ['you', 'workspace']],
+                'author_name' => self::str(true),
+                'body' => self::str(),
+                'created_at' => self::str(),
+            ], ['id', 'from', 'body', 'created_at']),
+            'CustomerMessageListResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CustomerMessage')]),
+            'CustomerMessageResponse' => self::dataEnvelope(['nullable' => true, 'allOf' => [SchemaBuilder::ref('CustomerMessage')]]),
+            'CustomerChatRequest' => self::object([
+                'message' => self::str(),
+                'name' => self::str(),
+                'email' => self::str(),
+                // Left empty by people. Anything here is treated as a bot.
+                'website' => self::str(),
+                'bot_token' => self::str(),
+            ], ['message']),
+            'PublicChatInfoResponse' => self::dataEnvelope(self::object([
+                'workspace_name' => self::str(),
+                'greeting' => self::str(true),
+                'max_length' => self::int(),
+                'bot_check' => ['type' => 'object', 'nullable' => true, 'properties' => [
+                    'provider' => self::str(),
+                    'site_key' => self::str(),
+                ]],
+            ], ['workspace_name', 'max_length'])),
+            'PublicChatStartResponse' => self::dataEnvelope(self::object([
+                'token' => self::str(),
+                'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('CustomerMessage')],
+            ], ['token', 'messages'])),
+            'MyConversationListResponse' => self::dataEnvelope(['type' => 'array', 'items' => self::object([
+                'id' => self::int(),
+                'channel' => self::str(),
+                'subject' => self::str(true),
+                'status' => self::str(),
+                'last_message_at' => self::str(),
+            ], ['id', 'channel', 'status', 'last_message_at'])]),
+            'MyConversationResponse' => self::dataEnvelope(self::object([
+                'id' => self::int(),
+                'channel' => self::str(),
+                'subject' => self::str(true),
+                'status' => self::str(),
+                'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('CustomerMessage')],
+            ], ['id', 'channel', 'status', 'messages'])),
+            'MyConversationStartResponse' => self::dataEnvelope(['type' => 'object', 'nullable' => true, 'properties' => [
+                'conversation_id' => self::int(),
+                'message' => SchemaBuilder::ref('CustomerMessage'),
+            ]]),
+            'InboundAcceptedResponse' => self::dataEnvelope(self::object(['accepted' => self::bool()], ['accepted'])),
             // One row of GET /api/me/waiting: an inbox item or an agent proposal.
             'WaitingRow' => self::object([
                 'key' => self::str(),
@@ -11713,6 +11852,273 @@ final class CoreApiSchemas
      * Workspace-controlled customer sign-up (WHIT-915): four public routes and
      * the workspace admin's five.
      *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function messagingRoutes(): array
+    {
+        $slug = [
+            'name' => 'workspace',
+            'in' => 'path',
+            'required' => true,
+            'description' => 'The workspace\'s slug. When the request\'s host names a workspace too, they must agree.',
+            'schema' => ['type' => 'string'],
+        ];
+        $notFound = [404 => self::errorResponse('Conversation not found')];
+        $refused = [422 => self::errorResponse('The message cannot be sent: empty, too long, the channel is off, or the address is not valid')];
+        // An agent's message is held for this long and can be cancelled meanwhile,
+        // so Allowed does not make a send irreversible (ADR 0016 §6).
+        $cancelHeld = ['undo' => [
+            'windowSeconds' => \Whity\Core\Messaging\MessagingService::AGENT_HOLD_SECONDS,
+            'operation' => 'post_api_messages_id_cancel',
+            'arguments' => ['id' => '/result/data/id'],
+        ]];
+
+        return [
+            self::permissionRoute('GET', '/api/messages/conversations', 'messages:read', [
+                'summary' => 'List conversations with customers',
+                'description' => 'Newest activity first, paged by `cursor`. Filter by `status`, `assignee` (a person\'s id, `me` or '
+                    . '`none`), `channel`, or `q` (searches names, addresses, subjects and message text).',
+                'tags' => ['messages'],
+                'parameters' => [
+                    self::queryParam('status', 'string', 'open, pending or closed'),
+                    self::queryParam('assignee', 'string', 'A person\'s id, me, or none'),
+                    self::queryParam('channel', 'string', 'email, webchat or a plugin channel'),
+                    self::queryParam('q', 'string', 'Search text'),
+                    self::queryParam('cursor', 'string', 'next_cursor from the previous page'),
+                    self::queryParam('limit', 'integer', 'Page size (default 30, max 100)'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('A page of conversations', 'MessagingConversationListResponse'),
+                    422 => self::errorResponse('The cursor is not one this endpoint returned'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/messages/conversations', 'messages:reply', [
+                'mcp' => $cancelHeld,
+                'summary' => 'Write to someone in a new conversation',
+                'description' => 'Email by default. Sent from a background job; an agent\'s message waits five minutes first and can be cancelled.',
+                'tags' => ['messages'],
+                'request' => 'MessagingStartRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The queued message', 'MessagingMessageResponse'),
+                ] + $refused + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/messages/conversations/{id:\d+}', 'messages:read', [
+                'summary' => 'Read a conversation and its messages, notes included',
+                'tags' => ['messages'],
+                'responses' => [
+                    200 => self::jsonResponse('The conversation and its messages, oldest first', 'MessagingConversationDetailResponse'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/messages/conversations/{id:\d+}', 'messages:manage', [
+                'summary' => 'Change a conversation\'s status or who it is assigned to',
+                'tags' => ['messages'],
+                'request' => 'MessagingUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The conversation', 'MessagingConversationResponse'),
+                    422 => self::errorResponse('Unknown status, or the person is not staff of this workspace'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/messages/conversations/{id:\d+}/replies', 'messages:reply', [
+                'mcp' => $cancelHeld,
+                'summary' => 'Reply to the customer in a conversation',
+                'description' => 'Sent on the conversation\'s channel from a background job. An agent\'s reply waits five minutes '
+                    . 'and can be cancelled in that time.',
+                'tags' => ['messages'],
+                'request' => 'MessagingBodyRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The queued reply', 'MessagingMessageResponse'),
+                ] + $refused + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/messages/conversations/{id:\d+}/notes', 'messages:reply', [
+                'summary' => 'Add an internal note to a conversation (never sent to the customer)',
+                'tags' => ['messages'],
+                'request' => 'MessagingBodyRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The note', 'MessagingMessageResponse'),
+                ] + $refused + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/messages/{id:\d+}/cancel', 'messages:reply', [
+                'summary' => 'Cancel a message that has not been sent yet',
+                'tags' => ['messages'],
+                'responses' => [
+                    200 => self::jsonResponse('The cancelled message', 'MessagingMessageResponse'),
+                    409 => self::errorResponse('The message has already been sent or does not exist'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/messages/channels', 'messages:read', [
+                'summary' => 'The channels messages can use, and whether each is on here',
+                'tags' => ['messages'],
+                'responses' => [200 => self::jsonResponse('Every channel', 'MessagingChannelListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/messages/settings', 'messages:manage', [
+                'summary' => 'Web chat and inbound email settings',
+                'tags' => ['messages'],
+                'responses' => [200 => self::jsonResponse('The settings', 'MessagingSettingsResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/messages/settings', 'messages:manage', [
+                'summary' => 'Turn web chat on or off and set the inbound email address',
+                'tags' => ['messages'],
+                'request' => 'MessagingSettingsUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The settings', 'MessagingSettingsResponse'),
+                    422 => self::errorResponse('A value is not valid'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/messages/settings/inbound-secret', 'messages:manage', [
+                // A secret is shown once, to a person, never to an agent.
+                'mcp' => ['expose' => false],
+                'summary' => 'Make a new inbound email secret (shown once)',
+                'tags' => ['messages'],
+                'responses' => [201 => self::jsonResponse('The new secret', 'MessagingSecretResponse')] + self::authErrors(),
+            ]),
+            [
+                'method' => 'GET',
+                'path' => '/api/me/messages',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The caller\'s own conversations with the workspace',
+                    'tags' => ['messages'],
+                    'responses' => [200 => self::jsonResponse('Their conversations', 'MyConversationListResponse')] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/messages',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Write to the workspace (continues the caller\'s open chat, or starts one)',
+                    'tags' => ['messages'],
+                    'request' => 'CustomerChatRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The message', 'MyConversationStartResponse'),
+                        404 => self::errorResponse('The workspace does not take messages here'),
+                    ] + $refused + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/messages/{id:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'One of the caller\'s own conversations',
+                    'tags' => ['messages'],
+                    'parameters' => [self::queryParam('after', 'integer', 'Only messages after this id')],
+                    'responses' => [200 => self::jsonResponse('The conversation', 'MyConversationResponse')] + $notFound + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/messages/{id:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Write in one of the caller\'s own conversations',
+                    'tags' => ['messages'],
+                    'request' => 'CustomerChatRequest',
+                    'responses' => [201 => self::jsonResponse('The message', 'CustomerMessageResponse')] + $notFound + $refused + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/public/chat/{workspace}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'What a workspace\'s chat box needs (public)',
+                    'description' => 'An unknown workspace and one with web chat off answer the same 404.',
+                    'tags' => ['messages'],
+                    'parameters' => [$slug],
+                    'responses' => [
+                        200 => self::jsonResponse('The chat box settings', 'PublicChatInfoResponse'),
+                        404 => self::errorResponse('Chat is not available here'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/public/chat/{workspace}/conversations',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Start a chat with a workspace (public); returns the chat\'s token once',
+                    'description' => 'Limited per address and per workspace, checked by the instance\'s bot check when one is set up, '
+                        . 'and at most three chats from one address a day.',
+                    'tags' => ['messages'],
+                    'parameters' => [$slug],
+                    'request' => 'CustomerChatRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The chat token and the first message', 'PublicChatStartResponse'),
+                        404 => self::errorResponse('Chat is not available here'),
+                        422 => self::errorResponse('Empty or too long, an invalid email, or a failed bot check'),
+                        429 => self::errorResponse('Too many chats or messages'),
+                        503 => self::errorResponse('The bot check could not be reached'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/public/chat/{workspace}/messages',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Write in a chat (public; `Authorization: Bearer <chat token>`)',
+                    'tags' => ['messages'],
+                    'parameters' => [$slug],
+                    'request' => 'CustomerChatRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The message', 'CustomerMessageResponse'),
+                        401 => self::errorResponse('The chat token is missing or unknown'),
+                        404 => self::errorResponse('Chat is not available here'),
+                        422 => self::errorResponse('Empty or too long'),
+                        429 => self::errorResponse('Too many messages'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/public/chat/{workspace}/messages',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Read a chat (public; `Authorization: Bearer <chat token>`)',
+                    'tags' => ['messages'],
+                    'parameters' => [$slug, self::queryParam('after', 'integer', 'Only messages after this id')],
+                    'responses' => [
+                        200 => self::jsonResponse('The chat\'s messages, oldest first', 'CustomerMessageListResponse'),
+                        401 => self::errorResponse('The chat token is missing or unknown'),
+                        404 => self::errorResponse('Chat is not available here'),
+                        429 => self::errorResponse('Too many requests'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/public/messages/inbound/{channel}/{workspace}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Where a provider delivers messages and delivery news for a channel (public)',
+                    'description' => 'The channel checks the provider\'s signature with the workspace\'s own secret. For core\'s '
+                        . '`email` channel: the raw RFC 822 message (or `{"raw": "..."}`) with `X-Whity-Signature: sha256=<hex '
+                        . 'HMAC-SHA256 of the body>`. Every request gets the same 202.',
+                    'tags' => ['messages'],
+                    'parameters' => [
+                        ['name' => 'channel', 'in' => 'path', 'required' => true, 'description' => 'email, or a plugin channel such as acme:whatsapp', 'schema' => ['type' => 'string']],
+                        $slug,
+                    ],
+                    'responses' => [
+                        202 => self::jsonResponse('Received', 'InboundAcceptedResponse'),
+                        429 => self::errorResponse('Too many requests'),
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /**
      * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
      */
     private static function customerSignupRoutes(): array

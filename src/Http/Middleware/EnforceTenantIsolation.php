@@ -362,6 +362,19 @@ class EnforceTenantIsolation
         '#^/api/v1/public/forms/[^/]+/uploads$#',
         '#^/api/v1/public/forms/[^/]+/submissions$#',
 
+        // Messages web chat (ADR 0016 §5). A visitor has no session; the workspace
+        // is the slug, checked against the host, and web chat must be on.
+        // PublicChatApiHandler throttles per address, per chat and per workspace
+        // before writing anything, and a chat's token reaches only that chat.
+        '#^/api/v1/public/chat/[a-z0-9-]+$#',
+        '#^/api/v1/public/chat/[a-z0-9-]+/conversations$#',
+        '#^/api/v1/public/chat/[a-z0-9-]+/messages$#',
+        // Providers delivering to a message channel (ADR 0016 §3). A provider
+        // cannot hold a session: the channel checks the provider's signature with
+        // the workspace's own secret before anything is read, and every answer is
+        // the same 202. Anchored to exactly the channel key and the slug.
+        '#^/api/v1/public/messages/inbound/[a-z][a-z0-9_]*(?::|%3A)?[a-z0-9_]*/[a-z0-9-]+$#',
+
         // What the page of a plugin's public form needs to show its bot check
         // (WHIT-906). The key in the path is the only thing it answers to.
         '#^/api/v1/public/plugin-forms/[^/]+$#',

@@ -127,6 +127,14 @@ final class TenantOwnedTables
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_service_staff' => '248_create_calendar_bookings.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
+        // Messages (ADR 0016, WHIT-938): conversations with customers, their
+        // messages, web chat visitors and the per-workspace settings. Every
+        // query binds tenant_id. The public chat and inbound webhook routes find
+        // the workspace from its slug first, then bind it like any other read.
+        'conversations' => '243_create_conversations_and_messages.php',
+        'messages' => '243_create_conversations_and_messages.php',
+        'webchat_visitors' => '245_create_webchat_and_messaging_settings.php',
+        'messaging_settings' => '245_create_webchat_and_messaging_settings.php',
 
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says

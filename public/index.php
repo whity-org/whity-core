@@ -5309,7 +5309,75 @@ $router->register('GET',  '/api/public/signup/confirm',               [$publicSi
 $router->register('POST', '/api/public/signup/confirm',               [$publicSignupHandler, 'confirm'], null);
 $router->register('GET',  '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'info'],    null);
 $router->register('POST', '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'request'], null);
-$workspaceSignupHandler = new \Whity\Api\WorkspaceSignupApiHandler(
+
+// MESSAGES (ADR 0016, WHIT-938): conversations with customers by email and web
+// chat, one send API for every core module (the calendar's reminders use it),
+// channels a store plugin can add, and outbound messages metered in warn mode.
+// Plugin channels join this registry when plugins load below.
+$messageChannelRegistry = new \Whity\Core\Messaging\MessageChannelRegistry();
+\Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannelRegistry);
+$messagingService = \Whity\Core\Messaging\CoreMessaging::build(
+    $db->getPdo(),
+    $messageChannelRegistry,
+    $mailer,
+    $secretStore,
+    static fn (string $name, array $payload, array $opts): ?int => $queueService->dispatch($name, $payload, $opts),
+    $planLimitMeters,
+    (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+);
+\Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messagingService);
+$jobsRegistry->register(
+    \Whity\Core\Messaging\Jobs\DeliverMessageJob::NAME,
+    new \Whity\Core\Messaging\Jobs\DeliverMessageJob(static fn (): \Whity\Core\Messaging\MessagingService => $messagingService),
+    false
+);
+$inboxSourceRegistry->registerCoreSource(
+    \Whity\Core\Messaging\MessagesInboxSource::KEY,
+    new \Whity\Core\Messaging\MessagesInboxSource($messagingService->conversations())
+);
+$messagingSettings = new \Whity\Core\Messaging\MessagingSettings($db->getPdo(), $secretStore);
+$messagesHandler = new \Whity\Api\MessagesApiHandler($messagingService, $messagingSettings);
+$router->register('GET',   '/api/messages/conversations',                 [$messagesHandler, 'list'],   null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_READ);
+$router->register('POST',  '/api/messages/conversations',                 [$messagesHandler, 'start'],  null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_REPLY);
+$router->register('GET',   '/api/messages/conversations/{id:\d+}',        [$messagesHandler, 'show'],   null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_READ);
+$router->register('PATCH', '/api/messages/conversations/{id:\d+}',        [$messagesHandler, 'update'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
+$router->register('POST',  '/api/messages/conversations/{id:\d+}/replies', [$messagesHandler, 'reply'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_REPLY);
+$router->register('POST',  '/api/messages/conversations/{id:\d+}/notes',  [$messagesHandler, 'note'],   null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_REPLY);
+$router->register('POST',  '/api/messages/{id:\d+}/cancel',               [$messagesHandler, 'cancel'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_REPLY);
+$router->register('GET',   '/api/messages/channels',                      [$messagesHandler, 'channels'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_READ);
+$router->register('GET',   '/api/messages/settings',                      [$messagesHandler, 'getSettings'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
+$router->register('PUT',   '/api/messages/settings',                      [$messagesHandler, 'putSettings'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
+$router->register('POST',  '/api/messages/settings/inbound-secret',       [$messagesHandler, 'rotateInboundSecret'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
+// A signed-in customer's own conversations: ownership is the check, like /api/me/forms.
+$meMessagesHandler = new \Whity\Api\MeMessagesApiHandler($messagingService);
+$router->register('GET',  '/api/me/messages',            [$meMessagesHandler, 'list'],  null);
+$router->register('POST', '/api/me/messages',            [$meMessagesHandler, 'start'], null);
+$router->register('GET',  '/api/me/messages/{id:\d+}',   [$meMessagesHandler, 'show'],  null);
+$router->register('POST', '/api/me/messages/{id:\d+}',   [$meMessagesHandler, 'send'],  null);
+// Public: web chat for visitors, and the providers' inbound webhook. Both find the
+// workspace from its slug; each path is listed in EnforceTenantIsolation one by one.
+$publicChatHandler = new \Whity\Api\PublicChatApiHandler(
+    $db->getPdo(),
+    $messagingService,
+    $messagingSettings,
+    $brandingHostRepo,
+    $hostResolver,
+    $publicFormBotCheck,
+    new DatabaseSharedStore($db->getPdo()),
+    hash('sha256', 'whity.webchat.ip|' . $jwtSecret),
+);
+$router->register('GET',  '/api/public/chat/{workspace}',               [$publicChatHandler, 'info'],  null);
+$router->register('POST', '/api/public/chat/{workspace}/conversations', [$publicChatHandler, 'start'], null);
+$router->register('POST', '/api/public/chat/{workspace}/messages',      [$publicChatHandler, 'send'],  null);
+$router->register('GET',  '/api/public/chat/{workspace}/messages',      [$publicChatHandler, 'poll'],  null);
+$inboundMessagesHandler = new \Whity\Api\InboundMessagesApiHandler(
+    $messagingService,
+    $brandingHostRepo,
+    new DatabaseSharedStore($db->getPdo()),
+);
+$router->register('POST', '/api/public/messages/inbound/{channel}/{workspace}', [$inboundMessagesHandler, 'receive'], null);
+
+$workspaceSignupHandler =new \Whity\Api\WorkspaceSignupApiHandler(
     $db->getPdo(),
     $roleChecker,
     $signupSettings,
@@ -5989,9 +6057,8 @@ $router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'prev
 $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
 // A plugin's billing portal goes into its slot (SDK 1.77, WHIT-1010).
 $pluginLoader->setBillingPortals($pluginBillingPortals);
-// Plugins' inbox sources and message channels (SDK 1.97, #881, ADR 0016).
-$messageChannelRegistry = new \Whity\Core\Messaging\MessageChannelRegistry();
-\Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannelRegistry);
+// Plugins' inbox sources and message channels (SDK 1.97, #881, ADR 0016). The
+// channel registry is built with Messages above, holding core's email and web chat.
 $pluginLoader->setInboxSources($inboxSourceRegistry);
 $pluginLoader->setMessageChannels($messageChannelRegistry);
 // WHIT-1011: plugin SERVICE routes accept a client-credentials token from the

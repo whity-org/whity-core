@@ -587,6 +587,22 @@
   "get_api_meetings_id": {
     "ar": "عرض اجتماع وجدول أعماله وقراراته"
   },
+  "get_api_messages_channels": {
+    "en": "See the channels messages can use",
+    "ar": "عرض قنوات الرسائل المتاحة"
+  },
+  "get_api_messages_conversations": {
+    "en": "List conversations with customers",
+    "ar": "عرض المحادثات مع العملاء"
+  },
+  "get_api_messages_conversations_id": {
+    "en": "Read a conversation",
+    "ar": "قراءة محادثة"
+  },
+  "get_api_messages_settings": {
+    "en": "See the web chat and inbound email settings",
+    "ar": "عرض إعدادات الدردشة والبريد الوارد"
+  },
   "get_api_migrations": {
     "en": "See database updates and whether they have run",
     "ar": "عرض تحديثات قاعدة البيانات وحالتها"
@@ -930,6 +946,10 @@
   "patch_api_languages_id": {
     "en": "Change a language's name or switch it on or off",
     "ar": "تعديل اسم لغة أو تشغيلها وإيقافها"
+  },
+  "patch_api_messages_conversations_id": {
+    "en": "Change a conversation's status or who it is assigned to",
+    "ar": "تغيير حالة المحادثة أو المسؤول عنها"
   },
   "patch_api_ou_types_id": {
     "en": "Rename or reorder a unit type",
@@ -1333,6 +1353,22 @@
     "en": "Set a meeting's date and place",
     "ar": "تحديد موعد اجتماع ومكانه"
   },
+  "post_api_messages_conversations": {
+    "en": "Write to someone in a new conversation",
+    "ar": "مراسلة شخص في محادثة جديدة"
+  },
+  "post_api_messages_conversations_id_notes": {
+    "en": "Add an internal note to a conversation",
+    "ar": "إضافة ملاحظة داخلية إلى محادثة"
+  },
+  "post_api_messages_conversations_id_replies": {
+    "en": "Reply to a customer",
+    "ar": "الرد على عميل"
+  },
+  "post_api_messages_id_cancel": {
+    "en": "Cancel a message that has not been sent yet",
+    "ar": "إلغاء رسالة لم تُرسل بعد"
+  },
   "post_api_ou_types": {
     "en": "Add a unit type, or adopt a built-in one",
     "ar": "إضافة نوع وحدة تنظيمية"
@@ -1561,6 +1597,10 @@
   },
   "put_api_meetings_id_attendance": {
     "ar": "تسجيل من حضر اجتماعًا"
+  },
+  "put_api_messages_settings": {
+    "en": "Change the web chat and inbound email settings",
+    "ar": "تغيير إعدادات الدردشة والبريد الوارد"
   },
   "put_api_notification_settings_channel": {
     "en": "Change how a notification channel sends messages",

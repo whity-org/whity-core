@@ -12,9 +12,14 @@ namespace Whity\Core\Mail;
  * while the mailer is Null means links are never delivered — configure a real
  * transport (`MAIL_TRANSPORT=log` at minimum) before enforcing.
  */
-final class NullMailer implements Mailer
+final class NullMailer implements Mailer, ThreadedMailer
 {
     public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
+    {
+        // Intentionally empty: no transport configured.
+    }
+
+    public function sendThreaded(OutgoingEmail $email): void
     {
         // Intentionally empty: no transport configured.
     }

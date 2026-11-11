@@ -31,6 +31,7 @@ final class PlanLimitsReport
     /** Metered limits read through the meter, in the order they are shown. */
     private const METERED = [
         EntitlementRegistry::AGENTS_RUNS_PER_MONTH,
+        EntitlementRegistry::MESSAGES_OUTBOUND_PER_MONTH,
         EntitlementRegistry::DOCUMENTS_RENDER_PER_DAY,
         EntitlementRegistry::DOCUMENTS_RENDER_PER_MONTH,
     ];
