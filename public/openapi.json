@@ -30292,6 +30292,117 @@
                 }
             }
         },
+        "/api/v1/me/inbox/merged": {
+            "get": {
+                "operationId": "get_api_v1_me_inbox_merged",
+                "summary": "Every inbox source's items awaiting the caller, as one list",
+                "tags": [
+                    "inbox"
+                ],
+                "description": "Urgent items first, then the newest. Paged by position: pass `next_cursor` back as `cursor`. A source that fails is named in `unavailable`; a source read past its scan limit is named in `truncated`.",
+                "parameters": [
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "required": false,
+                        "description": "The next_cursor of the previous page; omit for the first",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "Page size (default 25, max 100)",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "open",
+                        "in": "query",
+                        "required": false,
+                        "description": "Falsey to include the caller's history as well (default open-only)",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One page of the merged inbox",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MergedInboxResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "'cursor' is not one this endpoint returned",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/inbox/sources": {
             "get": {
                 "operationId": "get_api_v1_me_inbox_sources",
@@ -66436,6 +66547,9 @@
                     "meta": {
                         "type": "object",
                         "additionalProperties": true
+                    },
+                    "urgent": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
@@ -68781,6 +68895,54 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "MergedInboxResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/InboxItem"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "source": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "source"
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    "next_cursor": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "unavailable": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "truncated": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "data",
+                    "next_cursor",
+                    "unavailable",
+                    "truncated"
                 ]
             },
             "MigrationEntry": {

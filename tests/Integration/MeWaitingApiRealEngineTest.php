@@ -10,7 +10,7 @@ use RuntimeException;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Api\MeWaitingApiHandler;
 use Whity\Core\Agent\AgentProposalRepository;
-use Whity\Core\Inbox\InboxItem;
+use Whity\Sdk\Inbox\InboxItem;
 use Whity\Core\Inbox\InboxSourceInterface;
 use Whity\Core\Inbox\InboxSourceRegistry;
 use Whity\Core\Request;

@@ -1,8 +1,8 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.94.0",
+    "sdk_version": "1.97.0",
     "core_version": "0.2.28",
-    "updated": "2026-11-09",
+    "updated": "2026-11-11",
     "ratings": {
         "full": "A plugin can read, change, react to and extend this area through a published SDK contract.",
         "partial": "Some of it is in the SDK; the rest is missing or reachable only through internal core classes.",
@@ -512,15 +512,19 @@
                 {
                     "what": "inbox and timeline blocks for the plugin's own items",
                     "since": "1.31"
+                },
+                {
+                    "what": "Inbox source contract (InboxSource, KeysetInboxSource, PluginInboxSourcesInterface): plugin sources reach the merged inbox, urgent first then newest, paged by position",
+                    "since": "1.97"
                 }
             ],
             "missing": [
-                "An inbox source contract so plugin tasks reach Waiting for you",
                 "Acting on an inbox item from a plugin"
             ],
             "security": "Each source must answer only for the caller in the current workspace. The host has to enforce that rather than trust the source.",
             "issues": [
-                881
+                881,
+                1804
             ],
             "plan": "0.2.28"
         },
@@ -733,6 +737,27 @@
             ],
             "security": null,
             "plan": "0.2.27"
+        },
+        {
+            "id": "messaging",
+            "group": "platform",
+            "name": "Messages and channels",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "MessageChannel contract and PluginMessageChannelsInterface: add a channel such as WhatsApp or SMS (send, receive with the channel verifying the provider, delivery status, capabilities, templates)",
+                    "since": "1.97"
+                }
+            ],
+            "missing": [
+                "A host service for a plugin to read conversations or send through Messages",
+                "Messages events (received, sent, failed)"
+            ],
+            "security": "A channel must verify every inbound request itself and act only for the workspace it is called for. The host never parses provider payloads and namespaces every plugin channel.",
+            "issues": [
+                1803
+            ],
+            "plan": "0.2.28"
         },
         {
             "id": "i18n",

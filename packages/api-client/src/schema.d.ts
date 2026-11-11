@@ -4562,6 +4562,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/inbox/merged": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every inbox source's items awaiting the caller, as one list
+         * @description Urgent items first, then the newest. Paged by position: pass `next_cursor` back as `cursor`. A source that fails is named in `unavailable`; a source read past its scan limit is named in `truncated`.
+         */
+        get: operations["get_api_v1_me_inbox_merged"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/inbox/sources": {
         parameters: {
             query?: never;
@@ -11281,6 +11301,7 @@ export interface components {
             meta?: {
                 [key: string]: unknown;
             };
+            urgent?: boolean;
         };
         InboxItemListResponse: {
             data: components["schemas"]["InboxItem"][];
@@ -11906,6 +11927,14 @@ export interface components {
                 isPrimary: boolean;
                 created: boolean;
             };
+        };
+        MergedInboxResponse: {
+            data: (components["schemas"]["InboxItem"] & {
+                source: string;
+            })[];
+            next_cursor: string | null;
+            unavailable: string[];
+            truncated: string[];
         };
         MigrationEntry: {
             name: string;
@@ -38470,6 +38499,87 @@ export interface operations {
                 };
             };
             /** @description 'source' is missing or names no registered source */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_inbox_merged: {
+        parameters: {
+            query?: {
+                /** @description The next_cursor of the previous page; omit for the first */
+                cursor?: string;
+                /** @description Page size (default 25, max 100) */
+                limit?: number;
+                /** @description Falsey to include the caller's history as well (default open-only) */
+                open?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of the merged inbox */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergedInboxResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description 'cursor' is not one this endpoint returned */
             422: {
                 headers: {
                     [name: string]: unknown;

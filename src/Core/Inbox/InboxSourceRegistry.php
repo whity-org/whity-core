@@ -7,6 +7,7 @@ namespace Whity\Core\Inbox;
 use Whity\Core\Container\HostWiredService;
 use Whity\Core\RBAC\ResourceTypeRegistry;
 use Whity\Core\Support\SourceSlug;
+use Whity\Sdk\Inbox\InboxSource;
 
 /**
  * The catalogue of registered INBOX SOURCES (#881), and the reason routing's
@@ -25,48 +26,25 @@ use Whity\Core\Support\SourceSlug;
  * inbox is the odd one out, not the aggregate" — so the shape is borrowed rather
  * than invented.
  *
- * WHAT THIS DECIDES, AND WHAT IT POINTEDLY DOES NOT
- * ------------------------------------------------
- * #881 names three questions that only arise once sources are AGGREGATED, and
- * says each needs deciding before an aggregate ships:
+ * THE THREE QUESTIONS #881 LEFT OPEN, AND THEIR ANSWERS (ADR 0016)
+ * ----------------------------------------------------------------
+ *   1. Ordering across sources: {@see \Whity\Sdk\Inbox\InboxOrder}. Urgent
+ *      items first (a flag the source sets per item), then the newest.
+ *   2. Failure isolation: a source that throws is named as unavailable and the
+ *      rest is still served ({@see InboxAggregate}, and
+ *      {@see \Whity\Api\MeWaitingApiHandler} before it).
+ *   3. Pagination across sources: keyset, by {@see \Whity\Sdk\Inbox\InboxCursor},
+ *      in {@see InboxAggregate}; never page 1 of each source concatenated.
  *
- *   1. ordering across heterogeneous sources ("most urgent" is not "most
- *      recent");
- *   2. per-source failure isolation (one source being down must degrade to
- *      "this source is unavailable", not blank the aggregate);
- *   3. pagination across sources (concatenating page 1 of each is #867 one
- *      level up).
+ * `GET /api/me/inbox?source=…` still reads one source at a time and still
+ * requires `source`; the merged list is `GET /api/me/inbox/merged`.
  *
- * None of them is answered here, deliberately ({@see \Whity\Api\MeWaitingApiHandler}
- * answers them for the merged list, WHIT-872). This read surface is ONE SOURCE
- * AT A TIME (`GET /api/me/inbox?source=…`), and `source` is REQUIRED — an
- * unsourced request is a 422, not "core's only source", because answering it
- * would silently become wrong the day a second source registers, and the caller
- * would have no way to notice. That refusal is the honest placeholder for a
- * decision this PR is not entitled to make.
- *
- * What it does provide is the seam: when the aggregate lands it reads this
- * registry and this interface, and the sources themselves do not change.
- *
- * WHY THE PLUGIN-FACING HALF IS NOT HERE YET
- * ------------------------------------------
- * #881 names `PluginInboxSourcesInterface` as the other half, and it is
- * genuinely absent. {@see InboxSourceInterface} and {@see InboxItem} live in
- * `src/Core`, not in `sdk/`, so only core can contribute a source today.
- *
- * That is a deliberate ordering, not an oversight. A plugin contract has to be
- * published before plugins can implement it and cannot be quietly changed
- * afterwards — and question (1) above is precisely a question about this
- * interface: source-declared ranking is the likely answer, which means an extra
- * method. Publishing the contract now would mean publishing one #881 then has to
- * break, in an SDK that is vendored into every plugin and version-pinned
- * (scripts/ci-sdk-version-collision.php). Registering core's own source against
- * a core-only registry proves the shape without asking anybody to build on it.
- *
- * Promoting it later is a move, not a redesign: the two types go to
- * `Whity\Sdk\Inbox`, this class gains a namespacing {@see register()} beside
- * {@see registerCoreSource()}, and the plugin loader gains the same
- * optional-interface block every other contribution point already has.
+ * THE PLUGIN-FACING HALF (SDK 1.97)
+ * ---------------------------------
+ * The contract moved to `Whity\Sdk\Inbox` once question 1 was answered, so it
+ * did not have to be published and then broken. Plugins register through
+ * {@see register()}, under `<plugin>:<key>`, from the loader's
+ * {@see \Whity\Sdk\PluginInboxSourcesInterface} block.
  *
  * {@see HostWiredService}: an improvised, empty instance would report the
  * caller's inbox as EMPTY rather than as unavailable — and "no items" is the
@@ -100,7 +78,7 @@ final class InboxSourceRegistry implements HostWiredService
     /**
      * Registered sources, keyed by canonical key.
      *
-     * @var array<string, InboxSourceInterface>
+     * @var array<string, InboxSource>
      */
     private array $sources = [];
 
@@ -122,7 +100,7 @@ final class InboxSourceRegistry implements HostWiredService
      *
      * @throws InvalidInboxSourceException On a malformed or duplicate key.
      */
-    public function registerCoreSource(string $key, InboxSourceInterface $source): void
+    public function registerCoreSource(string $key, InboxSource $source): void
     {
         if (!self::isValidSlug($key)) {
             throw InvalidInboxSourceException::forSlug($key);
@@ -141,9 +119,50 @@ final class InboxSourceRegistry implements HostWiredService
      * Null is what turns an unknown `?source=` into a 422 naming the registered
      * keys, rather than an empty list that reads as "you have no items".
      */
-    public function get(string $key): ?InboxSourceInterface
+    public function get(string $key): ?InboxSource
     {
         return $this->sources[$key] ?? null;
+    }
+
+    /**
+     * Register a plugin's sources under `<plugin>:<key>` (SDK 1.97, #881).
+     *
+     * Attributed by the plugin's own name, passed by the loader, never by
+     * anything the plugin returns. The whole batch is checked before any of it
+     * is stored. A plugin registering again (a reload) replaces its own keys;
+     * it can never take another source's key, because the prefix is its own.
+     *
+     * @param array<mixed, mixed> $sources bare key => {@see InboxSource}
+     *
+     * @throws InvalidInboxSourceException On a malformed key, a non-source, or
+     *                                     a plugin calling itself core.
+     */
+    public function register(string $pluginName, array $sources): void
+    {
+        if ($pluginName === self::CORE_SOURCE || SourceSlug::from($pluginName) === null) {
+            throw InvalidInboxSourceException::forSlug($pluginName);
+        }
+
+        $batch = [];
+        foreach ($sources as $key => $source) {
+            if (!is_string($key) || !self::isValidSlug($key)) {
+                throw InvalidInboxSourceException::forSlug(is_string($key) ? $key : (string) $key);
+            }
+            if (!$source instanceof InboxSource) {
+                throw InvalidInboxSourceException::forSlug($key);
+            }
+            $batch[self::canonicalKey($pluginName, $key)] = $source;
+        }
+
+        foreach ($this->originByKey as $key => $origin) {
+            if ($origin === $pluginName) {
+                unset($this->sources[$key], $this->originByKey[$key]);
+            }
+        }
+        foreach ($batch as $key => $source) {
+            $this->sources[$key] = $source;
+            $this->originByKey[$key] = $pluginName;
+        }
     }
 
     public function has(string $key): bool
@@ -222,9 +241,8 @@ final class InboxSourceRegistry implements HostWiredService
     /**
      * The canonical key a source's bare slug resolves to.
      *
-     * Present now, unused until the plugin-facing half lands, so that the
-     * namespacing rule is stated in the same place as every other registry's
-     * rather than being invented under time pressure later.
+     * Used by {@see register()} since SDK 1.97, and stated here beside every
+     * other registry's rule so the catalogues spell a plugin's keys one way.
      */
     public static function canonicalKey(string $origin, string $slug): string
     {

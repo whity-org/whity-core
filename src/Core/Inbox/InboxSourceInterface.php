@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Inbox;
 
+use Whity\Sdk\Inbox\InboxSource;
+
 /**
  * One contributor of items to the caller's inbox (#881).
  *
@@ -24,20 +26,13 @@ namespace Whity\Core\Inbox;
  * surfaces would be the same mistake as two audit trails." So routing's
  * recipients register HERE, as core's first source.
  *
- * WHAT THIS DELIBERATELY DOES NOT DECIDE
- * --------------------------------------
- * #881 names three questions a single-source list does not have to answer, and
- * says they need deciding before an aggregate ships: ordering across
- * heterogeneous sources, per-source failure isolation, and pagination across
- * sources (which is #867 one level up). None of them is answered here, and that
- * is deliberate — this PR would be deciding them by accident.
- *
- * What it provides is the SEAM: a registered, namespaced source with a paginated
- * read and a count, addressed one source at a time
- * (`GET /api/me/inbox?source=…`). When the aggregate lands it reads this same
- * registry and this same interface; the source does not change. That is exactly
- * the "cheap hedge" #881 describes, made real on the server rather than left as
- * a convention each team follows differently.
+ * WHAT WAS LEFT OPEN, AND IS NOW DECIDED
+ * ---------------------------------------
+ * #881 named three questions a single-source list does not have to answer:
+ * ordering across sources, per-source failure isolation, and pagination across
+ * sources. This seam shipped first without deciding them. ADR 0016 decides
+ * them: {@see \Whity\Sdk\Inbox\InboxOrder}, a failing source reported as
+ * unavailable, and keyset paging in {@see InboxAggregate}.
  *
  * SELF-SCOPED, ALWAYS
  * -------------------
@@ -46,6 +41,13 @@ namespace Whity\Core\Inbox;
  * because an inbox is by definition the caller's own — the same posture
  * `/api/me/notifications` and `/api/me/sessions` take, and the reason the
  * endpoint needs no RBAC permission.
+ *
+ * SDK 1.97 PUBLISHED THE CONTRACT
+ * -------------------------------
+ * The methods now live on {@see InboxSource} in the SDK so plugins can supply
+ * sources too (ADR 0016 decides the order and paging #881 left open: see
+ * {@see \Whity\Sdk\Inbox\InboxOrder}). This interface stays as core's name
+ * for the same contract, so core sources need not change.
  *
  * WHY THE NOTIFICATION INBOX IS NOT A SOURCE
  * ------------------------------------------
@@ -58,32 +60,6 @@ namespace Whity\Core\Inbox;
  * merely happened. Folding it in would also silently change the contract of an
  * endpoint clients already consume.
  */
-interface InboxSourceInterface
+interface InboxSourceInterface extends InboxSource
 {
-    /**
-     * A short human name for the source, shown wherever items are grouped or
-     * filtered by origin.
-     */
-    public function label(): string;
-
-    /**
-     * A page of the caller's items, newest first.
-     *
-     * @param bool $openOnly When true (the ordinary inbox), only items still
-     *        awaiting the caller. When false, their history too — a source that
-     *        has no notion of a closed item may ignore this and return the same
-     *        rows either way.
-     *
-     * @return list<InboxItem>
-     */
-    public function list(int $tenantId, int $profileId, bool $openOnly, int $limit, int $offset): array;
-
-    /**
-     * How many items the same predicate as {@see list()} matches.
-     *
-     * Must be the real total rather than the size of the returned page: a
-     * post-filtered count is a total the caller cannot reach, which is the
-     * defect every list surface in this codebase records having paid for once.
-     */
-    public function count(int $tenantId, int $profileId, bool $openOnly): int;
 }

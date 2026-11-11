@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Whity\Core\Inbox;
+namespace Whity\Sdk\Inbox;
 
 /**
  * One item awaiting somebody, in the shape the `inbox` block already declares
@@ -29,7 +29,7 @@ namespace Whity\Core\Inbox;
  * ------------------------------
  * For the document-routing source it is the ACTION of the trail event that put
  * the item in the inbox, read through a foreign key rather than stored beside it
- * — see {@see \Whity\Core\Document\Routing\RouteRecipientRepository}. The block
+ * (core's routing recipients repository). The block
  * prop is called `statusField` because a block needs a word for "the short
  * qualifier line"; nothing about it obliges a source to keep a status column,
  * and this one deliberately does not.
@@ -40,6 +40,13 @@ namespace Whity\Core\Inbox;
  * to see it. A URL baked in here would be a web route in a payload the desktop
  * host also consumes. `resourceType` + `id` is what a client resolves a
  * destination from, exactly as the block's own `actions` already do.
+ *
+ * MOVED TO THE SDK IN 1.97 (#881)
+ * --------------------------------
+ * A plugin's own inbox source builds these, so the type is part of the plugin
+ * contract. `urgent` is new: the cross-source order puts urgent items first and
+ * then the newest ({@see InboxOrder}). Recency alone is the wrong answer for an
+ * approval that is due, and only the source knows which of its items are.
  *
  * Immutable value object.
  */
@@ -69,6 +76,9 @@ final class InboxItem
      *                                  must not depend on. Never load-bearing for the
      *                                  aggregate: anything the aggregate needs is a
      *                                  named field above.
+     * @param bool $urgent              Shown before every item that is not, across all
+     *                                  sources. Default false: most items are ordered
+     *                                  by when they arrived.
      */
     public function __construct(
         public readonly string $id,
@@ -80,6 +90,7 @@ final class InboxItem
         public readonly ?string $resourceId,
         public readonly array $meta = [],
         public readonly ?array $sender = null,
+        public readonly bool $urgent = false,
     ) {
     }
 
@@ -104,6 +115,7 @@ final class InboxItem
             'resource_id' => $this->resourceId,
             'sender' => $this->sender,
             'meta' => $this->meta,
+            'urgent' => $this->urgent,
         ];
     }
 }

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.94).
+ * SDK identity (v1.97).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1200,12 +1200,23 @@ namespace Whity\Sdk;
  * `document.issuing` and `document.issued` with `origin: route` (WHIT-923).
  *
  * Purely additive.)
+ *
+ * 1.97 (MESSAGES AND INBOX SOURCES, ADR 0016: {@see Messaging\MessageChannel} and
+ * {@see PluginMessageChannelsInterface} let a plugin add a channel such as WhatsApp or SMS:
+ * send, receive (the channel verifies the provider), delivery status, capabilities and
+ * templates. The host namespaces it `<plugin>:<key>`, meters it and isolates its failures.
+ * {@see Inbox\InboxSource}, {@see Inbox\KeysetInboxSource} and
+ * {@see PluginInboxSourcesInterface} let a plugin's items reach the merged inbox, ordered by
+ * {@see Inbox\InboxOrder} (urgent first, then newest) and paged by {@see Inbox\InboxCursor}.
+ * {@see Inbox\InboxItem} moved here from core and gained `urgent` (#881, WHIT-937).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.94.0';
+    public const VERSION = '1.97.0';
 
     /**
      * Static identity only — never instantiated.

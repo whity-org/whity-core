@@ -4571,6 +4571,8 @@ $meInboxHandler = new \Whity\Api\MeInboxApiHandler($tokenValidator, $inboxSource
 // already names exactly one person.
 $router->register('GET', '/api/me/inbox/sources', [$meInboxHandler, 'sources'], null);
 $router->register('GET', '/api/me/inbox',         [$meInboxHandler, 'list'],    null);
+// #881, ADR 0016: every source as one list, urgent first then newest, keyset-paged.
+$router->register('GET', '/api/me/inbox/merged',  [$meInboxHandler, 'merged'],  null);
 
 // WHIT-783: one search across documents, forms, people, units and plugin
 // records that opted in, for the "search records" MCP tool and ⌘K. Session-
@@ -5888,6 +5890,11 @@ $router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'prev
 $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
 // A plugin's billing portal goes into its slot (SDK 1.77, WHIT-1010).
 $pluginLoader->setBillingPortals($pluginBillingPortals);
+// Plugins' inbox sources and message channels (SDK 1.97, #881, ADR 0016).
+$messageChannelRegistry = new \Whity\Core\Messaging\MessageChannelRegistry();
+\Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannelRegistry);
+$pluginLoader->setInboxSources($inboxSourceRegistry);
+$pluginLoader->setMessageChannels($messageChannelRegistry);
 // WHIT-1011: plugin SERVICE routes accept a client-credentials token from the
 // trusted issuer (SERVICE_TOKEN_ISSUER, else MCP_OAUTH_ISSUER) for a client on
 // SERVICE_TOKEN_CLIENTS. Off, so no service route opens, until both are set.
