@@ -23,6 +23,8 @@ use Whity\Core\Calendar\ServiceRepository;
 use Whity\Core\Http\HttpFetcher;
 use Whity\Core\Mail\EmailLayout;
 use Whity\Core\Mail\Mailer;
+use Whity\Core\Mail\OutgoingEmail;
+use Whity\Core\Mail\ThreadedMailer;
 use Whity\Core\Plugin\PublicForm\BotCheck;
 use Whity\Core\Queue\JobRepository;
 use Whity\Core\Queue\QueueService;
@@ -263,6 +265,41 @@ final class PublicBookingRealEngineTest extends TestCase
         $second = $this->feed->issue(1, 11);
         self::assertSame(404, $this->handler->feed(self::request('GET', '/x'), ['token' => $first . '.ics'])->getStatusCode());
         self::assertSame(200, $this->handler->feed(self::request('GET', '/x'), ['token' => $second . '.ics'])->getStatusCode());
+    }
+
+    public function testTheConfirmationCarriesTheBookingAsAnIcsAttachment(): void
+    {
+        $captured = [];
+        $mailer = new class (static function (OutgoingEmail $email) use (&$captured): void {
+            $captured[] = $email;
+        }) implements Mailer, ThreadedMailer {
+            public function __construct(private readonly \Closure $record)
+            {
+            }
+
+            public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
+            {
+                ($this->record)(new OutgoingEmail($toEmail, $subject, $textBody, $htmlBody));
+            }
+
+            public function sendThreaded(OutgoingEmail $email): void
+            {
+                ($this->record)($email);
+            }
+        };
+        $this->service->setMessenger(new EmailBookingMessenger($mailer, new EmailLayout(), $this->settings, new TenantHostRepository($this->pdo), 'https://app.example.com/booking'));
+
+        $made = self::data($this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']))['data'];
+        self::assertCount(1, $captured);
+        self::assertCount(1, $captured[0]->attachments);
+        $ics = $captured[0]->attachments[0];
+        self::assertSame('booking.ics', $ics->filename);
+        self::assertStringContainsString('DTSTART:20261116T070000Z', $ics->content);
+        self::assertStringContainsString('UID:booking-' . $made['id'] . '-1@whity', $ics->content);
+
+        // A reminder carries no file.
+        $this->service->cancel(1, (int) $made['id'], 'staff', '');
+        self::assertSame([], $captured[1]->attachments);
     }
 
     public function testTheReminderIsQueuedSentOnceAndSkippedAfterAMove(): void

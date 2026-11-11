@@ -37,17 +37,20 @@ final class SmtpMailer implements Mailer, ThreadedMailer
 
     public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
     {
-        $this->deliver($toEmail, $subject, $textBody, $htmlBody, null, []);
+        $this->deliver($toEmail, $subject, $textBody, $htmlBody, null, [], []);
     }
 
     /** Messages (ADR 0016): the same dialogue, with the conversation's headers. */
     public function sendThreaded(OutgoingEmail $email): void
     {
-        $this->deliver($email->to, $email->subject, $email->textBody, $email->htmlBody, $email->fromName, $email->extraHeaders());
+        $this->deliver($email->to, $email->subject, $email->textBody, $email->htmlBody, $email->fromName, $email->extraHeaders(), $email->attachments);
     }
 
-    /** @param list<string> $extraHeaders already checked for line breaks by {@see OutgoingEmail} */
-    private function deliver(string $toEmail, string $subject, string $textBody, ?string $htmlBody, ?string $fromName, array $extraHeaders): void
+    /**
+     * @param list<string> $extraHeaders already checked for line breaks by {@see OutgoingEmail}
+     * @param list<MailAttachment> $attachments
+     */
+    private function deliver(string $toEmail, string $subject, string $textBody, ?string $htmlBody, ?string $fromName, array $extraHeaders, array $attachments): void
     {
         // WHIT-991: no mail from a proposal preview.
         \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Sending mail');
@@ -81,7 +84,7 @@ final class SmtpMailer implements Mailer, ThreadedMailer
             $this->command($conn, 'DATA', 354);
             // Dot-stuff the WHOLE payload (headers + body) once, so a body line
             // starting with '.' — in either MIME part — cannot end DATA early.
-            $message = self::dotStuff($this->buildMessage($toEmail, $fromEmail, $subject, $textBody, $htmlBody, $fromName, $extraHeaders));
+            $message = self::dotStuff($this->buildMessage($toEmail, $fromEmail, $subject, $textBody, $htmlBody, $fromName, $extraHeaders, $attachments));
             $conn->write($message . "\r\n.\r\n");
             $this->expect($conn, 250);            // message accepted
 
@@ -201,7 +204,11 @@ final class SmtpMailer implements Mailer, ThreadedMailer
      * CRLF; the caller dot-stuffs the whole payload once. $fromEmail/$toEmail are
      * already CRLF-validated by send().
      *
+     * With attachments the body above becomes the first part of a
+     * multipart/mixed message, and each file follows base64-encoded (WHIT-947).
+     *
      * @param list<string> $extraHeaders already checked for line breaks by {@see OutgoingEmail}
+     * @param list<MailAttachment> $attachments
      */
     private function buildMessage(
         string $toEmail,
@@ -211,6 +218,7 @@ final class SmtpMailer implements Mailer, ThreadedMailer
         ?string $htmlBody,
         ?string $fromName = null,
         array $extraHeaders = [],
+        array $attachments = [],
     ): string {
         // A conversation names the workspace as the sender, on the instance's address.
         $displayName = $fromName !== null && $fromName !== '' ? $fromName : $this->config->fromName;
@@ -227,16 +235,40 @@ final class SmtpMailer implements Mailer, ThreadedMailer
             ...$extraHeaders,
         ];
 
-        if ($htmlBody === null) {
-            $headers[] = 'Content-Type: text/plain; charset=UTF-8';
-            $headers[] = 'Content-Transfer-Encoding: 8bit';
+        [$bodyHeaders, $body] = self::bodyPart($textBody, $htmlBody);
+        if ($attachments === []) {
+            return implode("\r\n", [...$headers, ...$bodyHeaders]) . "\r\n\r\n" . $body;
+        }
 
-            return implode("\r\n", $headers) . "\r\n\r\n" . self::normalizeCrlf($textBody);
+        $mixed = '=_whity_mixed_' . bin2hex(random_bytes(12));
+        $headers[] = 'Content-Type: multipart/mixed; boundary="' . $mixed . '"';
+        $parts = ['--' . $mixed, ...$bodyHeaders, '', $body];
+        foreach ($attachments as $attachment) {
+            $parts[] = '--' . $mixed;
+            $parts[] = 'Content-Type: ' . $attachment->contentType . '; name="' . $attachment->filename . '"';
+            $parts[] = 'Content-Transfer-Encoding: base64';
+            $parts[] = 'Content-Disposition: attachment; filename="' . $attachment->filename . '"';
+            $parts[] = '';
+            $parts[] = rtrim(chunk_split(base64_encode($attachment->content), 76, "\r\n"));
+        }
+        $parts[] = '--' . $mixed . '--';
+
+        return implode("\r\n", $headers) . "\r\n\r\n" . implode("\r\n", $parts);
+    }
+
+    /**
+     * The message body: text only, or multipart/alternative with HTML.
+     *
+     * @return array{0: list<string>, 1: string} its headers, and the body
+     */
+    private static function bodyPart(string $textBody, ?string $htmlBody): array
+    {
+        if ($htmlBody === null) {
+            return [['Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: 8bit'], self::normalizeCrlf($textBody)];
         }
 
         // multipart/alternative: text first (fallback), HTML second (preferred).
         $boundary = '=_whity_' . bin2hex(random_bytes(12));
-        $headers[] = 'Content-Type: multipart/alternative; boundary="' . $boundary . '"';
 
         $parts = [
             '--' . $boundary,
@@ -252,7 +284,7 @@ final class SmtpMailer implements Mailer, ThreadedMailer
             '--' . $boundary . '--',
         ];
 
-        return implode("\r\n", $headers) . "\r\n\r\n" . implode("\r\n", $parts);
+        return [['Content-Type: multipart/alternative; boundary="' . $boundary . '"'], implode("\r\n", $parts)];
     }
 
     /**
