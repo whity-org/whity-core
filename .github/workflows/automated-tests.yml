@@ -55,7 +55,7 @@ concurrency:
 #                            PR->develop  merge queue  push     nightly  PR->main
 #   SQLite shards            no pcov      no pcov      pcov     pcov     pcov
 #   Coverage merge & floor   -            -            yes      yes      yes
-#   Dialect shards (PG)      -            yes          yes      yes      yes
+#   Dialect shards (PG)      yes          yes          yes      yes      yes
 #   every other job          by path      by path      by path  all      by path
 #
 # Measured over 18 runs (31 Oct 2026) the jobs themselves take 1-8 min, but a
@@ -63,14 +63,14 @@ concurrency:
 # shared by every open PR, the merge queue and the develop pushes. So the PR
 # path is made cheaper in runner-minutes, not only shorter.
 #
-# Nothing that catches breakage leaves the path to develop. A PR can only land
-# on develop through the merge queue, and the `merge_group` run still runs the
-# dialect shards, so a Postgres-only bug fails in the queue and the PR is
-# removed from it before it reaches develop. Coverage is not breakage: the
+# Nothing that catches breakage leaves the path to develop, and the Dialect
+# shards run on every PR too (WHIT-950): under ParaTest they take ~2 min a
+# shard (WHIT-934), inside the Integration shards' time, so a Postgres-only bug
+# shows up on the PR rather than only in the merge queue. Coverage is not breakage: the
 # floor is a trend gate, judged on every push to develop or main, nightly, and
 # on release PRs into main, so a drop shows up there, after merge.
 #
-# The mode is decided once, in the `changes` job (`all`, `full`, `coverage`),
+# The mode is decided once, in the `changes` job (`all`, `coverage`),
 # so every job reads the same answer.
 # ---------------------------------------------------------------------------
 
@@ -80,7 +80,7 @@ concurrency:
 #   changes ──┬─ test (SQLite shard 1..3, coverage) ─── coverage (merge + floor)
 #             ├─ static-analysis
 #             ├─ postgres-migrations
-#             ├─ postgres-integration (shard 1..5)
+#             ├─ postgres-integration (shard 1..2)
 #             ├─ postgres-dialect (shard 1..2)
 #             ├─ i18n-catalogue
 #             ├─ web
@@ -122,9 +122,8 @@ jobs:
       desktop_host: ${{ steps.mode.outputs.all == 'true' && 'true' || steps.filter.outputs.desktop_host }}
       watchdog: ${{ steps.mode.outputs.all == 'true' && 'true' || steps.filter.outputs.watchdog }}
       sdk_coverage: ${{ steps.mode.outputs.all == 'true' && 'true' || steps.filter.outputs.sdk_coverage }}
-      # full: the dialect shards run. coverage: the SQLite shards run under
-      # pcov and the coverage floor is enforced. See "What runs where" above.
-      full: ${{ steps.mode.outputs.full }}
+      # coverage: the SQLite shards run under pcov and the coverage floor is
+      # enforced. See "What runs where" above.
       coverage: ${{ steps.mode.outputs.coverage }}
     steps:
       - name: Decide the run mode
@@ -133,16 +132,16 @@ jobs:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.base_ref }}
         run: |
-          all=false; full=true; coverage=true
+          all=false; coverage=true
           case "$EVENT" in
             schedule|workflow_dispatch) all=true ;;
             merge_group) coverage=false ;;
             pull_request)
               # A release PR into main is gated on everything.
-              if [ "$BASE" != "main" ]; then full=false; coverage=false; fi ;;
+              if [ "$BASE" != "main" ]; then coverage=false; fi ;;
           esac
-          echo "event=$EVENT base=${BASE:-none}: all=$all full=$full coverage=$coverage"
-          { echo "all=$all"; echo "full=$full"; echo "coverage=$coverage"; } >> "$GITHUB_OUTPUT"
+          echo "event=$EVENT base=${BASE:-none}: all=$all coverage=$coverage"
+          { echo "all=$all"; echo "coverage=$coverage"; } >> "$GITHUB_OUTPUT"
 
       - name: Checkout code
         if: steps.mode.outputs.all != 'true'
@@ -1215,14 +1214,12 @@ jobs:
     # itself reads `strategy.job-total`, so only this label is manual.
     name: Dialect shard ${{ matrix.shard }}/2 (real-engine suites on PostgreSQL)
     needs: changes
-    # Not on PRs into develop. It does not duplicate the Integration shards (it
-    # excludes tests/Integration and tests/Security); it re-runs on Postgres the
-    # real-engine tests the SQLite shards already run, and it is the longest
-    # job here (7-8 min median). It does run in the merge queue, so a
-    # Postgres-only bug still cannot reach develop: the PR learns about it in
-    # the queue instead. The Integration shards and the migrations + Security
-    # job stay on every PR, so every PR still runs on real Postgres.
-    if: needs.changes.outputs.backend == 'true' && needs.changes.outputs.full == 'true'
+    # On every backend PR as well as in the merge queue (WHIT-950). It does not
+    # duplicate the Integration shards (it excludes tests/Integration and
+    # tests/Security); it re-runs on Postgres the real-engine tests the SQLite
+    # shards already run. Under ParaTest a shard takes ~2 min (WHIT-934), so a
+    # PR learns about a Postgres-only bug on the PR instead of in the queue.
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
 
     strategy:
@@ -1386,8 +1383,8 @@ jobs:
             echo "no PostgreSQL JUnit reports in this run"
             exit 0
           fi
-          # The Dialect shards run only in the merge queue; a PR run keeps the
-          # committed Dialect seconds and refreshes the Integration ones.
+          # --keep-from carries over the committed seconds of any file this
+          # run did not report (a shard that failed before writing JUnit).
           php scripts/ci-test-shard.php timings ci-test-timings-postgres.json junit \
             --keep-from=scripts/ci-test-timings-postgres.json
 

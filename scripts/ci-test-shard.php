@@ -176,7 +176,7 @@ if ($command === 'timings' && $argc >= 4) {
     $testFiles = whity_list_test_files($repoRoot);
     $timings = whity_timings_from_junit($xml, $testFiles);
     // --keep-from: carry over the seconds of files these reports did not run
-    // (the Dialect shards run only in the merge queue), dropping deleted files.
+    // (a shard that failed before writing its report), dropping deleted files.
     $timings += array_intersect_key($keep, array_flip($testFiles));
     ksort($timings, SORT_STRING);
     file_put_contents($argv[2], json_encode($timings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
