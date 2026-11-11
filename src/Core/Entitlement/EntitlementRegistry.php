@@ -126,6 +126,15 @@ final class EntitlementRegistry
      */
     public const AGENTS_RUNS_PER_MONTH = 'agents.runs.per_month';
 
+    // -- Messages (ADR 0016, WHIT-938) ---------------------------------------
+
+    /**
+     * Messages the workspace sends to customers each month, on every channel,
+     * plugin channels included. Notes and inbound messages do not count. Only
+     * warns: a reply or a booking reminder is never held back by a number.
+     */
+    public const MESSAGES_OUTBOUND_PER_MONTH = 'messages.outbound.per_month';
+
     /**
      * Limits that only ever warn: passing one is recorded and shown, never
      * refused, whatever an enforcement setting says. The business model's
@@ -140,6 +149,7 @@ final class EntitlementRegistry
         self::BRAND_OWN_EMAIL_SENDER,
         self::BRAND_OWN_APP,
         self::AGENTS_RUNS_PER_MONTH,
+        self::MESSAGES_OUTBOUND_PER_MONTH,
     ];
 
     /**
@@ -156,6 +166,7 @@ final class EntitlementRegistry
         self::DOCUMENTS_RENDER_PER_MONTH => EntitlementDefinition::PERIOD_MONTH,
         self::CUSTOMERS_PER_MONTH        => EntitlementDefinition::PERIOD_MONTH,
         self::AGENTS_RUNS_PER_MONTH      => EntitlementDefinition::PERIOD_MONTH,
+        self::MESSAGES_OUTBOUND_PER_MONTH => EntitlementDefinition::PERIOD_MONTH,
     ];
 
     /**
@@ -190,6 +201,7 @@ final class EntitlementRegistry
         self::BRAND_OWN_EMAIL_SENDER => 'true',
         self::BRAND_OWN_APP          => 'true',
         self::AGENTS_RUNS_PER_MONTH  => '-1',
+        self::MESSAGES_OUTBOUND_PER_MONTH => '-1',
     ];
 
     /**
@@ -214,6 +226,7 @@ final class EntitlementRegistry
         self::BRAND_OWN_EMAIL_SENDER => 'bool',
         self::BRAND_OWN_APP          => 'bool',
         self::AGENTS_RUNS_PER_MONTH  => 'int',
+        self::MESSAGES_OUTBOUND_PER_MONTH => 'int',
     ];
 
     /**
@@ -237,6 +250,7 @@ final class EntitlementRegistry
         self::BRAND_OWN_EMAIL_SENDER => 'Allow this workspace to send email from its own address. Its own sign-in is "sso.tenant_idp".',
         self::BRAND_OWN_APP          => 'Allow this workspace to publish its own app in the app stores.',
         self::AGENTS_RUNS_PER_MONTH  => 'Agent tool calls included each calendar month. Work past it is counted as usage and goes ahead (-1 for unlimited).',
+        self::MESSAGES_OUTBOUND_PER_MONTH => 'Messages this workspace sends to customers each calendar month, on every channel. Sending past it is counted as usage and goes ahead (-1 for unlimited).',
     ];
 
     /**

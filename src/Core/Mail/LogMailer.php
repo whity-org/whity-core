@@ -19,9 +19,23 @@ use Psr\Log\LoggerInterface;
  * production deployment whose logs are broadly readable; use a real SMTP/API
  * transport there. This is why `log` is opt-in, never the default.
  */
-final class LogMailer implements Mailer
+final class LogMailer implements Mailer, ThreadedMailer
 {
     public function __construct(private readonly LoggerInterface $logger) {}
+
+    public function sendThreaded(OutgoingEmail $email): void
+    {
+        \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Sending mail');
+        $this->logger->info('[mail] would send email', [
+            'to'          => $email->to,
+            'subject'     => $email->subject,
+            'body'        => $email->textBody,
+            'has_html'    => $email->htmlBody !== null,
+            'message_id'  => $email->messageId,
+            'in_reply_to' => $email->inReplyTo,
+            'reply_to'    => $email->replyTo,
+        ]);
+    }
 
     public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
     {

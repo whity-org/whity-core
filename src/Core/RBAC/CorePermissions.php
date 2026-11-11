@@ -454,6 +454,12 @@ final class CorePermissions
     // Workspace-controlled customer sign-up (WHIT-915, migration 222): the mode,
     // the starting role and the queue of people waiting to join.
     public const SIGNUP_MANAGE = 'signup:manage';
+    // MESSAGES (ADR 0016, migration 244). Read the workspace's conversations with
+    // customers; reply and write notes; assign, change status and set channels up.
+    // Customers never use these: their side checks ownership of the conversation.
+    public const MESSAGES_READ = 'messages:read';
+    public const MESSAGES_REPLY = 'messages:reply';
+    public const MESSAGES_MANAGE = 'messages:manage';
     // CONVENING (migrations 130/131). Deliberative BODIES that meet, minute a
     // numbered decision, and — where the agenda item carried a document — drive
     // that document's existing approval route with the decision.
@@ -575,6 +581,9 @@ final class CorePermissions
             self::FORMS_REVIEW,
             self::PUBLIC_FORM_KEYS_MANAGE,
             self::SIGNUP_MANAGE,
+            self::MESSAGES_READ,
+            self::MESSAGES_REPLY,
+            self::MESSAGES_MANAGE,
             self::CONVENING_READ,
             self::CONVENING_MANAGE,
             self::CONVENING_DECIDE,

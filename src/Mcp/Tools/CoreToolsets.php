@@ -74,6 +74,11 @@ final class CoreToolsets
             'titleAr'     => 'أنساق المستندات',
             'description' => "The workspace's document themes: print colour and letterhead, how a theme resolves, and where it is used.",
         ],
+        'core.messages' => [
+            'title'       => 'Messages',
+            'titleAr'     => 'الرسائل',
+            'description' => 'Conversations with customers by email and web chat: read them, reply, add notes, assign and close.',
+        ],
         'core.forms' => [
             'title'       => 'Forms',
             'titleAr'     => 'النماذج',
@@ -137,7 +142,8 @@ final class CoreToolsets
         'search'                   => 'core.search',
         'inbox'                    => 'core.inbox',
         'notifications'            => 'core.inbox',
-        'users'                    => 'core.people',
+        'messages'                 => 'core.messages',
+        'users'                  => 'core.people',
         'user-groups'              => 'core.people',
         'roles'                    => 'core.people',
         'rbac'                     => 'core.people',
