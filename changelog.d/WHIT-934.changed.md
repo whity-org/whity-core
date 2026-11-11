@@ -1,0 +1,2 @@
+- **The PostgreSQL test jobs run in parallel.** The Integration and Dialect shards now run under ParaTest, one seeded database per worker, and are split by recorded PostgreSQL test time instead of file count, so the slowest CI jobs finish sooner (WHIT-934).
+- **Stale test timings no longer fail CI.** When many test files have no recorded time, the shard planner now adds a warning to the run instead of the timings check failing every pull request (WHIT-934).

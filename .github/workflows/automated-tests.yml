@@ -1016,15 +1016,17 @@ jobs:
   postgres-integration:
     # Keep the `/5` here in step with the matrix below; the shard arithmetic
     # itself reads `strategy.job-total`, so only this label is manual.
-    name: Integration shard ${{ matrix.shard }}/5 (PostgreSQL)
+    name: Integration shard ${{ matrix.shard }}/2 (PostgreSQL)
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
+      # Two, under ParaTest with one seeded database per worker (WHIT-934).
+      # Five serial shards took 139-292 s each.
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2]
 
     # A real PostgreSQL service so the PHPUnit Integration suite runs against
     # the actual engine.  This catches Postgres-specific bugs the SQLite test
@@ -1092,6 +1094,20 @@ jobs:
           INITIAL_SUPERUSER_PASSWORD=superuser123
           EOF
 
+      # A throwaway server: nothing here needs to survive a crash, and without
+      # fsync SchemaFromMigrations clones each test database with FILE_COPY,
+      # which on PostgreSQL 15 beats the WAL copy once flushes are free.
+      - name: Run PostgreSQL without fsync
+        env:
+          PGPASSWORD: whity_dev
+        run: |
+          psql -h localhost -U whity -d postgres -v ON_ERROR_STOP=1 -q \
+            -c "ALTER SYSTEM SET fsync = off" \
+            -c "ALTER SYSTEM SET full_page_writes = off" \
+            -c "ALTER SYSTEM SET synchronous_commit = off" \
+            -c "SELECT pg_reload_conf()"
+          psql -h localhost -U whity -d postgres -tAc "SHOW fsync" | grep -qx off
+
       # Each shard provisions the shared whity_core database the same way the
       # unsharded job did (~3 s total); tests that reach for the seeded baseline
       # rather than their own SchemaFromMigrations schema still find it.
@@ -1101,42 +1117,56 @@ jobs:
       - name: Seed on real PostgreSQL
         run: php public/index.php seed
 
-      # Sharded by file, round-robin over the same deterministic sorted listing
-      # in every shard, so the union is exactly the file set the
-      # `<testsuite name="Integration"><directory>tests/Integration</directory>`
-      # iterator walks — a new Integration test lands in exactly one shard with
-      # no workflow edit and can never fall between shards.
+      # One seeded copy of whity_core per ParaTest worker (WHIT-934). Some
+      # Integration tests boot the real host against the database in
+      # PHPUNIT_PG_DSN and write to it; tests/bootstrap.php points worker N at
+      # whity_core_wN when PHPUNIT_PG_DB_PER_WORKER is set, so no two workers
+      # share one. A file-level copy of a 3 s seed takes well under a second.
+      - name: Copy the seeded database for each worker
+        env:
+          PGPASSWORD: whity_dev
+        run: |
+          for i in $(seq 1 "$(nproc)"); do
+            psql -h localhost -U whity -d postgres -v ON_ERROR_STOP=1 -qc \
+              "CREATE DATABASE whity_core_w${i} TEMPLATE whity_core"
+          done
+          echo "made $(nproc) worker copies of whity_core"
+
+      # Writes phpunit.shard.xml with this shard's Integration files, balanced on
+      # the recorded PostgreSQL seconds. Every shard derives the same plan from
+      # the same sorted listing and fails the job when the shards do not cover
+      # every file exactly once, when no file is selected, or when this shard is
+      # empty, so a new Integration test lands in exactly one shard with no
+      # workflow edit.
+      - name: Plan shard ${{ matrix.shard }}
+        run: |
+          find tests/Integration -type f -name '*Test.php' > integration-files.txt
+          php scripts/ci-test-shard.php plan ${{ matrix.shard }} ${{ strategy.job-total }} phpunit.shard.xml \
+            --files-from=integration-files.txt --timings=scripts/ci-test-timings-postgres.json
+
       - name: Run Integration suite on real PostgreSQL (shard ${{ matrix.shard }})
         env:
           PHPUNIT_PG_DSN: "pgsql:host=localhost;port=5432;dbname=whity_core"
+          PHPUNIT_PG_DB_PER_WORKER: '1'
           PHPUNIT_PG_USER: whity
           PHPUNIT_PG_PASSWORD: whity_dev
           JWT_SECRET: ci_jwt_secret_min_32_chars_for_hs256_aaaa
           ENCRYPTION_KEY: ci_encryption_key_min_32_chars_bbbbbbbb
         run: |
-          mapfile -t all < <(find tests/Integration -type f -name '*Test.php' | LC_ALL=C sort)
-          total=${#all[@]}
-          if [ "$total" -eq 0 ]; then
-            echo "::error::no test files matched tests/Integration/**/*Test.php — refusing to run an empty shard"
-            exit 1
-          fi
+          mkdir -p junit
+          vendor/bin/paratest \
+            --processes "$(nproc)" \
+            --configuration phpunit.shard.xml \
+            --log-junit "junit/integration-${{ matrix.shard }}.xml"
 
-          shards=${{ strategy.job-total }}
-          index=$(( ${{ matrix.shard }} - 1 ))
-          files=()
-          for i in "${!all[@]}"; do
-            if [ $(( i % shards )) -eq "$index" ]; then
-              files+=("${all[$i]}")
-            fi
-          done
-
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "::error::shard ${{ matrix.shard }}/${shards} selected 0 of ${total} Integration test files"
-            exit 1
-          fi
-
-          echo "Shard ${{ matrix.shard }}/${shards}: ${#files[@]} of ${total} Integration test files"
-          vendor/bin/phpunit "${files[@]}"
+      - name: Upload shard JUnit report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-pg-integration-${{ matrix.shard }}
+          path: junit/integration-${{ matrix.shard }}.xml
+          retention-days: 7
+          if-no-files-found: ignore
 
   # ---------------------------------------------------------------------------
   # The dialect gate: run the real-engine tests that live OUTSIDE tests/Integration
@@ -1181,7 +1211,7 @@ jobs:
   # on the runner.
   # ---------------------------------------------------------------------------
   postgres-dialect:
-    # Keep the `/3` here in step with the matrix below; the shard arithmetic
+    # Keep the `/2` here in step with the matrix below; the shard arithmetic
     # itself reads `strategy.job-total`, so only this label is manual.
     name: Dialect shard ${{ matrix.shard }}/2 (real-engine suites on PostgreSQL)
     needs: changes
@@ -1239,6 +1269,20 @@ jobs:
       - name: Install Dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
 
+      # A throwaway server: nothing here needs to survive a crash, and without
+      # fsync SchemaFromMigrations clones each test database with FILE_COPY,
+      # which on PostgreSQL 15 beats the WAL copy once flushes are free.
+      - name: Run PostgreSQL without fsync
+        env:
+          PGPASSWORD: whity_dev
+        run: |
+          psql -h localhost -U whity -d postgres -v ON_ERROR_STOP=1 -q \
+            -c "ALTER SYSTEM SET fsync = off" \
+            -c "ALTER SYSTEM SET full_page_writes = off" \
+            -c "ALTER SYSTEM SET synchronous_commit = off" \
+            -c "SELECT pg_reload_conf()"
+          psql -h localhost -U whity -d postgres -tAc "SHOW fsync" | grep -qx off
+
       # No `migrate run` / `seed` here, unlike postgres-integration: these tests
       # provision their own engine through SchemaFromMigrations and never read the
       # shared whity_core schema. The database exists only to host the template
@@ -1265,22 +1309,31 @@ jobs:
             exit 1
           fi
 
-          shards=${{ strategy.job-total }}
-          index=$(( ${{ matrix.shard }} - 1 ))
-          files=()
-          for i in "${!all[@]}"; do
-            if [ $(( i % shards )) -eq "$index" ]; then
-              files+=("${all[$i]}")
-            fi
-          done
+          # Balanced on recorded PostgreSQL seconds; the planner fails the job
+          # when the shards do not cover every selected file exactly once or
+          # when this shard is empty.
+          printf '%s\n' "${all[@]}" > dialect-files.txt
+          php scripts/ci-test-shard.php plan ${{ matrix.shard }} ${{ strategy.job-total }} phpunit.shard.xml \
+            --files-from=dialect-files.txt --timings=scripts/ci-test-timings-postgres.json
 
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "::error::shard ${{ matrix.shard }}/${shards} selected 0 of ${total} real-engine test files"
-            exit 1
-          fi
+          # ParaTest workers share this server: each test clones its own
+          # database from the one migration template, and template builds and
+          # clones are serialised by SchemaFromMigrations' advisory lock.
+          mkdir -p junit
+          vendor/bin/paratest \
+            --processes "$(nproc)" \
+            --no-coverage \
+            --configuration phpunit.shard.xml \
+            --log-junit "junit/dialect-${{ matrix.shard }}.xml"
 
-          echo "Shard ${{ matrix.shard }}/${shards}: ${#files[@]} of ${total} real-engine test files"
-          vendor/bin/phpunit --no-coverage "${files[@]}"
+      - name: Upload shard JUnit report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-pg-dialect-${{ matrix.shard }}
+          path: junit/dialect-${{ matrix.shard }}.xml
+          retention-days: 7
+          if-no-files-found: ignore
 
       # The whole job is worthless if the template cache quietly fell back to the
       # per-test migration run: the suite would still be green, just 100x slower,
@@ -1298,6 +1351,53 @@ jobs:
             echo "::error::no template database was built — SchemaFromMigrations fell back to re-running every migration per test (see the stderr notice above for the reason)"
             exit 1
           fi
+
+  # Per-file PostgreSQL seconds for the Integration and Dialect shard plans,
+  # rebuilt from their JUnit reports like the SQLite `test-timings` artifact.
+  # Commit the `test-timings-postgres` artifact over
+  # scripts/ci-test-timings-postgres.json when the plan drifts; stale timings
+  # cost balance, never coverage. Reporting only: it never fails the run on a
+  # test result, and it runs after red shards too so their timings still count.
+  postgres-timings:
+    name: PostgreSQL test timings
+    needs: [changes, postgres-integration, postgres-dialect]
+    if: always() && needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Download shard JUnit reports
+        uses: actions/download-artifact@v8
+        with:
+          pattern: junit-pg-*
+          merge-multiple: true
+          path: junit
+
+      - name: Rebuild per-file PostgreSQL test timings
+        run: |
+          if ! ls junit/*.xml >/dev/null 2>&1; then
+            echo "no PostgreSQL JUnit reports in this run"
+            exit 0
+          fi
+          # The Dialect shards run only in the merge queue; a PR run keeps the
+          # committed Dialect seconds and refreshes the Integration ones.
+          php scripts/ci-test-shard.php timings ci-test-timings-postgres.json junit \
+            --keep-from=scripts/ci-test-timings-postgres.json
+
+      - name: Upload test timings
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-timings-postgres
+          path: ci-test-timings-postgres.json
+          retention-days: 30
+          if-no-files-found: ignore
 
   # NOTE: Infection mutation testing moved OFF the per-PR path to a 6-hourly
   # scheduled run — see .github/workflows/mutation-testing.yml (WC-232ec317).
@@ -1957,6 +2057,7 @@ jobs:
       - postgres-migrations
       - postgres-integration
       - postgres-dialect
+      - postgres-timings
       - render-service
       - watchdog
       - web

@@ -12,6 +12,7 @@ declare(strict_types=1);
  * seconds instead (see whity_plan_shards()).
  *
  *   php scripts/ci-test-shard.php plan <shard> <total> <config-out.xml>
+ *       [--files-from=<list.txt>] [--timings=<timings.json>]
  *
  *     Writes a copy of phpunit.xml whose only test suite is this shard's files,
  *     heaviest first, for `paratest --configuration`. ParaTest takes one path
@@ -19,7 +20,14 @@ declare(strict_types=1);
  *     no test file exists, when the shards do not partition the file set
  *     exactly, or when this shard is empty.
  *
- *   php scripts/ci-test-shard.php timings <out.json> <junit.xml|dir> [...]
+ *     By default the file set is every *Test.php under tests/ and the timings are
+ *     scripts/ci-test-timings.json (the SQLite shards). The PostgreSQL jobs pass
+ *     --files-from (one repo-relative path per line: the Integration directory,
+ *     or the dialect job's grep) and --timings=scripts/ci-test-timings-postgres.json,
+ *     because a file takes a different time on the other engine. A listed path
+ *     that is not a test file fails the plan rather than being dropped.
+ *
+ *   php scripts/ci-test-shard.php timings <out.json> <junit.xml|dir> [...] [--keep-from=<old.json>]
  *
  *     Rebuilds the timings file from JUnit reports (directories expand to their
  *     *.xml). Every CI run publishes a fresh one as the `test-timings` artifact;
@@ -35,10 +43,22 @@ const TIMINGS_FILE = __DIR__ . '/ci-test-timings.json';
 $repoRoot = dirname(__DIR__);
 $command = $argv[1] ?? '';
 
-if ($command === 'plan' && $argc === 5) {
+if ($command === 'plan' && $argc >= 5) {
     $shard = (int) $argv[2];
     $total = (int) $argv[3];
     $out = $argv[4];
+    $filesFrom = null;
+    $timingsFile = TIMINGS_FILE;
+    foreach (array_slice($argv, 5) as $option) {
+        if (str_starts_with($option, '--files-from=')) {
+            $filesFrom = substr($option, strlen('--files-from='));
+        } elseif (str_starts_with($option, '--timings=')) {
+            $timingsFile = substr($option, strlen('--timings='));
+        } else {
+            fwrite(STDERR, "::error::unknown option {$option}\n");
+            exit(2);
+        }
+    }
 
     if ($total < 1 || $shard < 1 || $shard > $total) {
         fwrite(STDERR, "::error::invalid shard {$argv[2]}/{$argv[3]}\n");
@@ -46,13 +66,26 @@ if ($command === 'plan' && $argc === 5) {
     }
 
     $files = whity_list_test_files($repoRoot);
+    if ($filesFrom !== null) {
+        if (!is_file($filesFrom)) {
+            fwrite(STDERR, "::error::--files-from {$filesFrom} does not exist\n");
+            exit(2);
+        }
+        $listed = whity_parse_file_list((string) file_get_contents($filesFrom));
+        $notTests = array_diff($listed, $files);
+        if ($notTests !== []) {
+            fwrite(STDERR, '::error::--files-from lists paths that are not test files: ' . implode(', ', $notTests) . "\n");
+            exit(1);
+        }
+        $files = $listed;
+    }
     if ($files === []) {
-        fwrite(STDERR, "::error::no test files matched tests/**/*Test.php — refusing to run an empty shard\n");
+        fwrite(STDERR, "::error::no test files selected — refusing to run an empty shard\n");
         exit(1);
     }
 
-    $timings = is_file(TIMINGS_FILE)
-        ? json_decode((string) file_get_contents(TIMINGS_FILE), true, 512, JSON_THROW_ON_ERROR)
+    $timings = is_file($timingsFile)
+        ? json_decode((string) file_get_contents($timingsFile), true, 512, JSON_THROW_ON_ERROR)
         : [];
     $plan = whity_plan_shards($files, $timings, $total);
 
@@ -82,6 +115,12 @@ if ($command === 'plan' && $argc === 5) {
         implode(' / ', array_map(static fn(array $s): string => sprintf('%.0f', $s['seconds']), $plan)),
         $unknown > 0 ? ", {$unknown} file(s) without a timing weighted at the median" : ''
     );
+    // Stale timings cost balance, never coverage, so this is an annotation on
+    // the run rather than a failure: new test files must not block every PR.
+    if ($unknown > max(10, intdiv(count($files), 10))) {
+        fwrite(STDERR, "::warning::{$unknown} of " . count($files) . " test files have no timing in {$timingsFile}; "
+            . "the shards are unbalanced until it is refreshed from the latest develop run's timings artifact\n");
+    }
 
     $doc = new DOMDocument();
     $doc->preserveWhiteSpace = false;
@@ -116,7 +155,15 @@ if ($command === 'plan' && $argc === 5) {
 
 if ($command === 'timings' && $argc >= 4) {
     $xml = [];
+    $keep = [];
     foreach (array_slice($argv, 3) as $input) {
+        if (str_starts_with($input, '--keep-from=')) {
+            $keepFile = substr($input, strlen('--keep-from='));
+            $keep = is_file($keepFile)
+                ? (array) json_decode((string) file_get_contents($keepFile), true, 512, JSON_THROW_ON_ERROR)
+                : [];
+            continue;
+        }
         foreach (is_dir($input) ? (glob(rtrim($input, '/\\') . '/*.xml') ?: []) : [$input] as $path) {
             $xml[] = (string) file_get_contents($path);
         }
@@ -126,13 +173,18 @@ if ($command === 'timings' && $argc >= 4) {
         exit(2);
     }
 
-    $timings = whity_timings_from_junit($xml, whity_list_test_files($repoRoot));
+    $testFiles = whity_list_test_files($repoRoot);
+    $timings = whity_timings_from_junit($xml, $testFiles);
+    // --keep-from: carry over the seconds of files these reports did not run
+    // (the Dialect shards run only in the merge queue), dropping deleted files.
+    $timings += array_intersect_key($keep, array_flip($testFiles));
+    ksort($timings, SORT_STRING);
     file_put_contents($argv[2], json_encode($timings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
     printf("ci-test-shard: %d files, %.0f s total -> %s\n", count($timings), array_sum($timings), $argv[2]);
     exit(0);
 }
 
 fwrite(STDERR, "Usage:\n"
-    . "  php scripts/ci-test-shard.php plan <shard> <total> <config-out.xml>\n"
-    . "  php scripts/ci-test-shard.php timings <out.json> <junit.xml|dir> [...]\n");
+    . "  php scripts/ci-test-shard.php plan <shard> <total> <config-out.xml> [--files-from=<list.txt>] [--timings=<timings.json>]\n"
+    . "  php scripts/ci-test-shard.php timings <out.json> <junit.xml|dir> [...] [--keep-from=<old.json>]\n");
 exit(2);

@@ -30,6 +30,29 @@ if (is_string($paratestToken) && $paratestToken !== '') {
         putenv($tmpVar . '=' . $workerTmp);
         $_ENV[$tmpVar] = $workerTmp;
     }
+
+    // One seeded PostgreSQL database per worker, opt-in. The Integration suite
+    // has tests that boot the real host against the database named in
+    // PHPUNIT_PG_DSN (the CI job's migrated and seeded `whity_core`) and write
+    // to it, so workers sharing it would see each other's rows. CI makes
+    // `<dbname>_w1` ... `<dbname>_wN` with `CREATE DATABASE ... TEMPLATE` after
+    // seeding and sets PHPUNIT_PG_DB_PER_WORKER=1; each worker is pointed at its
+    // own copy here, before any test reads the DSN. Child processes inherit it.
+    // Tests that clone from SchemaFromMigrations' template are unaffected: they
+    // work in a throwaway database of their own either way.
+    $pgDsn = getenv('PHPUNIT_PG_DSN');
+    $perWorker = getenv('PHPUNIT_PG_DB_PER_WORKER');
+    if (is_string($pgDsn) && $pgDsn !== '' && is_string($perWorker) && $perWorker !== '' && $perWorker !== '0') {
+        if (preg_match('/\bdbname=([^;]*)/i', $pgDsn, $m) !== 1 || $m[1] === '') {
+            throw new RuntimeException('PHPUNIT_PG_DB_PER_WORKER needs a dbname= in PHPUNIT_PG_DSN');
+        }
+        $workerDb = $m[1] . '_w' . preg_replace('/\D/', '', $paratestToken);
+        $workerDsn = (string) preg_replace('/\bdbname=[^;]*/i', 'dbname=' . $workerDb, $pgDsn);
+        foreach (['PHPUNIT_PG_DSN' => $workerDsn, 'DB_NAME' => $workerDb] as $name => $value) {
+            putenv($name . '=' . $value);
+            $_ENV[$name] = $value;
+        }
+    }
 }
 
 require_once dirname(__DIR__) . '/vendor/autoload.php';
