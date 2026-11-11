@@ -7,7 +7,7 @@ namespace Whity\Api;
 use Throwable;
 use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Agent\AgentProposalRepository;
-use Whity\Core\Inbox\InboxItem;
+use Whity\Sdk\Inbox\InboxItem;
 use Whity\Core\Inbox\InboxSourceRegistry;
 use Whity\Core\Request;
 use Whity\Core\Response;

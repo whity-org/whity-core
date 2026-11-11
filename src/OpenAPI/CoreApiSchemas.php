@@ -6588,7 +6588,21 @@ final class CoreApiSchemas
                 ],
                 // Source-specific extras a client may use and must not depend on.
                 'meta' => ['type' => 'object', 'additionalProperties' => true],
+                // Shown before every item that is not, across all sources (SDK 1.97).
+                'urgent' => ['type' => 'boolean'],
             ], ['id', 'title', 'timestamp']),
+            // GET /api/me/inbox/merged: every source as one list, keyset-paged (#881).
+            'MergedInboxResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => [
+                    'allOf' => [
+                        SchemaBuilder::ref('InboxItem'),
+                        self::object(['source' => self::str()], ['source']),
+                    ],
+                ]],
+                'next_cursor' => self::str(true),
+                'unavailable' => ['type' => 'array', 'items' => self::str()],
+                'truncated' => ['type' => 'array', 'items' => self::str()],
+            ], ['data', 'next_cursor', 'unavailable', 'truncated']),
             'InboxItemListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('InboxItem')],
                 'pagination' => SchemaBuilder::ref('Pagination'),
@@ -13836,6 +13850,28 @@ final class CoreApiSchemas
                     'responses' => [
                         200 => self::jsonResponse("That source's items, with pagination", 'InboxItemListResponse'),
                         422 => self::errorResponse("'source' is missing or names no registered source"),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/inbox/merged',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => "Every inbox source's items awaiting the caller, as one list",
+                    'description' => 'Urgent items first, then the newest. Paged by position: pass `next_cursor` back as '
+                        . '`cursor`. A source that fails is named in `unavailable`; a source read past its scan limit is '
+                        . 'named in `truncated`.',
+                    'tags' => ['inbox'],
+                    'parameters' => [
+                        self::queryParam('cursor', 'string', 'The next_cursor of the previous page; omit for the first'),
+                        self::queryParam('limit', 'integer', 'Page size (default 25, max 100)'),
+                        self::queryParam('open', 'boolean', 'Falsey to include the caller\'s history as well (default open-only)'),
+                    ],
+                    'responses' => [
+                        200 => self::jsonResponse('One page of the merged inbox', 'MergedInboxResponse'),
+                        422 => self::errorResponse("'cursor' is not one this endpoint returned"),
                     ] + self::authErrors(),
                 ],
             ],
