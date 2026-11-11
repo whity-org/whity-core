@@ -115,6 +115,12 @@ if ($command === 'plan' && $argc >= 5) {
         implode(' / ', array_map(static fn(array $s): string => sprintf('%.0f', $s['seconds']), $plan)),
         $unknown > 0 ? ", {$unknown} file(s) without a timing weighted at the median" : ''
     );
+    // Stale timings cost balance, never coverage, so this is an annotation on
+    // the run rather than a failure: new test files must not block every PR.
+    if ($unknown > max(10, intdiv(count($files), 10))) {
+        fwrite(STDERR, "::warning::{$unknown} of " . count($files) . " test files have no timing in {$timingsFile}; "
+            . "the shards are unbalanced until it is refreshed from the latest develop run's timings artifact\n");
+    }
 
     $doc = new DOMDocument();
     $doc->preserveWhiteSpace = false;

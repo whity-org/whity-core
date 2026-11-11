@@ -290,6 +290,9 @@ final class SchemaFromMigrations
     /** Maintenance connection (to the `postgres` database), opened once. */
     private static ?PDO $pgAdmin = null;
 
+    /** `CREATE DATABASE` strategy clause for clones, decided once per process. */
+    private static ?string $pgCloneStrategy = null;
+
     /**
      * Clone databases created by this process, oldest first.
      *
@@ -349,9 +352,11 @@ final class SchemaFromMigrations
             self::pruneClones($admin);
 
             $clone = self::PG_CLONE_PREFIX . bin2hex(random_bytes(8));
+            // Shared: clones of one template may run side by side (ParaTest
+            // workers); only a template build or drop needs the server to itself.
             self::withTemplateLock($admin, static function () use ($admin, $clone, $template): void {
-                $admin->exec("CREATE DATABASE \"{$clone}\" TEMPLATE \"{$template}\"");
-            });
+                $admin->exec("CREATE DATABASE \"{$clone}\" TEMPLATE \"{$template}\"" . self::cloneStrategy($admin));
+            }, shared: true);
             self::$pgClones[] = $clone;
             self::registerCloneCleanup();
 
@@ -522,28 +527,35 @@ final class SchemaFromMigrations
     }
 
     /**
-     * Serialise template creation/cloning across processes.
+     * Serialise template builds against each other and against clones.
      *
      * Two shards racing to build the same template would both run the whole
-     * migration set; worse, some Postgres versions reject a `CREATE DATABASE …
-     * TEMPLATE` that overlaps another copy of the same source.  A session-level
-     * advisory lock is the right tool: it is released automatically if the
-     * process dies, so a crashed build cannot wedge the next run.
+     * migration set, and a clone must never copy a template that is still being
+     * built or is being dropped.  A session-level advisory lock is the right
+     * tool: it is released automatically if the process dies, so a crashed
+     * build cannot wedge the next run.
+     *
+     * Clones take the lock SHARED: Postgres copies one source into several new
+     * databases at once (the source only has to have no connections), and
+     * under ParaTest an exclusive lock made every worker queue behind every
+     * other worker's clone. Measured on PostgreSQL 15, 4 workers x 20 clones:
+     * 19.0 s exclusive, 11.0 s shared (WHIT-934).
      *
      * @template T
      * @param callable(): T $work
      * @return T
      */
-    private static function withTemplateLock(PDO $admin, callable $work): mixed
+    private static function withTemplateLock(PDO $admin, callable $work, bool $shared = false): mixed
     {
-        // A fixed key: the lock guards "one template build / clone at a time on
-        // this server", not one per template name.
-        $admin->exec('SELECT pg_advisory_lock(4207310001)');
+        // A fixed key: the lock guards "one template build at a time on this
+        // server, and no clone during it", not one per template name.
+        $mode = $shared ? '_shared' : '';
+        $admin->exec("SELECT pg_advisory_lock{$mode}(4207310001)");
         try {
             return $work();
         } finally {
             try {
-                $admin->exec('SELECT pg_advisory_unlock(4207310001)');
+                $admin->exec("SELECT pg_advisory_unlock{$mode}(4207310001)");
             } catch (\Throwable) {
                 // session teardown releases it anyway
             }
@@ -551,6 +563,32 @@ final class SchemaFromMigrations
     }
 
     /** Maintenance connection to the `postgres` database, opened at most once. */
+    /**
+     * Postgres 15 copies a template block by block through the WAL by default,
+     * which costs the same with or without fsync. FILE_COPY copies the files
+     * and checkpoints instead, which is far slower on a durable server but much
+     * faster on one with fsync off, as CI's throwaway servers run (WHIT-934).
+     * Measured on PostgreSQL 15 with fsync off, 4 workers x 20 clones: 9.0 s
+     * WAL_LOG, 6.9 s FILE_COPY; with fsync on, FILE_COPY took 105.8 s.
+     */
+    private static function cloneStrategy(PDO $admin): string
+    {
+        if (self::$pgCloneStrategy === null) {
+            self::$pgCloneStrategy = '';
+            try {
+                $version = (int) $admin->query('SHOW server_version_num')->fetchColumn();
+                $fsync   = (string) $admin->query('SHOW fsync')->fetchColumn();
+                if ($version >= 150000 && $fsync === 'off') {
+                    self::$pgCloneStrategy = ' STRATEGY FILE_COPY';
+                }
+            } catch (\Throwable) {
+                // keep the default strategy
+            }
+        }
+
+        return self::$pgCloneStrategy;
+    }
+
     private static function pgAdminConnection(string $adminDsn, string $user, string $password): PDO
     {
         return self::$pgAdmin ??= new PDO($adminDsn, $user, $password, [

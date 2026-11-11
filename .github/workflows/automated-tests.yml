@@ -1094,6 +1094,20 @@ jobs:
           INITIAL_SUPERUSER_PASSWORD=superuser123
           EOF
 
+      # A throwaway server: nothing here needs to survive a crash, and without
+      # fsync SchemaFromMigrations clones each test database with FILE_COPY,
+      # which on PostgreSQL 15 beats the WAL copy once flushes are free.
+      - name: Run PostgreSQL without fsync
+        env:
+          PGPASSWORD: whity_dev
+        run: |
+          psql -h localhost -U whity -d postgres -v ON_ERROR_STOP=1 -q \
+            -c "ALTER SYSTEM SET fsync = off" \
+            -c "ALTER SYSTEM SET full_page_writes = off" \
+            -c "ALTER SYSTEM SET synchronous_commit = off" \
+            -c "SELECT pg_reload_conf()"
+          psql -h localhost -U whity -d postgres -tAc "SHOW fsync" | grep -qx off
+
       # Each shard provisions the shared whity_core database the same way the
       # unsharded job did (~3 s total); tests that reach for the seeded baseline
       # rather than their own SchemaFromMigrations schema still find it.
@@ -1254,6 +1268,20 @@ jobs:
 
       - name: Install Dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
+
+      # A throwaway server: nothing here needs to survive a crash, and without
+      # fsync SchemaFromMigrations clones each test database with FILE_COPY,
+      # which on PostgreSQL 15 beats the WAL copy once flushes are free.
+      - name: Run PostgreSQL without fsync
+        env:
+          PGPASSWORD: whity_dev
+        run: |
+          psql -h localhost -U whity -d postgres -v ON_ERROR_STOP=1 -q \
+            -c "ALTER SYSTEM SET fsync = off" \
+            -c "ALTER SYSTEM SET full_page_writes = off" \
+            -c "ALTER SYSTEM SET synchronous_commit = off" \
+            -c "SELECT pg_reload_conf()"
+          psql -h localhost -U whity -d postgres -tAc "SHOW fsync" | grep -qx off
 
       # No `migrate run` / `seed` here, unlike postgres-integration: these tests
       # provision their own engine through SchemaFromMigrations and never read the

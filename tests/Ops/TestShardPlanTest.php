@@ -128,29 +128,46 @@ final class TestShardPlanTest extends TestCase
         self::assertSame([], whity_parse_file_list("\n\n"));
     }
 
-    public function testCommittedPostgresTimingsAreTestFiles(): void
+    /**
+     * The committed timings only steer balance: a file without a timing runs
+     * at the median weight, and a timing for a deleted file is ignored. So
+     * these check the files are well-formed, not that they are current. A
+     * stale file is reported by `ci-test-shard.php plan` as a warning on the
+     * run; failing here made every PR red each time new test files landed
+     * before anyone refreshed the timings (WHIT-948).
+     */
+    public function testCommittedTimingsAreWellFormed(): void
     {
         $root = dirname(__DIR__, 2);
-        $timings = json_decode((string) file_get_contents($root . '/scripts/ci-test-timings-postgres.json'), true);
-        self::assertIsArray($timings);
-        self::assertSame([], array_diff(array_keys($timings), whity_list_test_files($root)));
+        foreach (['scripts/ci-test-timings.json', 'scripts/ci-test-timings-postgres.json'] as $file) {
+            $timings = json_decode((string) file_get_contents($root . '/' . $file), true);
+            self::assertIsArray($timings, $file);
+            foreach ($timings as $path => $seconds) {
+                self::assertMatchesRegularExpression('#^tests/.+Test\.php$#', (string) $path, $file);
+                self::assertIsNumeric($seconds, "{$file}: {$path}");
+                self::assertGreaterThanOrEqual(0, $seconds, "{$file}: {$path}");
+            }
+        }
     }
 
-    public function testCommittedTimingsCoverTheCurrentSuite(): void
+    public function testPlannerWarnsWhenManyFilesHaveNoTiming(): void
     {
         $root = dirname(__DIR__, 2);
-        $timings = json_decode((string) file_get_contents($root . '/scripts/ci-test-timings.json'), true);
-        self::assertIsArray($timings);
+        // The planner only writes its config into the repository root.
+        $out  = $root . '/phpunit.shard-selftest-' . getmypid() . '.xml';
+        $none = tempnam(sys_get_temp_dir(), 'timings');
+        file_put_contents($none, '{}');
 
-        $missing = array_diff(whity_list_test_files($root), array_keys($timings));
+        $cmd = [PHP_BINARY, $root . '/scripts/ci-test-shard.php', 'plan', '1', '1', $out, '--timings=' . $none];
+        $proc = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $root);
+        self::assertIsResource($proc);
+        stream_get_contents($pipes[1]);
+        $stderr = (string) stream_get_contents($pipes[2]);
+        $status = proc_close($proc);
+        @unlink($out);
+        @unlink($none);
 
-        // Not zero: a new test file may land before anyone refreshes the file,
-        // and it still runs. A large gap means the balance has gone stale.
-        self::assertLessThan(
-            50,
-            count($missing),
-            "scripts/ci-test-timings.json is missing timings for many test files; refresh it from the latest\n"
-            . "`test-timings` CI artifact. Missing: " . implode(', ', array_slice($missing, 0, 10))
-        );
+        self::assertSame(0, $status, $stderr);
+        self::assertStringContainsString('::warning::', $stderr);
     }
 }
