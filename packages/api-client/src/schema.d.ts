@@ -12994,6 +12994,7 @@ export interface components {
             inbound_email_address?: string | null;
             has_inbound_secret: boolean;
             updated_at?: string | null;
+            workspace_slug?: string | null;
         };
         MessagingSettingsResponse: {
             data: components["schemas"]["MessagingSettings"];

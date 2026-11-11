@@ -57,6 +57,8 @@ export function PlanLimits() {
         return t('billing.limits.customers', 'Customers this month');
       case 'agents.runs.per_month':
         return t('billing.limits.agentWork', 'Agent work this month');
+      case 'messages.outbound.per_month':
+        return t('billing.limits.messagesMonth', 'Messages sent this month');
       case 'documents.render.per_day':
         return t('billing.limits.documentsToday', 'Documents made today');
       case 'documents.render.per_month':

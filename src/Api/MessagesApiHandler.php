@@ -214,7 +214,7 @@ final class MessagesApiHandler
     /** @param array<string, string> $params */
     public function getSettings(Request $request, array $params = []): Response
     {
-        return $this->guard($request, fn (int $tenantId): Response => Response::json(['data' => $this->settings->get($tenantId)]));
+        return $this->guard($request, fn (int $tenantId): Response => Response::json(['data' => $this->settingsView($tenantId)]));
     }
 
     /** @param array<string, string> $params */
@@ -242,8 +242,14 @@ final class MessagesApiHandler
 
             $this->settings->save($tenantId, $enabled, $greeting !== null ? trim($greeting) : null, $address);
 
-            return Response::json(['data' => $this->settings->get($tenantId)]);
+            return Response::json(['data' => $this->settingsView($tenantId)]);
         });
+    }
+
+    /** @return array<string, mixed> the settings and the workspace slug they are reached under */
+    private function settingsView(int $tenantId): array
+    {
+        return $this->settings->get($tenantId) + ['workspace_slug' => $this->settings->workspaceSlug($tenantId)];
     }
 
     /** Make a new inbound email secret. It is shown once. */
