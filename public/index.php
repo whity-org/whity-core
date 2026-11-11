@@ -741,6 +741,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // and the plain member's sidebar would otherwise have no way home.
     ];
     $items[] = [
+        'id' => 'calendar',
+        'label' => 'Calendar',
+        'href' => '/calendar',
+        'icon' => 'calendar',
+        'group' => 'overview',
+        // After Dashboard (1), Inbox (2), Approvals (3) and the form entries (4, 5):
+        // a surface opened daily, about the team's own time (WHIT-944, ADR 0017).
+        'order' => 6,
+        // Mirrors GET /api/calendar/settings and the rest of the read routes.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CALENDAR_READ,
+    ];
+    $items[] = [
         'id' => 'users',
         'label' => 'Users',
         'href' => '/admin/users',

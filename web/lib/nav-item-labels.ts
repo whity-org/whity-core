@@ -19,6 +19,7 @@ export function useNavItemLabels(): Record<string, string> {
       dashboard: t('sidebar.item.dashboard', 'Dashboard'),
       system: t('sidebar.item.system', 'System'),
       inbox: t('sidebar.item.inbox', 'Inbox'),
+      calendar: t('sidebar.item.calendar', 'Calendar'),
       approvals: t('sidebar.item.approvals', 'Approvals'),
       users: t('sidebar.item.users', 'Users'),
       roles: t('sidebar.item.roles', 'Roles'),
