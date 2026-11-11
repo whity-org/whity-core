@@ -7,7 +7,9 @@ namespace Whity\Core\Calendar;
 /**
  * Tells a customer about their booking (ADR 0017, section 5). Called after
  * the booking's transaction commits; an implementation must never throw for
- * a delivery failure, only log it.
+ * a delivery failure, only log it. `$booking` is {@see BookingService::bookingOrFail()};
+ * after a create or a move it also carries `manage_token`, the raw token of
+ * the customer's new link, which exists nowhere else.
  *
  * The first implementation sends email through the Mailer; when the core
  * messages API lands (ADR 0016) another implementation sends through it, with
@@ -23,4 +25,7 @@ interface BookingMessenger
 
     /** @param array<string, mixed> $booking */
     public function cancelled(int $tenantId, array $booking): void;
+
+    /** @param array<string, mixed> $booking */
+    public function remind(int $tenantId, array $booking): void;
 }

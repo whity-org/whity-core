@@ -174,6 +174,18 @@ final class BookingRepository
         return $stmt->rowCount() === 1;
     }
 
+    /** Claim the reminder; false when another worker already did. */
+    public function markReminded(int $tenantId, int $id, DateTimeImmutable $now): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE calendar_bookings SET reminder_sent_at = :now
+              WHERE tenant_id = :tenant_id AND id = :id AND reminder_sent_at IS NULL'
+        );
+        $stmt->execute([':now' => Interval::toDb($now), ':tenant_id' => $tenantId, ':id' => $id]);
+
+        return $stmt->rowCount() === 1;
+    }
+
     /**
      * How many future live bookings this email holds here (spam cap).
      */

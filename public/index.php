@@ -4960,14 +4960,18 @@ $router->register('DELETE', '/api/convening-bodies/{id:\d+}/members/{profileId:\
 $calendarRepository = new \Whity\Core\Calendar\CalendarRepository($db->getPdo());
 $calendarServiceRepository = new \Whity\Core\Calendar\ServiceRepository($db->getPdo());
 $calendarBookingRepository = new \Whity\Core\Calendar\BookingRepository($db->getPdo());
-$calendarBookingService = new \Whity\Core\Calendar\BookingService(
+// Customer emails (with the manage link) and reminders are wired here and in
+// CoreJobs the same way, through CalendarServices (WHIT-942).
+$calendarBookingService = \Whity\Core\Calendar\CalendarServices::bookingService(
     $db->getPdo(),
-    $calendarRepository,
-    $calendarServiceRepository,
-    $calendarBookingRepository,
     $settingsService,
     $hookManager,
+    $mailer,
+    $frontendUrls,
+    $queueService,
+    $logger,
 );
+$calendarFeed = new \Whity\Core\Calendar\CalendarFeed($db->getPdo(), $calendarRepository, $calendarBookingRepository);
 $calendarHandler = new \Whity\Api\CalendarApiHandler(
     $calendarRepository,
     $calendarServiceRepository,
@@ -4975,11 +4979,17 @@ $calendarHandler = new \Whity\Api\CalendarApiHandler(
     $calendarBookingService,
     $settingsService,
     $roleChecker,
+    $calendarFeed,
+    $frontendUrls->base(),
 );
 $router->register('GET',    '/api/calendar/settings',                       [$calendarHandler, 'getSettings'],     null, null, CorePermissions::CALENDAR_READ);
 $router->register('PUT',    '/api/calendar/settings',                       [$calendarHandler, 'putSettings'],     null, null, CorePermissions::CALENDAR_MANAGE);
 $router->register('GET',    '/api/calendar/staff',                          [$calendarHandler, 'listStaff'],       null, null, CorePermissions::CALENDAR_READ);
 $router->register('PUT',    '/api/calendar/staff/{profileId:\d+}',          [$calendarHandler, 'putStaff'],        null, null, CorePermissions::CALENDAR_MANAGE);
+// A person's ICS feed URL: shown once when turned on; turning it on again
+// replaces it. Own feed on calendar:write, anyone's with calendar:manage.
+$router->register('POST',   '/api/calendar/staff/{profileId:\d+}/feed',     [$calendarHandler, 'enableFeed'],      null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('DELETE', '/api/calendar/staff/{profileId:\d+}/feed',     [$calendarHandler, 'disableFeed'],     null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('GET',    '/api/calendar/staff/{profileId:\d+}/hours',    [$calendarHandler, 'getHours'],        null, null, CorePermissions::CALENDAR_READ);
 $router->register('PUT',    '/api/calendar/staff/{profileId:\d+}/hours',    [$calendarHandler, 'putHours'],        null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('GET',    '/api/calendar/time-off',                       [$calendarHandler, 'listExceptions'],  null, null, CorePermissions::CALENDAR_READ);
@@ -5202,6 +5212,33 @@ $hostResolver = new \Whity\Core\Branding\HostResolver(
     $brandingHostRepo,
     getenv('BRANDING_BASE_DOMAIN') ?: ''
 );
+
+// ── Public booking page, manage links, staff feed (WHIT-942, ADR 0017) ─────
+// UNAUTHENTICATED (null, null). The workspace comes from the path slug,
+// checked against the host, or from a 256-bit token naming its own row; each
+// path is an anchored pattern in EnforceTenantIsolation. The handler throttles
+// per IP before it looks anything up.
+$publicBookingHandler = new \Whity\Api\PublicBookingApiHandler(
+    $calendarBookingService,
+    $calendarRepository,
+    $calendarServiceRepository,
+    $calendarBookingRepository,
+    new \Whity\Core\Calendar\ManageLinks($db->getPdo()),
+    $calendarFeed,
+    $brandingHostRepo,
+    $hostResolver,
+    $publicFormBotCheck,
+    new DatabaseSharedStore($db->getPdo()),
+);
+$router->register('GET',  '/api/public/booking/{workspace}',                       [$publicBookingHandler, 'page'],        null);
+$router->register('GET',  '/api/public/booking/{workspace}/slots',                 [$publicBookingHandler, 'slots'],       null);
+$router->register('POST', '/api/public/booking/{workspace}/bookings',              [$publicBookingHandler, 'book'],        null);
+$router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}',             [$publicBookingHandler, 'showBooking'], null);
+$router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/slots',       [$publicBookingHandler, 'manageSlots'], null);
+$router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/move',        [$publicBookingHandler, 'move'],        null);
+$router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/cancel',      [$publicBookingHandler, 'cancel'],      null);
+$router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/ics',         [$publicBookingHandler, 'ics'],         null);
+$router->register('GET',  '/api/public/calendar/feeds/{token:[a-f0-9]{64}\.ics}', [$publicBookingHandler, 'feed'],        null);
 $brandingHandler = new \Whity\Api\BrandingApiHandler(
     $brandingService,
     $hostResolver,

@@ -9,6 +9,7 @@ use DateTimeZone;
 use PDO;
 use Throwable;
 use Whity\Core\Hooks\HookManager;
+use Whity\Core\Queue\QueueService;
 use Whity\Core\Settings\SettingsService;
 
 /**
@@ -30,6 +31,10 @@ final class BookingService
     /** @var list<ExternalBusySource> */
     private array $busySources = [];
 
+    private ?ManageLinks $links = null;
+
+    private ?QueueService $queue = null;
+
     public function __construct(
         private readonly PDO $db,
         private readonly CalendarRepository $calendar,
@@ -50,6 +55,18 @@ final class BookingService
     public function setMessenger(BookingMessenger $messenger): void
     {
         $this->messenger = $messenger;
+    }
+
+    /** Customer manage links (WHIT-942): issued on create and move, revoked on cancel. */
+    public function setLinks(ManageLinks $links): void
+    {
+        $this->links = $links;
+    }
+
+    /** Reminders are queued here when set ({@see BookingReminderJob}). */
+    public function setQueue(QueueService $queue): void
+    {
+        $this->queue = $queue;
     }
 
     public function settingsFor(int $tenantId): CalendarSettings
@@ -152,7 +169,7 @@ final class BookingService
                 ]);
             });
             if ($id !== null) {
-                $booking = $this->bookingOrFail($tenantId, $id);
+                $booking = $this->afterWrite($tenantId, $id);
                 $this->announceBooking(CalendarEventNames::BOOKING_CREATED, $tenantId, $booking);
                 $this->announceBooking(CalendarEventNames::BOOKING_CONFIRMED, $tenantId, $booking);
                 $this->tell('confirmed', $tenantId, $booking);
@@ -203,7 +220,7 @@ final class BookingService
             throw CalendarRejectedException::taken();
         }
 
-        $booking = $this->bookingOrFail($tenantId, $bookingId);
+        $booking = $this->afterWrite($tenantId, $bookingId);
         $this->announceBooking(CalendarEventNames::BOOKING_RESCHEDULED, $tenantId, $booking);
         $this->tell('rescheduled', $tenantId, $booking);
 
@@ -224,6 +241,7 @@ final class BookingService
         if (!$done) {
             throw new CalendarRejectedException('This booking is already cancelled or has ended.', 422);
         }
+        $this->links?->revoke($tenantId, $bookingId);
         $booking = $this->bookingOrFail($tenantId, $bookingId);
         $this->announceBooking(CalendarEventNames::BOOKING_CANCELLED, $tenantId, $booking);
         $this->tell('cancelled', $tenantId, $booking);
@@ -278,6 +296,65 @@ final class BookingService
         $row = $this->bookings->find($tenantId, $id) ?? throw CalendarRejectedException::notFound('Booking');
         $booking = BookingRepository::toApi($row);
         $booking['service'] = $this->services->find($tenantId, (int) $row['service_id']);
+        $booking['staff_name'] = $this->calendar->displayName((int) $row['profile_id']);
+
+        return $booking;
+    }
+
+    /**
+     * Send a booking's reminder if it is still due (the queued job's work).
+     * Returns what happened, or `['due' => …]` when it is not due yet and the
+     * job must be queued again.
+     *
+     * @return string|array{due: DateTimeImmutable}
+     */
+    public function sendReminder(int $tenantId, int $bookingId, string $startsAt): string|array
+    {
+        $row = $this->bookings->find($tenantId, $bookingId);
+        if ($row === null || $row['status'] !== BookingRepository::STATUS_CONFIRMED) {
+            return 'not on';
+        }
+        if (Interval::toApi(Interval::fromDb((string) $row['starts_at'])) !== $startsAt) {
+            return 'moved';
+        }
+        if ($row['reminder_sent_at'] !== null || $row['reminder_due_at'] === null) {
+            return 'nothing due';
+        }
+        $due = Interval::fromDb((string) $row['reminder_due_at']);
+        if ($due->getTimestamp() > $this->now()->getTimestamp() + 60) {
+            return ['due' => $due];
+        }
+        // Claimed before sending, so two workers never both send it.
+        if (!$this->bookings->markReminded($tenantId, $bookingId, $this->now())) {
+            return 'already sent';
+        }
+        $this->tell('remind', $tenantId, $this->bookingOrFail($tenantId, $bookingId));
+
+        return 'sent';
+    }
+
+    /**
+     * The booking after a create or a move: a fresh manage link when the
+     * customer gave an email, and the reminder queued.
+     *
+     * @return array<string, mixed>
+     */
+    private function afterWrite(int $tenantId, int $bookingId): array
+    {
+        $booking = $this->bookingOrFail($tenantId, $bookingId);
+        $start = Interval::fromApi($booking['starts_at']) ?? $this->now();
+        if ($this->links !== null && $booking['customer']['email'] !== '') {
+            $booking['manage_token'] = $this->links->issue($tenantId, $bookingId, $start);
+        }
+        if ($this->queue !== null) {
+            $row = $this->bookings->find($tenantId, $bookingId);
+            $due = $row !== null && $row['reminder_due_at'] !== null ? Interval::fromDb((string) $row['reminder_due_at']) : null;
+            try {
+                BookingReminderJob::schedule($this->queue, $tenantId, $bookingId, (string) $booking['starts_at'], $due, $this->now());
+            } catch (Throwable $e) {
+                error_log('[calendar] could not queue a reminder: ' . $e->getMessage());
+            }
+        }
 
         return $booking;
     }
@@ -493,6 +570,7 @@ final class BookingService
             match ($what) {
                 'confirmed' => $this->messenger->confirmed($tenantId, $booking),
                 'rescheduled' => $this->messenger->rescheduled($tenantId, $booking),
+                'remind' => $this->messenger->remind($tenantId, $booking),
                 default => $this->messenger->cancelled($tenantId, $booking),
             };
         } catch (Throwable $e) {

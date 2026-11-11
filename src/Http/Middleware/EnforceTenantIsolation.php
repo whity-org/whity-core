@@ -349,6 +349,16 @@ class EnforceTenantIsolation
         // the host. PublicSignupApiHandler throttles before examining anything
         // and answers the same 202 for every address it accepts.
         '#^/api/v1/public/signup/workspaces/[a-z0-9-]+$#',
+        // WHIT-942 (ADR 0017): the public booking page names its workspace by
+        // slug, checked against the host; the manage link and the staff feed
+        // name their own row by a 256-bit token. PublicBookingApiHandler
+        // throttles per IP before looking anything up.
+        '#^/api/v1/public/booking/[a-z0-9-]+$#',
+        '#^/api/v1/public/booking/[a-z0-9-]+/slots$#',
+        '#^/api/v1/public/booking/[a-z0-9-]+/bookings$#',
+        '#^/api/v1/public/bookings/[a-f0-9]{64}$#',
+        '#^/api/v1/public/bookings/[a-f0-9]{64}/(slots|move|cancel|ics)$#',
+        '#^/api/v1/public/calendar/feeds/[a-f0-9]{64}\.ics$#',
         '#^/api/v1/public/forms/[^/]+/uploads$#',
         '#^/api/v1/public/forms/[^/]+/submissions$#',
 

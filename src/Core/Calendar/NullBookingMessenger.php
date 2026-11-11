@@ -18,4 +18,8 @@ final class NullBookingMessenger implements BookingMessenger
     public function cancelled(int $tenantId, array $booking): void
     {
     }
+
+    public function remind(int $tenantId, array $booking): void
+    {
+    }
 }
