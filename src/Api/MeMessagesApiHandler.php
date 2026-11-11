@@ -159,7 +159,7 @@ final class MeMessagesApiHandler
         try {
             return $fn($tenantId, $profileId);
         } catch (MessagingException $e) {
-            return Response::error($e->getMessage(), 422);
+            return Response::error($e->plain(), 422);
         } catch (\Throwable $e) {
             error_log('[MeMessagesApiHandler] request failed: ' . $e->getMessage());
 

@@ -163,7 +163,7 @@ final class PublicChatApiHandler
         } catch (MessagingException $e) {
             $this->rollBack($own);
 
-            return Response::error($e->getMessage(), 422);
+            return Response::error($e->plain(), 422);
         } catch (\Throwable $e) {
             $this->rollBack($own);
             error_log('[PublicChat] start failed: ' . $e->getMessage());
@@ -216,7 +216,7 @@ final class PublicChatApiHandler
                 (int) $visitor['conversation_id']
             );
         } catch (MessagingException $e) {
-            return Response::error($e->getMessage(), 422);
+            return Response::error($e->plain(), 422);
         } catch (\Throwable $e) {
             error_log('[PublicChat] send failed: ' . $e->getMessage());
 
