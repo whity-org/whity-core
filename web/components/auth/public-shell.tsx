@@ -11,13 +11,14 @@ import { useBranding } from '@/lib/branding-context';
  * workspace's logo above, "Built on Whity" and the language switcher below.
  * Same shape as the public form page, /f/[slug].
  */
-export function PublicShell({ children }: { children: ReactNode }) {
+export function PublicShell({ children, wide = false }: { children: ReactNode; /** A wider column, for the booking page's week of days (WHIT-945). */ wide?: boolean }) {
   const branding = useBranding();
   const t = useTranslation('auth');
+  const width = wide ? 'max-w-2xl' : 'max-w-md';
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-background px-4 py-10">
-      <div className="w-full max-w-md flex-1 space-y-6">
+      <div className={`w-full ${width} flex-1 space-y-6`}>
         <div className="flex justify-center">
           <TenantLogo
             name={branding.siteName}
@@ -28,7 +29,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
         </div>
         {children}
       </div>
-      <footer className="mt-10 flex w-full max-w-md flex-wrap items-center justify-between gap-3">
+      <footer className={`mt-10 flex w-full ${width} flex-wrap items-center justify-between gap-3`}>
         {/* WHIT-932: the workspace's plan may remove the credit. */}
         {branding.builtOnWhity && <BuiltOnWhity label={t('join.builtOn', 'Built on Whity')} />}
         <LanguageSwitcher
