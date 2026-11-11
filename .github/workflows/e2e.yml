@@ -141,46 +141,42 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
 
-      # Pull pgvector/pgvector:pg15 before compose up so Docker Hub flakiness
-      # (rate-limit / transient auth timeout) can be retried independently.
-      # Three attempts with a backoff are enough to ride out brief outages
-      # without burning the 25-minute job timeout on a single hung pull.
-      - name: Pull Docker base images (with retry)
-        run: |
-          for i in 1 2 3; do
-            docker pull pgvector/pgvector:pg15 && break
-            echo "Pull attempt $i failed — retrying in 15s..."
-            sleep 15
-          done
-
+      # IN THE BACKGROUND (WHIT-935). The stack took ~80 s (image build ~30 s,
+      # then healthchecks), and npm ci plus the Playwright deps took another
+      # ~115 s that did not need it. Started here, it comes up while those run;
+      # "Wait for the backend stack" below joins it before the tests.
+      #
+      # Pull pgvector/pgvector:pg15 first so Docker Hub flakiness (rate-limit /
+      # transient auth timeout) can be retried independently; three attempts
+      # with a backoff ride out brief outages.
+      #
       # The dev compose file builds whity-core:dev from the Dockerfile `base`
-      # target and bind-mounts the checkout. With the APP_ENV=development
-      # default, the one-shot db-init service runs migrations + seed before
-      # the worker pool starts, so the stack comes up with the deterministic
-      # accounts the suite expects (admin123 / user123 compose defaults).
-      - name: Start the backend stack
-        # MCP on, so mcp-connect.spec.ts can connect an app for real (WHIT-697).
+      # target and bind-mounts the checkout (so vendor/ must exist first). With
+      # the APP_ENV=development default, the one-shot db-init service runs
+      # migrations + seed before the worker pool starts, so the stack comes up
+      # with the deterministic accounts the suite expects (admin123 / user123
+      # compose defaults). MCP on, so mcp-connect.spec.ts can connect an app for
+      # real (WHIT-697).
+      #
+      # No image cache: once the build runs beside npm ci it is off the
+      # critical path, so caching it would save nothing a shard waits for.
+      - name: Start the backend stack (in the background)
         env:
           MCP_ENABLED: 'true'
-        run: docker compose -f docker-compose.yml up -d --wait
-
-      # `--wait` covers container/healthcheck state, not end-to-end readiness
-      # of the HTTP surface; poll the health endpoint until the API answers.
-      - name: Wait for the backend API
         run: |
-          for i in $(seq 1 60); do
-            if curl -fsS http://localhost:8000/api/health > /dev/null 2>&1; then
-              echo "Backend healthy after ~$(( i * 2 ))s"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Backend did not become healthy within 120s" >&2
-          docker compose -f docker-compose.yml ps
-          docker compose -f docker-compose.yml logs --tail 100
-          exit 1
+          nohup bash -c '
+            for i in 1 2 3; do
+              docker pull pgvector/pgvector:pg15 && break
+              echo "Pull attempt $i failed — retrying in 15s..."
+              sleep 15
+            done
+            docker compose -f docker-compose.yml up -d --wait
+            echo $? > "$RUNNER_TEMP/stack.exit"
+          ' > "$RUNNER_TEMP/stack.log" 2>&1 &
+          echo "backend stack starting in the background (pid $!)"
 
-      # setup-node v5 (issue #198 tracks aligning the other workflows' v4).
+      # Setup Node, npm ci and the Playwright browser/deps steps sit between
+      # the background start above and the join below.
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
@@ -332,11 +328,52 @@ jobs:
               .catch(e => { console.error('Chromium cannot launch — dependencies really are missing:', e.message); process.exit(1); });
           "
 
+      # Join the background start: wait for `compose up --wait` to finish and
+      # fail with its log if it did, then poll the health endpoint, because
+      # `--wait` covers container healthchecks, not end-to-end readiness of
+      # the HTTP surface.
+      - name: Wait for the backend stack
+        run: |
+          for i in $(seq 1 300); do
+            [ -f "$RUNNER_TEMP/stack.exit" ] && break
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/stack.log"
+          if [ "$(cat "$RUNNER_TEMP/stack.exit" 2>/dev/null)" != "0" ]; then
+            echo "::error::docker compose up did not finish cleanly (exit: $(cat "$RUNNER_TEMP/stack.exit" 2>/dev/null || echo 'still running after 300 s'))"
+            docker compose -f docker-compose.yml ps
+            docker compose -f docker-compose.yml logs --tail 100
+            exit 1
+          fi
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/api/health > /dev/null 2>&1; then
+              echo "Backend healthy after ~$(( i * 2 ))s of polling"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend did not become healthy within 120s" >&2
+          docker compose -f docker-compose.yml ps
+          docker compose -f docker-compose.yml logs --tail 100
+          exit 1
+
+      # Balanced on recorded seconds per spec file (scripts/e2e-shard.mjs,
+      # scripts/e2e-timings.json) instead of Playwright's --shard, which splits
+      # by test count. The planner fails the job when the shards do not cover
+      # every spec exactly once or when this shard is empty; Playwright itself
+      # fails on "No tests found". The `setup` project is a dependency and runs
+      # in every shard, as it did with --shard.
+      #
       # The Playwright config starts the Next dev server itself (webServer on
       # port 3010) and proxies /api/* to the stack at localhost:8000.
       - name: Run the E2E suite (shard ${{ matrix.shard }}/4)
         working-directory: web
-        run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: playwright-json/shard-${{ matrix.shard }}.json
+        run: |
+          node ../scripts/e2e-shard.mjs plan ${{ matrix.shard }} ${{ strategy.job-total }} > "$RUNNER_TEMP/specs.txt"
+          mapfile -t specs < "$RUNNER_TEMP/specs.txt"
+          npx playwright test "${specs[@]}"
 
       - name: Upload Playwright report and traces
         if: failure()
@@ -347,6 +384,51 @@ jobs:
             web/playwright-report
             web/test-results
           retention-days: 7
+          if-no-files-found: ignore
+
+      # Per-file seconds for the next timings refresh (the `e2e-timings` job).
+      - name: Upload Playwright JSON report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-json-${{ matrix.shard }}
+          path: web/playwright-json/shard-${{ matrix.shard }}.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # Rebuilds scripts/e2e-timings.json from the shards' JSON reports and
+  # publishes it as the `e2e-timings` artifact; commit it when the plan drifts.
+  # Reporting only: it runs after red shards too, and fails nothing on a test.
+  e2e-timings:
+    name: E2E test timings
+    needs: [changes, e2e]
+    if: always() && needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Download shard JSON reports
+        uses: actions/download-artifact@v8
+        with:
+          pattern: e2e-json-*
+          merge-multiple: true
+          path: e2e-json
+
+      - name: Rebuild per-file E2E timings
+        run: |
+          if ! ls e2e-json/*.json >/dev/null 2>&1; then
+            echo "no Playwright JSON reports in this run"
+            exit 0
+          fi
+          node scripts/e2e-shard.mjs timings e2e-timings.json e2e-json --keep-from=scripts/e2e-timings.json
+
+      - name: Upload E2E timings
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-timings
+          path: e2e-timings.json
+          retention-days: 30
           if-no-files-found: ignore
 
   # ONE verdict branch protection can require, mirroring `CI gate` in
@@ -364,6 +446,7 @@ jobs:
     needs:
       - changes
       - e2e
+      - e2e-timings
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
