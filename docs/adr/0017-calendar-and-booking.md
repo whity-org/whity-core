@@ -110,8 +110,9 @@ decision-register rules that had no setting.
   - a day's hours are computed from that day's own offsets, so a 09:00 to
     17:00 day is 8 hours of wall clock even when it is 7 or 9 hours of
     elapsed time across a change.
-  - Slots step through local wall-clock time, then every candidate is
-    checked as an UTC interval, so nothing is offered twice or skipped.
+  - Slots step through absolute time from the start of each open window,
+    and every candidate is checked as a UTC interval, so across a clock
+    change nothing is offered twice or skipped.
 - **Display** is in the workspace's zone (the web's `useDateDisplay()` with
   the zone passed in). The public page says which zone the times are in and,
   when the visitor's browser is in another zone, shows both. Confirmation
