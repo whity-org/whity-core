@@ -7,6 +7,7 @@ namespace Whity\Core\Usage;
 use DateTimeImmutable;
 use DateTimeZone;
 use PDO;
+use Whity\Core\Calendar\CalendarEventNames;
 use Whity\Core\Entitlement\EntitlementRegistry;
 use Whity\Core\Entitlement\EntitlementService;
 use Whity\Core\Hooks\HookManager;
@@ -29,7 +30,12 @@ use Whity\Sdk\Hooks\Events;
  *    counts once, because two anonymous people cannot be told apart and no
  *    name or email is kept for the count;
  *  - somebody who joins as a customer through the workspace's own sign-up
- *    (`memberships.kind = 'customer'`, WHIT-915).
+ *    (`memberships.kind = 'customer'`, WHIT-915);
+ *  - somebody whose booking is confirmed (WHIT-941, ADR 0017): by profile
+ *    when the booking is linked to one that is not staff, otherwise by a
+ *    hash of the email they gave, so one person booking twice in a month
+ *    counts once and no address is kept in the count. A booking for a
+ *    member of staff counts nothing.
  *
  * Staff (`memberships.kind = 'member'`) sending an internal form are not
  * customers. Agents are never counted: they act for staff.
@@ -58,6 +64,7 @@ final class CustomerUsage
     {
         $hooks->listen(Events::FORM_SUBMITTED, [$this, 'onFormSubmitted']);
         $hooks->listen(Events::MEMBERSHIP_CUSTOMER_JOINED, [$this, 'onCustomerJoined']);
+        $hooks->listen(CalendarEventNames::BOOKING_CONFIRMED, [$this, 'onBookingConfirmed']);
     }
 
     /**
@@ -82,6 +89,47 @@ final class CustomerUsage
             }
         } catch (\Throwable $e) {
             error_log('[customers] could not count a form submission: ' . $e->getMessage());
+        }
+
+        return $data;
+    }
+
+    /**
+     * A confirmed booking (ADR 0017, section 8).
+     *
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    public function onBookingConfirmed(array $data, array $context = []): array
+    {
+        try {
+            $tenantId = (int) ($data['tenant_id'] ?? 0);
+            $bookingId = (int) ($data['id'] ?? 0);
+            if ($tenantId <= 0 || $bookingId <= 0) {
+                return $data;
+            }
+            $stmt = $this->db->prepare(
+                'SELECT customer_profile_id, customer_email FROM calendar_bookings WHERE tenant_id = :tenant_id AND id = :id'
+            );
+            $stmt->execute([':tenant_id' => $tenantId, ':id' => $bookingId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!is_array($row)) {
+                return $data;
+            }
+            $profileId = $row['customer_profile_id'] !== null ? (int) $row['customer_profile_id'] : null;
+            $email = strtolower(trim((string) $row['customer_email']));
+            if ($profileId !== null) {
+                if (!$this->isStaff($tenantId, $profileId)) {
+                    $this->served($tenantId, 'profile:' . $profileId);
+                }
+            } elseif ($email !== '') {
+                $this->served($tenantId, 'booking-email:' . hash('sha256', $email));
+            } else {
+                $this->served($tenantId, 'booking:' . $bookingId);
+            }
+        } catch (\Throwable $e) {
+            error_log('[customers] could not count a booking: ' . $e->getMessage());
         }
 
         return $data;

@@ -117,6 +117,17 @@ final class TenantOwnedTables
         'tenant_plan_addons' => '241_create_tenant_plan_addons.php',
         'tenant_monthly_customers' => '242_create_tenant_monthly_customers.php',
 
+        // WHIT-941 — calendar and bookings (ADR 0017). Every query binds
+        // tenant_id; the two token lookups (feed, manage link) are reasoned
+        // ignores that read the tenant from the row they find.
+        'calendar_staff' => '247_create_calendar.php',
+        'calendar_working_hours' => '247_create_calendar.php',
+        'calendar_availability_exceptions' => '247_create_calendar.php',
+        'calendar_events' => '247_create_calendar.php',
+        'calendar_services' => '248_create_calendar_bookings.php',
+        'calendar_service_staff' => '248_create_calendar_bookings.php',
+        'calendar_bookings' => '248_create_calendar_bookings.php',
+
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says
         // which workspace a referrer brought, which is tenant data. `affiliates`,

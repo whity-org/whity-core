@@ -474,6 +474,13 @@ final class CorePermissions
     public const CONVENING_MANAGE = 'convening:manage';
     public const CONVENING_DECIDE = 'convening:decide';
 
+    // CALENDAR (migrations 247 to 249, ADR 0017). Staff calendars, services,
+    // availability and bookings. Read and write go to every staff role (anchor
+    // documents:read); manage to the roles that run the workspace.
+    public const CALENDAR_READ = 'calendar:read';
+    public const CALENDAR_WRITE = 'calendar:write';
+    public const CALENDAR_MANAGE = 'calendar:manage';
+
     /**
      * Return the full list of core permission strings.
      *
@@ -571,6 +578,9 @@ final class CorePermissions
             self::CONVENING_READ,
             self::CONVENING_MANAGE,
             self::CONVENING_DECIDE,
+            self::CALENDAR_READ,
+            self::CALENDAR_WRITE,
+            self::CALENDAR_MANAGE,
         ];
     }
 }

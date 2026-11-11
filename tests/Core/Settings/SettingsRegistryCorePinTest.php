@@ -182,6 +182,15 @@ final class SettingsRegistryCorePinTest extends TestCase
             'ui.hide_dates',
             // #1019. The cap on one label-resolution request.
             'labels.resolve_max_ids',
+            // WHIT-941. Calendar and bookings (ADR 0017).
+            'calendar.booking_page_enabled',
+            'calendar.min_notice_minutes',
+            'calendar.max_advance_days',
+            'calendar.slot_step_minutes',
+            'calendar.reminder_hours_before',
+            'calendar.payment_hold_minutes',
+            'calendar.week_start',
+            'calendar.weekend_days',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
         ];
@@ -389,6 +398,16 @@ final class SettingsRegistryCorePinTest extends TestCase
             // argument i18n.enabled won above, pointing the other way.
             'ui.hide_dates' => 'false',
             'labels.resolve_max_ids' => '100',
+            // WHIT-941: the booking page is off until a workspace turns it on;
+            // the week starts on Saturday with Friday and Saturday off (design register).
+            'calendar.booking_page_enabled' => 'false',
+            'calendar.min_notice_minutes' => '120',
+            'calendar.max_advance_days' => '60',
+            'calendar.slot_step_minutes' => '15',
+            'calendar.reminder_hours_before' => '24',
+            'calendar.payment_hold_minutes' => '15',
+            'calendar.week_start' => 'saturday',
+            'calendar.weekend_days' => 'friday,saturday',
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',
@@ -544,6 +563,20 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['labels.resolve_max_ids', '500', true],
             ['labels.resolve_max_ids', '501', false],
             ['labels.resolve_max_ids', '0', false],
+            ['calendar.booking_page_enabled', 'true', true],
+            ['calendar.booking_page_enabled', '1', false],
+            ['calendar.min_notice_minutes', '0', true],
+            ['calendar.min_notice_minutes', '-5', false],
+            ['calendar.max_advance_days', '0', false],
+            ['calendar.slot_step_minutes', '4', false],
+            ['calendar.reminder_hours_before', '169', false],
+            ['calendar.payment_hold_minutes', '30', true],
+            ['calendar.week_start', 'sunday', true],
+            ['calendar.week_start', 'Sunday', false],
+            ['calendar.weekend_days', 'friday,saturday', true],
+            ['calendar.weekend_days', '', true],
+            ['calendar.weekend_days', 'friday,friday', false],
+            ['calendar.weekend_days', 'fri', false],
             ['app.installable', 'false', true],
             ['app.installable', '1', false],
             ['branding_favicon', 'anything', false],

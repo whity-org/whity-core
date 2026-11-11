@@ -116,6 +116,7 @@ final class CoreApiSchemas
             self::timeWindowRoutes(),
             self::formRoutes(),
             self::conveningRoutes(),
+            self::calendarRoutes(),
             self::delegationRoutes(),
             self::auditRoutes(),
             self::frontendFeatureRoutes(),
@@ -9443,6 +9444,160 @@ final class CoreApiSchemas
                     ], ['body', 'agenda', 'decisions', 'invitations', 'attendance']),
                 ]]
             ),
+            'CalendarSettings' => self::object([
+                'time_zone' => self::str() + ['description' => 'The workspace time zone (IANA).'],
+                'booking_page_enabled' => self::bool(),
+                'min_notice_minutes' => self::int(),
+                'max_advance_days' => self::int(),
+                'slot_step_minutes' => self::int(),
+                'reminder_hours_before' => self::int() + ['description' => '0 means no reminder.'],
+                'payment_hold_minutes' => self::int(),
+                'week_start' => self::str(),
+                'weekend_days' => ['type' => 'array', 'items' => self::str()],
+                'currency' => self::str(),
+            ], ['time_zone', 'booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'payment_hold_minutes', 'week_start', 'weekend_days', 'currency']),
+            'CalendarSettingsRequest' => self::object([
+                'booking_page_enabled' => self::bool() + ['description' => 'Turn the public booking page on or off.'],
+                'min_notice_minutes' => self::int() + ['minimum' => 0, 'maximum' => 43200, 'description' => 'Least time between booking and start, in minutes.'],
+                'max_advance_days' => self::int() + ['minimum' => 1, 'maximum' => 730, 'description' => 'How many days ahead a booking may be made.'],
+                'slot_step_minutes' => self::int() + ['minimum' => 5, 'maximum' => 240, 'description' => 'Free times are offered every this many minutes.'],
+                'reminder_hours_before' => self::int() + ['minimum' => 0, 'maximum' => 168, 'description' => 'Send one reminder this many hours before; 0 sends none.'],
+                'payment_hold_minutes' => self::int() + ['minimum' => 1, 'maximum' => 1440, 'description' => 'How long a payment step holds a slot.'],
+                'week_start' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], 'description' => 'The first day of the week in calendar views.'],
+                'weekend_days' => ['type' => 'array', 'items' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']], 'description' => 'Days shown as the weekend.'],
+            ], []),
+            'CalendarStaff' => self::object([
+                'profile_id' => self::int(),
+                'display_name' => self::str(),
+                'bookable' => self::bool() + ['description' => 'Offered on the public booking page.'],
+                'sort_order' => self::int(),
+                'feed_enabled' => self::bool(),
+            ], ['profile_id', 'display_name', 'bookable', 'sort_order', 'feed_enabled']),
+            'CalendarStaffRequest' => self::object([
+                'bookable' => self::bool() + ['description' => 'Offer this person on the public booking page.'],
+                'sort_order' => self::int() + ['description' => 'Position in lists and in "anyone" order; lower comes first.'],
+            ], []),
+            'CalendarHours' => self::object([
+                'weekday' => self::int() + ['minimum' => 1, 'maximum' => 7, 'description' => 'ISO weekday: 1 Monday to 7 Sunday.'],
+                'start_time' => self::str() + ['description' => 'Local `HH:MM`.'],
+                'end_time' => self::str() + ['description' => 'Local `HH:MM`; `24:00` is midnight.'],
+            ], ['weekday', 'start_time', 'end_time']),
+            'CalendarHoursRequest' => self::object([
+                'hours' => ['type' => 'array', 'maxItems' => 70, 'items' => SchemaBuilder::ref('CalendarHours'), 'description' => 'Every working-hours row for the week; the list replaces what is there.'],
+            ], ['hours']),
+            'CalendarTimeOff' => self::object([
+                'id' => self::int(),
+                'profile_id' => self::int(),
+                'kind' => self::str() + ['enum' => ['off', 'open']],
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'note' => self::str(),
+            ], ['id', 'profile_id', 'kind', 'starts_at', 'ends_at', 'note']),
+            'CalendarTimeOffRequest' => self::object([
+                'profile_id' => self::int() + ['description' => 'Whose calendar. Default: yours.'],
+                'kind' => self::str() + ['enum' => ['off', 'open'], 'description' => '`off` is time off; `open` adds hours on a day that is normally closed. Default `off`.'],
+                'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
+                'ends_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
+                'note' => self::str() + ['maxLength' => 500, 'description' => 'A short note for the team.'],
+            ], ['starts_at', 'ends_at']),
+            'CalendarService' => self::object([
+                'id' => self::int(),
+                'name' => SchemaBuilder::ref('LocalizedLabel'),
+                'description' => SchemaBuilder::ref('LocalizedLabel'),
+                'duration_minutes' => self::int(),
+                'buffer_before_minutes' => self::int(),
+                'buffer_after_minutes' => self::int(),
+                'price_minor' => self::int(true) + ['description' => 'Minor units (JOD 12.500 is 12500); null when no price is shown.'],
+                'currency' => self::str(),
+                'bookable_online' => self::bool(),
+                'active' => self::bool(),
+                'sort_order' => self::int(),
+                'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
+            ], ['id', 'name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_minor', 'currency', 'bookable_online', 'active', 'sort_order', 'staff_profile_ids']),
+            'CalendarServiceRequest' => self::object([
+                'name' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],
+                'description' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],
+                'duration_minutes' => self::int() + ['minimum' => 5, 'maximum' => 1440, 'description' => 'How long the service takes.'],
+                'buffer_before_minutes' => self::int() + ['minimum' => 0, 'maximum' => 240, 'description' => 'Time kept free before it.'],
+                'buffer_after_minutes' => self::int() + ['minimum' => 0, 'maximum' => 240, 'description' => 'Time kept free after it.'],
+                'price_minor' => self::int(true) + ['minimum' => 0, 'description' => 'Price shown to customers, in minor units (JOD 12.500 is 12500); null shows no price.'],
+                'currency' => self::str() + ['pattern' => '^[A-Z]{3}$', 'description' => 'Three-letter currency code; default the workspace currency.'],
+                'bookable_online' => self::bool() + ['description' => 'Offer it on the public booking page.'],
+                'active' => self::bool() + ['description' => 'Inactive services cannot be booked.'],
+                'sort_order' => self::int() + ['minimum' => 0, 'description' => 'Position in lists; lower comes first.'],
+                'staff_profile_ids' => ['type' => 'array', 'maxItems' => 200, 'items' => self::int(), 'description' => 'The staff who provide it; the list replaces what is there.'],
+            ], []),
+            'CalendarSlot' => self::object([
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'profile_ids' => ['type' => 'array', 'items' => self::int(), 'description' => 'Who is free then.'],
+            ], ['starts_at', 'ends_at', 'profile_ids']),
+            'CalendarBookingCustomer' => self::object([
+                'profile_id' => self::int() + ['description' => 'An existing customer or member of this workspace.'],
+                'name' => self::str() + ['maxLength' => 200],
+                'email' => self::str() + ['maxLength' => 320],
+                'phone' => self::str() + ['maxLength' => 40],
+                'note' => self::str() + ['maxLength' => 1000],
+            ], []),
+            'CalendarBooking' => self::object([
+                'id' => self::int(),
+                'service_id' => self::int(),
+                'profile_id' => self::int() + ['description' => 'The member of staff.'],
+                'customer_profile_id' => self::int(true),
+                'customer' => SchemaBuilder::ref('CalendarBookingCustomer'),
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'blocks_from' => self::str() + ['description' => 'Start including the buffer before.'],
+                'blocks_until' => self::str() + ['description' => 'End including the buffer after.'],
+                'status' => self::str() + ['enum' => ['pending_payment', 'confirmed', 'cancelled', 'expired']],
+                'hold_expires_at' => self::str(true),
+                'source' => self::str() + ['enum' => ['staff', 'public', 'agent']],
+                'price_minor' => self::int(true),
+                'currency' => self::str(),
+                'cancelled_by' => self::str(true),
+                'cancel_reason' => self::str(),
+                'created_at' => self::str(true),
+            ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
+            'CalendarBookingCreateRequest' => self::object([
+                'service_id' => self::int() + ['description' => 'The service to book.'],
+                'profile_id' => self::int() + ['description' => 'Leave out for whoever is free.'],
+                'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
+                'customer' => ['allOf' => [SchemaBuilder::ref('CalendarBookingCustomer')], 'description' => 'Who the booking is for: an existing customer by profile_id, or a name with an email or phone.'],
+                'keep_to_hours' => self::bool() + ['description' => 'Refuse a time outside working hours. Always on for agents.'],
+            ], ['service_id', 'starts_at', 'customer']),
+            'CalendarBookingMoveRequest' => self::object([
+                'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
+                'profile_id' => self::int() + ['description' => 'Move to another person. Default: the same one.'],
+                'keep_to_hours' => self::bool() + ['description' => 'Refuse a time outside working hours. Always on for agents.'],
+            ], ['starts_at']),
+            'CalendarBookingCancelRequest' => self::object([
+                'reason' => self::str() + ['maxLength' => 500, 'description' => 'Why, in a few words; shown to the customer.'],
+            ], []),
+            'CalendarEvent' => self::object([
+                'id' => self::int(),
+                'profile_id' => self::int(),
+                'title' => self::str(),
+                'notes' => self::str(),
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'all_day' => self::bool(),
+                'busy' => self::bool(),
+                'status' => self::str(),
+                'external_ref' => self::str(true),
+            ], ['id', 'profile_id', 'title', 'starts_at', 'ends_at', 'all_day', 'busy', 'status']),
+            'CalendarEventRequest' => self::object([
+                'profile_id' => self::int() + ['description' => 'Whose calendar. Default: yours.'],
+                'title' => self::str() + ['maxLength' => 200, 'description' => 'What it is.'],
+                'notes' => self::str() + ['maxLength' => 5000, 'description' => 'More detail, for the team.'],
+                'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
+                'ends_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
+                'all_day' => self::bool() + ['description' => 'Shown as an all-day event.'],
+                'busy' => self::bool() + ['description' => 'Blocks bookings. Default true.'],
+            ], []),
+            'CalendarEventResponse' => self::object([
+                'data' => SchemaBuilder::ref('CalendarEvent'),
+                'overlapping_bookings' => ['type' => 'array', 'items' => self::int()],
+            ], ['data', 'overlapping_bookings']),
             'MeetingCreateRequest' => self::object([
                 'body_id' => self::int() + ['description' => 'Convening body holding the meeting (see GET /api/convening-bodies).'],
                 'title' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Meeting title, as text or as a `{language: text}` map.'],
@@ -15784,6 +15939,221 @@ final class CoreApiSchemas
             'requiredRole' => 'admin',
             'requiredPermission' => null,
             'schema' => $schema,
+        ];
+    }
+
+    /**
+     * Calendar and bookings (WHIT-941, ADR 0017). Instants are ISO 8601 with
+     * an offset on the way in and UTC with `Z` on the way out. Create, move and
+     * cancel declare no undo window, so an agent's call always becomes a
+     * proposal its person approves.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function calendarRoutes(): array
+    {
+        $range = [
+            self::queryParam('from', 'string', 'Start of the range, ISO 8601 with an offset, such as `2026-11-16T00:00:00+03:00`.', true),
+            self::queryParam('to', 'string', 'End of the range (exclusive), with an offset. At most 62 days after `from`.', true),
+        ];
+        $person = self::queryParam('profile_id', 'integer', 'Only this member of staff.');
+
+        return [
+            self::permissionRoute('GET', '/api/calendar/settings', 'calendar:read', [
+                'summary' => 'Read the calendar settings: time zone, booking window, slot step, reminders, week layout',
+                'tags' => ['calendar'],
+                'responses' => [200 => self::jsonResponse('The settings', self::dataEnvelope(SchemaBuilder::ref('CalendarSettings')))] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/calendar/settings', 'calendar:manage', [
+                'summary' => 'Change the calendar settings; fields left out keep their value',
+                'description' => 'The time zone is the workspace setting `timezone`, changed in Settings, not here.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarSettingsRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The settings', self::dataEnvelope(SchemaBuilder::ref('CalendarSettings'))),
+                    422 => self::errorResponse('A value out of range'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/staff', 'calendar:read', [
+                'summary' => 'List the staff who have a calendar',
+                'tags' => ['calendar'],
+                'responses' => [200 => self::jsonResponse('Staff with calendars', self::listEnvelope('CalendarStaff'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/calendar/staff/{profileId:\d+}', 'calendar:manage', [
+                'summary' => 'Give a member of staff a calendar, or change whether customers can book them online',
+                'tags' => ['calendar'],
+                'request' => 'CalendarStaffRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Staff with calendars', self::listEnvelope('CalendarStaff')),
+                    404 => self::errorResponse('Not a member of staff here'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/staff/{profileId:\d+}/hours', 'calendar:read', [
+                'summary' => 'Read a person\'s weekly working hours',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Weekly hours, local wall-clock time', self::listEnvelope('CalendarHours')),
+                    404 => self::errorResponse('Not a member of staff here'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/calendar/staff/{profileId:\d+}/hours', 'calendar:write', [
+                'summary' => 'Replace a person\'s weekly working hours',
+                'description' => 'Your own hours with `calendar:write`; anybody else\'s needs `calendar:manage`. Times are local wall-clock `HH:MM` in the workspace time zone; `24:00` ends at midnight.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarHoursRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Weekly hours', self::listEnvelope('CalendarHours')),
+                    403 => self::errorResponse('Another person\'s hours without calendar:manage'),
+                    422 => self::errorResponse('A row out of order or unreadable'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/time-off', 'calendar:read', [
+                'summary' => 'List time off and extra opening hours in a range',
+                'tags' => ['calendar'],
+                'parameters' => array_merge($range, [$person]),
+                'responses' => [200 => self::jsonResponse('Exceptions', self::listEnvelope('CalendarTimeOff'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/time-off', 'calendar:write', [
+                'summary' => 'Add time off (`off`) or extra hours (`open`) for a person',
+                'tags' => ['calendar'],
+                'request' => 'CalendarTimeOffRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The exception', self::dataEnvelope(SchemaBuilder::ref('CalendarTimeOff'))),
+                    403 => self::errorResponse('Another person\'s calendar without calendar:manage'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/calendar/time-off/{id:\d+}', 'calendar:write', [
+                'summary' => 'Remove time off or extra hours',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Removed', self::dataEnvelope(self::object(['id' => self::int(), 'deleted' => self::bool()], ['id', 'deleted']))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/services', 'calendar:read', [
+                'summary' => 'List services',
+                'tags' => ['calendar'],
+                'responses' => [200 => self::jsonResponse('Services', self::listEnvelope('CalendarService'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/services', 'calendar:manage', [
+                'summary' => 'Add a service',
+                'description' => 'The price is shown only; charging is a payment plugin\'s job. `price_minor` is in minor units: JOD 12.500 is 12500.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarServiceRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The service', self::dataEnvelope(SchemaBuilder::ref('CalendarService'))),
+                    422 => self::errorResponse('A missing or out-of-range value'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/services/{id:\d+}', 'calendar:read', [
+                'summary' => 'Get one service',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The service', self::dataEnvelope(SchemaBuilder::ref('CalendarService'))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/calendar/services/{id:\d+}', 'calendar:manage', [
+                'summary' => 'Change a service; fields left out keep their value',
+                'tags' => ['calendar'],
+                'request' => 'CalendarServiceRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The service', self::dataEnvelope(SchemaBuilder::ref('CalendarService'))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/availability', 'calendar:read', [
+                'summary' => 'List free times for a service',
+                'description' => 'Each slot lists the people free then. Working hours, time off, existing bookings with their buffers, busy events, the minimum notice and the booking window are all applied.',
+                'tags' => ['calendar'],
+                'parameters' => array_merge([self::queryParam('service_id', 'integer', 'The service.', true)], $range, [$person]),
+                'responses' => [
+                    200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
+                    404 => self::errorResponse('No such service'),
+                    422 => self::errorResponse('A missing or unreadable range'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/bookings', 'calendar:read', [
+                'summary' => 'List bookings in a range',
+                'tags' => ['calendar'],
+                'parameters' => array_merge($range, [$person, self::queryParam('status', 'string', 'Comma-separated statuses. Default: `confirmed,pending_payment`.')]),
+                'responses' => [200 => self::jsonResponse('Bookings', self::listEnvelope('CalendarBooking'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings', 'calendar:write', [
+                'summary' => 'Book a service for a customer',
+                'description' => 'Leave `profile_id` out to take whoever is free. Refused with 409 when the time was just taken. '
+                    . 'An agent\'s call becomes a proposal its person approves, and keeps to the working hours.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarBookingCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('No such service, person or customer'),
+                    409 => self::errorResponse('That time was just taken'),
+                    422 => self::errorResponse('Outside the booking window, or missing customer details'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/bookings/{id:\d+}', 'calendar:read', [
+                'summary' => 'Get one booking',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/move', 'calendar:write', [
+                'summary' => 'Move a booking to another time, or another person',
+                'tags' => ['calendar'],
+                'request' => 'CalendarBookingMoveRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('That time was just taken'),
+                    422 => self::errorResponse('A cancelled booking, or outside the booking window'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/cancel', 'calendar:write', [
+                'summary' => 'Cancel a booking',
+                'tags' => ['calendar'],
+                'request' => 'CalendarBookingCancelRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Already cancelled'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/events', 'calendar:read', [
+                'summary' => 'List staff events in a range',
+                'tags' => ['calendar'],
+                'parameters' => array_merge($range, [$person]),
+                'responses' => [200 => self::jsonResponse('Events', self::listEnvelope('CalendarEvent'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/events', 'calendar:write', [
+                'summary' => 'Add an event to a person\'s calendar',
+                'description' => 'Your own with `calendar:write`; anybody else\'s needs `calendar:manage`. A busy event blocks bookings. `overlapping_bookings` lists bookings it sits over.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarEventRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The event', SchemaBuilder::ref('CalendarEventResponse')),
+                    403 => self::errorResponse('Another person\'s calendar without calendar:manage'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/calendar/events/{id:\d+}', 'calendar:write', [
+                'summary' => 'Change an event; fields left out keep their value',
+                'tags' => ['calendar'],
+                'request' => 'CalendarEventRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The event', SchemaBuilder::ref('CalendarEventResponse')),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/calendar/events/{id:\d+}', 'calendar:write', [
+                'summary' => 'Remove an event',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Removed', self::dataEnvelope(self::object(['id' => self::int(), 'deleted' => self::bool()], ['id', 'deleted']))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
         ];
     }
 

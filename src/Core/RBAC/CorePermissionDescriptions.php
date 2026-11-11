@@ -149,6 +149,9 @@ final class CorePermissionDescriptions
         CorePermissions::PUBLIC_FORM_KEYS_MANAGE      => 'Issue and revoke the keys that open a plugin\'s public form for this workspace',
         CorePermissions::CONVENING_READ               => 'See the tenant\'s convening bodies, their meetings, agendas and recorded decisions',
         CorePermissions::CONVENING_MANAGE             => 'Create and change convening bodies and their membership, build agendas, schedule ',
+        CorePermissions::CALENDAR_READ                => 'See the team\'s calendars, bookings and services',
+        CorePermissions::CALENDAR_WRITE               => 'Keep your own calendar events, and book, move and cancel customer bookings',
+        CorePermissions::CALENDAR_MANAGE              => 'Set up services, everyone\'s working hours and time off, and the public booking page',
         CorePermissions::CONVENING_DECIDE             => 'Record a body\'s decision on an agenda item — the act that can approve or reject a ',
         ];
     }

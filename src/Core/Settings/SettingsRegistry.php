@@ -758,6 +758,25 @@ final class SettingsRegistry
     public const LABELS_RESOLVE_MAX_IDS = 'labels.resolve_max_ids';
 
     /**
+     * Calendar and bookings (WHIT-941, ADR 0017). Tenant-overridable.
+     * The booking page is off until a workspace turns it on. Notice is the
+     * least time between booking and start; the window is how many days
+     * ahead a booking may be; slots are offered every step minutes; one
+     * reminder goes out this many hours before (0 = none); a payment step
+     * holds a slot this many minutes. Week start and weekend days record the
+     * design register's rule (Saturday first, Friday and Saturday off) as
+     * settings a workspace can change.
+     */
+    public const CALENDAR_BOOKING_PAGE_ENABLED = 'calendar.booking_page_enabled';
+    public const CALENDAR_MIN_NOTICE_MINUTES = 'calendar.min_notice_minutes';
+    public const CALENDAR_MAX_ADVANCE_DAYS = 'calendar.max_advance_days';
+    public const CALENDAR_SLOT_STEP_MINUTES = 'calendar.slot_step_minutes';
+    public const CALENDAR_REMINDER_HOURS_BEFORE = 'calendar.reminder_hours_before';
+    public const CALENDAR_PAYMENT_HOLD_MINUTES = 'calendar.payment_hold_minutes';
+    public const CALENDAR_WEEK_START = 'calendar.week_start';
+    public const CALENDAR_WEEKEND_DAYS = 'calendar.weekend_days';
+
+    /**
      * Whether the web app offers itself as an installable app (#1733): the web
      * manifest, the service worker and the offline page. GLOBAL-ONLY — it is
      * a question about the whole installation, not one workspace.
@@ -902,6 +921,7 @@ final class SettingsRegistry
         self::FORMS_SHOW_REVIEWER_NAMES,
         self::I18N_ENABLED,
         self::UI_HIDE_DATES,
+        self::CALENDAR_BOOKING_PAGE_ENABLED,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
@@ -1004,6 +1024,7 @@ final class SettingsRegistry
         // hosted Sentry, or a self-hosted GlitchTip/Bugsink — via the encrypted
         // DSN. Switching is a settings change, not a code change.
         self::ERROR_TRACKING_PROVIDER => ['internal', 'sentry'],
+        self::CALENDAR_WEEK_START => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
     ];
 
     /**
@@ -1223,6 +1244,14 @@ final class SettingsRegistry
         // most of them have not expressed.
         self::UI_HIDE_DATES => 'false',
         self::LABELS_RESOLVE_MAX_IDS => '100',
+        self::CALENDAR_BOOKING_PAGE_ENABLED => 'false',
+        self::CALENDAR_MIN_NOTICE_MINUTES => '120',
+        self::CALENDAR_MAX_ADVANCE_DAYS => '60',
+        self::CALENDAR_SLOT_STEP_MINUTES => '15',
+        self::CALENDAR_REMINDER_HOURS_BEFORE => '24',
+        self::CALENDAR_PAYMENT_HOLD_MINUTES => '15',
+        self::CALENDAR_WEEK_START => 'saturday',
+        self::CALENDAR_WEEKEND_DAYS => 'friday,saturday',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
     ];
@@ -1588,6 +1617,14 @@ final class SettingsRegistry
             self::INVITATION_TTL_DAYS => self::validateInvitationTtlDays($value),
             self::UI_HIDE_DATES => self::validateBoolean($value, self::UI_HIDE_DATES),
             self::LABELS_RESOLVE_MAX_IDS => self::validateLabelsResolveMaxIds($value),
+            self::CALENDAR_BOOKING_PAGE_ENABLED => self::validateBoolean($value, self::CALENDAR_BOOKING_PAGE_ENABLED),
+            self::CALENDAR_MIN_NOTICE_MINUTES => self::validateWholeNumberBetween($value, self::CALENDAR_MIN_NOTICE_MINUTES, 0, 43200),
+            self::CALENDAR_MAX_ADVANCE_DAYS => self::validateWholeNumberBetween($value, self::CALENDAR_MAX_ADVANCE_DAYS, 1, 730),
+            self::CALENDAR_SLOT_STEP_MINUTES => self::validateWholeNumberBetween($value, self::CALENDAR_SLOT_STEP_MINUTES, 5, 240),
+            self::CALENDAR_REMINDER_HOURS_BEFORE => self::validateWholeNumberBetween($value, self::CALENDAR_REMINDER_HOURS_BEFORE, 0, 168),
+            self::CALENDAR_PAYMENT_HOLD_MINUTES => self::validateWholeNumberBetween($value, self::CALENDAR_PAYMENT_HOLD_MINUTES, 1, 1440),
+            self::CALENDAR_WEEK_START => in_array($value, self::ENUM_OPTIONS[self::CALENDAR_WEEK_START], true) ? null : 'calendar.week_start must be a day of the week.',
+            self::CALENDAR_WEEKEND_DAYS => self::validateWeekdayList($value),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the
@@ -1717,6 +1754,35 @@ final class SettingsRegistry
      * The setting can only shorten that lifetime, never extend it, so a value
      * above the ceiling is rejected rather than silently clamped.
      */
+    private static function validateWholeNumberBetween(string $value, string $key, int $min, int $max): ?string
+    {
+        if (preg_match('/^\d+$/', $value) !== 1) {
+            return "{$key} must be a whole number.";
+        }
+        if ((int) $value < $min || (int) $value > $max) {
+            return "{$key} must be between {$min} and {$max}.";
+        }
+
+        return null;
+    }
+
+    /** Comma-separated day names, each at most once; empty means no weekend. */
+    private static function validateWeekdayList(string $value): ?string
+    {
+        if ($value === '') {
+            return null;
+        }
+        $seen = [];
+        foreach (explode(',', $value) as $day) {
+            if (!in_array($day, self::ENUM_OPTIONS[self::CALENDAR_WEEK_START], true) || isset($seen[$day])) {
+                return 'calendar.weekend_days must be day names separated by commas, such as friday,saturday.';
+            }
+            $seen[$day] = true;
+        }
+
+        return null;
+    }
+
     private static function validateLabelsResolveMaxIds(string $value): ?string
     {
         if (preg_match('/^\d+$/', $value) !== 1) {
