@@ -210,7 +210,12 @@ final class PublicBookingApiHandler
             ]);
             $this->store->increment('cal:ws-day:' . $tenantId, self::DAY);
 
-            return Response::json(['data' => self::forCustomer($booking) + ['manage_token' => $booking['manage_token'] ?? null]], 201);
+            // With a payment step (SDK 1.98) the booking is held and the page
+            // sends the customer to `payment.url`; they come back to the manage page.
+            return Response::json(['data' => self::forCustomer($booking) + [
+                'manage_token' => $booking['manage_token'] ?? null,
+                'payment' => $booking['payment'] ?? null,
+            ]], 201);
         });
     }
 

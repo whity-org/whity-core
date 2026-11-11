@@ -9633,6 +9633,13 @@ final class CoreApiSchemas
                 'currency' => self::str(),
                 'customer' => self::object(['name' => self::str(), 'email' => self::str()], ['name', 'email']),
                 'manage_token' => self::str(true) + ['description' => 'Only after booking or moving: the token of the new manage link.'],
+                'payment' => ['type' => 'object', 'nullable' => true, 'description' => 'Only when a payment plugin holds the booking (SDK 1.98): send the customer to `url`.', 'properties' => [
+                    'url' => self::str(),
+                    'amount_minor' => self::int(),
+                    'currency' => self::str(),
+                    'label' => self::str(),
+                    'hold_expires_at' => self::str(),
+                ]],
                 'workspace' => self::object(['name' => self::str()], ['name']),
                 'time_zone' => self::str(),
             ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
@@ -9748,6 +9755,7 @@ final class CoreApiSchemas
                 'currency' => self::str(),
                 'cancelled_by' => self::str(true),
                 'cancel_reason' => self::str(),
+                'payment_ref' => self::str(true) + ['description' => 'The reference from the payment plugin, once paid (SDK 1.98).'],
                 'created_at' => self::str(true),
             ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
             'CalendarBookingCreateRequest' => self::object([

@@ -22,4 +22,8 @@ final class NullBookingMessenger implements BookingMessenger
     public function remind(int $tenantId, array $booking): void
     {
     }
+
+    public function awaitingPayment(int $tenantId, array $booking): void
+    {
+    }
 }

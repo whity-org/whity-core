@@ -147,7 +147,8 @@ final class ServiceRepository
         return [
             'id' => (int) $r['id'],
             'name' => LocalizedLabel::decode((string) $r['name']),
-            'description' => LocalizedLabel::decode((string) $r['description']),
+            // An empty label is an object, never a list, so a client always reads `{}`.
+            'description' => LocalizedLabel::decode((string) $r['description']) ?: new \stdClass(),
             'duration_minutes' => (int) $r['duration_minutes'],
             'buffer_before_minutes' => (int) $r['buffer_before_minutes'],
             'buffer_after_minutes' => (int) $r['buffer_after_minutes'],

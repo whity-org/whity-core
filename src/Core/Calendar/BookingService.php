@@ -10,6 +10,10 @@ use PDO;
 use Throwable;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Queue\QueueService;
+use Whity\Sdk\Calendar\BookingPaymentStep;
+use Whity\Sdk\Calendar\BookingQuote;
+use Whity\Sdk\Calendar\PaymentRequirement;
+use Whity\Sdk\Calendar\PendingBooking;
 use Whity\Core\Settings\SettingsService;
 
 /**
@@ -34,6 +38,10 @@ final class BookingService
     private ?ManageLinks $links = null;
 
     private ?QueueService $queue = null;
+
+    private ?CalendarPlugins $plugins = null;
+
+    private string $manageUrlBase = '';
 
     public function __construct(
         private readonly PDO $db,
@@ -61,6 +69,18 @@ final class BookingService
     public function setLinks(ManageLinks $links): void
     {
         $this->links = $links;
+    }
+
+    /** Plugins' payment step and busy times (SDK 1.98), read at call time. */
+    public function setPlugins(CalendarPlugins $plugins): void
+    {
+        $this->plugins = $plugins;
+    }
+
+    /** Where the customer's manage page lives; a payment step returns them there. */
+    public function setManageUrlBase(string $base): void
+    {
+        $this->manageUrlBase = $base;
     }
 
     /** Reminders are queued here when set ({@see BookingReminderJob}). */
@@ -142,8 +162,23 @@ final class BookingService
 
         $end = $start->modify('+' . $service['duration_minutes'] . ' minutes');
         $block = Availability::blockFor($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes']);
+        $step = $this->plugins?->paymentStep();
         foreach ($candidates as $candidate) {
-            $id = $this->underLock([[$tenantId, $candidate]], function () use ($tenantId, $candidate, $service, $settings, $request, $start, $end, $block, $now): ?int {
+            // Asked before the lock: a plugin never runs while a person's
+            // calendar is held. A step that fails refuses the booking rather
+            // than letting it through unpaid.
+            $quote = new BookingQuote($tenantId, (int) $service['id'], $candidate, $start, $end, $service['price_minor'], (string) $service['currency'], $request['customer_email'], $request['source']);
+            $requirement = null;
+            if ($step !== null) {
+                try {
+                    $requirement = $step->requirement($quote);
+                } catch (Throwable $e) {
+                    error_log('[calendar] the payment step failed to answer: ' . $e->getMessage());
+                    throw new CalendarRejectedException('Booking is unavailable right now. Try again later.', 503);
+                }
+            }
+            $hold = $requirement !== null ? $now->modify('+' . $settings->paymentHoldMinutes . ' minutes') : null;
+            $id = $this->underLock([[$tenantId, $candidate]], function () use ($tenantId, $candidate, $service, $settings, $request, $start, $end, $block, $now, $hold): ?int {
                 if (!$this->isFree($tenantId, $candidate, $service, $settings, $start, $now, null, $request['enforce_hours'])) {
                     return null;
                 }
@@ -159,8 +194,8 @@ final class BookingService
                     'starts_at' => $start,
                     'ends_at' => $end,
                     'block' => $block,
-                    'status' => BookingRepository::STATUS_CONFIRMED,
-                    'hold_expires_at' => null,
+                    'status' => $hold !== null ? BookingRepository::STATUS_PENDING_PAYMENT : BookingRepository::STATUS_CONFIRMED,
+                    'hold_expires_at' => $hold,
                     'source' => $request['source'],
                     'price_minor' => $service['price_minor'],
                     'currency' => $service['currency'],
@@ -170,6 +205,9 @@ final class BookingService
             });
             if ($id !== null) {
                 $booking = $this->afterWrite($tenantId, $id);
+                if ($requirement !== null && $hold !== null) {
+                    return $this->startPayment($tenantId, $booking, $quote, $requirement, $hold, $step);
+                }
                 $this->announceBooking(CalendarEventNames::BOOKING_CREATED, $tenantId, $booking);
                 $this->announceBooking(CalendarEventNames::BOOKING_CONFIRMED, $tenantId, $booking);
                 $this->tell('confirmed', $tenantId, $booking);
@@ -288,6 +326,119 @@ final class BookingService
         $existing = $this->calendar->findEvent($tenantId, $eventId) ?? throw CalendarRejectedException::notFound('Event');
         $this->calendar->cancelEvent($tenantId, $eventId);
         $this->announce(CalendarEventNames::EVENT_DELETED, ['id' => $eventId, 'tenant_id' => $tenantId, 'profile_id' => (int) $existing['profile_id']]);
+    }
+
+    /**
+     * A payment step says the customer paid (SDK 1.98, {@see \Whity\Sdk\Calendar\Bookings}).
+     * A booking whose hold lapsed is confirmed only if its time is still free,
+     * checked under the person's lock.
+     */
+    public function confirmPaid(int $tenantId, int $bookingId, string $paymentRef): bool
+    {
+        $row = $this->bookings->find($tenantId, $bookingId);
+        if ($row === null || !in_array($row['status'], [BookingRepository::STATUS_PENDING_PAYMENT, BookingRepository::STATUS_EXPIRED], true)) {
+            return false;
+        }
+        $service = $this->services->find($tenantId, (int) $row['service_id']);
+        if ($service === null) {
+            return false;
+        }
+        $settings = $this->settingsFor($tenantId);
+        $start = Interval::fromDb((string) $row['starts_at']);
+        $done = $this->underLock([[$tenantId, (int) $row['profile_id']]], function () use ($tenantId, $bookingId, $row, $service, $settings, $start, $paymentRef): bool {
+            if (!$this->isFree($tenantId, (int) $row['profile_id'], $service, $settings, $start, $this->now(), $bookingId, false)) {
+                return false;
+            }
+
+            return $this->bookings->transition(
+                $tenantId,
+                $bookingId,
+                [BookingRepository::STATUS_PENDING_PAYMENT, BookingRepository::STATUS_EXPIRED],
+                BookingRepository::STATUS_CONFIRMED,
+                ['payment_ref' => mb_substr($paymentRef, 0, 255)],
+            );
+        });
+        if (!$done) {
+            return false;
+        }
+        $booking = $this->bookingOrFail($tenantId, $bookingId);
+        $this->announceBooking(CalendarEventNames::BOOKING_CONFIRMED, $tenantId, $booking);
+        $this->tell('confirmed', $tenantId, $booking);
+
+        return true;
+    }
+
+    /** A payment step gives up on a held booking: cancel it and free its time. */
+    public function releaseHold(int $tenantId, int $bookingId, string $reason): bool
+    {
+        $done = $this->bookings->transition(
+            $tenantId,
+            $bookingId,
+            [BookingRepository::STATUS_PENDING_PAYMENT],
+            BookingRepository::STATUS_CANCELLED,
+            ['cancelled_by' => 'payment', 'cancel_reason' => mb_substr($reason, 0, 500)],
+        );
+        if ($done) {
+            $this->links?->revoke($tenantId, $bookingId);
+            $booking = $this->bookingOrFail($tenantId, $bookingId);
+            $this->announceBooking(CalendarEventNames::BOOKING_CANCELLED, $tenantId, $booking);
+        }
+
+        return $done;
+    }
+
+    /** A hold nobody settled: expire it once its time is up (the queued job's work). */
+    public function expireHold(int $tenantId, int $bookingId): bool
+    {
+        $row = $this->bookings->find($tenantId, $bookingId);
+        if ($row === null || $row['status'] !== BookingRepository::STATUS_PENDING_PAYMENT || $row['hold_expires_at'] === null
+            || Interval::fromDb((string) $row['hold_expires_at']) > $this->now()) {
+            return false;
+        }
+        if (!$this->bookings->transition($tenantId, $bookingId, [BookingRepository::STATUS_PENDING_PAYMENT], BookingRepository::STATUS_EXPIRED)) {
+            return false;
+        }
+        $this->announceBooking(CalendarEventNames::BOOKING_EXPIRED, $tenantId, $this->bookingOrFail($tenantId, $bookingId));
+
+        return true;
+    }
+
+    /**
+     * Hand a held booking to the payment step and queue its expiry.
+     *
+     * @param array<string, mixed> $booking
+     * @return array<string, mixed>
+     */
+    private function startPayment(int $tenantId, array $booking, BookingQuote $quote, PaymentRequirement $requirement, DateTimeImmutable $hold, BookingPaymentStep $step): array
+    {
+        $bookingId = (int) $booking['id'];
+        $token = is_string($booking['manage_token'] ?? null) ? $booking['manage_token'] : '';
+        $returnUrl = rtrim($this->manageUrlBase, '/') . ($token !== '' ? '/' . $token : '');
+        try {
+            $handoff = $step->start(new PendingBooking($tenantId, $bookingId, $quote, $requirement, $hold), $returnUrl);
+        } catch (Throwable $e) {
+            error_log('[calendar] the payment step could not start: ' . $e->getMessage());
+            $this->releaseHold($tenantId, $bookingId, 'The payment could not be started.');
+            throw new CalendarRejectedException('Payment is unavailable right now. Try again later.', 503);
+        }
+        if ($this->queue !== null) {
+            try {
+                BookingHoldExpiryJob::schedule($this->queue, $tenantId, $bookingId, $hold, $this->now());
+            } catch (Throwable $e) {
+                error_log('[calendar] could not queue a hold expiry: ' . $e->getMessage());
+            }
+        }
+        $this->announceBooking(CalendarEventNames::BOOKING_CREATED, $tenantId, $booking);
+        $this->tell('awaitingPayment', $tenantId, $booking);
+        $booking['payment'] = [
+            'url' => $handoff->url,
+            'amount_minor' => $requirement->amountMinor,
+            'currency' => $requirement->currency,
+            'label' => $requirement->label,
+            'hold_expires_at' => Interval::toApi($hold),
+        ];
+
+        return $booking;
     }
 
     /** @return array<string, mixed> the booking with its service, for the API */
@@ -462,7 +613,11 @@ final class BookingService
     private function busyFor(int $tenantId, int $profileId, DateTimeImmutable $from, DateTimeImmutable $to, DateTimeImmutable $now, ?int $exceptBookingId): array
     {
         $busy = $this->calendar->busy($tenantId, $profileId, $from, $to, $now, $exceptBookingId);
-        foreach ($this->busySources as $source) {
+        $sources = $this->busySources;
+        foreach ($this->plugins?->busySources() ?? [] as $source) {
+            $sources[] = $source;
+        }
+        foreach ($sources as $source) {
             try {
                 foreach ($source->busyTimes($tenantId, $profileId, $from, $to) as $interval) {
                     $busy[] = $interval;
@@ -576,6 +731,7 @@ final class BookingService
                 'confirmed' => $this->messenger->confirmed($tenantId, $booking),
                 'rescheduled' => $this->messenger->rescheduled($tenantId, $booking),
                 'remind' => $this->messenger->remind($tenantId, $booking),
+                'awaitingPayment' => $this->messenger->awaitingPayment($tenantId, $booking),
                 default => $this->messenger->cancelled($tenantId, $booking),
             };
         } catch (Throwable $e) {

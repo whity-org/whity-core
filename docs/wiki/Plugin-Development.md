@@ -1849,6 +1849,33 @@ The host draws the field, checks the permission and stores the value in your
 `SecretStore` for that person's workspace. The browser only learns whether it is
 set. A block naming a secret you did not declare drops the screen at load.
 
+## Step 12g — Take a deposit or sync a calendar (SDK 1.98)
+
+Core has a calendar with services, availability and bookings (ADR 0017). Two
+optional interfaces let a store plugin extend it without touching its tables.
+
+**A payment before a booking is confirmed.** Implement
+`PluginBookingPaymentInterface` and return a `Calendar\BookingPaymentStep`.
+`requirement(BookingQuote)` returns a `PaymentRequirement` (amount in minor
+units, currency, label such as "Deposit") or null to confirm at once. When it
+asks for payment, core saves the booking as `pending_payment`, holds the slot
+for the workspace's `calendar.payment_hold_minutes`, and calls
+`start(PendingBooking, $returnUrl)` for the URL to send the customer to. When
+your provider says the money arrived, call
+`\Whitypp(\Whity\Sdk\Calendar\Bookings::class)->confirmPaid($tenantId, $bookingId, $ref)`.
+It returns false if the hold lapsed and the time was taken since: refund then.
+Call `release()` when the payment will not happen. One deployment has one
+payment step.
+
+**Busy times from outside.** Implement `PluginCalendarBusyInterface::busyTimes()`
+and return `BusyInterval`s in UTC. Core asks when it lists free times and again
+inside the person's lock before saving a booking, so answer from a cache. A
+throw is read as "not busy" and logged; an answer slower than 1.5 seconds is
+logged. Keep outside events on a person's calendar with
+`\Whitypp(\Whity\Sdk\Calendar\CalendarEvents::class)->upsertExternal(...)`
+keyed by your own reference, and write outwards from `Events::BOOKING_*` and
+`Events::CALENDAR_EVENT_*` (ids only).
+
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
 Everything a plugin only *declares* can live in a JSON file instead of PHP methods: its identity and requirements, permissions, roles, `blocks` screens, owned tables, data types and limits. Put `plugin.json` next to an empty class:

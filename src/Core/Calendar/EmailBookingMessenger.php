@@ -66,6 +66,11 @@ final class EmailBookingMessenger implements BookingMessenger
         $this->send($tenantId, $booking, 'reminder');
     }
 
+    public function awaitingPayment(int $tenantId, array $booking): void
+    {
+        $this->send($tenantId, $booking, 'held');
+    }
+
     /**
      * The email for one booking, without sending it. Public for tests.
      *
@@ -103,6 +108,15 @@ final class EmailBookingMessenger implements BookingMessenger
             $workspace !== '' ? sprintf($t['line.where'], $workspace) : null,
         ];
         $paragraphs = [$t[$kind . '.lead']];
+        if ($kind === 'held' && is_string($booking['hold_expires_at'] ?? null)) {
+            $until = Interval::fromApi($booking['hold_expires_at']);
+            if ($until !== null) {
+                $paragraphs[] = sprintf($t['held.until'], $until->setTimezone($settings->zone)->format('H:i'));
+            }
+        }
+        if ($kind === 'confirmed' && $link === null && ($booking['payment_ref'] ?? null) !== null) {
+            $paragraphs[] = $t['confirmed.paid'];
+        }
         foreach ($lines as $line) {
             if ($line !== null) {
                 $paragraphs[] = $line;
@@ -223,6 +237,10 @@ final class EmailBookingMessenger implements BookingMessenger
         'cancelled.heading' => 'Cancelled: %s',
         'cancelled.lead' => 'Your booking has been cancelled.',
         'reminder.heading' => 'Reminder: %s',
+        'held.heading' => 'Held for you: %s',
+        'held.lead' => 'Your time is held while you pay. It is confirmed once the payment goes through.',
+        'held.until' => 'If the payment is not finished by %s, the time is let go.',
+        'confirmed.paid' => 'Your payment went through. To move or cancel, use the link in the email we sent when you booked.',
         'reminder.lead' => 'This is a reminder of your booking.',
         'line.when' => 'When: %s',
         'line.with' => 'With: %s',
@@ -240,6 +258,10 @@ final class EmailBookingMessenger implements BookingMessenger
         'cancelled.heading' => 'تم الإلغاء: %s',
         'cancelled.lead' => 'تم إلغاء حجزك.',
         'reminder.heading' => 'تذكير: %s',
+        'held.heading' => 'محجوز لك: %s',
+        'held.lead' => 'موعدك محجوز ريثما تدفع، ويتأكد عند إتمام الدفع.',
+        'held.until' => 'إذا لم يكتمل الدفع حتى الساعة %s يُلغى الحجز.',
+        'confirmed.paid' => 'تم الدفع. لتغيير الموعد أو إلغائه استخدم الرابط في رسالة الحجز السابقة.',
         'reminder.lead' => 'هذا تذكير بحجزك.',
         'line.when' => 'الموعد: %s',
         'line.with' => 'مع: %s',

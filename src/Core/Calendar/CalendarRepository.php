@@ -300,6 +300,20 @@ final class CalendarRepository
         return array_values(array_map([self::class, 'eventToApi'], $stmt->fetchAll(PDO::FETCH_ASSOC)));
     }
 
+    /** The event a sync plugin wrote under its own reference, or null. */
+    public function findEventByExternalRef(int $tenantId, int $profileId, string $externalRef): ?int
+    {
+        $stmt = $this->db->prepare(
+            "SELECT id FROM calendar_events
+              WHERE tenant_id = :tenant_id AND profile_id = :profile_id AND external_ref = :ref AND status = 'confirmed'
+              ORDER BY id LIMIT 1"
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId, ':ref' => $externalRef]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int) $id;
+    }
+
     /** @return array<string, mixed>|null */
     public function findEvent(int $tenantId, int $id): ?array
     {

@@ -63830,6 +63830,11 @@
                     "cancel_reason": {
                         "type": "string"
                     },
+                    "payment_ref": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The reference from the payment plugin, once paid (SDK 1.98)."
+                    },
                     "created_at": {
                         "type": "string",
                         "nullable": true
@@ -78935,6 +78940,28 @@
                         "type": "string",
                         "nullable": true,
                         "description": "Only after booking or moving: the token of the new manage link."
+                    },
+                    "payment": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Only when a payment plugin holds the booking (SDK 1.98): send the customer to `url`.",
+                        "properties": {
+                            "url": {
+                                "type": "string"
+                            },
+                            "amount_minor": {
+                                "type": "integer"
+                            },
+                            "currency": {
+                                "type": "string"
+                            },
+                            "label": {
+                                "type": "string"
+                            },
+                            "hold_expires_at": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "workspace": {
                         "type": "object",

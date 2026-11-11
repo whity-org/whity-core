@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.97).
+ * SDK identity (v1.98).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1211,12 +1211,23 @@ namespace Whity\Sdk;
  * {@see Inbox\InboxItem} moved here from core and gained `urgent` (#881, WHIT-937).
  *
  * Purely additive.)
+ *
+ * 1.98 (CALENDAR AND BOOKINGS, ADR 0017: {@see PluginBookingPaymentInterface} gives the host a
+ * {@see Calendar\BookingPaymentStep} that can require a payment, such as a deposit, before a
+ * booking is confirmed; core holds the slot as `pending_payment` and the plugin settles it
+ * through the host service {@see Calendar\Bookings}. {@see PluginCalendarBusyInterface} adds
+ * busy times from outside core, read when free times are listed and again inside the
+ * person's lock, failing open. {@see Calendar\CalendarEvents} keeps outside events on a
+ * person's calendar. {@see Hooks\Events::BOOKING_CREATED} and the other calendar and booking
+ * events carry ids only (WHIT-943).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.97.0';
+    public const VERSION = '1.98.0';
 
     /**
      * Static identity only — never instantiated.

@@ -9618,6 +9618,8 @@ export interface components {
             currency?: string;
             cancelled_by?: string | null;
             cancel_reason?: string;
+            /** @description The reference from the payment plugin, once paid (SDK 1.98). */
+            payment_ref?: string | null;
             created_at?: string | null;
         };
         CalendarBookingCancelRequest: {
@@ -13816,6 +13818,14 @@ export interface components {
             };
             /** @description Only after booking or moving: the token of the new manage link. */
             manage_token?: string | null;
+            /** @description Only when a payment plugin holds the booking (SDK 1.98): send the customer to `url`. */
+            payment?: {
+                url?: string;
+                amount_minor?: number;
+                currency?: string;
+                label?: string;
+                hold_expires_at?: string;
+            } | null;
             workspace?: {
                 name: string;
             };
