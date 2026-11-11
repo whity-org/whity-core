@@ -52,6 +52,7 @@ final class PermissionAreas
         'tags' => ['tags', 'Tags', self::GROUP_DOCUMENTS],
         'forms' => ['forms', 'Forms', self::GROUP_DOCUMENTS],
         'convening' => ['convening', 'Meetings and decisions', self::GROUP_DOCUMENTS],
+        'calendar' => ['calendar', 'Calendar and bookings', self::GROUP_PEOPLE],
         'time_windows' => ['time_windows', 'Time windows', self::GROUP_DOCUMENTS],
         'agents' => ['agents', 'Agents', self::GROUP_AI],
         'mcp' => ['connected_ai', 'Connected AI apps', self::GROUP_AI],

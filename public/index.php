@@ -4950,6 +4950,56 @@ $router->register('GET',    '/api/convening-bodies/{id:\d+}/members',       [$co
 $router->register('POST',   '/api/convening-bodies/{id:\d+}/members',       [$conveningBodiesHandler, 'addMember'],    null, null, CorePermissions::CONVENING_MANAGE);
 $router->register('DELETE', '/api/convening-bodies/{id:\d+}/members/{profileId:\d+}', [$conveningBodiesHandler, 'removeMember'], null, null, CorePermissions::CONVENING_MANAGE);
 
+// ── Calendar and bookings (WHIT-941, ADR 0017) ─────────────────────────────
+// Staff calendars, services, availability and bookings. Every write that can
+// take time on a person's calendar runs under that person's lock row, so two
+// requests can never book the same time (BookingService). Reading on
+// calendar:read; booking and one's own events, hours and time off on
+// calendar:write (the handler checks calendar:manage when the person is not
+// the caller); services, settings and the staff list on calendar:manage.
+$calendarRepository = new \Whity\Core\Calendar\CalendarRepository($db->getPdo());
+$calendarServiceRepository = new \Whity\Core\Calendar\ServiceRepository($db->getPdo());
+$calendarBookingRepository = new \Whity\Core\Calendar\BookingRepository($db->getPdo());
+$calendarBookingService = new \Whity\Core\Calendar\BookingService(
+    $db->getPdo(),
+    $calendarRepository,
+    $calendarServiceRepository,
+    $calendarBookingRepository,
+    $settingsService,
+    $hookManager,
+);
+$calendarHandler = new \Whity\Api\CalendarApiHandler(
+    $calendarRepository,
+    $calendarServiceRepository,
+    $calendarBookingRepository,
+    $calendarBookingService,
+    $settingsService,
+    $roleChecker,
+);
+$router->register('GET',    '/api/calendar/settings',                       [$calendarHandler, 'getSettings'],     null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/settings',                       [$calendarHandler, 'putSettings'],     null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('GET',    '/api/calendar/staff',                          [$calendarHandler, 'listStaff'],       null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/staff/{profileId:\d+}',          [$calendarHandler, 'putStaff'],        null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('GET',    '/api/calendar/staff/{profileId:\d+}/hours',    [$calendarHandler, 'getHours'],        null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/staff/{profileId:\d+}/hours',    [$calendarHandler, 'putHours'],        null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/time-off',                       [$calendarHandler, 'listExceptions'],  null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/time-off',                       [$calendarHandler, 'createException'], null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('DELETE', '/api/calendar/time-off/{id:\d+}',              [$calendarHandler, 'deleteException'], null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/services',                       [$calendarHandler, 'listServices'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/services',                       [$calendarHandler, 'createService'],   null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('GET',    '/api/calendar/services/{id:\d+}',              [$calendarHandler, 'showService'],     null, null, CorePermissions::CALENDAR_READ);
+$router->register('PATCH',  '/api/calendar/services/{id:\d+}',              [$calendarHandler, 'updateService'],   null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('GET',    '/api/calendar/availability',                   [$calendarHandler, 'availability'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('GET',    '/api/calendar/bookings',                       [$calendarHandler, 'listBookings'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/bookings',                       [$calendarHandler, 'createBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/bookings/{id:\d+}',              [$calendarHandler, 'showBooking'],     null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/move',         [$calendarHandler, 'moveBooking'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/cancel',       [$calendarHandler, 'cancelBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/events',                         [$calendarHandler, 'listEvents'],      null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/events',                         [$calendarHandler, 'createEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('PATCH',  '/api/calendar/events/{id:\d+}',                [$calendarHandler, 'updateEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('DELETE', '/api/calendar/events/{id:\d+}',                [$calendarHandler, 'deleteEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
+
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,
     $meetingRepository,

@@ -79,6 +79,11 @@ final class CoreToolsets
             'titleAr'     => 'النماذج',
             'description' => 'Forms, their fields and their submissions.',
         ],
+        'core.calendar' => [
+            'title'       => 'Calendar and bookings',
+            'titleAr'     => 'التقويم والحجوزات',
+            'description' => 'Staff calendars, services, working hours, time off, free times and customer bookings.',
+        ],
         'core.convening' => [
             'title'       => 'Meetings',
             'titleAr'     => 'الاجتماعات',
@@ -147,6 +152,7 @@ final class CoreToolsets
         'reports'                  => 'core.documents',
         'forms'                    => 'core.forms',
         'convening'                => 'core.convening',
+        'calendar'                 => 'core.calendar',
         'taxonomy'                 => 'core.taxonomy',
         'data-types'               => 'core.taxonomy',
         'time-windows'             => 'core.time',
