@@ -576,9 +576,10 @@ final class SchemaFromMigrations
         if (self::$pgCloneStrategy === null) {
             self::$pgCloneStrategy = '';
             try {
-                $version = (int) $admin->query('SHOW server_version_num')->fetchColumn();
-                $fsync   = (string) $admin->query('SHOW fsync')->fetchColumn();
-                if ($version >= 150000 && $fsync === 'off') {
+                $version = $admin->query('SHOW server_version_num');
+                $fsync   = $admin->query('SHOW fsync');
+                if ($version !== false && $fsync !== false
+                    && (int) $version->fetchColumn() >= 150000 && $fsync->fetchColumn() === 'off') {
                     self::$pgCloneStrategy = ' STRATEGY FILE_COPY';
                 }
             } catch (\Throwable) {
