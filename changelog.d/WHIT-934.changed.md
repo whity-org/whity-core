@@ -1,0 +1,1 @@
+- **The PostgreSQL test jobs run in parallel.** The Integration and Dialect shards now run under ParaTest, one seeded database per worker, and are split by recorded PostgreSQL test time instead of file count, so the slowest CI jobs finish sooner (WHIT-934).

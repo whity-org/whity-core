@@ -514,7 +514,11 @@ final class SchemaFromMigrations
             $env .= $name . '=' . (is_string($value) ? $value : '') . "\n";
         }
 
-        return substr(hash('sha256', self::$migrationsHash . "\n" . $env), 0, 16);
+        // `<migrations>_<environment>`: the first half alone says which
+        // migration set a template was built from, which is what
+        // dropStaleTemplates() needs to tell a stale template from one another
+        // worker built for a different environment a moment ago.
+        return substr(self::$migrationsHash, 0, 12) . '_' . substr(hash('sha256', $env), 0, 8);
     }
 
     /**
@@ -609,6 +613,11 @@ final class SchemaFromMigrations
     {
         $keep = array_values(self::$pgTemplates);
         $keep[] = $justBuilt;
+        // Under ParaTest several processes share the server, each with its own
+        // $pgTemplates. A template for the CURRENT migration set may belong to
+        // another worker that varied an environment input and is about to
+        // clone it, so only templates of another migration set are stale.
+        $current = self::PG_TEMPLATE_PREFIX . substr((string) self::$migrationsHash, 0, 12) . '_';
 
         try {
             $stmt = $admin->prepare(
@@ -616,7 +625,7 @@ final class SchemaFromMigrations
             );
             $stmt->execute([':prefix' => self::PG_TEMPLATE_PREFIX . '%']);
             foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $candidate) {
-                if (!in_array((string) $candidate, $keep, true)) {
+                if (!in_array((string) $candidate, $keep, true) && !str_starts_with((string) $candidate, $current)) {
                     self::dropDatabase($admin, (string) $candidate);
                 }
             }

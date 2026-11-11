@@ -119,6 +119,23 @@ final class TestShardPlanTest extends TestCase
         );
     }
 
+    public function testFileListsAreNormalisedLikeTheDirectoryListing(): void
+    {
+        self::assertSame(
+            ['tests/Integration/ATest.php', 'tests/Integration/Sub/BTest.php'],
+            whity_parse_file_list("./tests/Integration/Sub/BTest.php\r\n\ntests\\Integration\\ATest.php\ntests/Integration/ATest.php\n")
+        );
+        self::assertSame([], whity_parse_file_list("\n\n"));
+    }
+
+    public function testCommittedPostgresTimingsAreTestFiles(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $timings = json_decode((string) file_get_contents($root . '/scripts/ci-test-timings-postgres.json'), true);
+        self::assertIsArray($timings);
+        self::assertSame([], array_diff(array_keys($timings), whity_list_test_files($root)));
+    }
+
     public function testCommittedTimingsCoverTheCurrentSuite(): void
     {
         $root = dirname(__DIR__, 2);
