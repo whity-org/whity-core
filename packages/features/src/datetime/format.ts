@@ -88,7 +88,26 @@ const SHORT_DATE: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short',
  */
 function shortStyleLocale(locale: DateLocale): string {
   const base = locale === undefined || locale.startsWith('en') ? 'en-GB' : locale.split('-u-')[0]
-  return `${base}-u-nu-latn`
+  // Arabic with no region reads the Egyptian month names (أكتوبر); the design
+  // uses the Levantine ones (تشرين الأول, docs/design/08-arabic.md), which are
+  // Jordan's. A region the reader chose themselves is kept.
+  return `${base === 'ar' ? 'ar-JO' : base}-u-nu-latn`
+}
+
+/**
+ * The zone to read an instant in, when the caller names one (the calendar
+ * shows the WORKSPACE's zone, ADR 0017). Left out, the runtime's zone is used,
+ * exactly as before. An unknown name falls back to UTC rather than throwing,
+ * which is what the server does with one.
+ */
+function zoneOption(timeZone: string | undefined): Intl.DateTimeFormatOptions {
+  if (timeZone === undefined) return {}
+  try {
+    new Intl.DateTimeFormat('en', { timeZone })
+    return { timeZone }
+  } catch {
+    return { timeZone: 'UTC' }
+  }
 }
 
 /**
@@ -103,10 +122,12 @@ function shortStyleLocale(locale: DateLocale): string {
  * absent date looks like with a LITERAL, and the guard refuses a fallback that
  * is anything else.
  */
-export function formatDate(value: string | null | undefined, locale: DateLocale): string | null {
+export function formatDate(value: string | null | undefined, locale: DateLocale, timeZone?: string): string | null {
   const parsed = parseWireDate(value)
   // A bare date names a day rather than an instant, so it stays that day in every zone.
-  const options = /^\d{4}-\d{2}-\d{2}$/.test((value ?? '').trim()) ? { ...SHORT_DATE, timeZone: 'UTC' } : SHORT_DATE
+  const options = /^\d{4}-\d{2}-\d{2}$/.test((value ?? '').trim())
+    ? { ...SHORT_DATE, timeZone: 'UTC' }
+    : { ...SHORT_DATE, ...zoneOption(timeZone) }
 
   return parsed === null ? null : parsed.toLocaleDateString(shortStyleLocale(locale), options)
 }
@@ -115,21 +136,66 @@ export function formatDate(value: string | null | undefined, locale: DateLocale)
  * A time of day alone, 24-hour, under {@see formatDate}'s rules: for a list
  * that already says which day it covers (an activity timeline headed "Today").
  */
-export function formatTime(value: string | null | undefined, locale: DateLocale): string | null {
+export function formatTime(value: string | null | undefined, locale: DateLocale, timeZone?: string): string | null {
   const parsed = parseWireDate(value)
 
   return parsed === null
     ? null
-    : parsed.toLocaleTimeString(shortStyleLocale(locale), { hour: '2-digit', minute: '2-digit', hour12: false })
+    : parsed.toLocaleTimeString(shortStyleLocale(locale), {
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+        ...zoneOption(timeZone),
+      })
 }
 
 /** A date and a time, under {@see formatDate}'s rules. */
-export function formatDateTime(value: string | null | undefined, locale: DateLocale): string | null {
+export function formatDateTime(value: string | null | undefined, locale: DateLocale, timeZone?: string): string | null {
   const parsed = parseWireDate(value)
 
   return parsed === null
     ? null
-    : parsed.toLocaleString(shortStyleLocale(locale), { ...SHORT_DATE, hour: '2-digit', minute: '2-digit', hour12: false })
+    : parsed.toLocaleString(shortStyleLocale(locale), {
+        ...SHORT_DATE,
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+        ...zoneOption(timeZone),
+      })
+}
+
+/**
+ * The parts of a date a calendar heads its columns and pages with, under
+ * {@see formatDate}'s rules (Western digits, Levantine Arabic months):
+ *  - `weekday`: "Sat" / "السبت", for a column;
+ *  - `weekdayDay`: "Sat 14" / "السبت 14", for a column on a wider screen;
+ *  - `dayMonth`: "14 Nov" / "14 تشرين الثاني", for a list grouped by day;
+ *  - `monthYear`: "November 2026" / "تشرين الثاني 2026", for a page title;
+ *  - `dayNumber`: "14", for a month cell.
+ */
+export type CalendarLabelStyle = 'weekday' | 'weekdayDay' | 'dayMonth' | 'monthYear' | 'dayNumber' | 'fullDate'
+
+const CALENDAR_LABELS: Record<CalendarLabelStyle, Intl.DateTimeFormatOptions> = {
+  weekday: { weekday: 'short' },
+  weekdayDay: { weekday: 'short', day: 'numeric' },
+  dayMonth: { day: 'numeric', month: 'short' },
+  monthYear: { month: 'long', year: 'numeric' },
+  dayNumber: { day: 'numeric' },
+  fullDate: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' },
+}
+
+/** A calendar heading for an instant, in `timeZone` when given. */
+export function formatCalendarLabel(
+  value: string | null | undefined,
+  style: CalendarLabelStyle,
+  locale: DateLocale,
+  timeZone?: string
+): string | null {
+  const parsed = parseWireDate(value)
+
+  return parsed === null
+    ? null
+    : parsed.toLocaleDateString(shortStyleLocale(locale), { ...CALENDAR_LABELS[style], ...zoneOption(timeZone) })
 }
 
 /** The coarsest unit in which an age still reads as a duration. */

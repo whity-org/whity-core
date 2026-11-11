@@ -16,6 +16,10 @@ Sidebar groups: (top) Dashboard · Inbox · Approvals — People — AI — Docu
 | A01 | Dashboard (home) | `/dashboard`; `/admin` redirects here | `TplHome`, `TplHomeMember`; operators' platform cards from `TplAdminDashboard`; shell states `AppShellCollapsed`, `AppShellMobile` | section 20; one merged waiting list (Inbox and Approvals), app home cards in the plugin manifest |
 | A02 | Inbox (documents awaiting a decision) | `/admin/inbox` | `TplInbox` | section 21; states composed by the app |
 | A03 | Approvals (agent proposals) | new: `/admin/approvals` | `TplAgentApprovals`, `TplAgentApprovalsAr`, `ApprovalQueue` | server 10 |
+| A04 | Calendar (day, week, month; new booking; booking sheet with Move and Cancel; events) | `/calendar` | none yet (ask WHIT-946) | section 21; ADR 0017; times in the workspace's zone, week from `week_start`, weekend from `weekend_days` |
+| A04b | Calendar services · service | `/calendar/services`, `/calendar/services/[id]` | none yet (ask WHIT-946) | section 21; Overview only (no access list or history in the API yet) |
+| A04c | Hours and time off | `/calendar/hours` | none yet (ask WHIT-946) | section 21; own hours on `calendar:write`, anyone's on `calendar:manage` |
+| A04d | Calendar settings | `/calendar/settings` | none yet (ask WHIT-946) | section 21; `calendar:manage` |
 | **People** | | | | |
 | A10 | Users · user | `/admin/users`, `/admin/users/[id]` | `TplUsers`, `TplUserRecord`, `TplUserRecordAr` | section 21 |
 | A11 | User groups | `/admin/user-groups` | `TplUserGroups` | section 21 |
