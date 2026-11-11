@@ -407,11 +407,16 @@ final class BookingService
     {
         $from = $earliest->modify('-1 day');
         $to = $latest->modify('+1 day');
+        // Windows are built from the start of the local day, not from
+        // "now plus notice", so free times stay on the working-hours grid
+        // (09:00, 09:15, ...) instead of starting at an odd minute and second;
+        // slots() then drops the ones before `$earliest`.
+        $dayStart = $earliest->setTimezone($settings->zone)->setTime(0, 0);
         $windows = Availability::openWindows(
             $this->calendar->hours($tenantId, $profileId),
             $this->calendar->exceptions($tenantId, $profileId, $from, $to),
             $settings->zone,
-            $earliest,
+            $dayStart,
             $latest->modify('+' . $service['duration_minutes'] . ' minutes'),
         );
 

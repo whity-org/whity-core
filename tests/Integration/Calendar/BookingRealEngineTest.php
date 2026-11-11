@@ -131,6 +131,26 @@ final class BookingRealEngineTest extends TestCase
         self::assertSame([], $this->service->availability(1, $this->cake, null, self::at('2026-11-20T00:00:00+03:00'), self::at('2026-11-21T00:00:00+03:00')));
     }
 
+    public function testFreeTimesStayOnTheGridWhenNoticeEndsMidSlot(): void
+    {
+        // 09:20:44 in Amman on a working Sunday, with an hour's notice: the
+        // first free time is 10:30, not 10:20:44.
+        $service = new BookingService(
+            $this->pdo,
+            $this->calendar,
+            $this->services,
+            $this->bookings,
+            new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo)),
+            null,
+            clock: static fn (): DateTimeImmutable => new DateTimeImmutable('2026-11-15 06:20:44', new DateTimeZone('UTC')),
+        );
+        $slots = $service->availability(1, $this->cake, 11, self::at('2026-11-15T00:00:00+03:00'), self::at('2026-11-16T00:00:00+03:00'));
+        self::assertSame('2026-11-15T07:30:00Z', $slots[0]['starts_at']);
+        foreach ($slots as $slot) {
+            self::assertMatchesRegularExpression('/T\d\d:(00|30):00Z$/', $slot['starts_at']);
+        }
+    }
+
     public function testAnyoneFillsEachPersonThenRefusesWithTaken(): void
     {
         $first = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00'));
