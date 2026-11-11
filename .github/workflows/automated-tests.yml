@@ -1208,7 +1208,7 @@ jobs:
     # Postgres-only bug still cannot reach develop: the PR learns about it in
     # the queue instead. The Integration shards and the migrations + Security
     # job stay on every PR, so every PR still runs on real Postgres.
-    if: needs.changes.outputs.backend == 'true' && needs.changes.outputs.full == 'true'
+    if: needs.changes.outputs.backend == 'true' # TEMP-MEASURE: restore && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-latest
 
     strategy:
