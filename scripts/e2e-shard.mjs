@@ -19,7 +19,8 @@
 //   node scripts/e2e-shard.mjs timings <out.json> <report.json|dir> [...] [--keep-from=<old.json>]
 //
 //     Rebuilds the timings from Playwright JSON reports (directories expand to
-//     their *.json). --keep-from carries over files the reports did not run.
+//     their *.json). --keep-from carries over files the reports did not run;
+//     a spec in neither is recorded as 0 s, as it matches no Playwright project.
 //     Every E2E run publishes a fresh `e2e-timings` artifact; commit it over
 //     scripts/e2e-timings.json when the plan drifts. Stale timings cost balance,
 //     never coverage.
@@ -153,6 +154,10 @@ function main(argv) {
     const specs = listSpecs();
     const fresh = timingsFromReports(paths.map((p) => JSON.parse(readFileSync(p, 'utf8'))), specs);
     const merged = { ...Object.fromEntries(Object.entries(keep).filter(([f]) => specs.includes(f))), ...fresh };
+    // A spec no report ran and no old timing knows matches no Playwright
+    // project, so it never runs: record 0 rather than let the planner weigh it
+    // at the median. A shard whose report went missing keeps its old timings.
+    for (const spec of specs) if (!(spec in merged)) merged[spec] = 0;
     const sorted = Object.fromEntries(Object.keys(merged).sort().map((k) => [k, merged[k]]));
     writeFileSync(out, JSON.stringify(sorted, null, 2) + '\n');
     const sum = Object.values(sorted).reduce((a, b) => a + b, 0);
