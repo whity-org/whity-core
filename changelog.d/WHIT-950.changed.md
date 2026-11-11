@@ -1,0 +1,1 @@
+- **PostgreSQL dialect tests run on every pull request.** The Dialect shards, which re-run the real-engine tests on PostgreSQL, now run on backend pull requests as well as in the merge queue, so a PostgreSQL-only failure shows up on the pull request (WHIT-950).
