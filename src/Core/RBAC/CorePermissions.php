@@ -487,12 +487,6 @@ final class CorePermissions
     public const CALENDAR_WRITE = 'calendar:write';
     public const CALENDAR_MANAGE = 'calendar:manage';
 
-    // TEAM CHAT (migration 259, CH.1-CH.2). The team's own chats, people and
-    // agents together, on the Messages tables. Both go to every staff role
-    // (anchor documents:read); what a member sees is decided by membership.
-    public const CHAT_READ = 'chat:read';
-    public const CHAT_WRITE = 'chat:write';
-
     /**
      * Return the full list of core permission strings.
      *
@@ -596,8 +590,6 @@ final class CorePermissions
             self::CALENDAR_READ,
             self::CALENDAR_WRITE,
             self::CALENDAR_MANAGE,
-            self::CHAT_READ,
-            self::CHAT_WRITE,
         ];
     }
 }

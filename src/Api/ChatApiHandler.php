@@ -16,8 +16,9 @@ use Whity\Mcp\Auth\McpPrincipal;
 /**
  * Team chat, `/api/chat/…` (CH.1, CH.2).
  *
- * Gated on `chat:read` / `chat:write` at the router; membership is decided
- * here, by {@see ChatService}: a chat the caller is not in is "not found".
+ * Ungated at the router, like the Inbox: only staff of the workspace get in
+ * (customers are refused), and membership is decided by {@see ChatService}:
+ * a chat the caller is not in is "not found".
  *
  * Agents reach the read and post routes as MCP tools. An MCP call carries the
  * agent (`agent_principal_id`), and the agent sees only the chats it is a

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Database\Migrations;
 
-use Whity\Core\RBAC\CorePermissions;
 use Whity\Database\Database;
 
 /**
@@ -25,21 +24,12 @@ use Whity\Database\Database;
  *   joined, by default) and has a mode per action (`off`, `ask`, `allowed`).
  *   A member who leaves keeps the row with `removed_at`, so history keeps names.
  *
- * Permissions `chat:read` and `chat:write` go to every staff role (anchor
- * `documents:read`, as migration 249) and to the roles holding
- * `settings:write`. Granted by capability, never by role name.
+ * No permission is added: team chat is for everyone who works in the
+ * workspace (owner, 12 Nov: what any team can use is core), so the routes are
+ * gated like the Inbox, on being staff and being in the chat.
  */
 final class CreateTeamChat
 {
-    /** @var array<string, string> */
-    private const PERMISSIONS = [
-        CorePermissions::CHAT_READ => 'Read the team chats you are in',
-        CorePermissions::CHAT_WRITE => 'Start team chats, write in them and add people and agents',
-    ];
-
-    /** @var list<string> */
-    private const AUDIENCE = [CorePermissions::DOCUMENTS_READ, CorePermissions::SETTINGS_WRITE];
-
     public static function up(Database $db): void
     {
         $db->exec("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS kind VARCHAR(16) NOT NULL DEFAULT 'customer'");
@@ -92,77 +82,15 @@ final class CreateTeamChat
         $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS chat_members_agent_unique ON chat_members (conversation_id, agent_id) WHERE agent_id IS NOT NULL AND removed_at IS NULL');
         $db->exec('CREATE INDEX IF NOT EXISTS chat_members_profile_idx ON chat_members (tenant_id, profile_id)');
         $db->exec('CREATE INDEX IF NOT EXISTS chat_members_agent_idx ON chat_members (tenant_id, agent_id, works_for_profile_id)');
-
-        foreach (self::PERMISSIONS as $name => $description) {
-            $db->query(
-                'INSERT INTO permissions (name, description, created_at)
-                 VALUES (:name, :description, NOW())
-                 ON CONFLICT (name) DO NOTHING',
-                [':name' => $name, ':description' => $description]
-            );
-            $permissionId = self::permissionId($db, $name);
-            if ($permissionId === null) {
-                continue;
-            }
-            foreach (self::rolesHoldingAny($db, self::AUDIENCE) as $roleId) {
-                $db->query(
-                    'INSERT INTO role_permissions (role_id, permission_id, created_at)
-                     VALUES (:role_id, :permission_id, NOW())
-                     ON CONFLICT (role_id, permission_id) DO NOTHING',
-                    [':role_id' => $roleId, ':permission_id' => $permissionId]
-                );
-            }
-        }
     }
 
     public static function down(Database $db): void
     {
-        foreach (array_keys(self::PERMISSIONS) as $name) {
-            $permissionId = self::permissionId($db, $name);
-            if ($permissionId !== null) {
-                $db->query('DELETE FROM role_permissions WHERE permission_id = :permission_id', [':permission_id' => $permissionId]);
-                $db->query('DELETE FROM permissions WHERE id = :id', [':id' => $permissionId]);
-            }
-        }
-
         $db->exec('DROP TABLE IF EXISTS chat_members');
         $db->exec('DROP TABLE IF EXISTS chats');
         $db->exec("DELETE FROM conversations WHERE kind = 'team'");
         $db->exec('DROP INDEX IF EXISTS conversations_kind_idx');
         $db->exec('ALTER TABLE messages DROP COLUMN IF EXISTS chat_meta');
         $db->exec('ALTER TABLE conversations DROP COLUMN IF EXISTS kind');
-    }
-
-    /**
-     * @param list<string> $permissions
-     * @return list<int>
-     */
-    private static function rolesHoldingAny(Database $db, array $permissions): array
-    {
-        $roleIds = [];
-        foreach ($permissions as $permission) {
-            $rows = $db->query(
-                'SELECT rp.role_id
-                   FROM role_permissions rp
-                   JOIN permissions p ON p.id = rp.permission_id
-                  WHERE p.name = :name',
-                [':name' => $permission]
-            )->fetchAll();
-            if ($rows === false) {
-                continue;
-            }
-            foreach ($rows as $row) {
-                $roleIds[(int) $row['role_id']] = true;
-            }
-        }
-
-        return array_map('intval', array_keys($roleIds));
-    }
-
-    private static function permissionId(Database $db, string $name): ?int
-    {
-        $result = $db->query('SELECT id FROM permissions WHERE name = :name', [':name' => $name])->fetch();
-
-        return $result === false ? null : (int) $result['id'];
     }
 }

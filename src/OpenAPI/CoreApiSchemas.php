@@ -221,6 +221,15 @@ final class CoreApiSchemas
         // WHIT-920: the same act on a route whatever it travels on. The engine
         // refuses anybody without an open item on the route.
         'POST /api/routes/{routeId:\d+}/actions',
+        // Team chat (CH.2): an agent sees only the chats it was added to, from
+        // when it joined, and posts only as its member's "post" mode allows.
+        'GET /api/chat/chats',
+        'GET /api/chat/chats/{id:\d+}',
+        'GET /api/chat/chats/{id:\d+}/messages',
+        'POST /api/chat/chats/{id:\d+}/messages',
+        'POST /api/chat/chats/{id:\d+}/proposals',
+        'POST /api/chat/chats/{id:\d+}/read',
+        'GET /api/chat/directory',
     ];
 
     /**
@@ -11998,25 +12007,28 @@ final class CoreApiSchemas
     /**
      * Team chat (CH.1, CH.2): the team's own chats, people and agents together.
      *
-     * Agents get the read and post routes as tools; starting chats, adding or
-     * removing members, renaming and deciding held lines are a person's.
+     * Ungated like the Inbox: the handler lets in staff only, and only members
+     * see a chat. Agents get the read and post routes as tools (listed in
+     * AGENT_CALLABLE_UNGATED); starting chats, adding or removing members,
+     * renaming and deciding held lines are a person's.
      *
      * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
      */
     private static function chatRoutes(): array
     {
+        // No permission: staff of the workspace, and members of the chat, is the check.
         $notFound = [404 => self::errorResponse('Chat not found, or you are not in it')];
         $personOnly = ['expose' => false];
 
         return [
-            self::permissionRoute('GET', '/api/chat/chats', 'chat:read', [
+            self::ungatedRoute('GET', '/api/chat/chats', [
                 'summary' => 'List the team chats you are in',
                 'description' => 'Newest activity first, with unread counts and the last message. An agent sees only the chats it was added to '
                     . 'for its person; mentions_me counts the unread lines that mention it.',
                 'tags' => ['chat'],
                 'responses' => [200 => self::jsonResponse('Your chats', 'ChatListResponse')] + self::authErrors(),
             ]),
-            self::permissionRoute('POST', '/api/chat/chats', 'chat:write', [
+            self::ungatedRoute('POST', '/api/chat/chats', [
                 'mcp' => $personOnly,
                 'summary' => 'Start a group chat, or open a direct chat with a person or one of your agents',
                 'tags' => ['chat'],
@@ -12026,13 +12038,13 @@ final class CoreApiSchemas
                     422 => self::errorResponse('No name, someone who is not in this workspace, or an agent that does not work for you'),
                 ] + self::authErrors(),
             ]),
-            self::permissionRoute('GET', '/api/chat/chats/{id:\d+}', 'chat:read', [
+            self::ungatedRoute('GET', '/api/chat/chats/{id:\d+}', [
                 'summary' => 'Read a chat: its members, what each agent may do, and its latest messages',
                 'description' => 'An agent reads only the messages from when it joined (or what the person who added it allowed).',
                 'tags' => ['chat'],
                 'responses' => [200 => self::jsonResponse('The chat', 'ChatDetailResponse')] + $notFound + self::authErrors(),
             ]),
-            self::permissionRoute('PATCH', '/api/chat/chats/{id:\d+}', 'chat:write', [
+            self::ungatedRoute('PATCH', '/api/chat/chats/{id:\d+}', [
                 'mcp' => $personOnly,
                 'summary' => 'Rename a group chat or link the chat to a board, a meeting or a record',
                 'tags' => ['chat'],
@@ -12042,7 +12054,7 @@ final class CoreApiSchemas
                     422 => self::errorResponse('The name or the link is not valid'),
                 ] + $notFound + self::authErrors(),
             ]),
-            self::permissionRoute('GET', '/api/chat/chats/{id:\d+}/messages', 'chat:read', [
+            self::ungatedRoute('GET', '/api/chat/chats/{id:\d+}/messages', [
                 'summary' => 'Read a chat\'s messages',
                 'description' => 'Oldest first: those after `after` (a message id), or the page before `before`.',
                 'tags' => ['chat'],
@@ -12053,7 +12065,7 @@ final class CoreApiSchemas
                 ],
                 'responses' => [200 => self::jsonResponse('Messages', 'ChatMessageListResponse')] + $notFound + self::authErrors(),
             ]),
-            self::permissionRoute('POST', '/api/chat/chats/{id:\d+}/messages', 'chat:write', [
+            self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/messages', [
                 'summary' => 'Write in a team chat',
                 'description' => 'Mention people and agents in the chat with `mentions`. An agent writes only when it may post there; '
                     . 'on Ask first its message waits for the person it works for.',
@@ -12065,7 +12077,7 @@ final class CoreApiSchemas
                     422 => self::errorResponse('The message is empty or too long'),
                 ] + $notFound + self::authErrors(),
             ]),
-            self::permissionRoute('POST', '/api/chat/chats/{id:\d+}/proposals', 'chat:write', [
+            self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/proposals', [
                 'summary' => 'Put one of your waiting proposals in a chat (agents)',
                 'description' => 'Shows it as a card that only the person it waits for can approve.',
                 'tags' => ['chat'],
@@ -12075,13 +12087,13 @@ final class CoreApiSchemas
                     403 => self::errorResponse('Only an agent that may post here shares its proposals'),
                 ] + $notFound + self::authErrors(),
             ]),
-            self::permissionRoute('POST', '/api/chat/chats/{id:\d+}/read', 'chat:read', [
+            self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/read', [
                 'summary' => 'Mark a chat read up to a message',
                 'tags' => ['chat'],
                 'request' => 'ChatReadRequest',
                 'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
             ]),
-            self::permissionRoute('POST', '/api/chat/chats/{id:\d+}/members', 'chat:write', [
+            self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/members', [
                 'mcp' => $personOnly,
                 'summary' => 'Add a person or an agent to a chat',
                 'description' => 'For an agent, say who it works for here, what it can read (from now on by default) and what it may do. '
@@ -12093,7 +12105,7 @@ final class CoreApiSchemas
                     422 => self::errorResponse('Already in the chat, not in this workspace, or the agent does not work for that person'),
                 ] + $notFound + self::authErrors(),
             ]),
-            self::permissionRoute('DELETE', '/api/chat/chats/{id:\d+}/members/{member:\d+}', 'chat:write', [
+            self::ungatedRoute('DELETE', '/api/chat/chats/{id:\d+}/members/{member:\d+}', [
                 'mcp' => $personOnly,
                 'summary' => 'Remove an agent, leave a chat, or remove a person from a group you started',
                 'tags' => ['chat'],
@@ -12102,7 +12114,7 @@ final class CoreApiSchemas
                     403 => self::errorResponse('Only the person who started the chat removes people'),
                 ] + $notFound + self::authErrors(),
             ]),
-            self::permissionRoute('POST', '/api/chat/messages/{id:\d+}/approve', 'chat:write', [
+            self::ungatedRoute('POST', '/api/chat/messages/{id:\d+}/approve', [
                 'mcp' => $personOnly,
                 'summary' => 'Let an agent\'s held message through (the person it works for)',
                 'tags' => ['chat'],
@@ -12112,7 +12124,7 @@ final class CoreApiSchemas
                     409 => self::errorResponse('The message is not waiting'),
                 ] + $notFound + self::authErrors(),
             ]),
-            self::permissionRoute('POST', '/api/chat/messages/{id:\d+}/decline', 'chat:write', [
+            self::ungatedRoute('POST', '/api/chat/messages/{id:\d+}/decline', [
                 'mcp' => $personOnly,
                 'summary' => 'Decline an agent\'s held message (the person it works for)',
                 'tags' => ['chat'],
@@ -12122,7 +12134,7 @@ final class CoreApiSchemas
                     409 => self::errorResponse('The message is not waiting'),
                 ] + $notFound + self::authErrors(),
             ]),
-            self::permissionRoute('GET', '/api/chat/directory', 'chat:read', [
+            self::ungatedRoute('GET', '/api/chat/directory', [
                 'summary' => 'Find people and agents to add to a chat or mention',
                 'tags' => ['chat'],
                 'parameters' => [self::queryParam('q', 'string', 'Part of a name')],
@@ -17026,6 +17038,23 @@ final class CoreApiSchemas
      * @param array<string, mixed> $schema
      * @return array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}
      */
+    /**
+     * A route with no permission gate: the handler decides who may use it.
+     *
+     * @param array<string, mixed> $schema
+     * @return array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}
+     */
+    private static function ungatedRoute(string $method, string $path, array $schema): array
+    {
+        return [
+            'method' => $method,
+            'path' => $path,
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => $schema,
+        ];
+    }
+
     private static function permissionRoute(string $method, string $path, string $permission, array $schema): array
     {
         return [
