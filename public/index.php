@@ -3485,10 +3485,9 @@ $documentBlockRegistry = new \Whity\Core\Document\Blocks\DocumentBlockRegistry(
                 continue;
             }
             $row = $versions[$manifest->name()] ?? null;
-            $label = $manifest->label();
             $out[] = [
                 'plugin' => $manifest->name(),
-                'label' => ['en' => (string) ($label['en'] ?? $manifest->name()), 'ar' => (string) ($label['ar'] ?? $label['en'] ?? $manifest->name())],
+                'label' => $manifest->label(),
                 'verified' => $row !== null && $pluginTrust->isVerified($row['plugin'], $row['version'], $row['hash']),
                 'blocks' => $blocks,
             ];

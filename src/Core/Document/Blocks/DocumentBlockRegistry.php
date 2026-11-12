@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Document\Blocks;
 
+use Whity\Core\Container\HostWiredService;
 use Whity\Sdk\Manifest\DocumentBlockValidator;
 
 /**
@@ -24,7 +25,7 @@ use Whity\Sdk\Manifest\DocumentBlockValidator;
  * (E.19). {@see self::forTenant()} lists the workspace's switched-off plugins
  * so the placeholder can name one and offer Enable.
  */
-final class DocumentBlockRegistry
+final class DocumentBlockRegistry implements HostWiredService
 {
     /** @var array<string, array{label: array{en: string, ar: string}, blocks: array<string, array<string, mixed>>}> */
     private array $code = [];
