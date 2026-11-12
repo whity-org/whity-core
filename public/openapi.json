@@ -794,7 +794,7 @@
         "/api/v1/2fa-recovery/force-reset": {
             "post": {
                 "operationId": "post_api_v1_2fa_recovery_force_reset",
-                "summary": "Secondary fallback: force-clear a named profile's 2FA with no prior request (tenant-scoped)",
+                "summary": "Start a two-step reset for a named profile with no prior request; it counts as the first approval (tenant-scoped)",
                 "tags": [
                     "auth"
                 ],
@@ -871,6 +871,122 @@
                     },
                     "422": {
                         "description": "A valid profile_id is required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/2fa-recovery/identity-check": {
+            "post": {
+                "operationId": "post_api_v1_2fa_recovery_identity_check",
+                "summary": "Start the admin's \"confirm it's you\" check: names it, and sends a code by email when that is the check",
+                "tags": [
+                    "auth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/IdentityCheckRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The check to make",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/IdentityCheckResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A request_id or profile_id is required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many codes were sent lately",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -976,10 +1092,11 @@
         "/api/v1/2fa-recovery/{id}/approve": {
             "post": {
                 "operationId": "post_api_v1_2fa_recovery_id_approve",
-                "summary": "Clear the target profile's 2FA and send a fresh password-reset link (tenant-scoped)",
+                "summary": "Approve a two-step reset: the first admin's approval is recorded, a second admin's clears the two-step and sends a reset link",
                 "tags": [
                     "auth"
                 ],
+                "description": "Two different admins must approve, and the person asking can never approve their own (AG.1). Each approval first confirms the admin is who they say with a code.",
                 "parameters": [
                     {
                         "name": "id",
@@ -990,13 +1107,33 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TwoFactorRecoveryApproveRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
-                        "description": "Approved",
+                        "description": "Recorded, or cleared",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ApprovalStatusResponse"
+                                    "$ref": "#/components/schemas/TwoFactorRecoveryApprovalResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
                         }
@@ -1033,6 +1170,132 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "This admin gave the first approval; a different admin has to give the second",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/2fa-recovery/{id}/checks": {
+            "post": {
+                "operationId": "post_api_v1_2fa_recovery_id_checks",
+                "summary": "Record a check that it is really the person asking",
+                "tags": [
+                    "auth"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TwoFactorRecoveryCheckRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Recorded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TwoFactorRecoveryApprovalResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No pending 2FA-recovery request found for that id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No text, or more than 300 characters",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4725,6 +4988,82 @@
                         }
                     }
                 }
+            }
+        },
+        "/api/v1/away-periods": {
+            "get": {
+                "operationId": "get_api_v1_away_periods",
+                "summary": "Everyone's \"I'm away\" periods, newest first",
+                "tags": [
+                    "delegations"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Away periods",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AwayPeriodListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/v1/billing/change-plan": {
@@ -30613,6 +30952,246 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/away": {
+            "delete": {
+                "operationId": "delete_api_v1_me_away",
+                "summary": "Back early: end your away period at once",
+                "tags": [
+                    "me"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ended",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AwayPeriodResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "You aren't away",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "operationId": "get_api_v1_me_away",
+                "summary": "Your \"I'm away\", or null",
+                "tags": [
+                    "me"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Your away period",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AwayPeriodResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "operationId": "put_api_v1_me_away",
+                "summary": "Hand your decisions to someone while you're away",
+                "tags": [
+                    "me"
+                ],
+                "description": "Replaces any away period you had. In force from startsOn up to backOn.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AwayPeriodRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Your away period",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AwayPeriodResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Yourself as the delegate, someone outside the workspace, bad dates, or nothing to hand over",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -63433,6 +64012,164 @@
                     "data"
                 ]
             },
+            "AwayPeriod": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "profile": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name"
+                        ]
+                    },
+                    "delegate": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name"
+                        ]
+                    },
+                    "startsOn": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "backOn": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "covers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "flows",
+                                "proposals",
+                                "documents"
+                            ]
+                        }
+                    },
+                    "message": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "starting",
+                            "in_force",
+                            "ended"
+                        ]
+                    },
+                    "endedAt": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "profile",
+                    "delegate",
+                    "startsOn",
+                    "backOn",
+                    "covers",
+                    "message",
+                    "status",
+                    "endedAt",
+                    "createdAt"
+                ]
+            },
+            "AwayPeriodListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AwayPeriod"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "AwayPeriodRequest": {
+                "type": "object",
+                "properties": {
+                    "delegateProfileId": {
+                        "type": "integer"
+                    },
+                    "startsOn": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "backOn": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "The day you are back; it ends at the start of that day"
+                    },
+                    "covers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "flows",
+                                "proposals",
+                                "documents"
+                            ]
+                        },
+                        "minItems": 1
+                    },
+                    "message": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "delegateProfileId",
+                    "startsOn",
+                    "backOn",
+                    "covers"
+                ]
+            },
+            "AwayPeriodResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AwayPeriod"
+                            }
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "BillingAccessResponse": {
                 "type": "object",
                 "properties": {
@@ -70209,10 +70946,19 @@
                 "properties": {
                     "profile_id": {
                         "type": "integer"
+                    },
+                    "code": {
+                        "type": "string",
+                        "description": "The admin's authenticator code, or the code emailed to them"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "required": [
-                    "profile_id"
+                    "profile_id",
+                    "code"
                 ]
             },
             "ForceResetResponse": {
@@ -70221,17 +70967,21 @@
                     "data": {
                         "type": "object",
                         "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
                             "profile_id": {
                                 "type": "integer"
                             },
                             "status": {
                                 "type": "string",
                                 "enum": [
-                                    "forced"
+                                    "waiting_for_second_admin"
                                 ]
                             }
                         },
                         "required": [
+                            "id",
                             "profile_id",
                             "status"
                         ]
@@ -72765,6 +73515,45 @@
                         "items": {
                             "$ref": "#/components/schemas/HomeCard"
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "IdentityCheckRequest": {
+                "type": "object",
+                "properties": {
+                    "request_id": {
+                        "type": "integer"
+                    },
+                    "profile_id": {
+                        "type": "integer"
+                    }
+                }
+            },
+            "IdentityCheckResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "method": {
+                                "type": "string",
+                                "enum": [
+                                    "totp",
+                                    "email_code"
+                                ]
+                            },
+                            "email_hint": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "method",
+                            "email_hint"
+                        ]
                     }
                 },
                 "required": [
@@ -77383,6 +78172,68 @@
                     },
                     "created_at": {
                         "type": "string"
+                    },
+                    "requested_from": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "last_signed_in_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "checks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "text": {
+                                    "type": "string"
+                                },
+                                "by_profile_id": {
+                                    "type": "integer"
+                                },
+                                "by_name": {
+                                    "type": "string"
+                                },
+                                "at": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "text",
+                                "by_profile_id",
+                                "by_name",
+                                "at"
+                            ]
+                        }
+                    },
+                    "first_approval": {
+                        "allOf": [
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "profile_id": {
+                                        "type": "integer"
+                                    },
+                                    "display_name": {
+                                        "type": "string"
+                                    },
+                                    "at": {
+                                        "type": "string"
+                                    },
+                                    "method": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "profile_id",
+                                    "display_name",
+                                    "at",
+                                    "method"
+                                ]
+                            }
+                        ],
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -77390,7 +78241,11 @@
                     "profile_id",
                     "email",
                     "display_name",
-                    "created_at"
+                    "created_at",
+                    "requested_from",
+                    "last_signed_in_at",
+                    "checks",
+                    "first_approval"
                 ]
             },
             "PendingTwoFactorRecoveryListResponse": {
@@ -85379,6 +86234,60 @@
                 },
                 "required": [
                     "grace_period_days"
+                ]
+            },
+            "TwoFactorRecoveryApprovalResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "waiting_for_second_admin",
+                                    "approved",
+                                    "rejected",
+                                    "pending"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "status"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "TwoFactorRecoveryApproveRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "The approving admin's authenticator code, or the code emailed to them"
+                    }
+                },
+                "required": [
+                    "code"
+                ]
+            },
+            "TwoFactorRecoveryCheckRequest": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "maxLength": 300,
+                        "description": "What was checked: \"Called him on the number on file\""
+                    }
+                },
+                "required": [
+                    "text"
                 ]
             },
             "TwoFactorRecoveryConfirmRequest": {

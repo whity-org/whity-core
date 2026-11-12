@@ -2863,6 +2863,52 @@ final class CoreApiSchemas
     private static function delegationRoutes(): array
     {
         return [
+            self::permissionRoute('GET', '/api/away-periods', 'delegation:manage', [
+                'summary' => 'Everyone\'s "I\'m away" periods, newest first',
+                'tags' => ['delegations'],
+                'responses' => [200 => self::jsonResponse('Away periods', 'AwayPeriodListResponse')] + self::authErrors(),
+            ]),
+            [
+                'method' => 'GET',
+                'path' => '/api/me/away',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Your "I\'m away", or null',
+                    'tags' => ['me'],
+                    'responses' => [200 => self::jsonResponse('Your away period', 'AwayPeriodResponse')] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/away',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Hand your decisions to someone while you\'re away',
+                    'description' => 'Replaces any away period you had. In force from startsOn up to backOn.',
+                    'tags' => ['me'],
+                    'request' => 'AwayPeriodRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('Your away period', 'AwayPeriodResponse'),
+                        422 => self::errorResponse('Yourself as the delegate, someone outside the workspace, bad dates, or nothing to hand over'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'DELETE',
+                'path' => '/api/me/away',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Back early: end your away period at once',
+                    'tags' => ['me'],
+                    'responses' => [
+                        200 => self::jsonResponse('Ended', 'AwayPeriodResponse'),
+                        404 => self::errorResponse('You aren\'t away'),
+                    ] + self::authErrors(),
+                ],
+            ],
             self::permissionRoute('GET', '/api/delegations', 'delegation:manage', [
                 'summary' => 'List the tenant\'s permission delegations',
                 'tags' => ['delegations'],
@@ -10872,8 +10918,66 @@ final class CoreApiSchemas
                 // Why they asked, in their own words. Optional, so often null.
                 'reason' => self::str(true),
                 'created_at' => self::str(),
-            ], ['id', 'profile_id', 'email', 'display_name', 'created_at']),
+                // AG.1: where it came from ("Chrome on Windows", or "admin" when an admin started it).
+                'requested_from' => self::str(true),
+                'last_signed_in_at' => self::str(true),
+                // What admins did to confirm it's really the person, with who and when.
+                'checks' => ['type' => 'array', 'items' => self::object([
+                    'text' => self::str(),
+                    'by_profile_id' => self::int(),
+                    'by_name' => self::str(),
+                    'at' => self::str(),
+                ], ['text', 'by_profile_id', 'by_name', 'at'])],
+                // The first admin's approval; a second, different admin clears it.
+                'first_approval' => ['allOf' => [self::object([
+                    'profile_id' => self::int(),
+                    'display_name' => self::str(),
+                    'at' => self::str(),
+                    'method' => self::str(),
+                ], ['profile_id', 'display_name', 'at', 'method'])], 'nullable' => true],
+            ], ['id', 'profile_id', 'email', 'display_name', 'created_at', 'requested_from', 'last_signed_in_at', 'checks', 'first_approval']),
             'PendingTwoFactorRecoveryListResponse' => self::paginatedListEnvelope('PendingTwoFactorRecoveryItem'),
+            // AG.1: the first approval waits for a second admin; the second clears the two-step.
+            'TwoFactorRecoveryApprovalResponse' => self::dataEnvelope(self::object([
+                'id' => self::int(),
+                'status' => ['type' => 'string', 'enum' => ['waiting_for_second_admin', 'approved', 'rejected', 'pending']],
+            ], ['id', 'status'])),
+            'TwoFactorRecoveryApproveRequest' => self::object([
+                'code' => ['type' => 'string', 'description' => 'The approving admin\'s authenticator code, or the code emailed to them'],
+            ], ['code']),
+            'TwoFactorRecoveryCheckRequest' => self::object([
+                'text' => ['type' => 'string', 'maxLength' => 300, 'description' => 'What was checked: "Called him on the number on file"'],
+            ], ['text']),
+            'IdentityCheckRequest' => self::object([
+                'request_id' => self::int(),
+                'profile_id' => self::int(),
+            ], []),
+            'IdentityCheckResponse' => self::dataEnvelope(self::object([
+                'method' => ['type' => 'string', 'enum' => ['totp', 'email_code']],
+                'email_hint' => self::str(true),
+            ], ['method', 'email_hint'])),
+            // OR.1: "I'm away".
+            'AwayPeriod' => self::object([
+                'id' => self::int(),
+                'profile' => self::object(['id' => self::int(), 'name' => self::str(true)], ['id', 'name']),
+                'delegate' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']),
+                'startsOn' => ['type' => 'string', 'format' => 'date'],
+                'backOn' => ['type' => 'string', 'format' => 'date'],
+                'covers' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['flows', 'proposals', 'documents']]],
+                'message' => self::str(true),
+                'status' => ['type' => 'string', 'enum' => ['starting', 'in_force', 'ended']],
+                'endedAt' => self::str(true),
+                'createdAt' => self::str(),
+            ], ['id', 'profile', 'delegate', 'startsOn', 'backOn', 'covers', 'message', 'status', 'endedAt', 'createdAt']),
+            'AwayPeriodResponse' => self::dataEnvelope(['allOf' => [SchemaBuilder::ref('AwayPeriod')], 'nullable' => true]),
+            'AwayPeriodListResponse' => self::listEnvelope('AwayPeriod'),
+            'AwayPeriodRequest' => self::object([
+                'delegateProfileId' => self::int(),
+                'startsOn' => ['type' => 'string', 'format' => 'date'],
+                'backOn' => ['type' => 'string', 'format' => 'date', 'description' => 'The day you are back; it ends at the start of that day'],
+                'covers' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['flows', 'proposals', 'documents']], 'minItems' => 1],
+                'message' => self::str(true),
+            ], ['delegateProfileId', 'startsOn', 'backOn', 'covers']),
 
             // Shared 200 response for every id-based approve/reject action across
             // both queues (password-resets and 2fa-recovery).
@@ -10905,11 +11009,17 @@ final class CoreApiSchemas
 
             // POST /api/2fa-recovery/force-reset — the secondary admin-direct
             // fallback (no prior request): request body + 200 response.
-            'ForceResetRequest' => self::object(['profile_id' => self::int()], ['profile_id']),
-            'ForceResetResponse' => self::dataEnvelope(self::object([
+            // Since AG.1 this is the first approval; a second admin clears it.
+            'ForceResetRequest' => self::object([
                 'profile_id' => self::int(),
-                'status' => ['type' => 'string', 'enum' => ['forced']],
-            ], ['profile_id', 'status'])),
+                'code' => ['type' => 'string', 'description' => 'The admin\'s authenticator code, or the code emailed to them'],
+                'reason' => self::str(true),
+            ], ['profile_id', 'code']),
+            'ForceResetResponse' => self::dataEnvelope(self::object([
+                'id' => self::int(),
+                'profile_id' => self::int(),
+                'status' => ['type' => 'string', 'enum' => ['waiting_for_second_admin']],
+            ], ['id', 'profile_id', 'status'])),
 
             // ── Plugin-declared data types (WC-723, Door 2) ───────────────────
             // `actions` is the honest-degradation contract: it lists ONLY the
@@ -12423,11 +12533,34 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/2fa-recovery/{id:\d+}/approve', 'two_factor_recovery:approve', [
-                'summary' => 'Clear the target profile\'s 2FA and send a fresh password-reset link (tenant-scoped)',
+                'summary' => 'Approve a two-step reset: the first admin\'s approval is recorded, a second admin\'s clears the two-step and sends a reset link',
+                'description' => 'Two different admins must approve, and the person asking can never approve their own (AG.1). Each approval first confirms the admin is who they say with a code.',
                 'tags' => ['auth'],
+                'request' => 'TwoFactorRecoveryApproveRequest',
                 'responses' => [
-                    200 => self::jsonResponse('Approved', 'ApprovalStatusResponse'),
+                    200 => self::jsonResponse('Recorded, or cleared', 'TwoFactorRecoveryApprovalResponse'),
                     404 => self::errorResponse('No pending 2FA-recovery request found for that id'),
+                    409 => self::errorResponse('This admin gave the first approval; a different admin has to give the second'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/2fa-recovery/{id:\d+}/checks', 'two_factor_recovery:approve', [
+                'summary' => 'Record a check that it is really the person asking',
+                'tags' => ['auth'],
+                'request' => 'TwoFactorRecoveryCheckRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Recorded', 'TwoFactorRecoveryApprovalResponse'),
+                    404 => self::errorResponse('No pending 2FA-recovery request found for that id'),
+                    422 => self::errorResponse('No text, or more than 300 characters'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/2fa-recovery/identity-check', 'two_factor_recovery:approve', [
+                'summary' => 'Start the admin\'s "confirm it\'s you" check: names it, and sends a code by email when that is the check',
+                'tags' => ['auth'],
+                'request' => 'IdentityCheckRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                    422 => self::errorResponse('A request_id or profile_id is required'),
+                    429 => self::errorResponse('Too many codes were sent lately'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/2fa-recovery/{id:\d+}/reject', 'two_factor_recovery:approve', [
@@ -12439,7 +12572,7 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/2fa-recovery/force-reset', 'two_factor_recovery:approve', [
-                'summary' => 'Secondary fallback: force-clear a named profile\'s 2FA with no prior request (tenant-scoped)',
+                'summary' => 'Start a two-step reset for a named profile with no prior request; it counts as the first approval (tenant-scoped)',
                 'tags' => ['auth'],
                 'request' => 'ForceResetRequest',
                 'responses' => [

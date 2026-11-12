@@ -137,8 +137,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Secondary fallback: force-clear a named profile's 2FA with no prior request (tenant-scoped) */
+        /** Start a two-step reset for a named profile with no prior request; it counts as the first approval (tenant-scoped) */
         post: operations["post_api_v1_2fa_recovery_force_reset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/2fa-recovery/identity-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start the admin's "confirm it's you" check: names it, and sends a code by email when that is the check */
+        post: operations["post_api_v1_2fa_recovery_identity_check"];
         delete?: never;
         options?: never;
         head?: never;
@@ -171,8 +188,28 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Clear the target profile's 2FA and send a fresh password-reset link (tenant-scoped) */
+        /**
+         * Approve a two-step reset: the first admin's approval is recorded, a second admin's clears the two-step and sends a reset link
+         * @description Two different admins must approve, and the person asking can never approve their own (AG.1). Each approval first confirms the admin is who they say with a code.
+         */
         post: operations["post_api_v1_2fa_recovery_id_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/2fa-recovery/{id}/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a check that it is really the person asking */
+        post: operations["post_api_v1_2fa_recovery_id_checks"];
         delete?: never;
         options?: never;
         head?: never;
@@ -779,6 +816,23 @@ export interface paths {
         put?: never;
         /** Switch the active tenant for an already-logged-in profile */
         post: operations["post_api_v1_auth_switch_tenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/away-periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Everyone's "I'm away" periods, newest first */
+        get: operations["get_api_v1_away_periods"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4438,6 +4492,28 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/away": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your "I'm away", or null */
+        get: operations["get_api_v1_me_away"];
+        /**
+         * Hand your decisions to someone while you're away
+         * @description Replaces any away period you had. In force from startsOn up to backOn.
+         */
+        put: operations["put_api_v1_me_away"];
+        post?: never;
+        /** Back early: end your away period at once */
+        delete: operations["delete_api_v1_me_away"];
         options?: never;
         head?: never;
         patch?: never;
@@ -9505,6 +9581,45 @@ export interface components {
                 automationsEnabled: boolean;
             };
         };
+        AwayPeriod: {
+            id: number;
+            profile: {
+                id: number;
+                name: string | null;
+            };
+            delegate: {
+                id: number;
+                name: string;
+            };
+            /** Format: date */
+            startsOn: string;
+            /** Format: date */
+            backOn: string;
+            covers: ("flows" | "proposals" | "documents")[];
+            message: string | null;
+            /** @enum {string} */
+            status: "starting" | "in_force" | "ended";
+            endedAt: string | null;
+            createdAt: string;
+        };
+        AwayPeriodListResponse: {
+            data: components["schemas"]["AwayPeriod"][];
+        };
+        AwayPeriodRequest: {
+            delegateProfileId: number;
+            /** Format: date */
+            startsOn: string;
+            /**
+             * Format: date
+             * @description The day you are back; it ends at the start of that day
+             */
+            backOn: string;
+            covers: ("flows" | "proposals" | "documents")[];
+            message?: string | null;
+        };
+        AwayPeriodResponse: {
+            data: components["schemas"]["AwayPeriod"] | null;
+        };
         BillingAccessResponse: {
             data: {
                 has_access: boolean;
@@ -11497,12 +11612,16 @@ export interface components {
         };
         ForceResetRequest: {
             profile_id: number;
+            /** @description The admin's authenticator code, or the code emailed to them */
+            code: string;
+            reason?: string | null;
         };
         ForceResetResponse: {
             data: {
+                id: number;
                 profile_id: number;
                 /** @enum {string} */
-                status: "forced";
+                status: "waiting_for_second_admin";
             };
         };
         Form: {
@@ -12198,6 +12317,17 @@ export interface components {
         };
         HomeCardListResponse: {
             data: components["schemas"]["HomeCard"][];
+        };
+        IdentityCheckRequest: {
+            request_id?: number;
+            profile_id?: number;
+        };
+        IdentityCheckResponse: {
+            data: {
+                /** @enum {string} */
+                method: "totp" | "email_code";
+                email_hint: string | null;
+            };
         };
         IdentityProvider: {
             id: number;
@@ -13426,6 +13556,20 @@ export interface components {
             display_name: string;
             reason?: string | null;
             created_at: string;
+            requested_from: string | null;
+            last_signed_in_at: string | null;
+            checks: {
+                text: string;
+                by_profile_id: number;
+                by_name: string;
+                at: string;
+            }[];
+            first_approval: {
+                profile_id: number;
+                display_name: string;
+                at: string;
+                method: string;
+            } | null;
         };
         PendingTwoFactorRecoveryListResponse: {
             data: components["schemas"]["PendingTwoFactorRecoveryItem"][];
@@ -15503,6 +15647,21 @@ export interface components {
         TwoFactorPolicyUpdateRequest: {
             grace_period_days: number;
         };
+        TwoFactorRecoveryApprovalResponse: {
+            data: {
+                id: number;
+                /** @enum {string} */
+                status: "waiting_for_second_admin" | "approved" | "rejected" | "pending";
+            };
+        };
+        TwoFactorRecoveryApproveRequest: {
+            /** @description The approving admin's authenticator code, or the code emailed to them */
+            code: string;
+        };
+        TwoFactorRecoveryCheckRequest: {
+            /** @description What was checked: "Called him on the number on file" */
+            text: string;
+        };
         TwoFactorRecoveryConfirmRequest: {
             token: string;
             /** @description Optional. Why you are asking, shown to the approver. At most 500 characters. */
@@ -16652,6 +16811,102 @@ export interface operations {
             };
         };
     };
+    post_api_v1_2fa_recovery_identity_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description The check to make */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityCheckResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A request_id or profile_id is required */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many codes were sent lately */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_2fa_recovery_pending: {
         parameters: {
             query?: never;
@@ -16726,15 +16981,28 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorRecoveryApproveRequest"];
+            };
+        };
         responses: {
-            /** @description Approved */
+            /** @description Recorded, or cleared */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApprovalStatusResponse"];
+                    "application/json": components["schemas"]["TwoFactorRecoveryApprovalResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Missing or invalid authentication */
@@ -16766,6 +17034,104 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This admin gave the first approval; a different admin has to give the second */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_2fa_recovery_id_checks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorRecoveryCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorRecoveryApprovalResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No pending 2FA-recovery request found for that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No text, or more than 300 characters */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -19618,6 +19984,71 @@ export interface operations {
                 };
             };
             /** @description Profile has no active membership in the requested tenant */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_away_periods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Away periods */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwayPeriodListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -39688,6 +40119,223 @@ export interface operations {
                 };
             };
             /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_away: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your away period */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwayPeriodResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_me_away: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AwayPeriodRequest"];
+            };
+        };
+        responses: {
+            /** @description Your away period */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwayPeriodResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Yourself as the delegate, someone outside the workspace, bad dates, or nothing to hand over */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_me_away: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ended */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwayPeriodResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description You aren't away */
             404: {
                 headers: {
                     [name: string]: unknown;

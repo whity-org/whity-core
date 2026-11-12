@@ -1901,14 +1901,23 @@ $twoFactorRecoveryApprovalsHandler = new \Whity\Api\TwoFactorRecoveryApprovalsAp
     $twoFactorRecoveryService,
     $roleChecker,
     $auditLogger,
-    $passwordResetMailer
+    $passwordResetMailer,
+    // AG.1: each approval confirms the admin is who they say first.
+    new \Whity\Core\Security\IdentityCheck(
+        $db->getPdo(),
+        new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo()),
+        $totpService,
+        new \Whity\Core\Security\IdentityCheckMailer($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService),
+    )
 );
 $router->register('GET',  '/api/2fa-recovery/pending',           [$twoFactorRecoveryApprovalsHandler, 'listPending'], null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
 $router->register('POST', '/api/2fa-recovery/{id:\d+}/approve',  [$twoFactorRecoveryApprovalsHandler, 'approve'],     null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
 $router->register('POST', '/api/2fa-recovery/{id:\d+}/reject',   [$twoFactorRecoveryApprovalsHandler, 'reject'],      null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
-// Secondary fallback (no prior request): an admin forces the same primitive
-// directly onto a named profile, e.g. when the locked-out user cannot even
-// receive email and reaches an admin out-of-band.
+$router->register('POST', '/api/2fa-recovery/{id:\d+}/checks',   [$twoFactorRecoveryApprovalsHandler, 'addCheck'],    null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
+$router->register('POST', '/api/2fa-recovery/identity-check',    [$twoFactorRecoveryApprovalsHandler, 'identityCheck'], null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
+// Secondary fallback (no prior request): an admin starts a reset for a named
+// profile, e.g. when the locked-out user cannot even receive email and reaches
+// an admin out-of-band. It is the first approval; a second admin still approves.
 $router->register('POST', '/api/2fa-recovery/force-reset',       [$twoFactorRecoveryApprovalsHandler, 'forceReset'],  null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
 
 // 10d. Tenant invitations (WHIT-417 / #797 item 3) — how a tenant administrator
@@ -2624,6 +2633,13 @@ $router->register('POST', '/api/time-windows/{id:\d+}/reopen', [$timeWindowsHand
 // invariant is enforced independently inside DelegationService.
 $delegationsHandler = new DelegationsApiHandler($db->getPdo(), $delegationService, $logger);
 $router->register('GET', '/api/delegations', [$delegationsHandler, 'list'], null, null, CorePermissions::DELEGATION_MANAGE);
+// OR.1: "I'm away". A person sets their own, from their own account (session,
+// self-scoped); the Delegations list shows everyone's.
+$awayHandler = new \Whity\Api\AwayApiHandler(new \Whity\Core\Delegation\AwayService($db->getPdo()), $auditLogger);
+$router->register('GET', '/api/me/away', [$awayHandler, 'show'], null);
+$router->register('PUT', '/api/me/away', [$awayHandler, 'set'], null);
+$router->register('DELETE', '/api/me/away', [$awayHandler, 'end'], null);
+$router->register('GET', '/api/away-periods', [$awayHandler, 'list'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('POST', '/api/delegations', [$delegationsHandler, 'create'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('DELETE', '/api/delegations/{id:\d+}', [$delegationsHandler, 'revoke'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('POST', '/api/delegations/{id:\d+}/restore', [$delegationsHandler, 'restore'], null, null, CorePermissions::DELEGATION_MANAGE);
