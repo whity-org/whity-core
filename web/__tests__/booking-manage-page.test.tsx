@@ -106,4 +106,33 @@ describe('ManageBookingScreen', () => {
     render(<ManageBookingScreen token={OLD} />);
     expect(await screen.findByTestId('manage-invalid')).toBeInTheDocument();
   });
+  it('takes the time the business suggested for a request and switches to the new link (design 3.3)', async () => {
+    const suggested = { ...booking, status: 'requested', suggested: true };
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === `/api/v1/public/bookings/${OLD}`) return respond(200, { data: suggested });
+      if (url === `/api/v1/public/bookings/${OLD}/accept` && init?.method === 'POST') {
+        return respond(200, { data: { ...booking, workspace: undefined, time_zone: undefined, manage_token: NEW } });
+      }
+      return respond(404, { error: 'This link is invalid or has expired' });
+    });
+    const replaceState = jest.spyOn(window.history, 'replaceState');
+
+    render(<ManageBookingScreen token={OLD} />);
+    expect(await screen.findByTestId('manage-card')).toHaveTextContent('suggests this one');
+    fireEvent.click(screen.getByTestId('manage-take'));
+
+    expect(await screen.findByTestId('manage-notice')).toHaveTextContent('Booked.');
+    expect(replaceState).toHaveBeenCalledWith(null, '', `/booking/${NEW}`);
+    expect(screen.queryByTestId('manage-take')).toBeNull();
+  });
+
+  it('shows a request that is still waiting without Take this time', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url === `/api/v1/public/bookings/${OLD}` ? respond(200, { data: { ...booking, status: 'requested', suggested: false } }) : respond(404, {})
+    );
+    render(<ManageBookingScreen token={OLD} />);
+    expect(await screen.findByTestId('manage-card')).toHaveTextContent('waiting for an answer');
+    expect(screen.queryByTestId('manage-take')).toBeNull();
+    expect(screen.getByTestId('manage-cancel')).toBeInTheDocument();
+  });
 });

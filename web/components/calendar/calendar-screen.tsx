@@ -8,12 +8,18 @@
  * existing pieces: the toggle group for the view, the select for the person,
  * the dialog and sheet patterns, and the six states.
  *
+ * DESIGN 3.3 (`TplAppointments`): a branch filter when the workspace puts
+ * staff or rooms in branches; customers' requests dashed amber and checked-in
+ * bookings green; a column beside the calendar with the Requests waiting for
+ * an OK and Today at a glance (below the calendar on a narrow screen).
+ *
  * PHONE. Day is the default on a narrow screen. Week becomes a list of days
  * (seven columns of 40px are unreadable for anyone, and the people this is
  * sized for are over 50); Month shows a count per day that opens the day.
  */
 
 import { useMemo, useState } from 'react';
+import { useLocalizedUnits } from '@/hooks/useLocalizedUnits';
 import Link from 'next/link';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { LoadProblem } from '@/components/load-problem';
@@ -41,12 +47,16 @@ import {
 import { AgendaList, MonthGrid, TimeGrid, type GridItem } from './calendar-grid';
 import { BookingDialog } from './booking-dialog';
 import { BookingSheet } from './booking-sheet';
+import { RequestsCard, TodayCard } from './appointments-side';
 import { CalendarNav } from './calendar-nav';
 import { EventDialog } from './event-dialog';
 import { useCalendarAccess, useCalendarBasics } from './use-calendar-basics';
 import { useCalendarWords } from './use-calendar-words';
 
 const EVERYONE = 'everyone';
+const ALL_BRANCHES = 'all';
+/** How far ahead the Requests card looks (the API allows 62 days at a time). */
+const REQUESTS_AHEAD_DAYS = 60;
 
 function isNarrow(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 767px)').matches;
@@ -96,7 +106,8 @@ function CalendarBody({
   const words = useCalendarWords();
   const access = useCalendarAccess();
   const { addToast } = useToast();
-  const { settings, staff, services, timeZone } = basics;
+  const { settings, staff, services, rooms, timeZone } = basics;
+  const units = useLocalizedUnits(basics.units);
   const dates = useDateDisplay({ timeZone });
 
   const today = useMemo(() => zonedDate(timeZone), [timeZone]);
@@ -106,7 +117,10 @@ function CalendarBody({
   const [view, setView] = useState<CalendarView>(() => (isNarrow() ? 'day' : 'week'));
   const [anchor, setAnchor] = useState<CalendarDate>(today);
   const [person, setPerson] = useState<string>(EVERYONE);
+  const [branch, setBranch] = useState<string>(ALL_BRANCHES);
   const [booking, setBooking] = useState<CalendarBooking | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [newBooking, setNewBooking] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
@@ -114,14 +128,30 @@ function CalendarBody({
   const range = viewRange(view, anchor, settings.week_start);
   const query = rangeQuery(range, timeZone);
   const profileId = person === EVERYONE ? null : Number(person);
+  const unitId = branch === ALL_BRANCHES ? null : Number(branch);
+  // Branches the workspace actually uses: a unit some person or room is in.
+  const usedUnits = useMemo(() => {
+    const used = new Set<number>();
+    for (const s of staff) if (s.unit_id !== null && s.unit_id !== undefined) used.add(s.unit_id);
+    for (const r of rooms) if (r.unit_id !== null) used.add(r.unit_id);
+    return units.filter((u) => used.has(u.id));
+  }, [staff, rooms, units]);
 
-  const { data, loading, error, forbidden, refetch } = useFetch(async () => {
+  const { data, loading, error, forbidden } = useFetch(async () => {
     const [bookings, events] = await Promise.all([
-      calendarApi.bookings({ ...query, profileId }),
+      calendarApi.bookings({ ...query, profileId, unitId }),
       calendarApi.events({ ...query, profileId }),
     ]);
     return { bookings, events };
-  }, [query.from, query.to, profileId]);
+  }, [query.from, query.to, profileId, unitId, reloadKey]);
+
+  const requests = useFetch(async () => {
+    const from = new Date();
+    const to = new Date(from.getTime() + REQUESTS_AHEAD_DAYS * 86_400_000);
+    return calendarApi.bookings({ from: from.toISOString(), to: to.toISOString(), unitId, status: 'requested' });
+  }, [unitId, reloadKey]);
+
+  const refetch = () => setReloadKey((k) => k + 1);
 
   const staffName = useMemo(() => new Map(staff.map((s) => [s.profile_id, s.display_name])), [staff]);
   const serviceById = useMemo(() => new Map(services.map((s) => [s.id, s])), [services]);
@@ -129,19 +159,26 @@ function CalendarBody({
   const items: GridItem[] = useMemo(() => {
     if (data === null) return [];
     const fromBookings = data.bookings
-      .filter((b) => b.status === 'confirmed' || b.status === 'pending_payment')
+      .filter((b) => b.status === 'confirmed' || b.status === 'pending_payment' || b.status === 'requested')
       .map<GridItem>((b) => ({
         key: `b${b.id}`,
         starts_at: b.starts_at,
         ends_at: b.ends_at,
         allDay: false,
-        title: b.customer.name ?? t('booking.noName', 'No name given'),
+        title:
+          b.status === 'requested'
+            ? t('grid.request', 'Request: {name}', { name: b.customer.name ?? t('booking.noName', 'No name given') })
+            : b.checked_in_at
+              ? t('grid.checkedIn', '{name} · checked in', { name: b.customer.name ?? t('booking.noName', 'No name given') })
+              : b.customer.name ?? t('booking.noName', 'No name given'),
         subtitle:
-          b.status === 'pending_payment'
+          b.status === 'pending_payment' || b.status === 'requested'
             ? `${words.serviceName(serviceById.get(b.service_id))} · ${words.status(b.status)}`
             : words.serviceName(serviceById.get(b.service_id)),
-        person: staffName.get(b.profile_id) ?? '',
-        tone: b.status === 'pending_payment' ? 'pending' : 'booking',
+        person: [staffName.get(b.profile_id) ?? '', b.room_name ? words.label(b.room_name) : '']
+          .filter((part) => part !== '')
+          .join(' · '),
+        tone: b.status === 'pending_payment' ? 'pending' : b.status === 'requested' ? 'request' : b.checked_in_at ? 'checkedIn' : 'booking',
         booking: b,
       }));
     const fromEvents = data.events
@@ -271,11 +308,29 @@ function CalendarBody({
             />
           </div>
         )}
+        {usedUnits.length > 0 && (
+          <div className="w-full sm:w-64">
+            <label htmlFor="calendar-branch" className="sr-only">
+              {t('toolbar.branch', 'Branch')}
+            </label>
+            <FieldSelect
+              id="calendar-branch"
+              value={branch}
+              onChange={setBranch}
+              options={[
+                { value: ALL_BRANCHES, label: t('toolbar.allBranches', 'All branches') },
+                ...usedUnits.map((u) => ({ value: String(u.id), label: u.name })),
+              ]}
+            />
+          </div>
+        )}
         <p className="text-sm text-muted-foreground" data-testid="calendar-zone">
           {t('toolbar.zone', 'Times in {zone}', { zone: timeZone })}
         </p>
       </div>
 
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="min-w-0 space-y-4">
       {error ? (
         <LoadProblem
           forbidden={forbidden}
@@ -333,6 +388,24 @@ function CalendarBody({
               : t('empty.month', 'Nothing booked this month.')}
         </p>
       )}
+      </div>
+
+      <aside className="grid content-start gap-4" aria-label={t('side.label', 'Requests and today')}>
+        <RequestsCard
+          requests={requests.data ?? []}
+          services={services}
+          staff={staff}
+          timeZone={timeZone}
+          canChange={access.canWrite}
+          onSuggest={(request) => {
+            setSuggesting(true);
+            setBooking(request);
+          }}
+          onChanged={refetch}
+        />
+        <TodayCard unitId={unitId} reloadKey={reloadKey} settings={settings} />
+      </aside>
+      </div>
 
       <BookingDialog
         open={newBooking}
@@ -351,15 +424,30 @@ function CalendarBody({
 
       <BookingSheet
         booking={booking}
-        onClose={() => setBooking(null)}
+        suggest={suggesting}
+        onClose={() => {
+          setBooking(null);
+          setSuggesting(false);
+        }}
         services={services}
         staff={staff}
         timeZone={timeZone}
         canChange={access.canWrite}
-        onChanged={(changed) => {
+        onChanged={(changed, what) => {
           setBooking(changed);
+          setSuggesting(false);
           addToast(
-            changed.status === 'cancelled' ? t('booking.cancelled', 'Booking cancelled') : t('booking.moved', 'Booking moved'),
+            what === 'cancelled'
+              ? t('booking.cancelled', 'Booking cancelled')
+              : what === 'suggested'
+                ? t('booking.suggested', 'Another time suggested to {name}', { name: changed.customer.name ?? '' })
+                : what === 'accepted'
+                  ? t('request.accepted', 'Booked for {name}', { name: changed.customer.name ?? '' })
+                  : what === 'checkedIn'
+                    ? t('booking.checkedInToast', '{name} checked in', { name: changed.customer.name ?? '' })
+                    : what === 'notCheckedIn'
+                      ? t('booking.checkInUndone', 'Check-in undone')
+                      : t('booking.moved', 'Booking moved'),
             'success'
           );
           refetch();
