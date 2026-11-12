@@ -5397,6 +5397,8 @@ $messagingService = \Whity\Core\Messaging\CoreMessaging::build(
     (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
 );
 \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messagingService);
+// WHIT-967 (SDK 1.99): a plugin messages a workspace's customer through Messages.
+\Whity\register_service(\Whity\Sdk\Messaging\CustomerMessages::class, new \Whity\Core\Messaging\HostCustomerMessages(static fn (): \Whity\Core\Messaging\MessagingService => $messagingService));
 $jobsRegistry->register(
     \Whity\Core\Messaging\Jobs\DeliverMessageJob::NAME,
     new \Whity\Core\Messaging\Jobs\DeliverMessageJob(static fn (): \Whity\Core\Messaging\MessagingService => $messagingService),
