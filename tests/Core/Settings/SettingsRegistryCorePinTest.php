@@ -191,6 +191,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.payment_hold_minutes',
             'calendar.week_start',
             'calendar.weekend_days',
+            // Design 3.3: off makes booking-page bookings requests.
+            'calendar.instant_booking',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
         ];
@@ -408,6 +410,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.payment_hold_minutes' => '15',
             'calendar.week_start' => 'saturday',
             'calendar.weekend_days' => 'friday,saturday',
+            'calendar.instant_booking' => 'true',
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',

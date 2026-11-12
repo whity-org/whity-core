@@ -9892,6 +9892,7 @@ final class CoreApiSchemas
                     'price_minor' => self::int(true),
                     'currency' => self::str(),
                     'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
+                    'sends_request' => self::bool() + ['description' => 'Booking it sends a request the business accepts first.'],
                 ], ['id', 'name', 'duration_minutes', 'price_minor', 'currency', 'staff_profile_ids'])],
                 'staff' => ['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'display_name' => self::str()], ['profile_id', 'display_name'])],
                 'bot_check' => ['type' => 'object', 'nullable' => true, 'properties' => ['provider' => self::str(), 'site_key' => self::str()]],
@@ -9913,7 +9914,8 @@ final class CoreApiSchemas
             ], ['starts_at']),
             'PublicBooking' => self::object([
                 'id' => self::int(),
-                'status' => self::str() + ['enum' => ['pending_payment', 'confirmed', 'cancelled', 'expired']],
+                'status' => self::str() + ['enum' => ['pending_payment', 'requested', 'confirmed', 'cancelled', 'expired'], 'description' => '`requested`: the customer asked for this time and staff accept it first.'],
+                'suggested' => self::bool() + ['description' => 'The business suggested this time for the request; the customer can take it.'],
                 'starts_at' => self::str(),
                 'ends_at' => self::str(),
                 'service' => self::object(['id' => self::int(true), 'name' => SchemaBuilder::ref('LocalizedLabel'), 'duration_minutes' => self::int(true)], ['id', 'name']),
@@ -9943,6 +9945,7 @@ final class CoreApiSchemas
                 'week_start' => self::str(),
                 'weekend_days' => ['type' => 'array', 'items' => self::str()],
                 'currency' => self::str(),
+                'instant_booking' => self::bool() + ['description' => 'Off: every booking from the booking page is a request.'],
             ], ['time_zone', 'booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'payment_hold_minutes', 'week_start', 'weekend_days', 'currency']),
             'CalendarSettingsRequest' => self::object([
                 'booking_page_enabled' => self::bool() + ['description' => 'Turn the public booking page on or off.'],
@@ -9953,6 +9956,7 @@ final class CoreApiSchemas
                 'payment_hold_minutes' => self::int() + ['minimum' => 1, 'maximum' => 1440, 'description' => 'How long a payment step holds a slot.'],
                 'week_start' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], 'description' => 'The first day of the week in calendar views.'],
                 'weekend_days' => ['type' => 'array', 'items' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']], 'description' => 'Days shown as the weekend.'],
+                'instant_booking' => self::bool() + ['description' => 'Off turns every booking from the booking page into a request staff accept.'],
             ], []),
             'CalendarStaff' => self::object([
                 'profile_id' => self::int(),
@@ -9960,8 +9964,34 @@ final class CoreApiSchemas
                 'bookable' => self::bool() + ['description' => 'Offered on the public booking page.'],
                 'sort_order' => self::int(),
                 'feed_enabled' => self::bool(),
+                'unit_id' => self::int(true) + ['description' => 'The branch (organisational unit) they work in.'],
             ], ['profile_id', 'display_name', 'bookable', 'sort_order', 'feed_enabled']),
+            'CalendarRoom' => self::object([
+                'id' => self::int(),
+                'name' => SchemaBuilder::ref('LocalizedLabel'),
+                'unit_id' => self::int(true) + ['description' => 'The branch (organisational unit) it is in.'],
+                'active' => self::bool(),
+                'sort_order' => self::int(),
+            ], ['id', 'name', 'unit_id', 'active', 'sort_order']),
+            'CalendarRoomRequest' => self::object([
+                'name' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],
+                'unit_id' => self::int(true) + ['description' => 'The branch it is in; null for none.'],
+                'active' => self::bool() + ['description' => 'Inactive rooms are not shown as columns.'],
+                'sort_order' => self::int() + ['minimum' => 0, 'description' => 'Position in lists; lower comes first.'],
+            ], []),
+            'CalendarToday' => self::object([
+                'date' => self::str() + ['description' => 'The local day, `YYYY-MM-DD`.'],
+                'booked' => self::int() + ['description' => 'Confirmed bookings that start that day.'],
+                'checked_in' => self::int() + ['description' => 'Of those, the customers who arrived.'],
+                'requests' => self::int() + ['description' => 'Open requests from now on, any day.'],
+                'reminders_sent' => self::int() + ['description' => 'Reminders sent that day.'],
+            ], ['date', 'booked', 'checked_in', 'requests', 'reminders_sent']),
+            'CalendarBookingSuggestRequest' => self::object([
+                'starts_at' => self::str() + ['description' => 'The time to suggest, ISO 8601 with an offset.'],
+                'profile_id' => self::int() + ['description' => 'Suggest another person. Default: the same one.'],
+            ], ['starts_at']),
             'CalendarStaffRequest' => self::object([
+                'unit_id' => self::int(true) + ['description' => 'The branch they work in; null for none.'],
                 'bookable' => self::bool() + ['description' => 'Offer this person on the public booking page.'],
                 'sort_order' => self::int() + ['description' => 'Position in lists and in "anyone" order; lower comes first.'],
             ], []),
@@ -10001,6 +10031,8 @@ final class CoreApiSchemas
                 'active' => self::bool(),
                 'sort_order' => self::int(),
                 'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
+                'room_id' => self::int(true) + ['description' => 'The room it needs; booked with the person.'],
+                'needs_approval' => self::bool() + ['description' => 'A customer\'s booking is a request staff accept first.'],
             ], ['id', 'name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_minor', 'currency', 'bookable_online', 'active', 'sort_order', 'staff_profile_ids']),
             'CalendarServiceRequest' => self::object([
                 'name' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],
@@ -10014,6 +10046,8 @@ final class CoreApiSchemas
                 'active' => self::bool() + ['description' => 'Inactive services cannot be booked.'],
                 'sort_order' => self::int() + ['minimum' => 0, 'description' => 'Position in lists; lower comes first.'],
                 'staff_profile_ids' => ['type' => 'array', 'maxItems' => 200, 'items' => self::int(), 'description' => 'The staff who provide it; the list replaces what is there.'],
+                'room_id' => self::int(true) + ['description' => 'The room it needs; null for none.'],
+                'needs_approval' => self::bool() + ['description' => 'Customers send a request instead of booking.'],
             ], []),
             'CalendarSlot' => self::object([
                 'starts_at' => self::str(),
@@ -10037,7 +10071,7 @@ final class CoreApiSchemas
                 'ends_at' => self::str(),
                 'blocks_from' => self::str() + ['description' => 'Start including the buffer before.'],
                 'blocks_until' => self::str() + ['description' => 'End including the buffer after.'],
-                'status' => self::str() + ['enum' => ['pending_payment', 'confirmed', 'cancelled', 'expired']],
+                'status' => self::str() + ['enum' => ['pending_payment', 'requested', 'confirmed', 'cancelled', 'expired'], 'description' => '`requested`: the customer asked for this time and staff accept it first.'],
                 'hold_expires_at' => self::str(true),
                 'source' => self::str() + ['enum' => ['staff', 'public', 'agent']],
                 'price_minor' => self::int(true),
@@ -10046,6 +10080,11 @@ final class CoreApiSchemas
                 'cancel_reason' => self::str(),
                 'payment_ref' => self::str(true) + ['description' => 'The reference from the payment plugin, once paid (SDK 1.98).'],
                 'created_at' => self::str(true),
+                'room_id' => self::int(true) + ['description' => 'The room it holds.'],
+                'checked_in_at' => self::str(true) + ['description' => 'When the customer arrived.'],
+                'suggested_at' => self::str(true) + ['description' => 'When staff suggested this time for a request.'],
+                'reminder_sent_at' => self::str(true),
+                'room_name' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => self::str(), 'description' => 'In lists: the room\'s name, language code => text.'],
             ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
             'CalendarBookingCreateRequest' => self::object([
                 'service_id' => self::int() + ['description' => 'The service to book.'],
@@ -17189,6 +17228,15 @@ final class CoreApiSchemas
                     422 => self::errorResponse('Already cancelled'),
                 ] + $limits,
             ]),
+            $route('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/accept', [
+                'summary' => 'Take the time the business suggested for a request (public); the link changes and the new one is emailed',
+                'parameters' => [$token],
+                'responses' => [
+                    200 => self::jsonResponse('Booked', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                    422 => self::errorResponse('No suggested time to take'),
+                ] + $limits,
+            ]),
             $route('GET', '/api/public/bookings/{token:[a-f0-9]{64}}/ics', [
                 'summary' => 'The booking as an .ics file to add to a calendar (public)',
                 'parameters' => [$token],
@@ -17414,7 +17462,7 @@ final class CoreApiSchemas
             self::permissionRoute('GET', '/api/calendar/bookings', 'calendar:read', [
                 'summary' => 'List bookings in a range',
                 'tags' => ['calendar'],
-                'parameters' => array_merge($range, [$person, self::queryParam('status', 'string', 'Comma-separated statuses. Default: `confirmed,pending_payment`.')]),
+                'parameters' => array_merge($range, [$person, self::queryParam('status', 'string', 'Comma-separated statuses. Default: `confirmed,pending_payment,requested`.'), self::queryParam('unit_id', 'integer', 'Only this branch: bookings whose person or room is in it.')]),
                 'responses' => [200 => self::jsonResponse('Bookings', self::listEnvelope('CalendarBooking'))] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/calendar/bookings', 'calendar:write', [
@@ -17457,6 +17505,78 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
                     404 => self::errorResponse('Not found'),
                     422 => self::errorResponse('Already cancelled'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/accept', 'calendar:write', [
+                'summary' => 'Accept a customer\'s request; it becomes a confirmed booking',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Not a request'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/suggest', 'calendar:write', [
+                'summary' => 'Suggest another time for a customer\'s request',
+                'description' => 'The request moves to the new time and stays a request; the customer is emailed and takes it from their link.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarBookingSuggestRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('That time was just taken'),
+                    422 => self::errorResponse('Not a request'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/check-in', 'calendar:write', [
+                'summary' => 'Check the customer in: they arrived',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Not a confirmed booking'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/calendar/bookings/{id:\d+}/check-in', 'calendar:write', [
+                'summary' => 'Undo a check-in',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Not a confirmed booking'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/today', 'calendar:read', [
+                'summary' => 'Today at a glance: booked, checked in, open requests and reminders sent',
+                'tags' => ['calendar'],
+                'parameters' => [
+                    self::queryParam('date', 'string', 'A local day, `YYYY-MM-DD`. Default: today.'),
+                    self::queryParam('unit_id', 'integer', 'Only this branch.'),
+                ],
+                'responses' => [200 => self::jsonResponse('Today', self::dataEnvelope(SchemaBuilder::ref('CalendarToday')))] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/rooms', 'calendar:read', [
+                'summary' => 'List rooms',
+                'tags' => ['calendar'],
+                'responses' => [200 => self::jsonResponse('Rooms', self::listEnvelope('CalendarRoom'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/rooms', 'calendar:manage', [
+                'summary' => 'Add a room a service can need',
+                'tags' => ['calendar'],
+                'request' => 'CalendarRoomRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The room', self::dataEnvelope(SchemaBuilder::ref('CalendarRoom'))),
+                    404 => self::errorResponse('No such branch'),
+                    422 => self::errorResponse('A missing name'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/calendar/rooms/{id:\d+}', 'calendar:manage', [
+                'summary' => 'Change a room; fields left out keep their value',
+                'tags' => ['calendar'],
+                'request' => 'CalendarRoomRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The room', self::dataEnvelope(SchemaBuilder::ref('CalendarRoom'))),
+                    404 => self::errorResponse('Not found'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/calendar/events', 'calendar:read', [

@@ -27,6 +27,7 @@ final class CalendarSettings
         public readonly int $weekStart,
         public readonly array $weekendDays,
         public readonly string $currency,
+        public readonly bool $instantBooking = true,
     ) {
     }
 
@@ -54,6 +55,7 @@ final class CalendarSettings
             self::weekday($effective[SettingsRegistry::CALENDAR_WEEK_START] ?? 'saturday') ?? 6,
             self::weekdays($effective[SettingsRegistry::CALENDAR_WEEKEND_DAYS] ?? 'friday,saturday'),
             $effective[SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? 'JOD',
+            ($effective[SettingsRegistry::CALENDAR_INSTANT_BOOKING] ?? 'true') !== 'false',
         );
     }
 
@@ -95,6 +97,7 @@ final class CalendarSettings
             'week_start' => self::WEEKDAYS[$this->weekStart - 1],
             'weekend_days' => array_map(static fn (int $d): string => self::WEEKDAYS[$d - 1], $this->weekendDays),
             'currency' => $this->currency,
+            'instant_booking' => $this->instantBooking,
         ];
     }
 }

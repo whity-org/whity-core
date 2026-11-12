@@ -63,12 +63,12 @@ final class CalendarRepository
     /**
      * Staff who have a calendar here, with their names.
      *
-     * @return list<array{profile_id: int, display_name: string, bookable: bool, sort_order: int, feed_enabled: bool}>
+     * @return list<array{profile_id: int, display_name: string, bookable: bool, sort_order: int, feed_enabled: bool, unit_id: ?int}>
      */
     public function listStaff(int $tenantId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT cs.profile_id, p.display_name, cs.bookable, cs.sort_order, cs.feed_token_hash
+            'SELECT cs.profile_id, p.display_name, cs.bookable, cs.sort_order, cs.feed_token_hash, cs.unit_id
                FROM calendar_staff cs
                JOIN profiles p ON p.id = cs.profile_id
               WHERE cs.tenant_id = :tenant_id
@@ -82,6 +82,7 @@ final class CalendarRepository
             'bookable' => DbBool::of($r['bookable']),
             'sort_order' => (int) $r['sort_order'],
             'feed_enabled' => $r['feed_token_hash'] !== null,
+            'unit_id' => $r['unit_id'] !== null ? (int) $r['unit_id'] : null,
         ], $stmt->fetchAll(PDO::FETCH_ASSOC)));
     }
 
@@ -106,6 +107,21 @@ final class CalendarRepository
         );
         $stmt->bindValue(':bookable', $bookable, $bookable === null ? PDO::PARAM_NULL : PDO::PARAM_BOOL);
         $stmt->bindValue(':sort_order', $sortOrder, $sortOrder === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->bindValue(':now', Interval::toDb(new DateTimeImmutable()));
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':profile_id', $profileId, PDO::PARAM_INT);
+        $stmt->execute();
+    }
+
+    /** The branch (organisational unit) this person works in, or none. */
+    public function setStaffUnit(int $tenantId, int $profileId, ?int $unitId): void
+    {
+        $this->ensureStaff($tenantId, $profileId);
+        $stmt = $this->db->prepare(
+            'UPDATE calendar_staff SET unit_id = :unit_id, updated_at = :now
+              WHERE tenant_id = :tenant_id AND profile_id = :profile_id'
+        );
+        $stmt->bindValue(':unit_id', $unitId, $unitId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
         $stmt->bindValue(':now', Interval::toDb(new DateTimeImmutable()));
         $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
         $stmt->bindValue(':profile_id', $profileId, PDO::PARAM_INT);
@@ -228,8 +244,9 @@ final class CalendarRepository
     }
 
     /**
-     * Everything that blocks this person in `[from, to)`: live bookings with
-     * their buffers, pending holds that have not lapsed, and busy events.
+     * Everything that blocks this person in `[from, to)`: live bookings and
+     * requests with their buffers, pending holds that have not lapsed, and
+     * busy events.
      *
      * @return list<Interval>
      */
@@ -240,7 +257,7 @@ final class CalendarRepository
               WHERE tenant_id = :tenant_id AND profile_id = :profile_id
                 AND blocks_from < :to AND blocks_until > :from
                 AND id <> :except
-                AND (status = 'confirmed' OR (status = 'pending_payment' AND hold_expires_at > :now))"
+                AND (status IN ('confirmed', 'requested') OR (status = 'pending_payment' AND hold_expires_at > :now))"
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,

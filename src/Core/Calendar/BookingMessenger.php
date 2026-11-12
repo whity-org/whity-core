@@ -36,4 +36,20 @@ interface BookingMessenger
      * @param array<string, mixed> $booking
      */
     public function awaitingPayment(int $tenantId, array $booking): void;
+
+    /**
+     * The customer asked for a time and staff accept it first (design 3.3).
+     * It carries the manage link.
+     *
+     * @param array<string, mixed> $booking
+     */
+    public function requested(int $tenantId, array $booking): void;
+
+    /**
+     * Staff suggested another time for the customer's request. It carries the
+     * manage link, where the customer takes the new time or picks another.
+     *
+     * @param array<string, mixed> $booking
+     */
+    public function suggested(int $tenantId, array $booking): void;
 }
