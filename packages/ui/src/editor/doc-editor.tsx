@@ -171,15 +171,24 @@ function countWords(editor: Editor): number {
  * with a record and Publish are M4's; comments and suggestions, agents and
  * plugin blocks join in M5–M7.
  */
+/** Strips underscores from both ends in linear time (a `^_+|_+$` regex can backtrack). */
+function trimUnderscores(value: string): string {
+  let start = 0
+  let end = value.length
+  while (start < end && value[start] === "_") start++
+  while (end > start && value[end - 1] === "_") end--
+  return value.slice(start, end)
+}
+
 /** A key for a new own field from its name: lowercase letters, digits and _, unique. */
 export function ownFieldKey(label: string, taken: string[]): string {
   const base =
-    label
-      .normalize("NFKD")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 32) || "field"
+    trimUnderscores(
+      label
+        .normalize("NFKD")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_"),
+    ).slice(0, 32) || "field"
   let key = base
   for (let n = 2; taken.includes(key); n++) key = `${base}_${n}`
   return key
