@@ -164,7 +164,9 @@ export function SettingsArea({ children }: { children: ReactNode }) {
   }, [tabs, navItems, canSeeDevices, canManageFields, t, tc]);
 
   return (
-    <div className="grid gap-6 md:grid-cols-[200px_minmax(0,1fr)] md:gap-8">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[200px_minmax(0,1fr)] md:gap-8">
+      {/* One shrinkable column on phones: without it the grid track sizes to the
+          sideways-scrolling nav row's full width and the whole page scrolls sideways. */}
       <nav
         aria-label={t('settingsArea.navLabel', 'Settings')}
         data-testid="settings-area-nav"
@@ -187,7 +189,7 @@ export function SettingsArea({ children }: { children: ReactNode }) {
                     data-testid={`settings-area-link-${link.id}`}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'rounded-md px-2 py-[7px] text-sm font-medium whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      'flex items-center rounded-md px-2 py-[7px] text-sm font-medium whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:min-h-11',
                       active
                         ? 'bg-primary-tint text-primary-tint-foreground'
                         : 'text-foreground hover:bg-muted',

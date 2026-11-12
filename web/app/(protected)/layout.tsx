@@ -28,17 +28,20 @@ export default function ProtectedLayout({
           own `overflow-auto` remains the ONLY scroll container — without this,
           a tall page (e.g. Settings after WC-fbdc31a2 added the email-addresses
           card) grows `body` too, producing a second, outer window scrollbar
-          that clips the fixed sidebar out of view as you scroll it. */}
-      <div className="fixed inset-0 flex overflow-hidden bg-background">
+          that clips the fixed sidebar out of view as you scroll it.
+          Being fixed, it also ignores body's safe-area padding (#1733), so it
+          carries the insets itself (physical sides: the notch doesn't mirror). */}
+      <div className="fixed inset-0 flex overflow-hidden bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]">
         {/* Sidebar - responsive widths handled in component */}
         <Sidebar />
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto">
+        <main className="min-w-0 flex-1 overflow-auto">
           {/* WHIT-147: the top bar holds search (⌘K); the palette mounts once per shell. */}
           <TopBar />
           <MaintenanceNotice />
-          <div className="p-6 md:p-8 max-w-7xl">{children}</div>
+          {/* Gutters 16px on phones, 24 from 640, 32 from 768 (register 4.5). */}
+          <div className="p-4 sm:p-6 md:p-8 max-w-7xl">{children}</div>
         </main>
         <AppCommandPalette />
       </div>
