@@ -1,1 +1,1 @@
-Migration numbers 240 and 246 are recorded as never used, so new migrations from 250 onwards pass the schema check.
+- **Migration numbers 240 and 246 are recorded as never used.** New migrations from 250 onwards pass the schema check again.
