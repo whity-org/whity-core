@@ -249,6 +249,15 @@ final class TenantPluginsRealEngineTest extends TestCase
             $m['screens'] = [];
             return $m;
         }, 'is taken by a plugin installed for every workspace'];
+        // Inside an installed plugin's namespace: helloworld_x could declare
+        // helloworld_x:manage, a slug helloworld may vouch for as customer-grade (#1872).
+        yield 'a name inside an installed plugin namespace' => [static function (array $m): array {
+            $m['plugin']['name'] = 'helloworld_orders';
+            $m['permissions'] = [['slug' => 'helloworld_orders:read', 'label' => ['en' => 'r', 'ar' => 'ق']]];
+            $m['roles'] = [];
+            $m['screens'] = [];
+            return $m;
+        }, 'is taken by a plugin installed for every workspace'];
         yield 'a permission outside its name' => [static function (array $m): array {
             $m['permissions'][] = ['slug' => 'users:delete', 'label' => ['en' => 'x', 'ar' => 'س']];
             return $m;

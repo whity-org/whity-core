@@ -28,6 +28,8 @@ A role is customer-safe when it holds no privileged permission, counting every r
 - an action that changes access, decides on someone's behalf, or removes things: `manage`, `approve`, `assign`, `delete`, `issue`, `publish`, `review`, `route` and similar;
 - a wildcard.
 
+One exception: a plugin permission that the plugin itself marks **customer-grade** (see [For plugins](#for-plugins)) is not privileged, whatever its action. So a dental lab plugin can let a clinic that signed up add its own patients (`dlaas_patient:manage`) or upload its own scans (`dlaas_scan:upload`).
+
 The role is checked when an admin saves the settings and again each time someone signs up. If a role gains an admin permission after it was saved, sign-ups stop until an admin chooses a role again. The settings screen shows a warning while that is the case.
 
 ### Customers are never staff
@@ -82,6 +84,48 @@ Email sign-up needs the instance's bot check (Settings → Public forms), unless
 Refusals from the settings and queue endpoints carry a stable `code` in `details` beside the English sentence, so a client can show them in the reader's language: `mode_invalid`, `role_required`, `role_not_customer_safe`, `workspace_slug_missing`, `domain_invalid` (with `value`, the line at fault), `domains_too_many` (with `max`), `membership_conflict` and `request_not_found`.
 
 ## For plugins
+
+### Customer-grade permissions (SDK 1.104)
+
+The customer rule drops `manage`, `upload`, `review` and the other privileged actions on every resource, because core can't tell whether a plugin's `manage` reaches one record or all of them. A plugin that scopes a permission to the caller's own records says so by implementing `Whity\Sdk\PluginCustomerPermissionsInterface`:
+
+```php
+final class DlaasPlugin implements PluginInterface, PluginRolesInterface, PluginCustomerPermissionsInterface
+{
+    public function getPermissions(): array
+    {
+        return ['dlaas_patient:read', 'dlaas_patient:manage', 'dlaas_scan:upload', 'dlaas_case:review'];
+    }
+
+    /** Every route checking these binds the caller's own clinic and answers 404 for any other. */
+    public function getCustomerPermissions(): array
+    {
+        return ['dlaas_patient:manage', 'dlaas_scan:upload', 'dlaas_case:review'];
+    }
+    // ...
+}
+```
+
+What happens then:
+
+- A customer keeps these permissions instead of losing them.
+- Settings → Sign-up can offer a role made of customer-safe core permissions plus these. Seed one with `PluginRolesInterface` (for example `clinic_owner`) or build it in Roles. The workspace admin still chooses it.
+- The plugin promises the scoping. Core can't check it, so every route that checks one of these permissions must limit the caller to their own records.
+
+The host refuses, skips and logs:
+
+- a slug the plugin doesn't declare in `getPermissions()`, or one another plugin claimed first;
+- a resource outside the plugin's own namespace. The resource must be the plugin's slug, or start with it and `_`: `dlaas_patient` for a plugin named DLaaS. Workspace plugins can't take a name inside an installed plugin's namespace, so none can reuse these slugs;
+- a core permission, or anything under a core or administration resource (`users`, `roles`, `settings`, `billing`, ...), whatever the action;
+- a resource another active plugin also declares permissions under. A plugin vouches only for resources it alone owns.
+
+When the plugin is disabled or uninstalled, its list is withdrawn at once: customers lose those permissions, and a sign-up role that needs them stops being offered and stops letting people join, until the plugin is back.
+
+Renaming actions to get past the rule (`dlaas_case:respond` instead of `dlaas_case:review`) is not the way: declare the permission customer-grade instead.
+
+Workspace (data-only) plugins can't declare customer-grade permissions. They have no routes of their own to do the scoping.
+
+### Events
 
 `membership.customer_joined` (SDK 1.73, `Whity\Sdk\Hooks\Events::MEMBERSHIP_CUSTOMER_JOINED`) fires after a customer membership is committed: at once in Open mode, or on approval. The payload is ids only: `tenant_id`, `profile_id`, `membership_id`, `role_id`, `role_name`, `via` (`open` or `approval`) and `approved_by`. The return value is ignored.
 

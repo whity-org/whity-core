@@ -16,6 +16,7 @@ use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Http\HttpFetcher;
+use Whity\Core\Identity\CustomerGradePermissions;
 use Whity\Core\Identity\CustomerSafeRole;
 use Whity\Core\Mail\EmailLayout;
 use Whity\Core\Mail\Mailer;
@@ -75,6 +76,7 @@ final class CustomerSignupRealEngineTest extends TestCase
 
     protected function setUp(): void
     {
+        CustomerGradePermissions::reset();
         RoleChecker::clearCache();
         TenantContext::reset();
 
@@ -141,6 +143,7 @@ final class CustomerSignupRealEngineTest extends TestCase
 
     protected function tearDown(): void
     {
+        CustomerGradePermissions::reset();
         RoleChecker::clearCache();
         TenantContext::reset();
         unset($_GET['token'], $_GET['status']);
@@ -337,6 +340,83 @@ final class CustomerSignupRealEngineTest extends TestCase
         // Staff in the same role keep it.
         self::assertFalse($this->roleChecker->isCustomerOnly(self::ADMIN_A, self::TENANT_A));
         self::assertTrue($this->roleChecker->hasPermissionForProfile(self::ADMIN_A, CorePermissions::ROLES_WRITE, self::TENANT_A));
+    }
+
+    // ==================== customer-grade plugin permissions (#1872) ====================
+
+    public function testACustomerKeepsPluginPermissionsThePluginDeclaresCustomerGrade(): void
+    {
+        CustomerGradePermissions::declare(
+            'Clinic\Plugin',
+            'clinic',
+            ['clinic_patient:read', 'clinic_patient:manage', 'clinic_scan:upload'],
+            ['clinic_patient:manage', 'clinic_scan:upload'],
+        );
+        $role = $this->makeTenantRole(self::TENANT_A, 'clinic owners', [
+            CorePermissions::FORMS_SUBMIT, 'clinic_patient:read', 'clinic_patient:manage', 'clinic_scan:upload',
+        ]);
+
+        // Settings > Sign-up offers it and accepts it.
+        $offered = array_column(CustomerSafeRole::make($this->pdo)->listForTenant(self::TENANT_A), 'id');
+        self::assertContains($role, $offered);
+        $this->configure(self::TENANT_A, self::ADMIN_A, 'open', $role);
+
+        $this->request('tenant-a', 'clinic@example.test', 'Example Clinic');
+        $this->confirm($this->tokenFromMail(0), 'a-long-enough-password');
+        $profileId = (int) $this->membership(self::TENANT_A, 'clinic@example.test')['profile_id'];
+
+        self::assertTrue($this->roleChecker->isCustomerOnly($profileId, self::TENANT_A));
+        $held = $this->roleChecker->getEffectivePermissionsForProfile($profileId, self::TENANT_A);
+        self::assertContains('clinic_patient:manage', $held);
+        self::assertContains('clinic_scan:upload', $held);
+
+        // The plugin is disabled or uninstalled: the permissions stop working
+        // for the customer, and the role is no longer offered or accepted.
+        CustomerGradePermissions::remove('Clinic\Plugin');
+        RoleChecker::clearCache();
+        $held = $this->roleChecker->getEffectivePermissionsForProfile($profileId, self::TENANT_A);
+        self::assertNotContains('clinic_patient:manage', $held);
+        self::assertNotContains('clinic_scan:upload', $held);
+        self::assertContains('clinic_patient:read', $held);
+        self::assertNotContains($role, array_column(CustomerSafeRole::make($this->pdo)->listForTenant(self::TENANT_A), 'id'));
+        self::assertFalse($this->decode($this->getSettings(self::TENANT_A, self::ADMIN_A))['data']['role_customer_safe']);
+    }
+
+    public function testCustomerGradeNeverCoversCoreOrAdminResourcesOrUndeclaredPermissions(): void
+    {
+        $refused = CustomerGradePermissions::declare(
+            'Shop\Plugin',
+            'shop',
+            ['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_order:manage', 'bakery_order:manage'],
+            ['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_order:manage', 'shop_item:delete', 'bakery_order:manage', 'bad slug', 'shop_order:*'],
+        );
+        self::assertSame(
+            ['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_item:delete', 'bakery_order:manage', 'bad slug', 'shop_order:*'],
+            $refused
+        );
+        foreach (['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_item:delete', 'bakery_order:manage'] as $p) {
+            self::assertTrue(CustomerSafeRole::isPrivilegedPermission($p), $p);
+        }
+        self::assertFalse(CustomerSafeRole::isPrivilegedPermission('shop_order:manage'));
+
+        // A customer given the admin role still gains nothing core from it.
+        $role = $this->makeTenantRole(self::TENANT_A, 'shoppers with users', [CorePermissions::USERS_WRITE, 'shop_order:manage']);
+        self::assertFalse(CustomerSafeRole::make($this->pdo)->isCustomerSafe($role, self::TENANT_A));
+    }
+
+    public function testAPluginCannotVouchForAResourceAnotherPluginAlsoDeclares(): void
+    {
+        CustomerGradePermissions::declare('Clinic\Plugin', 'clinic', ['clinic_case:review'], ['clinic_case:review']);
+        self::assertFalse(CustomerSafeRole::isPrivilegedPermission('clinic_case:review'));
+
+        // Another plugin declares a permission under the same resource: neither
+        // of them owns it alone, so the vouch no longer counts, whichever loaded first.
+        CustomerGradePermissions::declare('Other\Plugin', 'other', ['clinic_case:delete'], ['clinic_case:review']);
+        self::assertTrue(CustomerSafeRole::isPrivilegedPermission('clinic_case:review'));
+        self::assertTrue(CustomerSafeRole::isPrivilegedPermission('clinic_case:delete'));
+
+        CustomerGradePermissions::remove('Other\Plugin');
+        self::assertFalse(CustomerSafeRole::isPrivilegedPermission('clinic_case:review'));
     }
 
     // ==================== isolation ====================

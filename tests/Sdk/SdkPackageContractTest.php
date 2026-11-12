@@ -242,9 +242,9 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.103.0',
+            '1.104.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.103 ADDS PluginDocumentBlocksInterface, Documents\DocumentBlock and documents.blocks: blocks a plugin adds to the document editor, declarations drawn by Whity\'s own renderer (WHIT-993). '
+            'SDK 1.104 ADDS PluginCustomerPermissionsInterface: a plugin\'s own permissions that reach only the caller\'s records, which customers may hold (#1872, WHIT-995). '
             . 'SDK 1.102 ADDS the Mail\BillingEmails host service and PluginBillingEmailsInterface: Whity\'s own billing emails to a workspace\'s payers, operator-granted and capped (WHIT-985). '
             . 'SDK 1.101 ADDS Frontend\Blocks\BlockText: block screens take {en, ar} text, served in the language of the reader (WHIT-984). '
             . 'SDK 1.100 ADDS the Mail\WorkspaceEmails host service and the Mail\WorkspaceEmail value object: plugins email as the workspace (WHIT-978). '
