@@ -79,6 +79,7 @@ final class AgentEmailNotifierTest extends TestCase
         );
     }
 
+    /** @return array<string, mixed> */
     private function propose(string $summary = 'Send 12 payment reminders', string $tool = 'invoices.remind'): array
     {
         $id = $this->proposals->create(self::TENANT, $this->principal, $this->profileId, $tool, [], [], [], $summary);
@@ -122,7 +123,9 @@ final class AgentEmailNotifierTest extends TestCase
 
         self::assertFalse($this->notifier->proposalCreated($this->propose()));
         self::assertSame([], $this->mailer->sent);
-        self::assertFalse((new AgentRepository($this->pdo))->find($this->agentId, self::TENANT)['notify_by_email']);
+        $agent = (new AgentRepository($this->pdo))->find($this->agentId, self::TENANT);
+        self::assertNotNull($agent);
+        self::assertFalse($agent['notify_by_email'] ?? null);
     }
 
     public function testThePersonTurnsItOff(): void

@@ -133,7 +133,7 @@ final class AgentDailySummaryJob implements JobInterface
         // @tenant-guard-ignore: lists the workspaces the daily summary visits; every later query is scoped to one
         $stmt = $this->db->query('SELECT DISTINCT tenant_id FROM agent_assignments WHERE revoked_at IS NULL ORDER BY tenant_id');
 
-        return $stmt === false ? [] : array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        return $stmt === false ? [] : array_values(array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN)));
     }
 
     /** @return array<int, string> display names by profile id */
