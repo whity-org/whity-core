@@ -169,6 +169,22 @@ describe('BlockRenderer', () => {
     expect(screen.getByText('Editor')).toBeInTheDocument();
   });
 
+  it('isolates each cell value so an amount keeps its direction in an Arabic table', () => {
+    render(
+      <BlockRenderer
+        blocks={[
+          {
+            type: 'table',
+            columns: [{ key: 'value', label: 'القيمة' }],
+            rows: [{ value: '-90.000 JOD' }],
+          },
+        ]}
+      />
+    );
+    // Without <bdi> the RTL cell shows "JOD 90.000-".
+    expect(screen.getByText('-90.000 JOD').tagName).toBe('BDI');
+  });
+
   it('renders code content inside a <pre>', () => {
     const { container } = render(
       <BlockRenderer

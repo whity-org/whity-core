@@ -622,7 +622,7 @@ function StatRenderer({ block }: { block: StatBlock }) {
     <div className="rounded-lg bg-card p-4 ring-1 ring-foreground/10">
       <div className="text-xs text-muted-foreground">{block.label}</div>
       <div className="mt-1 flex items-center gap-1.5">
-        <span className="font-heading text-xl font-semibold">{value}</span>
+        <span className="font-heading text-xl font-semibold"><bdi>{value}</bdi></span>
         {TrendIcon !== null && block.trend && (
           <TrendIcon className={cn('size-4', TREND_TONE[block.trend])} aria-hidden />
         )}
@@ -735,7 +735,7 @@ function TableRenderer({ block }: { block: TableBlock }) {
             <tr key={rowIndex} className="border-b border-border last:border-0">
               {block.columns.map((column) => (
                 <td key={column.key} className="px-3 py-2 text-foreground">
-                  {row[column.key] ?? ''}
+                  <bdi>{row[column.key] ?? ''}</bdi>
                 </td>
               ))}
             </tr>
@@ -1481,6 +1481,12 @@ function InteractiveDataTable({
     id: col.key,
     accessorKey: col.key,
     header: col.label,
+    // Each value keeps its own direction (<bdi>): "-90.000 JOD" or "-3 box"
+    // in an Arabic table otherwise reads "JOD 90.000-", because a plugin
+    // sends formatted strings and the cell takes the page's direction.
+    // Amounts, codes and numbers stay left to right (CLAUDE.md); Arabic text
+    // in the same column still reads right to left.
+    cell: (row: Record<string, string>) => <bdi>{row[col.key] ?? ''}</bdi>,
     enableSorting: col.sortable === true,
     enableColumnFilter: col.filterable === true,
   }));
