@@ -48,7 +48,7 @@ import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { Button } from '@whity/ui/button';
 import { Skeleton } from '@whity/ui/skeleton';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { IconArrowLeft, IconPuzzle } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 

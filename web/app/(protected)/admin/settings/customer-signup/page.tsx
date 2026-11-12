@@ -22,7 +22,7 @@ import { SIGNUP_MANAGE } from '@/lib/capabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { FieldSelect } from '@/components/field-select';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { ActorChip } from '@whity/ui/actor-chip';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';

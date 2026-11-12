@@ -3,6 +3,12 @@
     "language": "ar",
     "notice": "Hand-written translations. Unlike the English catalogue one directory up, this file is NOT generated — it is the source of truth for this language and is edited by hand. Every key must also exist in the English catalogue (CI fails on one that does not); a key absent from here falls back to English at runtime. Seed it with `whity-cli i18n:sync --language=<code>`.",
     "keys": {
+        "component.api": "واجهة البرمجة (API)",
+        "component.database": "قاعدة البيانات",
+        "component.queue": "المهام في الخلفية",
+        "component.render": "إنشاء المستندات",
+        "component.scheduler": "المهام المجدولة",
+        "component.web": "تطبيق الويب",
         "components.checked": "فُحص {when}",
         "components.heading": "المكوّنات",
         "components.uptimeWindow": "مدة التشغيل خلال آخر {days} يوم.",

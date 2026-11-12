@@ -13,7 +13,7 @@ import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@whity/ui/badge';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { IconAlertTriangle, IconBug, IconDeviceFloppy, IconInbox } from '@tabler/icons-react';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';

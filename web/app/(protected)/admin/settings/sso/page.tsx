@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { FieldSelect } from '@/components/field-select';
 import { Switch } from '@whity/ui/switch';
 import { Badge } from '@whity/ui/badge';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import {
   IconAlertCircle,
   IconCopy,

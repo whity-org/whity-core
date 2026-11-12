@@ -12,7 +12,7 @@ import { Badge } from '@whity/ui/badge';
 import { Avatar } from '@whity/ui/avatar';
 import { Icon } from '@whity/ui/icon';
 import { Input } from '@whity/ui/input';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
 import { OtpInput } from '@whity/ui/otp-input';
 import { EmptyState } from '@whity/ui/empty-state';

@@ -1017,7 +1017,7 @@ export function DataTable<TData>({
                            */
                           <button
                             type="button"
-                            className="-mx-1 flex min-h-10 cursor-pointer items-center gap-1 rounded-sm px-1 text-start font-medium tracking-wider text-inherit uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                            className="-mx-1 flex min-h-10 cursor-pointer items-center gap-1 rounded-sm px-1 text-start font-medium text-inherit outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                           >
                             {content}
                           </button>

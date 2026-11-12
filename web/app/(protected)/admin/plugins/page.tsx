@@ -461,6 +461,14 @@ export default function PluginsPage() {
     }
   };
 
+  // Literal keys, so i18n:extract finds them (the classifier's labels are English).
+  const versionTierLabel: Record<PluginVersionTier, string> = {
+    alpha: t('plugins.version.alpha', 'Alpha'),
+    beta: t('plugins.version.beta', 'Beta'),
+    prerelease: t('plugins.version.prerelease', 'Pre-release'),
+    stable: t('plugins.version.stable', 'Stable'),
+  };
+
   const stateOf = (plugin: PluginEntry): { label: string; variant: React.ComponentProps<typeof Badge>['variant'] } => {
     switch (plugin.status) {
       case 'active':
@@ -523,7 +531,7 @@ export default function PluginsPage() {
                 variant={VERSION_BADGE_VARIANT[versionBadge.tier]}
                 data-testid={`version-badge-${plugin.id}`}
               >
-                {versionBadge.label}
+                {versionTierLabel[versionBadge.tier]}
               </Badge>
             )}
             {plugin.install?.update_waiting ? (

@@ -71,6 +71,7 @@
         "stepper.label": "Setup progress",
         "subtitle": "A few defaults to get started. You can change any of these later in Global Settings.",
         "title": "Set up your instance",
+        "welcome.connect": "We’ll also connect <0>email (SMTP)</0> and <1>file storage</1> — each step has a short guide that points you to the details it needs. None of it is permanent: every setting stays editable later from <2>Global Settings</2>.",
         "welcome.intro": "This is a fresh instance. The next few steps set the defaults every tenant inherits — the instance name and support contact, whether people may sign themselves up, and how sign-in works."
     }
 }

@@ -10,7 +10,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { ApprovalGatingTabs } from '@/components/admin/approval-gating-tabs';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { Pagination } from '@whity/ui/pagination';
 import { IconCheck, IconInbox, IconX } from '@tabler/icons-react';
 import { ConfirmAction } from '@whity/ui/confirm-action';

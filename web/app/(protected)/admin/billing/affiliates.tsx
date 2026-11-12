@@ -281,7 +281,7 @@ export function Affiliates() {
                         {expanded === a.id ? (
                           <IconChevronDown className="size-4" aria-hidden="true" />
                         ) : (
-                          <IconChevronRight className="size-4" aria-hidden="true" />
+                          <IconChevronRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
                         )}
                         {t('affiliate.payouts', 'Payouts')}
                       </Button>

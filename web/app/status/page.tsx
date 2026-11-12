@@ -83,6 +83,31 @@ const HEADLINE: Record<ComponentStatus, { key: string; text: string }> = {
   unknown: { key: 'headline.unknown', text: 'Status unavailable' },
 };
 
+/**
+ * A component's name in the reader's language. The server sends English names
+ * (StatusReport::COMPONENTS); the keys are stable, so the page translates by
+ * key and falls back to the server's name for a component it doesn't know.
+ * Literal `t()` calls so `i18n:extract` finds every key.
+ */
+function componentName(t: TranslateFn, key: string, serverName: string): string {
+  switch (key) {
+    case 'api':
+      return t('component.api', 'API');
+    case 'database':
+      return t('component.database', 'Database');
+    case 'queue':
+      return t('component.queue', 'Background jobs');
+    case 'scheduler':
+      return t('component.scheduler', 'Scheduled tasks');
+    case 'render':
+      return t('component.render', 'Document rendering');
+    case 'web':
+      return t('component.web', 'Web application');
+    default:
+      return serverName;
+  }
+}
+
 const LABEL: Record<ComponentStatus, { key: string; text: string }> = {
   operational: { key: 'label.operational', text: 'Operational' },
   degraded: { key: 'label.degraded', text: 'Degraded' },
@@ -225,7 +250,7 @@ export default function StatusPage() {
                 {data.components.map((component) => (
                   <li key={component.key} className="flex items-center justify-between gap-4 px-5 py-4">
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{component.name}</p>
+                      <p className="truncate font-medium">{componentName(t, component.key, component.name)}</p>
                       {/*
                         #1068: the freshness line goes when dates are hidden.
                         The component's NAME, its state badge and its uptime

@@ -11,7 +11,7 @@
  */
 
 import { useState } from 'react';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
