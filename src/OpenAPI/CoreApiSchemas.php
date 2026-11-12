@@ -117,6 +117,7 @@ final class CoreApiSchemas
             self::formRoutes(),
             self::conveningRoutes(),
             self::calendarRoutes(),
+            self::taskaatRoutes(),
             self::publicBookingRoutes(),
             self::delegationRoutes(),
             self::auditRoutes(),
@@ -153,6 +154,7 @@ final class CoreApiSchemas
             self::documentQrRoutes(),
             self::meInboxRoutes(),
             self::messagingRoutes(),
+            self::chatRoutes(),
             self::searchRoutes(),
             self::agentProposalRoutes(),
             self::agentRoutes(),
@@ -223,6 +225,15 @@ final class CoreApiSchemas
         // WHIT-920: the same act on a route whatever it travels on. The engine
         // refuses anybody without an open item on the route.
         'POST /api/routes/{routeId:\d+}/actions',
+        // Team chat (CH.2): an agent sees only the chats it was added to, from
+        // when it joined, and posts only as its member's "post" mode allows.
+        'GET /api/chat/chats',
+        'GET /api/chat/chats/{id:\d+}',
+        'GET /api/chat/chats/{id:\d+}/messages',
+        'POST /api/chat/chats/{id:\d+}/messages',
+        'POST /api/chat/chats/{id:\d+}/proposals',
+        'POST /api/chat/chats/{id:\d+}/read',
+        'GET /api/chat/directory',
     ];
 
     /**
@@ -4741,6 +4752,25 @@ final class CoreApiSchemas
                 ]),
             ], ['code', 'state']),
 
+            // WHIT-962 (A10): the workspace's connection to Taskaat.
+            'TaskaatConnection' => self::object([
+                'connected' => self::bool(),
+                'taskaat_url' => array_merge(self::str(), ['description' => 'Taskaat\'s web address, for "Open in Taskaat" links: /dashboard/{project-slug}?task={task-id}.']),
+                'connected_at' => self::str(),
+                'connected_by' => self::int(true),
+                'needs_reconnect' => self::bool(),
+            ], ['connected', 'taskaat_url']),
+            'TaskaatConnectionResponse' => self::object([
+                'data' => ['$ref' => '#/components/schemas/TaskaatConnection'],
+            ], ['data']),
+            'TaskaatConnectResponse' => self::object([
+                'data' => self::object(['authorize_url' => self::str()], ['authorize_url']),
+            ], ['data']),
+            'TaskaatConnectCompleteRequest' => self::object([
+                'code' => array_merge(self::str(), ['description' => 'The authorization code Taskaat sent back to /tasks/connect.']),
+                'state' => array_merge(self::str(), ['description' => 'The state Taskaat sent back with the code.']),
+            ], ['code', 'state']),
+
             // GET /api/plugins/store/catalog — a store's public catalogue entry.
             'StoreCataloguePlugin' => self::object([
                 'slug' => self::str(),
@@ -6661,6 +6691,140 @@ final class CoreApiSchemas
                 'source' => self::str(),
             ], ['data', 'pagination', 'source']),
 
+            // -- Team chat (CH.1, CH.2; migration 253) ----------------------------
+            // People and agents in one chat. An agent is always marked: who it is,
+            // who it works for, and what it may do in that chat.
+            'ChatPerson' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']),
+            'ChatLink' => self::object([
+                'type' => ['type' => 'string', 'enum' => ['board', 'meeting', 'record']],
+                'id' => self::str(),
+                'label' => self::str(),
+            ], ['type', 'id', 'label']),
+            'ChatMember' => self::object([
+                'member_id' => self::int(),
+                'type' => ['type' => 'string', 'enum' => ['person', 'agent']],
+                'profile_id' => self::int() + ['description' => 'A person\'s user id (people only).'],
+                'agent_id' => self::int() + ['description' => 'The agent (agents only).'],
+                'name' => self::str(),
+                'name_ar' => self::str(),
+                'role' => self::str(),
+                'role_ar' => self::str(),
+                'works_for' => SchemaBuilder::ref('ChatPerson'),
+                'reads' => ['type' => 'string', 'enum' => ['now', 'week', 'all'], 'description' => 'What the agent can read: from when it joined, the 7 days before that too, or everything.'],
+                'reads_from' => self::str(true),
+                'actions' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allowed']], 'description' => 'What the agent may do here, per action.'],
+                'added_by' => ['oneOf' => [SchemaBuilder::ref('ChatPerson'), ['type' => 'null']]],
+                'joined_at' => self::str(true),
+            ], ['member_id', 'type', 'name']),
+            'ChatAuthor' => self::object([
+                'type' => ['type' => 'string', 'enum' => ['person', 'agent']],
+                'profile_id' => self::int(),
+                'agent_id' => self::int(),
+                'name' => self::str(),
+                'works_for' => SchemaBuilder::ref('ChatPerson'),
+            ], ['type', 'name']),
+            'ChatMessage' => self::object([
+                'id' => self::int(),
+                'chat_id' => self::int(),
+                'kind' => ['type' => 'string', 'enum' => ['message', 'system', 'line', 'proposal'], 'description' => 'system: who joined, left or changed the chat; line: an agent\'s status or hand-off; proposal: an agent\'s proposal waiting for a decision.'],
+                'body' => self::str(),
+                'author' => ['oneOf' => [SchemaBuilder::ref('ChatAuthor'), ['type' => 'null']]],
+                'mentions' => ['type' => 'array', 'items' => self::object([
+                    'type' => ['type' => 'string', 'enum' => ['person', 'agent']],
+                    'id' => self::int(),
+                    'name' => self::str(),
+                ], ['type', 'id', 'name'])],
+                'status' => ['type' => 'string', 'enum' => ['posted', 'held', 'declined'], 'description' => 'held: an agent\'s line waiting for the person it works for.'],
+                'waiting_for' => ['oneOf' => [SchemaBuilder::ref('ChatPerson'), ['type' => 'null']]],
+                'can_decide' => self::bool(),
+                'proposal' => ['oneOf' => [self::object([
+                    'id' => self::int(),
+                    'tool' => self::str(),
+                    'summary' => self::str(),
+                    'status' => self::str(),
+                    'waiting_for' => SchemaBuilder::ref('ChatPerson'),
+                    'can_decide' => self::bool(),
+                    'expires_at' => self::str(true),
+                ], ['id', 'summary', 'status', 'waiting_for', 'can_decide']), ['type' => 'null']]],
+                'event' => ['type' => ['object', 'null'], 'additionalProperties' => true],
+                'created_at' => self::str(true),
+            ], ['id', 'chat_id', 'kind', 'body', 'status', 'created_at']),
+            'Chat' => self::object([
+                'id' => self::int(),
+                'type' => ['type' => 'string', 'enum' => ['group', 'direct']],
+                'title' => self::str(),
+                'with' => ['oneOf' => [SchemaBuilder::ref('ChatMember'), ['type' => 'null']]],
+                'people_count' => self::int(),
+                'agents_count' => self::int(),
+                'link' => ['oneOf' => [SchemaBuilder::ref('ChatLink'), ['type' => 'null']]],
+                'unread' => self::int(),
+                'mentions_me' => self::int() + ['description' => 'For an agent: unread lines that mention it.'],
+                'last_message' => ['oneOf' => [SchemaBuilder::ref('ChatMessage'), ['type' => 'null']]],
+                'last_message_at' => self::str(true),
+                'created_at' => self::str(true),
+            ], ['id', 'type', 'title', 'people_count', 'agents_count']),
+            'ChatListResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('Chat')]),
+            'ChatDetailResponse' => self::dataEnvelope([
+                'allOf' => [
+                    SchemaBuilder::ref('Chat'),
+                    self::object([
+                        'members' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMember')],
+                        'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMessage')],
+                        'has_earlier' => self::bool(),
+                        'my_member_id' => self::int(),
+                        'last_read_message_id' => self::int(),
+                    ], ['members', 'messages']),
+                ],
+            ]),
+            'ChatMessageListResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('ChatMessage')]),
+            'ChatMessageResponse' => self::dataEnvelope(SchemaBuilder::ref('ChatMessage')),
+            'ChatDirectoryResponse' => self::dataEnvelope(self::object([
+                'people' => ['type' => 'array', 'items' => self::object(['type' => self::str(), 'id' => self::int(), 'name' => self::str()], ['type', 'id', 'name'])],
+                'agents' => ['type' => 'array', 'items' => self::object([
+                    'type' => self::str(),
+                    'id' => self::int(),
+                    'name' => self::str(),
+                    'name_ar' => self::str(),
+                    'role' => self::str(),
+                    'role_ar' => self::str(),
+                ], ['type', 'id', 'name'])],
+            ], ['people', 'agents'])),
+            'ChatDoneResponse' => self::dataEnvelope(['type' => 'object', 'additionalProperties' => self::bool()]),
+            'ChatCreateRequest' => self::object([
+                'type' => ['type' => 'string', 'enum' => ['group', 'direct'], 'description' => 'group (the default) or direct.'],
+                'title' => self::str() + ['description' => 'The group\'s name, at most 120 characters.'],
+                'people' => ['type' => 'array', 'items' => self::int(), 'description' => 'For a group: the people to add (user ids), besides you.'],
+                'profile_id' => self::int() + ['description' => 'For a direct chat with a person: their user id.'],
+                'agent_id' => self::int() + ['description' => 'For a direct chat with one of your agents.'],
+                'link' => SchemaBuilder::ref('ChatLink'),
+            ], []),
+            'ChatUpdateRequest' => self::object([
+                'title' => self::str() + ['description' => 'A group\'s new name.'],
+                'link' => ['oneOf' => [SchemaBuilder::ref('ChatLink'), ['type' => 'null']], 'description' => 'What the chat is about, or null to remove the link.'],
+            ], []),
+            'ChatAddMemberRequest' => self::object([
+                'profile_id' => self::int() + ['description' => 'A person to add (user id).'],
+                'agent_id' => self::int() + ['description' => 'An agent to add.'],
+                'works_for' => self::int() + ['description' => 'The person in the chat the agent works for here; its proposals go to them. Defaults to you.'],
+                'reads' => ['type' => 'string', 'enum' => ['now', 'week', 'all'], 'description' => 'What the agent can read: from now on (the default), the last 7 days, or everything.'],
+                'actions' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allowed']], 'description' => 'What the agent may do here, per action; post is allowed unless said otherwise.'],
+            ], []),
+            'ChatPostRequest' => self::object([
+                'body' => self::str() + ['description' => 'The message, in plain words, at most 4000 characters.'],
+                'mentions' => ['type' => 'array', 'items' => self::object([
+                    'type' => ['type' => 'string', 'enum' => ['person', 'agent']],
+                    'id' => self::int(),
+                ], ['type', 'id']), 'description' => 'People (user id) and agents (agent id) in the chat this message mentions.'],
+                'style' => ['type' => 'string', 'enum' => ['message', 'line'], 'description' => 'Agents: line for a short status or hand-off line.'],
+            ], ['body']),
+            'ChatShareProposalRequest' => self::object([
+                'proposal_id' => self::int() + ['description' => 'One of your waiting proposals (from an Ask-first call).'],
+                'body' => self::str() + ['description' => 'What to say with it; the proposal\'s summary when empty.'],
+            ], ['proposal_id']),
+            'ChatReadRequest' => self::object([
+                'message_id' => self::int() + ['description' => 'The newest message you have read.'],
+            ], ['message_id']),
+
             // -- Messages (ADR 0016, WHIT-938) ------------------------------------
             // People are id and name, never a bare id.
             'MessagingPerson' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']),
@@ -6895,6 +7059,8 @@ final class CoreApiSchemas
                 // waiting · approved · declined · expired · undone
                 'status' => ['type' => 'string', 'enum' => ['waiting', 'approved', 'declined', 'expired', 'undone']],
                 'tool' => self::str(),
+                // AQ.1: 1 Ordinary, 2 Check first, 3 Needs verifying. Only Ordinary ones can be approved together.
+                'tier' => ['type' => 'integer', 'enum' => [1, 2, 3]],
                 'summary' => self::str(),
                 'arguments' => ['type' => 'object', 'additionalProperties' => true],
                 'diff' => ['nullable' => true, 'description' => 'What would change, when the operation can preview it'],
@@ -6908,7 +7074,7 @@ final class CoreApiSchemas
                 'action' => ['allOf' => [SchemaBuilder::ref('AgentAction')], 'nullable' => true],
                 'agentPaused' => ['type' => 'boolean', 'description' => 'The agent is paused, so this can be declined but not approved until it is resumed'],
                 'toolInfo' => ['allOf' => [SchemaBuilder::ref('AgentToolInfo')], 'nullable' => true, 'description' => 'What it would run, in plain words'],
-            ], ['id', 'agent', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt', 'action']),
+            ], ['id', 'agent', 'status', 'tool', 'tier', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt', 'action']),
             'AgentProposalListResponse' => self::listEnvelope('AgentProposal'),
             // ── Agent actions and undo (WHIT-812) ─────────────────────────────
             'AgentAction' => self::object([
@@ -6959,6 +7125,14 @@ final class CoreApiSchemas
             'AgentActionListResponse' => self::listEnvelope('AgentAction'),
             'AgentActionResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentAction')),
             'AgentProposalResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentProposal')),
+            'AgentProposalBulkApproveResponse' => self::dataEnvelope(self::object([
+                'approved' => ['type' => 'array', 'items' => SchemaBuilder::ref('AgentProposal')],
+                // not_found · open_on_its_own (tier 2 or 3) · not_waiting
+                'refused' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::int(),
+                    'reason' => ['type' => 'string', 'enum' => ['not_found', 'open_on_its_own', 'not_waiting']],
+                ], ['id', 'reason'])],
+            ], ['approved', 'refused'])),
             // ── Workspace agents and presets (WHIT-815) ──────────────────────
             'AgentPersonaFields' => self::object(self::agentPersonaProperties(), []),
             'AgentCreateRequest' => self::object(self::agentPersonaProperties() + [
@@ -12042,6 +12216,145 @@ final class CoreApiSchemas
     }
 
     /**
+     * Team chat (CH.1, CH.2): the team's own chats, people and agents together.
+     *
+     * Ungated like the Inbox: the handler lets in staff only, and only members
+     * see a chat. Agents get the read and post routes as tools (listed in
+     * AGENT_CALLABLE_UNGATED); starting chats, adding or removing members,
+     * renaming and deciding held lines are a person's.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function chatRoutes(): array
+    {
+        // No permission: staff of the workspace, and members of the chat, is the check.
+        $notFound = [404 => self::errorResponse('Chat not found, or you are not in it')];
+        $personOnly = ['expose' => false];
+
+        return [
+            self::ungatedRoute('GET', '/api/chat/chats', [
+                'summary' => 'List the team chats you are in',
+                'description' => 'Newest activity first, with unread counts and the last message. An agent sees only the chats it was added to '
+                    . 'for its person; mentions_me counts the unread lines that mention it.',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('Your chats', 'ChatListResponse')] + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/chats', [
+                'mcp' => $personOnly,
+                'summary' => 'Start a group chat, or open a direct chat with a person or one of your agents',
+                'tags' => ['chat'],
+                'request' => 'ChatCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The chat', 'ChatDetailResponse'),
+                    422 => self::errorResponse('No name, someone who is not in this workspace, or an agent that does not work for you'),
+                ] + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/chats/{id:\d+}', [
+                'summary' => 'Read a chat: its members, what each agent may do, and its latest messages',
+                'description' => 'An agent reads only the messages from when it joined (or what the person who added it allowed).',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('The chat', 'ChatDetailResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('PATCH', '/api/chat/chats/{id:\d+}', [
+                'mcp' => $personOnly,
+                'summary' => 'Rename a group chat or link the chat to a board, a meeting or a record',
+                'tags' => ['chat'],
+                'request' => 'ChatUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The chat', 'ChatDetailResponse'),
+                    422 => self::errorResponse('The name or the link is not valid'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/chats/{id:\d+}/messages', [
+                'summary' => 'Read a chat\'s messages',
+                'description' => 'Oldest first: those after `after` (a message id), or the page before `before`.',
+                'tags' => ['chat'],
+                'parameters' => [
+                    self::queryParam('after', 'integer', 'Messages after this id'),
+                    self::queryParam('before', 'integer', 'The page before this id'),
+                    self::queryParam('limit', 'integer', 'Page size (default 50, max 100)'),
+                ],
+                'responses' => [200 => self::jsonResponse('Messages', 'ChatMessageListResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/messages', [
+                'summary' => 'Write in a team chat',
+                'description' => 'Mention people and agents in the chat with `mentions`. An agent writes only when it may post there; '
+                    . 'on Ask first its message waits for the person it works for.',
+                'tags' => ['chat'],
+                'request' => 'ChatPostRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The message', 'ChatMessageResponse'),
+                    403 => self::errorResponse('The agent may not post in this chat'),
+                    422 => self::errorResponse('The message is empty or too long'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/proposals', [
+                'summary' => 'Put one of your waiting proposals in a chat (agents)',
+                'description' => 'Shows it as a card that only the person it waits for can approve.',
+                'tags' => ['chat'],
+                'request' => 'ChatShareProposalRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The message', 'ChatMessageResponse'),
+                    403 => self::errorResponse('Only an agent that may post here shares its proposals'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/read', [
+                'summary' => 'Mark a chat read up to a message',
+                'tags' => ['chat'],
+                'request' => 'ChatReadRequest',
+                'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/members', [
+                'mcp' => $personOnly,
+                'summary' => 'Add a person or an agent to a chat',
+                'description' => 'For an agent, say who it works for here, what it can read (from now on by default) and what it may do. '
+                    . 'A line in the chat tells everyone.',
+                'tags' => ['chat'],
+                'request' => 'ChatAddMemberRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The chat', 'ChatDetailResponse'),
+                    422 => self::errorResponse('Already in the chat, not in this workspace, or the agent does not work for that person'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('DELETE', '/api/chat/chats/{id:\d+}/members/{member:\d+}', [
+                'mcp' => $personOnly,
+                'summary' => 'Remove an agent, leave a chat, or remove a person from a group you started',
+                'tags' => ['chat'],
+                'responses' => [
+                    200 => self::jsonResponse('Removed', 'ChatDoneResponse'),
+                    403 => self::errorResponse('Only the person who started the chat removes people'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/messages/{id:\d+}/approve', [
+                'mcp' => $personOnly,
+                'summary' => 'Let an agent\'s held message through (the person it works for)',
+                'tags' => ['chat'],
+                'responses' => [
+                    200 => self::jsonResponse('The message', 'ChatMessageResponse'),
+                    403 => self::errorResponse('Someone else decides this message'),
+                    409 => self::errorResponse('The message is not waiting'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/messages/{id:\d+}/decline', [
+                'mcp' => $personOnly,
+                'summary' => 'Decline an agent\'s held message (the person it works for)',
+                'tags' => ['chat'],
+                'responses' => [
+                    200 => self::jsonResponse('The message', 'ChatMessageResponse'),
+                    403 => self::errorResponse('Someone else decides this message'),
+                    409 => self::errorResponse('The message is not waiting'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/directory', [
+                'summary' => 'Find people and agents to add to a chat or mention',
+                'tags' => ['chat'],
+                'parameters' => [self::queryParam('q', 'string', 'Part of a name')],
+                'responses' => [200 => self::jsonResponse('People and agents', 'ChatDirectoryResponse')] + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
      * Workspace-controlled customer sign-up (WHIT-915): four public routes and
      * the workspace admin's five.
      *
@@ -15221,6 +15534,24 @@ final class CoreApiSchemas
                     false,
                 ), static fn (mixed $v): bool => $v !== null),
             ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/agent-proposals/bulk-approve',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Approve several ordinary proposals together',
+                    'description' => 'Only Ordinary (tier 1) proposals are approved; each runs, is recorded and can be undone on its own. Check first and Needs verifying ones are never approved here and come back under refused.',
+                    'tags' => ['me'],
+                    'request' => self::object([
+                        'ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 1, 'maxItems' => 50, 'description' => 'The proposals to approve.'],
+                    ], ['ids']),
+                    'responses' => [
+                        200 => self::jsonResponse('What was approved and what has to be opened on its own', 'AgentProposalBulkApproveResponse'),
+                        422 => self::errorResponse('No ids, or more than 50'),
+                    ] + self::authErrors(),
+                ],
+            ],
         ];
     }
 
@@ -16880,6 +17211,60 @@ final class CoreApiSchemas
     }
 
     /**
+     * The workspace's connection to Taskaat (WHIT-962, A10). Not MCP tools: agents reach
+     * Taskaat through the taskaat_* tools, and connecting is a person's act.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function taskaatRoutes(): array
+    {
+        return [
+            self::permissionRoute('GET', '/api/taskaat/connection', 'tasks:read', [
+                'summary' => 'Whether this workspace is connected to Taskaat',
+                'description' => 'Tasks and boards live in the workspace\'s Taskaat (T.3). Never returns a token.',
+                'tags' => ['tasks'],
+                // Agents reach Taskaat through the taskaat_* tools; connecting is a person's act.
+                'mcp' => ['expose' => false],
+                'responses' => [200 => self::jsonResponse('The connection', 'TaskaatConnectionResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/taskaat/connect', 'tasks:manage', [
+                'summary' => 'Begin connecting this workspace to Taskaat',
+                'description' => 'People only, never an agent. Registers Whity with Taskaat (OAuth dynamic client registration, PKCE) '
+                    . 'and returns Taskaat\'s consent page to send the person to. Taskaat returns them to /tasks/connect.',
+                'tags' => ['tasks'],
+                // Agents reach Taskaat through the taskaat_* tools; connecting is a person's act.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => self::jsonResponse('Where to sign in', 'TaskaatConnectResponse'),
+                    502 => self::errorResponse('Taskaat could not be reached'),
+                    503 => self::errorResponse('Whity does not know its own web address (FRONTEND_URL)'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/taskaat/connect/complete', 'tasks:manage', [
+                'summary' => 'Finish connecting with the code Taskaat sent back',
+                'description' => 'Single use, by the person who started it. The tokens are kept encrypted and never returned.',
+                'tags' => ['tasks'],
+                // Agents reach Taskaat through the taskaat_* tools; connecting is a person's act.
+                'mcp' => ['expose' => false],
+                'request' => 'TaskaatConnectCompleteRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The connection', 'TaskaatConnectionResponse'),
+                    422 => self::errorResponse('Expired, not started here, or refused by Taskaat'),
+                    502 => self::errorResponse('Taskaat could not be reached'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/taskaat/connection', 'tasks:manage', [
+                'summary' => 'Disconnect this workspace from Taskaat',
+                'description' => 'Forgets the tokens. To revoke them in Taskaat too, remove Whity from Taskaat\'s connected apps.',
+                'tags' => ['tasks'],
+                // Agents reach Taskaat through the taskaat_* tools; connecting is a person's act.
+                'mcp' => ['expose' => false],
+                'responses' => [200 => self::jsonResponse('The connection', 'TaskaatConnectionResponse')] + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
      * Calendar and bookings (WHIT-941, ADR 0017). Instants are ISO 8601 with
      * an offset on the way in and UTC with `Z` on the way out. Create, move and
      * cancel declare no undo window, so an agent's call always becomes a
@@ -17123,6 +17508,23 @@ final class CoreApiSchemas
             'path' => $path,
             'requiredRole' => null,
             'requiredPermission' => $permission,
+            'schema' => $schema,
+        ];
+    }
+
+    /**
+     * A route with no permission gate: the handler decides who may use it.
+     *
+     * @param array<string, mixed> $schema
+     * @return array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}
+     */
+    private static function ungatedRoute(string $method, string $path, array $schema): array
+    {
+        return [
+            'method' => $method,
+            'path' => $path,
+            'requiredRole' => null,
+            'requiredPermission' => null,
             'schema' => $schema,
         ];
     }

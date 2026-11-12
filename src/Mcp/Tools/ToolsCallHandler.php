@@ -979,6 +979,10 @@ final class ToolsCallHandler implements MethodHandler
             'type'             => 'mcp',
             'principal_kind'   => $principal->principalKind,
             'scope'            => $principal->scope,
+            // Which agent is calling (`agent:<assignmentId>`), for handlers whose
+            // answer depends on the agent and not only its person: a team chat
+            // shows an agent only the chats it is a member of (CH.2).
+            'agent_principal_id' => $principal->isAgent() ? $principal->agentPrincipalId() : null,
         ];
         $request->setAttribute(Request::ATTR_JWT_CLAIMS, $claims);
         $request->user = (object) $claims;
