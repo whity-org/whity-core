@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.101).
+ * SDK identity (v1.103).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1246,12 +1246,22 @@ namespace Whity\Sdk;
  * resolves a tree, and {@see Frontend\Blocks\BlockValidator} accepts the objects (WHIT-984).
  *
  * Purely additive.)
+ *
+ * 1.103 (DOCUMENT BLOCKS: a plugin adds blocks to the document editor (editor M7, E.17–E.20).
+ * A code plugin implements {@see PluginDocumentBlocksInterface} with {@see Documents\DocumentBlock}
+ * declarations; a workspace plugin lists the same shape under `documents.blocks` in its manifest
+ * ({@see Manifest\DocumentBlockValidator}). A block is a declaration, never code: its fields, a view
+ * and an optional print view in the screen vocabulary's display blocks, naming fields as
+ * `{{data.key}}`. Whity's own renderer draws it, and a Verified plugin's blocks carry the mark.
+ * Without a print view a block is for notes and wiki pages only (WHIT-993).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.101.0';
+    public const VERSION = '1.103.0';
 
     /**
      * Static identity only — never instantiated.
