@@ -74,7 +74,7 @@ export function AwayCard({ people, onChanged }: { people: AwayPerson[]; onChange
   const others = useMemo(() => people.filter((p) => p.id !== user?.id), [people, user?.id]);
   const delegate = others.find((p) => String(p.id) === delegateId) ?? null;
   const firstName = delegate?.name.split(' ')[0] ?? '';
-  const day = (iso: string) => dates.date(iso) ?? iso;
+  const day = (iso: string) => dates.date(iso) ?? '';
 
   const handOver = async () => {
     setBusy(true);

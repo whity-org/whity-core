@@ -174,7 +174,7 @@ export default function DelegationsPage() {
             granteeIsRole: false,
             scope: t('away.row.scope', 'While away'),
             grantedAt: a.createdAt,
-            until: `${dates.date(a.startsOn) ?? a.startsOn} – ${dates.date(a.backOn) ?? a.backOn}`,
+            until: [dates.date(a.startsOn), dates.date(a.backOn)].filter(Boolean).join(' – '),
             status:
               a.status === 'starting'
                 ? t('away.status.starting', 'Starting')
