@@ -44,6 +44,8 @@ final class FrontendUrls
     public const STORE_CONNECT = 'STORE_CONNECT_URL';
     /** WHIT-942: the customer's page to move or cancel a booking; the token follows as a path segment. */
     public const BOOKING_MANAGE = 'BOOKING_MANAGE_URL';
+    /** WHIT-962: where Taskaat returns a person who connected the workspace to it. */
+    public const TASKAAT_CONNECT = 'TASKAAT_CONNECT_URL';
 
     /**
      * The bundled admin's path for each link — what an override replaces.
@@ -61,6 +63,7 @@ final class FrontendUrls
         self::SIGNUP_CONFIRM => '/join/confirm',
         self::STORE_CONNECT => '/admin/plugins/store/connect',
         self::BOOKING_MANAGE => '/booking',
+        self::TASKAAT_CONNECT => '/tasks/connect',
     ];
 
     /**

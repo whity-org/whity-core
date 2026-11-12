@@ -20,6 +20,10 @@ jest.mock('@/lib/api/client', () => ({
   },
 }));
 jest.mock('@/app/(protected)/admin/delegations/create-modal', () => ({ CreateDelegationModal: () => null }));
+// OR.1: the page also reads the caller's own "I'm away" and everyone's away periods.
+const mockApiClient = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ data: mockAway }) }));
+const mockAway: unknown = null;
+jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient: mockApiClient, user: { id: 1 } }) }));
 
 const row = {
   id: 7,

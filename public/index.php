@@ -1129,6 +1129,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'visibleIf' => 'messages-for-customer',
     ];
     $items[] = [
+        'id' => 'chat',
+        'label' => 'Chat',
+        'href' => '/chat',
+        'icon' => 'comment',
+        'group' => 'overview',
+        'order' => 9,
+        // Team chat (CH.1): the team's own chats, people and agents together.
+        // Ungated like its routes; shown to the people who work here, never to
+        // customers.
+        'visibleIf' => 'chat-for-staff',
+    ];
+    $items[] = [
         'id' => 'document-library',
         'label' => 'Documents',
         'href' => '/admin/document-library',
@@ -2087,6 +2099,8 @@ $navigationHandler = new NavigationApiHandler($hookManager, $roleChecker, [
     'forms-own-submissions' => [$formsNavConditions, 'hasOwnSubmissionsToSee'],
     // ADR 0016: a customer's own conversations with the workspace.
     'messages-for-customer' => [new \Whity\Core\Messaging\MessagesNavConditions($db->getPdo()), 'isCustomerWithMessages'],
+    // Team chat (CH.1): the people who work here.
+    'chat-for-staff' => [new \Whity\Core\Chat\ChatNavConditions(new \Whity\Core\Chat\ChatRepository($db->getPdo())), 'isStaff'],
 ]);
 $router->register('GET', '/api/navigation', [$navigationHandler, 'list']);
 
@@ -5453,6 +5467,8 @@ $messagingService = \Whity\Core\Messaging\CoreMessaging::build(
     (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
 );
 \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messagingService);
+// WHIT-967 (SDK 1.99): a plugin messages a workspace's customer through Messages.
+\Whity\register_service(\Whity\Sdk\Messaging\CustomerMessages::class, new \Whity\Core\Messaging\HostCustomerMessages(static fn (): \Whity\Core\Messaging\MessagingService => $messagingService));
 $jobsRegistry->register(
     \Whity\Core\Messaging\Jobs\DeliverMessageJob::NAME,
     new \Whity\Core\Messaging\Jobs\DeliverMessageJob(static fn (): \Whity\Core\Messaging\MessagingService => $messagingService),
@@ -5476,6 +5492,27 @@ $router->register('GET',   '/api/messages/settings',                      [$mess
 $router->register('PUT',   '/api/messages/settings',                      [$messagesHandler, 'putSettings'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
 $router->register('POST',  '/api/messages/settings/inbound-secret',       [$messagesHandler, 'rotateInboundSecret'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
 // A signed-in customer's own conversations: ownership is the check, like /api/me/forms.
+// Team chat (CH.1, CH.2; migration 253): the team's own chats on the Messages
+// tables. DELIBERATELY UNGATED at the router, like the Inbox: the handler lets
+// in only staff of the workspace, and only members see a chat, so a chat the
+// caller (or the calling agent) is not in answers 404. What an agent may do in
+// a chat is set per chat, by the person who added it.
+$chatRepository = new \Whity\Core\Chat\ChatRepository($db->getPdo());
+$chatHandler = new \Whity\Api\ChatApiHandler(new \Whity\Core\Chat\ChatService($chatRepository));
+$router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null);
+$router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null);
+$router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null);
+$router->register('PATCH',  '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'update'],        null);
+$router->register('GET',    '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'messages'],      null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'post'],          null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/proposals',               [$chatHandler, 'shareProposal'], null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/read',                    [$chatHandler, 'markRead'],      null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/members',                 [$chatHandler, 'addMember'],     null);
+$router->register('DELETE', '/api/chat/chats/{id:\d+}/members/{member:\d+}',    [$chatHandler, 'removeMember'],  null);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/approve',              [$chatHandler, 'approve'],       null);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/decline',              [$chatHandler, 'decline'],       null);
+$router->register('GET',    '/api/chat/directory',                              [$chatHandler, 'directory'],     null);
+
 $meMessagesHandler = new \Whity\Api\MeMessagesApiHandler($messagingService);
 $router->register('GET',  '/api/me/messages',            [$meMessagesHandler, 'list'],  null);
 $router->register('POST', '/api/me/messages',            [$meMessagesHandler, 'start'], null);
@@ -5801,6 +5838,28 @@ $mcpListChangedNotifier = new ListChangedNotifier(
 // ONE registry — a second instance would answer tools/list from a different set
 // than tools/call dispatches from.
 $authoredMcpTools = new AuthoredToolRegistry();
+// A10 (WHIT-962): tasks and boards live in the workspace's Taskaat (T.3). The
+// connection per workspace, the routes that make it, and Taskaat's tools in the
+// workspace MCP, registered ahead of the plugins' tools and again on every refresh.
+$taskaatConnection = new \Whity\Core\Taskaat\TaskaatConnection(
+    new \Whity\Core\Settings\TenantSettingsRepository($db->getPdo()),
+    $secretStore,
+    \Whity\Core\Taskaat\TaskaatConnection::originFromEnv(),
+    $frontendUrls->link(\Whity\Core\Http\FrontendUrls::TASKAAT_CONNECT),
+    'Whity (' . ((string) parse_url($frontendUrls->base(), PHP_URL_HOST) ?: 'installation') . ')',
+    static fn (string $url, array $headers = []): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url, $headers),
+    static fn (string $url, array $params): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postForm($url, $params),
+    static fn (string $url, array $payload): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postJson($url, $payload),
+);
+$taskaatTools = new \Whity\Core\Taskaat\TaskaatTools(new \Whity\Core\Taskaat\TaskaatClient(
+    $taskaatConnection,
+    static fn (string $url, array $payload, array $headers): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 30, maxBytes: 4194304))->postJson($url, $payload, $headers),
+));
+$taskaatHandler = new \Whity\Api\TaskaatApiHandler($taskaatConnection, $auditLogger);
+$router->register('GET',    '/api/taskaat/connection',       [$taskaatHandler, 'status'],     null, null, CorePermissions::TASKS_READ);
+$router->register('POST',   '/api/taskaat/connect',          [$taskaatHandler, 'connect'],    null, null, CorePermissions::TASKS_MANAGE);
+$router->register('POST',   '/api/taskaat/connect/complete', [$taskaatHandler, 'complete'],   null, null, CorePermissions::TASKS_MANAGE);
+$router->register('DELETE', '/api/taskaat/connection',       [$taskaatHandler, 'disconnect'], null, null, CorePermissions::TASKS_MANAGE);
 // WHIT-754: the plugin MCP tools a workspace turned on as always-on.
 $mcpEnabledPluginAlwaysOn = static function (int $tenantId) use ($settingsService): array {
     $raw = (string) ($settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::MCP_ALWAYS_ON_PLUGIN_TOOLS] ?? '');
@@ -5867,6 +5926,7 @@ $agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
+$router->register('POST', '/api/me/agent-proposals/bulk-approve',        [$agentProposalsHandler, 'bulkApprove'], null);
 // WHIT-872 (H.2): every inbox source and the caller's proposals in one list, oldest
 // first. Session-gated and self-scoped like the two surfaces it reads.
 $meWaitingHandler = new \Whity\Api\MeWaitingApiHandler($inboxSourceRegistry, $agentProposals, $agentAssignments);
@@ -6216,6 +6276,9 @@ $pluginLoader->collectMcpResources($pluginResources, $agentContextGrantedNow());
 // SDK 1.43. Collect FIRST, then hand the deriver the suppressions: a plugin
 // that authors its own tools may ask for its routes not to be derived, and the
 // deriver has to know that before anything asks it for a tool list.
+foreach ($taskaatTools->register($authoredMcpTools) as $taskaatRefused) {
+    error_log('[Taskaat] tool refused: ' . $taskaatRefused);
+}
 $pluginLoader->collectMcpTools($authoredMcpTools);
 $toolDeriver->suppressNamespaces($authoredMcpTools->suppressedPlugins());
 
@@ -6238,7 +6301,8 @@ $refreshMcpCatalog = static function (string $trigger) use (
     $authoredMcpTools,
     $toolDeriver,
     $pluginResources,
-    $agentContextGrantedNow
+    $agentContextGrantedNow,
+    $taskaatTools
 ): void {
     ToolDeriver::clearCache();
     $promptRegistry->reset();
@@ -6253,6 +6317,7 @@ $refreshMcpCatalog = static function (string $trigger) use (
     // included — a suppression from a plugin that is no longer active must stop
     // hiding derived tools.
     $authoredMcpTools->reset();
+    $taskaatTools->register($authoredMcpTools);
     $pluginLoader->collectMcpTools($authoredMcpTools);
     $toolDeriver->suppressNamespaces($authoredMcpTools->suppressedPlugins());
     // Last: the signature must be computed from the refreshed catalogue, not the

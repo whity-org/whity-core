@@ -17,6 +17,7 @@ use Whity\Core\Http\HttpFetcher;
 use Whity\Core\Mail\OutgoingEmail;
 use Whity\Core\Mail\ThreadedMailer;
 use Whity\Core\Messaging\CoreMessaging;
+use Whity\Core\Messaging\HostCustomerMessages;
 use Whity\Core\Messaging\Email\EmailChannel;
 use Whity\Core\Messaging\MessageChannelRegistry;
 use Whity\Core\Messaging\MessagesInboxSource;
@@ -33,6 +34,11 @@ use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Store\DatabaseSharedStore;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Http\Response;
+use Whity\Sdk\Messaging\ChannelCapabilities;
+use Whity\Sdk\Messaging\MessageChannel;
+use Whity\Sdk\Messaging\OutboundMessage;
+use Whity\Sdk\Messaging\SendOutcome;
+use Whity\Sdk\PluginInterface;
 
 /**
  * Messages end to end on the real schema (ADR 0016, WHIT-938): the send API,
@@ -316,6 +322,76 @@ final class MessagingRealEngineTest extends TestCase
         $stmt->execute([$tenantId]);
 
         return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * WHIT-967: a plugin's customer message never goes to a channel that
+     * cannot take it now. A WhatsApp-style channel needs a conversation the
+     * customer started (their address) and, outside its window, a template;
+     * otherwise email takes the message, so a refused send never drops it.
+     */
+    public function testCustomerMessagesUseWhatsAppOnlyWhenItCanReachThemAndFallBackToEmail(): void
+    {
+        $this->messaging->channels()->register('Whity WhatsApp', [new class implements MessageChannel {
+            public function key(): string
+            {
+                return 'whatsapp';
+            }
+
+            public function label(): array
+            {
+                return ['en' => 'WhatsApp', 'ar' => 'واتساب'];
+            }
+
+            public function isEnabled(int $tenantId): bool
+            {
+                return true;
+            }
+
+            public function capabilities(): ChannelCapabilities
+            {
+                return new ChannelCapabilities(requiresTemplate: true, freeformWindowSeconds: 86400);
+            }
+
+            public function send(OutboundMessage $message): SendOutcome
+            {
+                return SendOutcome::sent('wamid');
+            }
+
+            public function receive(int $tenantId, string $rawBody, array $headers): array
+            {
+                return [];
+            }
+
+            public function templates(int $tenantId): array
+            {
+                return [];
+            }
+        }]);
+        $key = (string) array_values(array_filter($this->messaging->channels()->keys(), static fn (string $k): bool => str_ends_with($k, ':whatsapp')))[0];
+        $host = new HostCustomerMessages(fn (): MessagingService => $this->messaging);
+        $plugin = $this->createStub(PluginInterface::class);
+        $plugin->method('getName')->willReturn('WhityPay');
+
+        // No WhatsApp conversation: no address we know reaches them there.
+        $first = $host->send($plugin, self::A, self::CUSTOMER_A, 'Your payment did not go through.', ['whatsapp', 'email'], 'Payment failed');
+        self::assertSame('email', $first);
+
+        // They wrote on WhatsApp two days ago: outside the window only a template may go.
+        $conversation = $this->messaging->conversations()->create(self::A, $key, '+962790000000', 'Customer A', null, self::CUSTOMER_A);
+        $this->pdo->exec("UPDATE conversations SET last_inbound_at = '" . gmdate('Y-m-d H:i:s', time() - 2 * 86400) . "' WHERE id = {$conversation}");
+        self::assertSame('email', $host->send($plugin, self::A, self::CUSTOMER_A, 'Your payment did not go through.', ['whatsapp', 'email'], 'Payment failed'));
+
+        // They wrote an hour ago: free text is allowed, in their conversation, marked as the plugin's.
+        $this->pdo->exec("UPDATE conversations SET last_inbound_at = '" . gmdate('Y-m-d H:i:s', time() - 3600) . "' WHERE id = {$conversation}");
+        self::assertSame($key, $host->send($plugin, self::A, self::CUSTOMER_A, 'Your payment did not go through.', ['whatsapp', 'email'], 'Payment failed'));
+        $statement = $this->pdo->prepare('SELECT source FROM messages WHERE conversation_id = :c ORDER BY id DESC LIMIT 1');
+        $statement->execute([':c' => $conversation]);
+        $source = $statement->fetchColumn();
+        self::assertSame('plugin.whitypay', $source);
+
+        // Another workspace's person is never reached.
+        self::assertNull($host->send($plugin, self::B, self::CUSTOMER_A, 'x', ['whatsapp', 'email']));
     }
 
     private function seed(): void
