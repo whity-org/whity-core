@@ -169,12 +169,14 @@ final class AgentEmailNotifier
               WHERE aa.id = :id AND aa.tenant_id = :tenant_id'
         );
         $stmt->execute([':id' => $assignmentId, ':tenant_id' => $tenantId]);
-        $value = $stmt->fetchColumn();
-        if ($value === false || $value === null) {
+        // A row, not a column: fetchColumn() answers false both for "no row" and
+        // for a false the driver returns as a real boolean.
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row) || $row['notify_by_email'] === null) {
             return true;
         }
 
-        return !in_array($value, [false, 0, '0', 'f', 'false'], true);
+        return \Whity\Core\Db\DbBool::of($row['notify_by_email']);
     }
 
     /** Preferences › Notifications; on unless the person turned it off. */

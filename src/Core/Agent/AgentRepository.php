@@ -237,7 +237,7 @@ final class AgentRepository
             'paused_at'             => $row['paused_at'] === null ? null : (string) $row['paused_at'],
             'paused_by_profile_id'  => $row['paused_by_profile_id'] === null ? null : (int) $row['paused_by_profile_id'],
             'may_read'              => array_values(array_filter($json($row['may_read']), 'is_int')),
-            'notify_by_email'       => !in_array($row['notify_by_email'] ?? true, [false, 0, '0', 'f', 'false'], true),
+            'notify_by_email'       => ($row['notify_by_email'] ?? null) === null ? true : \Whity\Core\Db\DbBool::of($row['notify_by_email']),
             'features'              => array_filter($json($row['features'] ?? null), 'is_bool'),
             'created_by_profile_id' => $row['created_by_profile_id'] === null ? null : (int) $row['created_by_profile_id'],
             'updated_by_profile_id' => $row['updated_by_profile_id'] === null ? null : (int) $row['updated_by_profile_id'],

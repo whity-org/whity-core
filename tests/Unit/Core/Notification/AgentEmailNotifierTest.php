@@ -50,12 +50,12 @@ final class AgentEmailNotifierTest extends TestCase
         $this->pdo->exec("INSERT INTO tenants (id, name, slug) VALUES (1, 'Example Bakery', 'example-bakery')");
         $this->pdo->exec(
             "INSERT INTO profiles (display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
-             VALUES ('Amro Saleh', 'x', false, 0, 0, datetime('now'), datetime('now'))"
+             VALUES ('Amro Saleh', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
         );
         $this->profileId = (int) $this->pdo->lastInsertId();
         $this->pdo->exec(
             "INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
-             VALUES ({$this->profileId}, 'amro@example.test', true, true, datetime('now'))"
+             VALUES ({$this->profileId}, 'amro@example.test', true, true, CURRENT_TIMESTAMP)"
         );
 
         $agents = new AgentRepository($this->pdo);
