@@ -259,6 +259,25 @@
 .wy-doc .wy-saved-action { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; border-radius: 4px; }
 .wy-doc .wy-saved-action:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
+/* E.23: a part filled per document. In the original, marked text; in a
+   document, the field it fills (EditorCustomBlocks `.wy-fill`). */
+.wy-doc [data-per-document],
+.wy-doc .wy-part {
+  outline: 1px dotted var(--input);
+  outline-offset: 2px;
+  border-radius: 3px;
+  background: var(--muted);
+  padding: 0 3px;
+}
+.wy-doc input.wy-part {
+  border: 0;
+  color: inherit;
+  font: inherit;
+  max-width: 100%;
+}
+.wy-doc input.wy-part::placeholder { color: var(--muted-foreground); }
+.wy-doc input.wy-part:focus-visible { outline: 2px solid var(--ring); }
+
 /* Toggle: the summary line, and the blocks it hides. */
 .wy-doc [data-type="toggle"] { display: flex; gap: 4px; align-items: flex-start; }
 .wy-doc .wy-toggle-button {
