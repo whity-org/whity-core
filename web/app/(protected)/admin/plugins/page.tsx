@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { uploadPluginPackage } from '@/lib/api/plugin-upload';
+import { Lottie } from '@whity/ui/lottie';
 import { useToast } from '@/lib/toast-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
@@ -686,6 +687,7 @@ export default function PluginsPage() {
       ) : plugins.length === 0 ? (
         <EmptyFirstTime
           icon="plugin"
+          moment="spot-plugin"
           title={t('plugins.empty.title', 'No plugins are installed yet')}
           description={t('plugins.empty.description', 'Find one in the Store tab and install it here.')}
           action={
@@ -796,6 +798,7 @@ export default function PluginsPage() {
           </DialogHeader>
 
           <div className="space-y-3 py-2">
+            {uploading && <Lottie name="uploading" play="loop" className="mx-auto h-20 w-[120px]" />}
             <label className="block">
               <span className="sr-only">{t('plugins.upload.fileLabel', 'Plugin package')}</span>
               <input

@@ -6,9 +6,13 @@
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { DisplayPreferencesContextProvider, type DisplayPreferencesValue } from '@whity/ui/display-preferences';
 import { EmptyFiltered } from '@whity/ui/page-states';
-import { Lottie, useMotionMode } from '@whity/ui/lottie';
+import { Lottie, hasPlayedOnceEver, useMotionMode } from '@whity/ui/lottie';
+import { ApprovalQueue } from '@whity/ui/approval-queue';
+import { LockedScreen } from '@whity/ui/locked-screen';
 
 import { DisplayPreferencesSettings } from '@/components/display-preferences-settings';
+import { FirstVisitScene } from '@/components/first-visit-scene';
+import { libraryEmptyState } from '@/app/(protected)/admin/document-library/library-empty-state';
 
 jest.mock('@whity/features/i18n', () => ({
   useTranslation: () => (_key: string, fallback: string) => fallback,
@@ -46,6 +50,45 @@ describe('Lottie', () => {
     expect(document.querySelector('[data-moment="no-results"]')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(onClear).toHaveBeenCalled();
+  });
+});
+
+describe('Moments in core screens (A13)', () => {
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it('plays all-caught-up when the approvals queue is empty', () => {
+    render(<ApprovalQueue items={[]} onCurrentChange={() => {}} />);
+    expect(document.querySelector('[data-moment="all-caught-up"]')).not.toBeNull();
+    expect(screen.getByText('All caught up')).toBeInTheDocument();
+  });
+
+  it('shows security-lock on the locked screen, unless the caller brings its own icon', () => {
+    const { rerender } = render(<LockedScreen description="Sign in again to continue." />);
+    expect(document.querySelector('[data-moment="security-lock"]')).not.toBeNull();
+    rerender(<LockedScreen icon={<span>own</span>} description="Sign in again to continue." />);
+    expect(document.querySelector('[data-moment="security-lock"]')).toBeNull();
+    expect(screen.getByText('own')).toBeInTheDocument();
+  });
+
+  it('gives the document library no-results for a search and empty-documents for an empty folder', () => {
+    const t = ((_key: string, fallback: string) => fallback) as unknown as Parameters<typeof libraryEmptyState>[0];
+    const base = { viewKey: 'all', collection: null, starredCollectionExists: false, total: 0 };
+    expect(libraryEmptyState(t, { ...base, searchApplied: true }).moment).toBe('no-results');
+    expect(libraryEmptyState(t, { ...base, searchApplied: false }).moment).toBe('empty-documents');
+    expect(libraryEmptyState(t, { ...base, searchApplied: false, total: 4 }).moment).toBeUndefined();
+  });
+
+  it('shows a first-run scene on the first visit only, whatever the Animations setting', () => {
+    document.documentElement.dataset.motion = 'off';
+    const first = render(<FirstVisitScene name="brand-sheet-platform" storageKey="test-brand" />);
+    expect(document.querySelector('[data-moment="brand-sheet-platform"]')).not.toBeNull();
+    first.unmount();
+    render(<FirstVisitScene name="brand-sheet-platform" storageKey="test-brand" />);
+    expect(document.querySelector('[data-moment="brand-sheet-platform"]')).toBeNull();
+    expect(hasPlayedOnceEver('test-brand')).toBe(true);
   });
 });
 

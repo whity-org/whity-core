@@ -235,22 +235,32 @@ function subscribeToTheme(callback: () => void): () => void {
   }
 }
 
-function seenThisSession(key: string | undefined): boolean {
-  if (!key) return false
+function seenBefore(key: string | undefined, ever: string | undefined): boolean {
   try {
-    return sessionStorage.getItem(`whity.once.${key}`) === "1"
+    if (ever && localStorage.getItem(`whity.onceEver.${ever}`) === "1") return true
+    return !!key && sessionStorage.getItem(`whity.once.${key}`) === "1"
   } catch {
     return false
   }
 }
 
-function markSeen(key: string | undefined): void {
-  if (!key) return
+function markSeen(key: string | undefined, ever: string | undefined): void {
   try {
-    sessionStorage.setItem(`whity.once.${key}`, "1")
+    if (ever) localStorage.setItem(`whity.onceEver.${ever}`, "1")
+    if (key) sessionStorage.setItem(`whity.once.${key}`, "1")
   } catch {
     // A private window can refuse storage; the scene then plays again next time.
   }
+}
+
+/** Whether a first-run scene (`onceEver`) has already played on this device. */
+export function hasPlayedOnceEver(key: string): boolean {
+  return seenBefore(undefined, key)
+}
+
+/** Record a first-run scene as played without showing it. */
+export function markPlayedOnceEver(key: string): void {
+  markSeen(undefined, key)
 }
 
 export interface LottieProps {
@@ -264,6 +274,8 @@ export interface LottieProps {
   play?: "view" | "manual" | "loop"
   /** Play once a session under this key, then show the last frame (empty states). */
   once?: string
+  /** Play once ever on this device under this key (first-run scenes), then show the last frame. */
+  onceEver?: string
   /** `manual` only: the approved end (forwards) or the waiting start (backwards). */
   approved?: boolean
   /** `loop` only: false when the waiting is over; the scene stops on its last frame. */
@@ -280,6 +292,7 @@ function Lottie({
   src,
   play = "view",
   once,
+  onceEver,
   approved = false,
   active = true,
   delay = 0,
@@ -297,8 +310,8 @@ function Lottie({
   const [ready, setReady] = React.useState(false)
 
   // Read inside the build without rebuilding when they change.
-  const live = React.useRef({ approved, active, mode, delay, once })
-  live.current = { approved, active, mode, delay, once }
+  const live = React.useRef({ approved, active, mode, delay, once, onceEver })
+  live.current = { approved, active, mode, delay, once, onceEver }
 
   React.useEffect(() => {
     const host = hostRef.current
@@ -330,14 +343,14 @@ function Lottie({
           if (cancelled) return
           setReady(true)
           const last = anim.totalFrames - 1
-          const { approved: isApproved, active: isActive, mode: motion, delay: wait, once: key } = live.current
+          const { approved: isApproved, active: isActive, mode: motion, delay: wait, once: key, onceEver: ever } = live.current
           if (play === "manual") {
             anim.goToAndStop(keepFrame != null && keepFrame > 0 ? keepFrame : isApproved ? last : 0, true)
           } else if (play === "loop") {
             if (!isActive) anim.goToAndStop(last, true)
             else if (motion !== "full") anim.goToAndStop(0, true)
             else anim.play()
-          } else if (playedRef.current || motion !== "full" || seenThisSession(key)) {
+          } else if (playedRef.current || motion !== "full" || seenBefore(key, ever)) {
             anim.goToAndStop(keepFrame ?? last, true)
             if (motion === "calm" && keepFrame == null) {
               stage.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 400, easing: "ease-out" })
@@ -353,7 +366,7 @@ function Lottie({
                 if (!entries.some((entry) => entry.isIntersecting && entry.intersectionRatio > 0.35)) return
                 observer?.disconnect()
                 playedRef.current = true
-                markSeen(key)
+                markSeen(key, ever)
                 timer = setTimeout(() => animRef.current?.goToAndPlay(0, true), wait)
               },
               { threshold: [0, 0.35, 0.6] }
