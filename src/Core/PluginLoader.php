@@ -942,6 +942,9 @@ class PluginLoader
             $this->documentFieldRegistry?->removeOwner($info['plugin']->getName());
             // A reload must not leave a removed plugin's webhook public (WHIT-671).
             \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
+            // Nor its customer-grade permissions (#1872). Only this loader's
+            // plugins: another loader in the same process keeps its own.
+            \Whity\Core\Identity\CustomerGradePermissions::remove((string) $pluginKey);
         \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
 
             if ($this->hookManager !== null) {
@@ -956,7 +959,6 @@ class PluginLoader
         $this->administrativelyDisabled = [];
         $this->claimedFeatureIds = [];
         $this->claimedPermissions = [];
-        \Whity\Core\Identity\CustomerGradePermissions::reset();
 
         // Reset lifecycle state machines. A reload re-registers every plugin
         // from disk, so each plugin (including a previously failed one whose
@@ -3255,15 +3257,28 @@ class PluginLoader
      */
     private function registerCustomerPermissions(PluginInterface $plugin, string $pluginKey): void
     {
+        // Every resource the plugin declares counts against other plugins'
+        // vouches, so it is recorded even when the declaration below throws.
+        // The registry holds the set registered above; asking the plugin again
+        // could answer differently.
         $declared = [];
-        $customer = [];
-        $refused = [];
         try {
-            foreach ($plugin->getPermissions() as $permission) {
+            $source = $this->permissionRegistry !== null
+                ? $this->permissionRegistry->getBySource($plugin->getName())
+                : $plugin->getPermissions();
+            foreach ($source as $permission) {
                 if (is_string($permission)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     $declared[] = $permission;
                 }
             }
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'customer permission declaration');
+        }
+
+        $namespace = \Whity\Sdk\PluginNamespace::slug($plugin->getName());
+        $customer = [];
+        $refused = [];
+        try {
             if ($plugin instanceof \Whity\Sdk\PluginCustomerPermissionsInterface) {
                 foreach ($plugin->getCustomerPermissions() as $slug) {
                     if (!is_string($slug)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
@@ -3278,19 +3293,19 @@ class PluginLoader
             }
         } catch (Throwable $e) {
             $this->handlePluginThrowable($pluginKey, $e, 'customer permission declaration');
-            \Whity\Core\Identity\CustomerGradePermissions::remove($pluginKey);
-
-            return;
+            $customer = [];
+            $refused = [];
         }
 
         $refused = [
             ...$refused,
-            ...\Whity\Core\Identity\CustomerGradePermissions::declare($pluginKey, $declared, $customer),
+            ...\Whity\Core\Identity\CustomerGradePermissions::declare($pluginKey, $namespace, $declared, $customer),
         ];
         foreach ($refused as $slug) {
             $this->logWarning(sprintf(
-                'Plugin %s declares "%s" customer-grade, but a plugin may vouch only for its own '
-                . 'permissions, never a core or administrative one; customers will not hold it',
+                'Plugin %s declares "%s" customer-grade, but a plugin may vouch only for permissions it '
+                . 'declares under its own name (its slug or slug_*), never a core or administrative one; '
+                . 'customers will not hold it',
                 $pluginKey,
                 $slug
             ));

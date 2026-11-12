@@ -27,6 +27,9 @@ namespace Whity\Sdk;
  *
  * WHAT THE HOST REFUSES (each refused slug is skipped and logged, the rest stay):
  *  - a slug this plugin does not declare in {@see PluginInterface::getPermissions()};
+ *  - a slug outside the plugin's own namespace: the resource must be the
+ *    plugin's slug ({@see PluginNamespace::slug()}) or start with it and `_`,
+ *    as `dlaas_patient` does for a plugin named DLaaS;
  *  - a core permission, or any permission under a core resource (`users`,
  *    `roles`, `settings`, ...), whatever its action;
  *  - a permission another plugin claimed first, or one whose resource another

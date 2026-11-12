@@ -26,7 +26,11 @@ use Whity\Core\RBAC\CorePermissions;
  *  - an active plugin declared it customer-grade and also declares it as one of
  *    its permissions, and it is the plugin that owns that slug (the loader
  *    passes only slugs this plugin claimed);
- *  - it is plain `resource:action` with no wildcard;
+ *  - it is plain `resource:action` with no wildcard, and the resource is in
+ *    the plugin's own namespace: its slug, or its slug followed by `_`
+ *    (`dlaas_patient` for a plugin named DLaaS). A workspace plugin can't use
+ *    that namespace ({@see \Whity\Core\Plugin\Tenant\TenantManifestPolicy}),
+ *    so no workspace plugin can gate its own records with the same slug;
  *  - the resource is not a core resource ({@see CorePermissions}) and not an
  *    administrative one ({@see CustomerSafeRole::isAdminResource()});
  *  - no OTHER registered plugin declares any permission under the same
@@ -51,14 +55,16 @@ final class CustomerGradePermissions
     /**
      * Record a plugin's declaration, replacing any earlier one for the same owner.
      *
-     * @param string       $owner        The loader's identity for the plugin.
-     * @param list<string> $declared     Every permission the plugin declares.
+     * @param string       $owner         The loader's identity for the plugin.
+     * @param string|null  $namespace     The plugin's slug ({@see \Whity\Sdk\PluginNamespace::slug()});
+     *                                    null refuses every customer-grade slug.
+     * @param list<string> $declared      Every permission the plugin declares.
      * @param list<string> $customerSlugs The ones it says are customer-grade,
      *                                    already limited to slugs it owns.
      * @return list<string> The customer-grade slugs refused outright (shape,
-     *                      core or admin resource, not declared), for the log.
+     *                      namespace, core or admin resource, not declared), for the log.
      */
-    public static function declare(string $owner, array $declared, array $customerSlugs): array
+    public static function declare(string $owner, ?string $namespace, array $declared, array $customerSlugs): array
     {
         $resources = [];
         $declaredSet = [];
@@ -73,7 +79,13 @@ final class CustomerGradePermissions
         $accepted = [];
         $refused = [];
         foreach ($customerSlugs as $slug) {
-            if (!isset($declaredSet[$slug]) || self::isCoreOrAdmin($slug)) {
+            $resource = self::resourceOf($slug);
+            if (!isset($declaredSet[$slug])
+                || self::isCoreOrAdmin($slug)
+                || $namespace === null
+                || $resource === null
+                || ($resource !== $namespace && !str_starts_with($resource, $namespace . '_'))
+            ) {
                 $refused[] = $slug;
                 continue;
             }

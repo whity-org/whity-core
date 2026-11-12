@@ -33,8 +33,9 @@ final class PluginCustomerPermissionsTest extends TestCase
         $suffix = bin2hex(random_bytes(4));
         $this->clinic = 'Clinic' . $suffix;
         $this->other = 'Other' . $suffix;
-        $this->a = 'cl' . $suffix;
-        $this->b = 'ot' . $suffix;
+        // A plugin's customer-grade resources must sit in its own namespace.
+        $this->a = strtolower($this->clinic);
+        $this->b = strtolower($this->other);
         $this->dir = sys_get_temp_dir() . '/whity_cgp_' . $suffix;
 
         $this->writePlugin($this->clinic, <<<'PHP'
@@ -52,7 +53,7 @@ final class Plugin implements PluginInterface, PluginCustomerPermissionsInterfac
     public function getRoutes(): array   { return []; }
     public function getPermissions(): array
     {
-        return ['__A___patient:read', '__A___patient:manage', '__A___scan:upload', 'users:write', 'settings:manage'];
+        return ['__A___patient:read', '__A___patient:manage', '__A___scan:upload', 'users:write', 'settings:manage', 'bakery_order:manage'];
     }
     public function getCustomerPermissions(): array
     {
@@ -63,6 +64,7 @@ final class Plugin implements PluginInterface, PluginCustomerPermissionsInterfac
             'settings:manage',        // refused: admin resource
             '__A___undeclared:manage',// refused: not in getPermissions()
             '__B___thing:manage',     // refused: the other plugin's
+            'bakery_order:manage',    // refused: declared, but outside this plugin's namespace
         ];
     }
     public function getHooks(): array      { return []; }
@@ -113,6 +115,7 @@ PHP);
                 'settings:manage',
                 $this->a . '_undeclared:manage',
                 $this->b . '_thing:manage',
+                'bakery_order:manage',
             ] as $refused
         ) {
             self::assertFalse(CustomerGradePermissions::isCustomerGrade($refused), $refused);
@@ -141,6 +144,18 @@ PHP);
 
         $loader->disablePlugin($this->other . '\\Plugin');
         self::assertTrue(CustomerGradePermissions::isCustomerGrade($this->a . '_scan:upload'));
+    }
+
+    public function testReloadingWithoutThePluginWithdrawsIt(): void
+    {
+        $loader = $this->load();
+        self::assertTrue(CustomerGradePermissions::isCustomerGrade($this->a . '_patient:manage'));
+
+        @unlink($this->dir . '/' . $this->clinic . '/Plugin.php');
+        @rmdir($this->dir . '/' . $this->clinic);
+        $loader->reload();
+
+        self::assertFalse(CustomerGradePermissions::isCustomerGrade($this->a . '_patient:manage'));
     }
 
     private function load(): PluginLoader

@@ -347,7 +347,8 @@ final class CustomerSignupRealEngineTest extends TestCase
     public function testACustomerKeepsPluginPermissionsThePluginDeclaresCustomerGrade(): void
     {
         CustomerGradePermissions::declare(
-            'Dlaas\Plugin',
+            'Clinic\Plugin',
+            'clinic',
             ['clinic_patient:read', 'clinic_patient:manage', 'clinic_scan:upload'],
             ['clinic_patient:manage', 'clinic_scan:upload'],
         );
@@ -371,7 +372,7 @@ final class CustomerSignupRealEngineTest extends TestCase
 
         // The plugin is disabled or uninstalled: the permissions stop working
         // for the customer, and the role is no longer offered or accepted.
-        CustomerGradePermissions::remove('Dlaas\Plugin');
+        CustomerGradePermissions::remove('Clinic\Plugin');
         RoleChecker::clearCache();
         $held = $this->roleChecker->getEffectivePermissionsForProfile($profileId, self::TENANT_A);
         self::assertNotContains('clinic_patient:manage', $held);
@@ -384,32 +385,33 @@ final class CustomerSignupRealEngineTest extends TestCase
     public function testCustomerGradeNeverCoversCoreOrAdminResourcesOrUndeclaredPermissions(): void
     {
         $refused = CustomerGradePermissions::declare(
-            'Sneaky\Plugin',
-            ['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_order:manage'],
-            ['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_order:manage', 'shop_item:delete', 'bad slug', 'shop_order:*'],
+            'Shop\Plugin',
+            'shop',
+            ['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_order:manage', 'bakery_order:manage'],
+            ['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_order:manage', 'shop_item:delete', 'bakery_order:manage', 'bad slug', 'shop_order:*'],
         );
         self::assertSame(
-            ['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_item:delete', 'bad slug', 'shop_order:*'],
+            ['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_item:delete', 'bakery_order:manage', 'bad slug', 'shop_order:*'],
             $refused
         );
-        foreach (['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_item:delete'] as $p) {
+        foreach (['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_item:delete', 'bakery_order:manage'] as $p) {
             self::assertTrue(CustomerSafeRole::isPrivilegedPermission($p), $p);
         }
         self::assertFalse(CustomerSafeRole::isPrivilegedPermission('shop_order:manage'));
 
         // A customer given the admin role still gains nothing core from it.
-        $role = $this->makeTenantRole(self::TENANT_A, 'sneaky', [CorePermissions::USERS_WRITE, 'shop_order:manage']);
+        $role = $this->makeTenantRole(self::TENANT_A, 'shoppers with users', [CorePermissions::USERS_WRITE, 'shop_order:manage']);
         self::assertFalse(CustomerSafeRole::make($this->pdo)->isCustomerSafe($role, self::TENANT_A));
     }
 
     public function testAPluginCannotVouchForAResourceAnotherPluginAlsoDeclares(): void
     {
-        CustomerGradePermissions::declare('Dlaas\Plugin', ['clinic_case:review'], ['clinic_case:review']);
+        CustomerGradePermissions::declare('Clinic\Plugin', 'clinic', ['clinic_case:review'], ['clinic_case:review']);
         self::assertFalse(CustomerSafeRole::isPrivilegedPermission('clinic_case:review'));
 
         // Another plugin declares a permission under the same resource: neither
         // of them owns it alone, so the vouch no longer counts, whichever loaded first.
-        CustomerGradePermissions::declare('Other\Plugin', ['clinic_case:delete'], ['clinic_case:review']);
+        CustomerGradePermissions::declare('Other\Plugin', 'other', ['clinic_case:delete'], ['clinic_case:review']);
         self::assertTrue(CustomerSafeRole::isPrivilegedPermission('clinic_case:review'));
         self::assertTrue(CustomerSafeRole::isPrivilegedPermission('clinic_case:delete'));
 

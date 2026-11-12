@@ -19,7 +19,10 @@ use Whity\Sdk\PluginNamespace;
  *   (its records live in the shared record store, WHIT-761), and limits are
  *   the operator's to set, in a catalogue sealed at boot;
  * - no dependencies on other plugins yet;
- * - a name no install-wide plugin uses, so nothing it declares can shadow one;
+ * - a name no install-wide plugin uses, and not one inside an install-wide
+ *   plugin's namespace (`dlaas_patient` while DLaaS is installed), so nothing
+ *   it declares can shadow one; an install-wide plugin's customer-grade
+ *   permissions (#1872) rely on that;
  * - permissions only under its own name (`cake_orders:read` for a plugin
  *   called CakeOrders or cake_orders), so it can't declare a slug core or
  *   another plugin gates something with;
@@ -56,7 +59,11 @@ final class TenantManifestPolicy
 
         $lower = strtolower($name);
         foreach ($installedPluginNames as $installed) {
-            if (strtolower($installed) === $lower || PluginNamespace::slug($installed) === $slug) {
+            $installedSlug = PluginNamespace::slug($installed);
+            if (strtolower($installed) === $lower
+                || $installedSlug === $slug
+                || ($installedSlug !== null && $slug !== null && str_starts_with($slug, $installedSlug . '_'))
+            ) {
                 $errors[] = "plugin.name: \"{$name}\" is taken by a plugin installed for every workspace";
                 break;
             }

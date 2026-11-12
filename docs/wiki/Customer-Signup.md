@@ -115,6 +115,7 @@ What happens then:
 The host refuses, skips and logs:
 
 - a slug the plugin doesn't declare in `getPermissions()`, or one another plugin claimed first;
+- a resource outside the plugin's own namespace. The resource must be the plugin's slug, or start with it and `_`: `dlaas_patient` for a plugin named DLaaS. Workspace plugins can't take a name inside an installed plugin's namespace, so none can reuse these slugs;
 - a core permission, or anything under a core or administration resource (`users`, `roles`, `settings`, `billing`, ...), whatever the action;
 - a resource another active plugin also declares permissions under. A plugin vouches only for resources it alone owns.
 
