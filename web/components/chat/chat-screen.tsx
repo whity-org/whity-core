@@ -110,7 +110,13 @@ export function ChatScreen() {
   }, [chats, filter, query]);
 
   if (listError !== null && chats === null) {
-    return <AreaError message={listError || t('error.generic', 'Something went wrong with Chat. Please try again.')} retryLabel={t('action.retry', 'Try again')} onRetry={() => void loadList()} />;
+    return (
+      <AreaError
+        message={listError || t('error.generic', 'Something went wrong with Chat. Please try again.')}
+        retryLabel={t('action.retry', 'Try again')}
+        onRetry={() => void loadList()}
+      />
+    );
   }
 
   return (
@@ -412,7 +418,11 @@ function OpenChat({
   if (error !== null) {
     return (
       <div className="grid place-items-center p-8 xl:col-span-2">
-        <AreaError message={error || t('error.generic', 'Something went wrong with Chat. Please try again.')} retryLabel={t('action.retry', 'Try again')} onRetry={() => void load()} />
+        <AreaError
+          message={error || t('error.generic', 'Something went wrong with Chat. Please try again.')}
+          retryLabel={t('action.retry', 'Try again')}
+          onRetry={() => void load()}
+        />
       </div>
     );
   }
@@ -650,6 +660,7 @@ function MessageRow({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const author = message.author;
+  const sentAt = time(message.created_at);
   const isAgent = author?.type === 'agent';
   const held = message.status === 'held';
 
@@ -694,7 +705,8 @@ function MessageRow({
                   })}
             </span>
           )}
-          {message.created_at && <time dateTime={message.created_at}>{time(message.created_at)}</time>}
+          {/* null when the workspace hides dates (ui.hide_dates): then no time at all, not even in an attribute */}
+          {sentAt !== null && <time>{sentAt}</time>}
         </div>
         <div className={cn(isAgent && 'border-s-2 border-primary-tint ps-2.5', message.status === 'declined' && 'text-muted-foreground line-through')}>
           {held ? (
