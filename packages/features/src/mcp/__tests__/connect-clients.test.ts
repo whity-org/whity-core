@@ -35,6 +35,13 @@ describe('mcpServerName', () => {
     expect(slug.length).toBeLessThanOrEqual(48)
     expect(slug.endsWith('-')).toBe(false)
   })
+
+  it('handles long runs of separators quickly and the same way', () => {
+    const start = Date.now()
+    expect(mcpServerName('-'.repeat(50_000) + 'a' + '!'.repeat(50_000) + 'x')).toBe('a-x')
+    expect(mcpServerName('--Ops--')).toBe('ops')
+    expect(Date.now() - start).toBeLessThan(1000)
+  })
 })
 
 describe('MCP_CLIENTS', () => {

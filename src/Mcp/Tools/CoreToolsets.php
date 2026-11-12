@@ -84,6 +84,11 @@ final class CoreToolsets
             'titleAr'     => 'النماذج',
             'description' => 'Forms, their fields and their submissions.',
         ],
+        'core.chat' => [
+            'title'       => 'Team chat',
+            'titleAr'     => 'محادثات الفريق',
+            'description' => 'The team chats an agent was added to: read them, write, mention people and share proposals.',
+        ],
         'core.calendar' => [
             'title'       => 'Calendar and bookings',
             'titleAr'     => 'التقويم والحجوزات',
@@ -165,6 +170,7 @@ final class CoreToolsets
         'convening'                => 'core.convening',
         'calendar'                 => 'core.calendar',
         'contacts'                 => 'core.contacts',
+        'chat'                     => 'core.chat',
         'taxonomy'                 => 'core.taxonomy',
         'data-types'               => 'core.taxonomy',
         'time-windows'             => 'core.time',

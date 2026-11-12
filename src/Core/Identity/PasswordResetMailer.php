@@ -56,12 +56,15 @@ final class PasswordResetMailer
             new EmailContent(
                 heading: 'Reset your password',
                 paragraphs: [
-                    'We received a request to reset the password for your account.',
-                    'This link expires in 1 hour. If you did not request this, you can safely ignore this message — your password will not change.',
+                    'Someone asked to reset the password for ' . $email . '. If it was you:',
                 ],
-                ctaLabel: 'Reset password',
+                ctaLabel: 'Choose a new password',
                 ctaUrl: $link,
-                footnote: "If you didn't request this, no action is needed.",
+                callout: 'Ignore this email; your password stays the same. Nobody can reset it without this link.',
+                footnote: 'The link works for 1 hour and only once.',
+                preheader: 'The link works for 1 hour.',
+                calloutLead: "Wasn't you?",
+                notice: 'Sent to ' . $email . '.',
             ),
             EmailBranding::fromSettings($this->settings),
         );
@@ -100,6 +103,7 @@ final class PasswordResetMailer
                     'There is no need to request another reset: a new request will not reach an administrator any sooner, and the one you already made is still in the queue.',
                 ],
                 footnote: "If you didn't request this, contact an administrator.",
+                notice: 'Sent to ' . $email . '.',
             ),
             EmailBranding::fromSettings($this->settings),
         );
@@ -125,6 +129,7 @@ final class PasswordResetMailer
                     'An administrator approved your pending password-reset request. Your new password is now active — you can sign in with it.',
                     "If you didn't request this, contact an administrator immediately.",
                 ],
+                notice: "Security emails can't be turned off. Sent to " . $email . '.',
             ),
             EmailBranding::fromSettings($this->settings),
         );

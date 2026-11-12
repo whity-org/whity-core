@@ -494,6 +494,13 @@ final class CorePermissions
     public const CONTACTS_READ = 'contacts:read';
     public const CONTACTS_WRITE = 'contacts:write';
     public const CONTACTS_IMPORT = 'contacts:import';
+    // TASKS on Taskaat (A10, T.3). Tasks and boards live in the workspace's
+    // Taskaat; these gate Whity's way into them. Read and write go to every
+    // staff role (anchor documents:read); manage (connecting the workspace to
+    // Taskaat) to the roles that run the workspace.
+    public const TASKS_READ = 'tasks:read';
+    public const TASKS_WRITE = 'tasks:write';
+    public const TASKS_MANAGE = 'tasks:manage';
 
     /**
      * Return the full list of core permission strings.
@@ -601,6 +608,9 @@ final class CorePermissions
             self::CONTACTS_READ,
             self::CONTACTS_WRITE,
             self::CONTACTS_IMPORT,
+            self::TASKS_READ,
+            self::TASKS_WRITE,
+            self::TASKS_MANAGE,
         ];
     }
 }

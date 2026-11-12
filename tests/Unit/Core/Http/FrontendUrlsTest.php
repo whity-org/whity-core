@@ -30,6 +30,7 @@ final class FrontendUrlsTest extends TestCase
             'public form' => [FrontendUrls::PUBLIC_FORM, '/f'],
             'document verify' => [FrontendUrls::DOCUMENT_VERIFY, '/verify'],
             'error details' => [FrontendUrls::ERROR_DETAILS, '/admin/errors'],
+            'taskaat connect' => [FrontendUrls::TASKAAT_CONNECT, '/tasks/connect'],
         ];
     }
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.98).
+ * SDK identity (v1.99).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1222,12 +1222,19 @@ namespace Whity\Sdk;
  * events carry ids only (WHIT-943).
  *
  * Purely additive.)
+ *
+ * 1.99 (CUSTOMER MESSAGES: the host service {@see Messaging\CustomerMessages} lets a plugin
+ * tell one of the workspace's customers something through Messages, trying channels in the
+ * plugin's order (`whatsapp` matches an installed WhatsApp channel, then `email`), in the
+ * customer's own conversation and marked as sent by the plugin (WHIT-967).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.98.0';
+    public const VERSION = '1.99.0';
 
     /**
      * Static identity only — never instantiated.

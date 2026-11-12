@@ -158,6 +158,9 @@ final class CorePermissionDescriptions
         CorePermissions::CONTACTS_READ                => 'See customers and suppliers, their tags and details',
         CorePermissions::CONTACTS_WRITE               => 'Add and change customers and suppliers, and their tags',
         CorePermissions::CONTACTS_IMPORT              => 'Import customers and suppliers from a spreadsheet, and undo an import',
+        CorePermissions::TASKS_READ                   => 'See tasks and boards in the workspace\'s Taskaat',
+        CorePermissions::TASKS_WRITE                  => 'Create and change tasks in the workspace\'s Taskaat: checks, evidence and reviews',
+        CorePermissions::TASKS_MANAGE                 => 'Connect the workspace to Taskaat, or disconnect it',
         CorePermissions::CONVENING_DECIDE             => 'Record a body\'s decision on an agenda item — the act that can approve or reject a ',
         ];
     }
