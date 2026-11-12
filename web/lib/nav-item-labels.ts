@@ -42,6 +42,7 @@ export function useNavItemLabels(): Record<string, string> {
       'document-library': t('sidebar.item.documentLibrary', 'Documents'),
       'document-templates': t('sidebar.item.documentTemplates', 'Document templates'),
       'document-sources': t('sidebar.item.documentSources', 'Notes and wiki'),
+      'saved-blocks': t('sidebar.item.savedBlocks', 'Saved blocks'),
       'approval-gating': t('sidebar.item.approvalGating', 'Approval Gating'),
       'my-agents': t('sidebar.item.myAgents', 'Agents'),
       agents: t('sidebar.item.agents', 'Agents'),

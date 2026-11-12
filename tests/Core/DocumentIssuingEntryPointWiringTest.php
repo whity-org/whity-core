@@ -93,9 +93,9 @@ final class DocumentIssuingEntryPointWiringTest extends TestCase
     {
         foreach (self::ENTRY_POINTS as $relative) {
             self::assertMatchesRegularExpression(
-                '/\$pluginLoader->setDocumentRegistries\(\$templateSlotRegistry, \$documentFieldRegistry\);\s*\$pluginLoader->load\(\);/',
+                '/\$pluginLoader->setDocumentRegistries\(\$templateSlotRegistry, \$documentFieldRegistry, \$documentBlockRegistry\);\s*\$pluginLoader->load\(\);/',
                 $this->read($relative),
-                "{$relative} must hand the loader the slot and field registries before load(), or code plugins' slots never register there."
+                "{$relative} must hand the loader the slot, field and block registries before load(), or code plugins' slots and blocks (SDK 1.103) never register there."
             );
         }
     }

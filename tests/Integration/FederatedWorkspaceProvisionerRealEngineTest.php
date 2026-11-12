@@ -156,4 +156,50 @@ final class FederatedWorkspaceProvisionerRealEngineTest extends TestCase
             $this->pdo->rollBack();
         }
     }
+
+    // ── the "Create your workspace" step (WHIT-994) ─────────────────────────
+
+    public function testStateForPicksTheScreenFromTheSameGates(): void
+    {
+        $fresh = $this->profile('Amro Saleh', 'amro@example.test');
+        $banned = $this->profile('Banned', 'banned@example.test', 'inactive');
+        $invited = $this->profile('Invitee', 'invitee@example.test');
+        $this->pdo->exec("INSERT INTO tenants (name, slug, created_at) VALUES ('Acme', 'acme', NOW())");
+        $acme = (int) $this->pdo->lastInsertId();
+        $roles = $this->pdo->query('SELECT id FROM roles ORDER BY id ASC LIMIT 1');
+        self::assertNotFalse($roles);
+        $roleId = (int) $roles->fetchColumn();
+        $this->pdo->prepare("INSERT INTO memberships (profile_id, tenant_id, role_id, ou_id, status, created_at)
+            VALUES (:p, :t, :r, NULL, 'invited', NOW())")->execute([':p' => $invited, ':t' => $acme, ':r' => $roleId]);
+        $tenantIdp = new FederatedProviderContext(9, 'acme', $acme);
+
+        self::assertSame(FederatedWorkspaceProvisioner::STATE_CREATE, $this->provisioner->stateFor($fresh, self::global()));
+        self::assertTrue($this->provisioner->mayOffer($fresh, self::global()));
+        self::assertSame(FederatedWorkspaceProvisioner::STATE_REFUSED, $this->provisioner->stateFor($fresh, $tenantIdp));
+        self::assertFalse($this->provisioner->mayOffer($fresh, $tenantIdp));
+        self::assertSame(FederatedWorkspaceProvisioner::STATE_REFUSED, $this->provisioner->stateFor($banned, self::global()));
+        self::assertSame(FederatedWorkspaceProvisioner::STATE_REFUSED, $this->provisioner->stateFor(999999, self::global()));
+        self::assertSame(FederatedWorkspaceProvisioner::STATE_WAITING, $this->provisioner->stateFor($invited, self::global()));
+        self::assertSame([['name' => 'Acme', 'status' => 'invited']], $this->provisioner->waitingWorkspaces($invited));
+
+        $this->settings->setGlobal(SettingsRegistry::SSO_SELF_PROVISION_WORKSPACE, 'false');
+        self::assertSame(FederatedWorkspaceProvisioner::STATE_NEEDS_INVITE, $this->provisioner->stateFor($fresh, self::global()));
+        self::assertFalse($this->provisioner->mayOffer($fresh, self::global()));
+    }
+
+    public function testTheNameTheyChoseIsUsedAndCleaned(): void
+    {
+        $pid = $this->profile('Amro Saleh', 'amro@example.test');
+
+        $tenant = $this->tenantOf((int) $this->provisioner->provisionFor($pid, 'amro@example.test', self::global(), "Example\u{202E} Bakery"));
+
+        self::assertSame('Example Bakery', $tenant['name']);
+        self::assertMatchesRegularExpression('/^ws-[0-9a-f]{12}$/', $tenant['slug']);
+    }
+
+    public function testTheSuggestedNameIsTheirDisplayNameNeverTheirEmail(): void
+    {
+        self::assertSame('Amro Saleh', $this->provisioner->suggestedName($this->profile("Amro\u{200F} Saleh", 'amro@example.test')));
+        self::assertSame('', $this->provisioner->suggestedName($this->profile('', 'john.doe@example.test')));
+    }
 }

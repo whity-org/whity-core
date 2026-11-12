@@ -47,8 +47,23 @@ const TERMS: SavedBlock = {
   usedIn: 0,
 }
 
+const SIGN: SavedBlock = {
+  ...BANK,
+  id: "7",
+  name: "Signature line",
+  blocks: [
+    {
+      id: "g1",
+      type: "paragraph",
+      content: [t("Signed by "), { type: "text", text: "Amro Saleh", marks: [{ type: "perDocument" }] }, t(" on "), { type: "text", text: "12 November 2026", marks: [{ type: "perDocument" }] }],
+    },
+  ],
+  perDocumentKeys: ["g1#0", "g1#1"],
+  usedIn: 4,
+}
+
 const SERVICES: EditorServices = {
-  savedBlocks: [BANK, TERMS],
+  savedBlocks: [BANK, TERMS, SIGN],
   saveBlock: async (b) => ({ ...b, id: "9", owner: BANK.owner, version: 1, usedIn: 0 }),
   canShareSavedBlocks: true,
 }
@@ -60,6 +75,7 @@ const DOC: WhityDocument = {
     { id: "p1", type: "paragraph", content: [t("Thank you for your order from Example Bakery. Please transfer the amount due to:")] },
     { id: "r1", type: "savedBlock", savedBlockId: "5", version: 3, overrides: {} },
     { id: "p2", type: "paragraph", content: [t("Questions? Reply to this letter or call us.")] },
+    { id: "r2", type: "savedBlock", savedBlockId: "7", version: 1, overrides: { "g1#0": [t("Awss Haddad")] } },
   ],
 }
 

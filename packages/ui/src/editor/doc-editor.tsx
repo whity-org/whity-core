@@ -20,7 +20,7 @@ import { BlockList } from "./block-list"
 import { AgentPanel, type AgentAskStart } from "./agent-panel"
 import type { EditorAgents } from "./agents"
 import { SelectionBubble } from "./bubble"
-import { applyItem, filterCatalogue, savedBlockItems } from "./catalogue"
+import { applyItem, filterCatalogue, pluginBlockItems, savedBlockItems } from "./catalogue"
 import type { Actor, DocumentKind, EditorMode, PublishBlocker, ResolvedThemeTokens, WhityDocument } from "./contract"
 import { fromEditorContent, toEditorContent } from "./convert"
 import { DocumentBehaviour } from "./behaviour"
@@ -152,6 +152,12 @@ export interface DocEditorProps {
    * request over MCP; what it writes arrives as suggestions through `collab`.
    */
   agents?: EditorAgents
+  /**
+   * M7, E.23: this is a saved block's original. The selection bubble offers
+   * "Filled per document", marking text each document using the synced
+   * block fills itself.
+   */
+  perDocumentParts?: boolean
   className?: string
 }
 
@@ -230,6 +236,7 @@ function DocEditor({
   onPrintLabels,
   collab,
   agents,
+  perDocumentParts = false,
   className,
 }: DocEditorProps) {
   const labels = React.useMemo(() => ({ ...EDITOR_LABELS, ...labelProp }), [labelProp])
@@ -692,7 +699,14 @@ function DocEditor({
     }
   }, [editor, relative])
 
-  const savedItems = React.useMemo(() => savedBlockItems(services.savedBlocks), [services.savedBlocks])
+  // Saved blocks (E.21), then each plugin's blocks for this kind of document (E.18, E.20).
+  const savedItems = React.useMemo(
+    () => [
+      ...savedBlockItems(services.savedBlocks),
+      ...pluginBlockItems(services.pluginBlocks, doc.kind, services.language ?? (doc.lang === "ar" ? "ar" : "en")),
+    ],
+    [services.savedBlocks, services.pluginBlocks, services.language, doc.kind, doc.lang]
+  )
   const slashItems = React.useMemo(() => filterCatalogue(slash.query, labels, EDITOR_LABELS, savedItems), [slash.query, labels, savedItems])
   React.useEffect(() => setSlashActive(0), [slash.query, slash.open])
   const pickSlash = React.useCallback(
@@ -1113,6 +1127,7 @@ function DocEditor({
                       onLink={() => openLink()}
                       onComment={showCollab && canComment ? startComment : undefined}
                       onRewrite={canAskAgent ? rewriteWithAgent : undefined}
+                      perDocument={perDocumentParts}
                     />
                   </>
                 )}

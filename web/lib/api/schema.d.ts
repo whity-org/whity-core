@@ -805,6 +805,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/sso/workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which "no workspace yet" screen a pending SSO sign-in gets */
+        get: operations["get_api_v1_auth_sso_workspace"];
+        put?: never;
+        /** Create the pending SSO sign-in's own workspace and sign in to it */
+        post: operations["post_api_v1_auth_sso_workspace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/switch-tenant": {
         parameters: {
             query?: never;
@@ -2522,6 +2540,26 @@ export interface paths {
          * @description Allowing it lets the plugin's jobs issue numbered, QR-verified documents from its own slots with nobody present, recorded with no person and the system as the actor.
          */
         put: operations["put_api_v1_document_background_issuing_plugin"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the blocks the workspace's plugins add to the document editor
+         * @description One entry per plugin (editor M7, E.17-E.20; SDK 1.103): its name, whether it carries Whity's Verified mark, and its blocks. Each block is a declaration Whity's own renderer draws: its fields, a view and an optional print view in the screen vocabulary's display blocks, and the kinds of document it may go in (without a print view, notes and wiki pages only). `off` lists the workspace's plugins that are installed but switched off; `canEnable` says whether the caller may switch them on.
+         */
+        get: operations["get_api_v1_document_blocks"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -12098,6 +12136,50 @@ export interface components {
             /** @description true lets the plugin issue from its own slots with no person, with only the permissions it declares; false stops it */
             allowed: boolean;
         };
+        DocumentBlockDefinition: {
+            /** @description `<plugin>/<block>` */
+            name: string;
+            /** @description The block's name within its plugin; a document's plugin block names it */
+            blockType: string;
+            label: components["schemas"]["LocalizedLabel"];
+            description: components["schemas"]["LocalizedLabel"] | null;
+            /** @description A Whity icon name */
+            icon: string;
+            keywords: string[];
+            /** @description The Edit form: {key, label, type (text, longText, number, date, select), required?, options?} */
+            fields: {
+                [key: string]: unknown;
+            }[];
+            /** @description Display blocks of the screen vocabulary, naming fields as {{data.key}} */
+            view: {
+                [key: string]: unknown;
+            }[];
+            /** @description What Whity Render prints; null means notes and wiki pages only (E.18) */
+            print: {
+                [key: string]: unknown;
+            }[] | null;
+            allowedIn: ("note" | "wiki" | "template" | "letter" | "report" | "label")[];
+        };
+        DocumentBlockPlugin: {
+            plugin: string;
+            label: components["schemas"]["LocalizedLabel"];
+            /** @description Whity's Verified mark, from Whity's marks only */
+            verified: boolean;
+            firstParty: boolean;
+            blocks: components["schemas"]["DocumentBlockDefinition"][];
+        };
+        DocumentBlocksResponse: {
+            data: {
+                plugins: components["schemas"]["DocumentBlockPlugin"][];
+                /** @description Installed here but switched off (E.19) */
+                off: {
+                    plugin: string;
+                    label: components["schemas"]["LocalizedLabel"];
+                }[];
+                /** @description The caller holds plugins:enable */
+                canEnable: boolean;
+            };
+        };
         DocumentChangesResponse: {
             data: {
                 /** @description Send it back as since on the next poll; opaque */
@@ -16921,6 +17003,23 @@ export interface components {
         };
         SsoProviderListResponse: {
             data: components["schemas"]["SsoProvider"][];
+        };
+        SsoWorkspaceCreateRequest: {
+            name: string;
+            locale?: string;
+            main_color?: string;
+        };
+        SsoWorkspaceSetupResponse: {
+            data: {
+                /** @enum {string} */
+                state: "create" | "waiting" | "needs_invite";
+                email: string;
+                suggested_name?: string;
+                workspaces?: {
+                    name: string;
+                    status: string;
+                }[];
+            };
         };
         StorageConfig: {
             id: number;
@@ -22088,6 +22187,158 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_auth_sso_workspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Create, waiting or needs_invite, with the address signed in with */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SsoWorkspaceSetupResponse"];
+                };
+            };
+            /** @description No pending sign-in, or it expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_auth_sso_workspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SsoWorkspaceCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Session issued for the new workspace */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionUserResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No pending sign-in, or it expired */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This sign-in may no longer create a workspace */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Name missing or too long, or an invalid language or colour */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Could not be created right now; nothing was created */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -31378,6 +31629,80 @@ export interface operations {
             };
             /** @description allowed is not a boolean, or the system tenant */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_document_blocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plugin blocks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentBlocksResponse"];
+                };
+            };
+            /** @description Tenant context is required */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
