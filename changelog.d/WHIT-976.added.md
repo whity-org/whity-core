@@ -1,0 +1,1 @@
+- **Tasks page.** A new Tasks item in the sidebar shows whether the workspace is connected to Taskaat, connects it with Taskaat's own sign-in or disconnects it (for people who manage tasks), and opens Taskaat. The task list and board come next (WHIT-976).

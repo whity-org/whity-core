@@ -753,6 +753,27 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CALENDAR_READ,
     ];
     $items[] = [
+        'id' => 'tasks',
+        'label' => 'Tasks',
+        'href' => '/tasks',
+        'icon' => 'list-todo',
+        'group' => 'overview',
+        // After Calendar (6) and Messages (7, 8): tasks and boards on Taskaat (A10, WHIT-962).
+        'order' => 11,
+        // Mirrors GET /api/taskaat/connection.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::TASKS_READ,
+    ];
+    $items[] = [
+        'id' => 'boards',
+        'label' => 'Boards',
+        'href' => '/boards',
+        'icon' => 'columns',
+        'group' => 'overview',
+        // Right after Tasks: the same tasks as columns (T.2).
+        'order' => 12,
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::TASKS_READ,
+    ];
+    $items[] = [
         'id' => 'contacts',
         'label' => 'Contacts',
         'href' => '/contacts',
@@ -1768,6 +1789,16 @@ $emailNotifications->subscribe($hookManager);
 $brandedEmailSender = new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService, $logger);
 // SDK 1.99 (WHIT-978): plugins send as the workspace through the same sender.
 \Whity\register_service(\Whity\Sdk\Mail\WorkspaceEmails::class, new \Whity\Core\Mail\SdkWorkspaceEmails($brandedEmailSender)); // @phpstan-ignore-line
+// SDK 1.102 (WHIT-985): Whity's own billing emails to a workspace's payers, only from a plugin
+// the operator granted (plugins.billing_email_senders), a few a day per workspace at most.
+\Whity\register_service(\Whity\Sdk\Mail\BillingEmails::class, new \Whity\Core\Mail\SdkBillingEmails( // @phpstan-ignore-line
+    $brandedEmailSender,
+    new \Whity\Core\Mail\WorkspaceRecipients($db->getPdo(), $roleChecker),
+    $settingsService,
+    new DatabaseSharedStore($db->getPdo()),
+    $frontendUrls->base(),
+    $logger,
+));
 $accountSecurityMailer = new \Whity\Core\Mail\AccountSecurityMailer(
     $brandedEmailSender,
     $profileEmailRepository,
@@ -5965,15 +5996,28 @@ $taskaatConnection = new \Whity\Core\Taskaat\TaskaatConnection(
     static fn (string $url, array $params): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postForm($url, $params),
     static fn (string $url, array $payload): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postJson($url, $payload),
 );
-$taskaatTools = new \Whity\Core\Taskaat\TaskaatTools(new \Whity\Core\Taskaat\TaskaatClient(
+$taskaatClient = new \Whity\Core\Taskaat\TaskaatClient(
     $taskaatConnection,
     static fn (string $url, array $payload, array $headers): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 30, maxBytes: 4194304))->postJson($url, $payload, $headers),
-));
+);
+$taskaatTools = new \Whity\Core\Taskaat\TaskaatTools($taskaatClient);
 $taskaatHandler = new \Whity\Api\TaskaatApiHandler($taskaatConnection, $auditLogger);
 $router->register('GET',    '/api/taskaat/connection',       [$taskaatHandler, 'status'],     null, null, CorePermissions::TASKS_READ);
 $router->register('POST',   '/api/taskaat/connect',          [$taskaatHandler, 'connect'],    null, null, CorePermissions::TASKS_MANAGE);
 $router->register('POST',   '/api/taskaat/connect/complete', [$taskaatHandler, 'complete'],   null, null, CorePermissions::TASKS_MANAGE);
 $router->register('DELETE', '/api/taskaat/connection',       [$taskaatHandler, 'disconnect'], null, null, CorePermissions::TASKS_MANAGE);
+// Tasks and Boards read and written through Taskaat's record tools (TplTasks, TplBoard).
+$tasksHandler = new \Whity\Api\TasksApiHandler(
+    $taskaatClient,
+    new \Whity\Core\Taskaat\TaskPeople($db->getPdo(), new \Whity\Core\Agent\AgentRepository($db->getPdo())),
+);
+$router->register('GET',   '/api/tasks/boards',         [$tasksHandler, 'boards'], null, null, CorePermissions::TASKS_READ);
+$router->register('GET',   '/api/tasks/boards/{board}', [$tasksHandler, 'board'],  null, null, CorePermissions::TASKS_READ);
+$router->register('GET',   '/api/tasks',                [$tasksHandler, 'list'],   null, null, CorePermissions::TASKS_READ);
+$router->register('POST',  '/api/tasks',                [$tasksHandler, 'create'], null, null, CorePermissions::TASKS_WRITE);
+$router->register('GET',   '/api/tasks/{task}',         [$tasksHandler, 'show'],   null, null, CorePermissions::TASKS_READ);
+$router->register('PATCH', '/api/tasks/{task}',         [$tasksHandler, 'update'], null, null, CorePermissions::TASKS_WRITE);
+$router->register('POST',  '/api/tasks/{task}/review',  [$tasksHandler, 'review'], null, null, CorePermissions::TASKS_WRITE);
 // WHIT-754: the plugin MCP tools a workspace turned on as always-on.
 $mcpEnabledPluginAlwaysOn = static function (int $tenantId) use ($settingsService): array {
     $raw = (string) ($settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::MCP_ALWAYS_ON_PLUGIN_TOOLS] ?? '');
