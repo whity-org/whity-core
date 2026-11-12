@@ -420,7 +420,7 @@ export default function CustomerSignupSettingsPage() {
                     <p className="text-sm text-muted-foreground">
                       {t(
                         'settings.customerSignup.invites.hint',
-                        'A customer can invite colleagues by email. They join with the same role as the customer who invited them, as customers, and never as staff. Invitations are sent by email, so this needs email set up for this instance.'
+                        'A customer can invite colleagues by email. They join with the same role as the customer who invited them, as customers, and never as staff. They join without waiting for approval, even when sign-up is off. Invitations are sent by email, so this needs email set up for this instance.'
                       )}
                     </p>
                   </div>

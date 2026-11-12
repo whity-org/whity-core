@@ -11,7 +11,10 @@ use Tests\Support\SchemaFromMigrations;
 use Whity\Api\TeamInvitationsApiHandler;
 use Whity\Api\WorkspaceSignupApiHandler;
 use Whity\Auth\RoleChecker;
+use Whity\Core\Audit\Actor;
+use Whity\Core\Audit\AuditContext;
 use Whity\Core\Audit\AuditLogger;
+use Whity\Core\Http\AfterResponse;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\CustomerSafeRole;
 use Whity\Core\Identity\InvitationMailer;
@@ -130,6 +133,8 @@ final class TeamInvitationsRealEngineTest extends TestCase
 
     protected function tearDown(): void
     {
+        AfterResponse::reset();
+        AuditContext::reset();
         RoleChecker::clearCache();
         TenantContext::reset();
     }
@@ -161,6 +166,12 @@ final class TeamInvitationsRealEngineTest extends TestCase
         self::assertSame(403, $res->getStatusCode());
         self::assertSame('not_a_customer', $this->decode($res)['details']['code']);
         self::assertSame(403, $this->invite(self::ADMIN, 'someone@example.test')->getStatusCode());
+
+        // An agent acting for a customer is not the customer.
+        AuditContext::setActor(Actor::agent('agent-1', self::CLINIC_OWNER));
+        $agent = $this->invite(self::CLINIC_OWNER, 'someone@example.test');
+        self::assertSame(403, $agent->getStatusCode());
+        self::assertSame('people_only', $this->decode($agent)['details']['code']);
     }
 
     public function testACustomerInvitesIntoTheirOwnRoleAsACustomer(): void
@@ -244,7 +255,7 @@ final class TeamInvitationsRealEngineTest extends TestCase
         $this->invite(self::CLINIC_OWNER, 'their-dentist@example.test');
         self::assertSame(
             [self::OTHER_CUSTOMER],
-            array_map('intval', $this->q("SELECT invited_by FROM invitations WHERE email = 'their-dentist@example.test'")->fetchAll(PDO::FETCH_COLUMN))
+            array_map('intval', $this->q("SELECT invited_by FROM invitations WHERE email = 'their-dentist@example.test' AND status = 'pending'")->fetchAll(PDO::FETCH_COLUMN))
         );
 
         // Somebody the sign-up turned away stays out.
@@ -257,8 +268,44 @@ final class TeamInvitationsRealEngineTest extends TestCase
         // Only the other customer's invitation went out.
         self::assertSame(['their-dentist@example.test'], array_column($this->sent, 'to'));
         self::assertSame(0, (int) $this->q(
-            "SELECT COUNT(*) FROM invitations WHERE email IN ('staff@example.test', 'turned-away@example.test')"
+            "SELECT COUNT(*) FROM invitations WHERE email IN ('staff@example.test', 'turned-away@example.test') AND status <> 'not_sent'"
         )->fetchColumn());
+
+        // And the inviter's own list looks the same for every one of them.
+        $this->invite(self::CLINIC_OWNER, 'brand-new@example.test');
+        $mine = $this->decode($this->list(self::CLINIC_OWNER))['data']['items'];
+        self::assertCount(5, $mine);
+        self::assertSame(['pending'], array_values(array_unique(array_column($mine, 'status'))));
+
+        // Staff don't see the ones that were not sent.
+        self::assertNotContains('staff@example.test', array_column($this->invitations->listForTenant(self::A), 'email'));
+    }
+
+    public function testALinkStopsWorkingWhenInvitesAreTurnedOffOrTheInviterIsSuspended(): void
+    {
+        $this->turnOn();
+        $this->invite(self::CLINIC_OWNER, 'first@example.test');
+        $this->invite(self::OTHER_CUSTOMER, 'second@example.test');
+
+        $this->admin->updateSettings($this->authed(self::A, self::ADMIN, 'PUT', '/api/signup/settings', ['customer_invites' => false]));
+        self::assertSame(InvitationService::ACCEPT_INVALID, $this->invitations->accept($this->token(0), password_hash('a-long-password', PASSWORD_BCRYPT))['result']);
+
+        $this->turnOn();
+        $this->q("UPDATE memberships SET status = 'suspended' WHERE profile_id = " . self::OTHER_CUSTOMER);
+        self::assertSame(InvitationService::ACCEPT_INVALID, $this->invitations->accept($this->token(1), password_hash('a-long-password', PASSWORD_BCRYPT))['result']);
+
+        // Turned back on, the first link works again: it was never used.
+        self::assertSame(InvitationService::ACCEPT_JOINED, $this->invitations->accept($this->token(0), password_hash('a-long-password', PASSWORD_BCRYPT))['result']);
+    }
+
+    public function testAnotherWorkspacesInvitationIsOutOfReach(): void
+    {
+        $this->turnOn();
+        $foreign = $this->invitations->invite(self::B, 'b-person@example.test', $this->customerRole, null, null);
+        $res = $this->team->revoke($this->authed(self::B, self::CLINIC_OWNER, 'DELETE', '/api/team-invitations/' . $foreign['id']), ['id' => $foreign['id']]);
+        self::assertSame(403, $res->getStatusCode(), 'not a customer in B');
+        self::assertSame(404, $this->revoke(self::CLINIC_OWNER, $foreign['id'])->getStatusCode());
+        self::assertSame('pending', $this->q('SELECT status FROM invitations WHERE id = ' . $foreign['id'])->fetchColumn());
     }
 
     public function testACustomerInvitationNeverCompletesAMembershipAnAdminStaged(): void
@@ -330,7 +377,11 @@ final class TeamInvitationsRealEngineTest extends TestCase
     /** @param array<string, mixed> $extra */
     private function invite(int $actor, string $email, array $extra = []): Response
     {
-        return $this->team->create($this->authed(self::A, $actor, 'POST', '/api/team-invitations', ['email' => $email] + $extra));
+        $response = $this->team->create($this->authed(self::A, $actor, 'POST', '/api/team-invitations', ['email' => $email] + $extra));
+        // The entry point sends deferred mail once the response is out.
+        AfterResponse::run(false);
+
+        return $response;
     }
 
     private function list(int $actor): Response

@@ -10,6 +10,7 @@ use Whity\Core\Audit\Actor;
 use Whity\Core\Audit\AuditContext;
 use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Hooks\HookManager;
+use Whity\Core\Http\AfterResponse;
 use Whity\Core\Identity\CustomerSafeRole;
 use Whity\Core\Identity\InvitationMailer;
 use Whity\Core\Identity\InvitationService;
@@ -51,7 +52,9 @@ use Whity\Sdk\Hooks\HookVetoException;
  * returns is ignored.
  *
  * LIMITS. Per inviter and per workspace, counted before any work. The email
- * needs the instance's mail transport; without one nothing is delivered.
+ * needs the instance's mail transport; without one nothing is delivered. It
+ * is sent after the response ({@see AfterResponse}), so the time taken
+ * doesn't tell a sent invitation from one that wasn't.
  */
 final class TeamInvitationsApiHandler
 {
@@ -150,6 +153,8 @@ final class TeamInvitationsApiHandler
                 ]);
                 $annotations = $this->annotations($result['annotations'] ?? []);
             } catch (HookVetoException $e) {
+                // A plugin's reason is shown as-is; the SDK docs ask plugins
+                // never to refuse in a way that says who is already here.
                 return Response::error($e->reason(), 409, ['code' => 'invite_refused', 'reason' => $e->reason()]);
             }
         }
@@ -331,19 +336,28 @@ final class TeamInvitationsApiHandler
         return preg_match('/^\d+$/', $raw) === 1 ? (int) $raw : InvitationService::DEFAULT_TTL_DAYS;
     }
 
-    /** Delivery failures never change the response. */
+    /**
+     * Sent after the response, so how long the request took says nothing
+     * about whether an invitation went out. Delivery failures never change
+     * the response.
+     */
     private function dispatchMail(string $email, int $tenantId, string $token, int $ttlDays): void
     {
-        if ($this->mailer === null || $token === '') {
+        $mailer = $this->mailer;
+        if ($mailer === null || $token === '') {
             return;
         }
 
-        try {
-            $stmt = $this->db->prepare('SELECT name FROM tenants WHERE id = :id');
-            $stmt->execute([':id' => $tenantId]);
-            $this->mailer->sendInvitation($email, (string) ($stmt->fetchColumn() ?: ''), $token, $ttlDays);
-        } catch (\Throwable $e) {
-            error_log('[team-invitations] mail dispatch failed: ' . $e->getMessage());
-        }
+        $stmt = $this->db->prepare('SELECT name FROM tenants WHERE id = :id');
+        $stmt->execute([':id' => $tenantId]);
+        $workspace = (string) ($stmt->fetchColumn() ?: '');
+
+        AfterResponse::defer(static function () use ($mailer, $email, $workspace, $token, $ttlDays): void {
+            try {
+                $mailer->sendInvitation($email, $workspace, $token, $ttlDays);
+            } catch (\Throwable $e) {
+                error_log('[team-invitations] mail dispatch failed: ' . $e->getMessage());
+            }
+        });
     }
 }

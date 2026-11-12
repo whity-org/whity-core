@@ -44,8 +44,10 @@ Settings → Sign-up has a switch, **Customers can invite their team**. It is of
 
 - **Into what.** The colleague joins in the inviter's own role, as a customer. Nobody can choose a different role, a unit or staff. If the inviter's role has since gained an admin permission, or they hold more than one role here, they can't invite (409 `role_not_customer_safe`).
 - **Who.** People only, never an agent acting for them, and never staff: staff invite from People.
-- **Nothing is revealed.** Every address the workspace's domain list allows gets the same answer (202). Nothing is sent when the address already has a membership here, was turned away from sign-up, or has an invitation someone else sent. A customer's invitation never replaces an admin's or another customer's, and never completes a membership an admin staged.
+- **Nothing is revealed.** Every address the workspace's domain list allows gets the same answer (202), the email is sent after the answer so timing doesn't tell either, and the inviter's own list shows every address they tried as pending. Nothing is sent when the address already has a membership here, was turned away from sign-up, or has an invitation someone else sent. A customer's invitation never replaces an admin's or another customer's, and never completes a membership an admin staged.
 - **The domain list** in Sign-up settings applies to invitations too.
+- **No approval queue.** Invited people join when they accept, even when sign-up is Off or Approval required. The switch is separate from the sign-up mode.
+- **Links stop working** when an admin turns the switch off, suspends or removes the inviter, or gives the inviter's role an admin permission. A link that wasn't used works again if things are put back.
 - **Limits.** 10 an hour and 30 a day per customer, 100 an hour per workspace.
 - **Audit.** Each invitation is recorded with the inviter as the actor (`tenant.invitation.created`, `kind: customer`). Staff see customer invitations in People → Invitations with `kind: customer` and who sent them, and can withdraw them there.
 - **Email.** Invitations are emailed, so they need the instance's mail transport and the Invitation email turned on (Settings → Email). Without it nothing reaches the colleague.

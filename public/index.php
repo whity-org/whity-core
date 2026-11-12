@@ -6601,6 +6601,9 @@ if ($isWorker) {
 
                 // Send response to client
                 $response->send();
+                // #1872: work deferred until the client has its answer (a customer
+                // team invitation's email). A no-op when nothing was deferred.
+                \Whity\Core\Http\AfterResponse::run();
             } catch (\Throwable $e) {
                 // Handle any uncaught exceptions
                 try {
@@ -6648,6 +6651,8 @@ if ($isWorker) {
                 // stay live. Scope the cache to the request instead; it still
                 // de-duplicates the repeated resolutions within a single one.
                 RoleChecker::clearCache();
+                // Nothing deferred by a request that failed may leak into the next.
+                \Whity\Core\Http\AfterResponse::reset();
                 // WHIT-760: the workspace-plugin reads are per request too.
                 $tenantManifestHost->resetRequest();
                 // WHIT-742: and the workspace record types the field registry read from them.
@@ -6750,6 +6755,7 @@ if ($isWorker) {
 
         // Send response to client
         $response->send();
+        \Whity\Core\Http\AfterResponse::run();
     } catch (\Throwable $e) {
         // Handle any uncaught exceptions
         try {
@@ -6784,6 +6790,7 @@ if ($isWorker) {
         // Same reasoning as the worker loop above: the effective-permission
         // cache must not outlive the request that filled it.
         RoleChecker::clearCache();
+        \Whity\Core\Http\AfterResponse::reset();
         $tenantManifestHost->resetRequest();
         $documentFieldRegistry->resetRequest();
     }

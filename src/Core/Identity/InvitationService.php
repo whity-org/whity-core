@@ -70,6 +70,12 @@ final class InvitationService
     public const STATUS_ACCEPTED = 'accepted';
     public const STATUS_REVOKED = 'revoked';
     public const STATUS_SUPERSEDED = 'superseded';
+    /**
+     * A customer's team invitation that was NOT sent (#1872): kept so the
+     * inviter's own list looks the same whether or not it went out. It has no
+     * live token, is never accepted, and staff lists leave it out.
+     */
+    public const STATUS_NOT_SENT = 'not_sent';
 
     /** {@see self::invite()} outcomes. */
     public const INVITE_CREATED = 'created';
@@ -228,6 +234,8 @@ final class InvitationService
                 || $this->wasTurnedAway($tenantId, $email)
                 || $this->hasPendingFromSomeoneElse($tenantId, $email, $inviterProfileId)
             ) {
+                // The inviter's own list must look the same as for a sent one.
+                $this->recordNotSent($tenantId, $email, $roleId, $inviterProfileId, $expiresAt);
                 if ($ownTx) {
                     $this->db->commit();
                 }
@@ -235,7 +243,22 @@ final class InvitationService
                 return $notSent;
             }
 
-            $this->supersedeOutstanding($tenantId, $email);
+            // Only this inviter's own earlier invitation is replaced: never an
+            // admin's or another customer's, expired or not.
+            $this->db->prepare(
+                'UPDATE invitations
+                    SET status = :superseded, updated_at = NOW()
+                  WHERE tenant_id = :tenant_id AND email = :email AND status IN (:pending, :not_sent)
+                    AND kind = :kind AND invited_by = :inviter'
+            )->execute([
+                ':superseded' => self::STATUS_SUPERSEDED,
+                ':tenant_id' => $tenantId,
+                ':email' => $email,
+                ':pending' => self::STATUS_PENDING,
+                ':not_sent' => self::STATUS_NOT_SENT,
+                ':kind' => self::KIND_CUSTOMER,
+                ':inviter' => $inviterProfileId,
+            ]);
 
             $this->db->prepare(
                 'INSERT INTO invitations
@@ -261,6 +284,17 @@ final class InvitationService
             }
 
             return ['result' => self::INVITE_CREATED, 'id' => $id, 'token' => $rawToken];
+        } catch (\PDOException $e) {
+            if ($ownTx && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            // Lost a race with an admin (or another customer) inviting the same
+            // address: one pending invitation per address is the index's rule.
+            // Theirs stands; this one is not sent.
+            if (in_array((string) $e->getCode(), ['23505', '23000'], true)) {
+                return $notSent;
+            }
+            throw $e;
         } catch (\Throwable $e) {
             if ($ownTx && $this->db->inTransaction()) {
                 $this->db->rollBack();
@@ -289,6 +323,10 @@ final class InvitationService
         $items = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $status = (string) $row['status'];
+            if ($status === self::STATUS_NOT_SENT) {
+                // Indistinguishable from a sent one, to the person who sent it.
+                $status = self::STATUS_PENDING;
+            }
             if ($status === self::STATUS_PENDING && (string) $row['expires_at'] <= $now) {
                 $status = 'expired';
             }
@@ -311,7 +349,7 @@ final class InvitationService
             'UPDATE invitations
                 SET status = :revoked, revoked_at = NOW(), updated_at = NOW()
               WHERE id = :id AND tenant_id = :tenant_id AND invited_by = :inviter
-                AND kind = :kind AND status = :pending'
+                AND kind = :kind AND status IN (:pending, :not_sent)'
         );
         $stmt->execute([
             ':revoked' => self::STATUS_REVOKED,
@@ -320,6 +358,7 @@ final class InvitationService
             ':inviter' => $inviterProfileId,
             ':kind' => self::KIND_CUSTOMER,
             ':pending' => self::STATUS_PENDING,
+            ':not_sent' => self::STATUS_NOT_SENT,
         ]);
 
         return $stmt->rowCount() > 0;
@@ -438,10 +477,10 @@ final class InvitationService
                     i.kind, r.name AS role_name
                FROM invitations i
                LEFT JOIN roles r ON r.id = i.role_id AND (r.tenant_id IS NULL OR r.tenant_id = i.tenant_id)
-              WHERE i.tenant_id = :tenant_id
+              WHERE i.tenant_id = :tenant_id AND i.status <> :not_sent
               ORDER BY i.created_at DESC, i.id DESC'
         );
-        $stmt->execute([':tenant_id' => $tenantId]);
+        $stmt->execute([':tenant_id' => $tenantId, ':not_sent' => self::STATUS_NOT_SENT]);
 
         $now = gmdate('Y-m-d H:i:s');
         $items = [];
@@ -554,10 +593,19 @@ final class InvitationService
                 // Already here — burn the invitation so the link cannot be
                 // replayed, but add nothing.
                 $outcome = self::ACCEPT_ALREADY_MEMBER;
-            } elseif ($isCustomer && ($statuses['invited'] || $this->wasTurnedAway($tenantId, $email))) {
+            } elseif ($isCustomer && (
+                $statuses['invited']
+                || $this->wasTurnedAway($tenantId, $email)
+                || !$this->customerInviteStillValid(
+                    $tenantId,
+                    (int) $invitation['role_id'],
+                    $invitation['invited_by'] !== null ? (int) $invitation['invited_by'] : null
+                )
+            )) {
                 // A customer's invitation never completes a membership an admin
-                // staged, and never lets in somebody the workspace's sign-up
-                // turned away (#1872). The link stays as it is; the admin decides.
+                // staged, never lets in somebody the workspace's sign-up turned
+                // away, and stops working once customer invites are off or the
+                // inviter can no longer invite (#1872). The link stays as it is.
                 return $this->finish($ownTx, ['result' => self::ACCEPT_INVALID, 'tenant_id' => null, 'profile_id' => null]);
             } elseif ($statuses['suspended']) {
                 // A suspension is an administrator's decision; an invitation
@@ -757,6 +805,60 @@ final class InvitationService
         ]);
     }
 
+    /** The row that stands for a team invitation that was not sent; its token is never mailed. */
+    private function recordNotSent(int $tenantId, string $email, int $roleId, int $inviterProfileId, string $expiresAt): void
+    {
+        $this->db->prepare(
+            'INSERT INTO invitations
+                 (tenant_id, email, role_id, ou_id, token_hash, status, invited_by, kind, expires_at, created_at, updated_at)
+             VALUES (:tenant_id, :email, :role_id, NULL, :hash, :status, :invited_by, :kind, :expires_at, NOW(), NOW())'
+        )->execute([
+            ':tenant_id' => $tenantId,
+            ':email' => $email,
+            ':role_id' => $roleId,
+            ':hash' => hash('sha256', bin2hex(random_bytes(self::TOKEN_BYTES))),
+            ':status' => self::STATUS_NOT_SENT,
+            ':invited_by' => $inviterProfileId,
+            ':kind' => self::KIND_CUSTOMER,
+            ':expires_at' => $expiresAt,
+        ]);
+    }
+
+    /**
+     * Whether a customer's team invitation may still let someone in (#1872):
+     * customer invites are still on, the inviter is still only a customer here
+     * with an active membership in the invitation's role, and that role is
+     * still customer-safe. Checked when the invitation is accepted, so turning
+     * the setting off, suspending or removing the inviter, or giving the role an
+     * admin permission stops links already sent.
+     */
+    private function customerInviteStillValid(int $tenantId, int $roleId, ?int $inviterProfileId): bool
+    {
+        if ($inviterProfileId === null) {
+            return false;
+        }
+        if (!(new \Whity\Core\Signup\WorkspaceSignupSettings($this->db))->get($tenantId)['customer_invites']) {
+            return false;
+        }
+
+        $stmt = $this->db->prepare(
+            'SELECT kind, role_id FROM memberships
+              WHERE profile_id = :pid AND tenant_id = :tid AND status = :active'
+        );
+        $stmt->execute([':pid' => $inviterProfileId, ':tid' => $tenantId, ':active' => MembershipRepository::STATUS_ACTIVE]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($rows === []) {
+            return false;
+        }
+        foreach ($rows as $row) {
+            if ($row['kind'] !== self::KIND_CUSTOMER || (int) $row['role_id'] !== $roleId) {
+                return false;
+            }
+        }
+
+        return CustomerSafeRole::make($this->db)->isCustomerSafe($roleId, $tenantId);
+    }
+
     /** Whether this workspace's sign-up turned the address away (#1872). */
     private function wasTurnedAway(int $tenantId, string $email): bool
     {
@@ -775,15 +877,15 @@ final class InvitationService
     {
         $stmt = $this->db->prepare(
             'SELECT 1 FROM invitations
-              WHERE tenant_id = :tenant_id AND email = :email AND status = :pending AND expires_at > :now
+              WHERE tenant_id = :tenant_id AND email = :email AND status = :pending
                 AND (kind <> :kind OR invited_by IS NULL OR invited_by <> :inviter)
               LIMIT 1'
         );
+        // Expired ones too: an admin can still resend an expired invitation.
         $stmt->execute([
             ':tenant_id' => $tenantId,
             ':email' => $email,
             ':pending' => self::STATUS_PENDING,
-            ':now' => gmdate('Y-m-d H:i:s'),
             ':kind' => self::KIND_CUSTOMER,
             ':inviter' => $inviterProfileId,
         ]);

@@ -192,7 +192,9 @@ final class Events
      *
      * A listener may:
      * - refuse with {@see HookVetoException}: nothing is written or sent, and the
-     *   customer sees your `reason()` (409);
+     *   customer sees your `reason()` (409). Refuse only for reasons about the
+     *   inviter (not a clinic owner, say), never about the address: "already a
+     *   member" would tell a customer who is in the workspace;
      * - return the payload with `annotations` set to a small JSON object (4 KB
      *   at most; key it by your plugin's name). It is stored on the invitation
      *   and handed back in {@see self::MEMBERSHIP_CUSTOMER_JOINED} when the
