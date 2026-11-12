@@ -7392,9 +7392,18 @@
                         "name": "status",
                         "in": "query",
                         "required": false,
-                        "description": "Comma-separated statuses. Default: `confirmed,pending_payment`.",
+                        "description": "Comma-separated statuses. Default: `confirmed,pending_payment,requested`.",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "name": "unit_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this branch: bookings whose person or room is in it.",
+                        "schema": {
+                            "type": "integer"
                         }
                     }
                 ],
@@ -7695,6 +7704,110 @@
                 ]
             }
         },
+        "/api/v1/calendar/bookings/{id}/accept": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_accept",
+                "summary": "Accept a customer's request; it becomes a confirmed booking",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/bookings/{id}/cancel": {
             "post": {
                 "operationId": "post_api_v1_calendar_bookings_id_cancel",
@@ -7793,6 +7906,212 @@
                     },
                     "422": {
                         "description": "Already cancelled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/bookings/{id}/check-in": {
+            "delete": {
+                "operationId": "delete_api_v1_calendar_bookings_id_check_in",
+                "summary": "Undo a check-in",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a confirmed booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_check_in",
+                "summary": "Check the customer in: they arrived",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a confirmed booking",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7927,6 +8246,141 @@
                     },
                     "422": {
                         "description": "A cancelled booking, or outside the booking window",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/bookings/{id}/suggest": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_suggest",
+                "summary": "Suggest another time for a customer's request",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "The request moves to the new time and stays a request; the customer is emailed and takes it from their link.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarBookingSuggestRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "That time was just taken",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a request",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8302,6 +8756,319 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/CalendarEventResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/rooms": {
+            "get": {
+                "operationId": "get_api_v1_calendar_rooms",
+                "summary": "List rooms",
+                "tags": [
+                    "calendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rooms",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarRoom"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_calendar_rooms",
+                "summary": "Add a room a service can need",
+                "tags": [
+                    "calendar"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarRoomRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The room",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarRoom"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such branch",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A missing name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/rooms/{id}": {
+            "patch": {
+                "operationId": "patch_api_v1_calendar_rooms_id",
+                "summary": "Change a room; fields left out keep their value",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarRoomRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The room",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarRoom"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
                                 }
                             }
                         }
@@ -9865,6 +10632,110 @@
                                                 "id",
                                                 "deleted"
                                             ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/today": {
+            "get": {
+                "operationId": "get_api_v1_calendar_today",
+                "summary": "Today at a glance: booked, checked in, open requests and reminders sent",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "date",
+                        "in": "query",
+                        "required": false,
+                        "description": "A local day, `YYYY-MM-DD`. Default: today.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "unit_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this branch.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Today",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarToday"
                                         }
                                     },
                                     "required": [
@@ -50350,6 +51221,104 @@
                 }
             }
         },
+        "/api/v1/public/bookings/{token}/accept": {
+            "post": {
+                "operationId": "post_api_v1_public_bookings_token_accept",
+                "summary": "Take the time the business suggested for a request (public); the link changes and the new one is emailed",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The 64-character token from the customer's email."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Booked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This link is invalid or has expired",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No suggested time to take",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/public/bookings/{token}/cancel": {
             "post": {
                 "operationId": "post_api_v1_public_bookings_token_cancel",
@@ -66759,6 +67728,10 @@
                                 "readable"
                             ]
                         }
+                    },
+                    "notifyByEmail": {
+                        "type": "boolean",
+                        "description": "Whether the person it acts for hears by email when something waits for them (A12)"
                     }
                 },
                 "required": [
@@ -66788,7 +67761,8 @@
                     "waiting",
                     "lastActiveAt",
                     "onItsOwn",
-                    "mayRead"
+                    "mayRead",
+                    "notifyByEmail"
                 ]
             },
             "AgentAction": {
@@ -67190,6 +68164,10 @@
                         },
                         "description": "Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access."
                     },
+                    "notifyByEmail": {
+                        "type": "boolean",
+                        "description": "Email the person it acts for when something waits for them: at most one an hour, and the email only opens Whity"
+                    },
                     "presetKey": {
                         "type": "string",
                         "description": "Start from this preset; fields sent override its own"
@@ -67411,6 +68389,10 @@
                             "type": "integer"
                         },
                         "description": "Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access."
+                    },
+                    "notifyByEmail": {
+                        "type": "boolean",
+                        "description": "Email the person it acts for when something waits for them: at most one an hour, and the email only opens Whity"
                     }
                 }
             },
@@ -68785,10 +69767,12 @@
                         "type": "string",
                         "enum": [
                             "pending_payment",
+                            "requested",
                             "confirmed",
                             "cancelled",
                             "expired"
-                        ]
+                        ],
+                        "description": "`requested`: the customer asked for this time and staff accept it first."
                     },
                     "hold_expires_at": {
                         "type": "string",
@@ -68824,6 +69808,33 @@
                     "created_at": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "room_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The room it holds."
+                    },
+                    "checked_in_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When the customer arrived."
+                    },
+                    "suggested_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When staff suggested this time for a request."
+                    },
+                    "reminder_sent_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "room_name": {
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "In lists: the room's name, language code => text."
                     }
                 },
                 "required": [
@@ -68920,6 +69931,22 @@
                     "keep_to_hours": {
                         "type": "boolean",
                         "description": "Refuse a time outside working hours. Always on for agents."
+                    }
+                },
+                "required": [
+                    "starts_at"
+                ]
+            },
+            "CalendarBookingSuggestRequest": {
+                "type": "object",
+                "properties": {
+                    "starts_at": {
+                        "type": "string",
+                        "description": "The time to suggest, ISO 8601 with an offset."
+                    },
+                    "profile_id": {
+                        "type": "integer",
+                        "description": "Suggest another person. Default: the same one."
                     }
                 },
                 "required": [
@@ -69065,6 +70092,65 @@
                     "hours"
                 ]
             },
+            "CalendarRoom": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "$ref": "#/components/schemas/LocalizedLabel"
+                    },
+                    "unit_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The branch (organisational unit) it is in."
+                    },
+                    "active": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "unit_id",
+                    "active",
+                    "sort_order"
+                ]
+            },
+            "CalendarRoomRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "$ref": "#/components/schemas/LocalizedLabel"
+                            }
+                        ],
+                        "description": "Text, or a `{ar, en}` map."
+                    },
+                    "unit_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The branch it is in; null for none."
+                    },
+                    "active": {
+                        "type": "boolean",
+                        "description": "Inactive rooms are not shown as columns."
+                    },
+                    "sort_order": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Position in lists; lower comes first."
+                    }
+                }
+            },
             "CalendarService": {
                 "type": "object",
                 "properties": {
@@ -69108,6 +70194,15 @@
                         "items": {
                             "type": "integer"
                         }
+                    },
+                    "room_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The room it needs; booked with the person."
+                    },
+                    "needs_approval": {
+                        "type": "boolean",
+                        "description": "A customer's booking is a request staff accept first."
                     }
                 },
                 "required": [
@@ -69198,6 +70293,15 @@
                             "type": "integer"
                         },
                         "description": "The staff who provide it; the list replaces what is there."
+                    },
+                    "room_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The room it needs; null for none."
+                    },
+                    "needs_approval": {
+                        "type": "boolean",
+                        "description": "Customers send a request instead of booking."
                     }
                 }
             },
@@ -69238,6 +70342,10 @@
                     },
                     "currency": {
                         "type": "string"
+                    },
+                    "instant_booking": {
+                        "type": "boolean",
+                        "description": "Off: every booking from the booking page is a request."
                     }
                 },
                 "required": [
@@ -69318,6 +70426,10 @@
                             ]
                         },
                         "description": "Days shown as the weekend."
+                    },
+                    "instant_booking": {
+                        "type": "boolean",
+                        "description": "Off turns every booking from the booking page into a request staff accept."
                     }
                 }
             },
@@ -69362,6 +70474,11 @@
                     },
                     "feed_enabled": {
                         "type": "boolean"
+                    },
+                    "unit_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The branch (organisational unit) they work in."
                     }
                 },
                 "required": [
@@ -69375,6 +70492,11 @@
             "CalendarStaffRequest": {
                 "type": "object",
                 "properties": {
+                    "unit_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The branch they work in; null for none."
+                    },
                     "bookable": {
                         "type": "boolean",
                         "description": "Offer this person on the public booking page."
@@ -69452,6 +70574,38 @@
                 "required": [
                     "starts_at",
                     "ends_at"
+                ]
+            },
+            "CalendarToday": {
+                "type": "object",
+                "properties": {
+                    "date": {
+                        "type": "string",
+                        "description": "The local day, `YYYY-MM-DD`."
+                    },
+                    "booked": {
+                        "type": "integer",
+                        "description": "Confirmed bookings that start that day."
+                    },
+                    "checked_in": {
+                        "type": "integer",
+                        "description": "Of those, the customers who arrived."
+                    },
+                    "requests": {
+                        "type": "integer",
+                        "description": "Open requests from now on, any day."
+                    },
+                    "reminders_sent": {
+                        "type": "integer",
+                        "description": "Reminders sent that day."
+                    }
+                },
+                "required": [
+                    "date",
+                    "booked",
+                    "checked_in",
+                    "requests",
+                    "reminders_sent"
                 ]
             },
             "CapabilityDenial": {
@@ -85662,10 +86816,16 @@
                         "type": "string",
                         "enum": [
                             "pending_payment",
+                            "requested",
                             "confirmed",
                             "cancelled",
                             "expired"
-                        ]
+                        ],
+                        "description": "`requested`: the customer asked for this time and staff accept it first."
+                    },
+                    "suggested": {
+                        "type": "boolean",
+                        "description": "The business suggested this time for the request; the customer can take it."
                     },
                     "starts_at": {
                         "type": "string"
@@ -85861,6 +87021,10 @@
                                     "items": {
                                         "type": "integer"
                                     }
+                                },
+                                "sends_request": {
+                                    "type": "boolean",
+                                    "description": "Booking it sends a request the business accepts first."
                                 }
                             },
                             "required": [

@@ -17,6 +17,16 @@ final class BookingRepository
     public const STATUS_CONFIRMED = 'confirmed';
     public const STATUS_CANCELLED = 'cancelled';
     public const STATUS_EXPIRED = 'expired';
+    /**
+     * A customer asked for this time and staff accept it first: the service
+     * needs approval, or the workspace turned instant booking off. A request
+     * holds its time (and room) like a booking, gets no reminder, and becomes
+     * `confirmed` when accepted.
+     */
+    public const STATUS_REQUESTED = 'requested';
+
+    /** Statuses that hold time on a calendar. */
+    public const LIVE = [self::STATUS_CONFIRMED, self::STATUS_PENDING_PAYMENT, self::STATUS_REQUESTED];
 
     public const SOURCE_STAFF = 'staff';
     public const SOURCE_PUBLIC = 'public';
@@ -25,7 +35,8 @@ final class BookingRepository
     private const COLUMNS = 'b.id, b.service_id, b.profile_id, b.customer_profile_id, b.customer_name, b.customer_email,
         b.customer_phone, b.customer_note, b.starts_at, b.ends_at, b.blocks_from, b.blocks_until, b.status,
         b.hold_expires_at, b.source, b.price_minor, b.currency, b.payment_ref, b.reminder_due_at, b.reminder_sent_at,
-        b.created_by_profile_id, b.cancelled_by, b.cancel_reason, b.cancelled_at, b.created_at, b.tenant_id';
+        b.created_by_profile_id, b.cancelled_by, b.cancel_reason, b.cancelled_at, b.created_at, b.tenant_id,
+        b.room_id, b.checked_in_at, b.suggested_at';
 
     public function __construct(private readonly PDO $db)
     {
@@ -38,10 +49,10 @@ final class BookingRepository
             'INSERT INTO calendar_bookings (tenant_id, service_id, profile_id, customer_profile_id, customer_name,
                     customer_email, customer_phone, customer_note, starts_at, ends_at, blocks_from, blocks_until,
                     status, hold_expires_at, source, price_minor, currency, reminder_due_at, created_by_profile_id,
-                    created_at, updated_at)
+                    room_id, created_at, updated_at)
              VALUES (:tenant_id, :service_id, :profile_id, :customer_profile_id, :customer_name, :customer_email,
                     :customer_phone, :customer_note, :starts_at, :ends_at, :blocks_from, :blocks_until, :status,
-                    :hold_expires_at, :source, :price_minor, :currency, :reminder_due_at, :created_by, :now, :now)
+                    :hold_expires_at, :source, :price_minor, :currency, :reminder_due_at, :created_by, :room_id, :now, :now)
              RETURNING id'
         );
         $stmt->execute([
@@ -64,6 +75,7 @@ final class BookingRepository
             ':currency' => $v['currency'],
             ':reminder_due_at' => $v['reminder_due_at'] !== null ? Interval::toDb($v['reminder_due_at']) : null,
             ':created_by' => $v['created_by_profile_id'],
+            ':room_id' => $v['room_id'] ?? null,
             ':now' => Interval::toDb(new DateTimeImmutable()),
         ]);
 
@@ -84,17 +96,25 @@ final class BookingRepository
      * Bookings whose service time touches `[from, to)`.
      *
      * @param list<int> $profileIds empty = everyone
-     * @param list<string> $statuses empty = live ones (confirmed, pending payment)
+     * @param list<string> $statuses empty = live ones (confirmed, pending payment, requested)
+     * @param int|null $unitId only bookings whose person or room is in this branch
      * @return list<array<string, mixed>>
      */
-    public function list(int $tenantId, array $profileIds, DateTimeImmutable $from, DateTimeImmutable $to, array $statuses = []): array
+    public function list(int $tenantId, array $profileIds, DateTimeImmutable $from, DateTimeImmutable $to, array $statuses = [], ?int $unitId = null): array
     {
-        $sql = 'SELECT ' . self::COLUMNS . ', s.name AS service_name, p.display_name AS staff_name
+        $sql = 'SELECT ' . self::COLUMNS . ', s.name AS service_name, p.display_name AS staff_name, r.name AS room_name
                   FROM calendar_bookings b
                   JOIN calendar_services s ON s.id = b.service_id AND s.tenant_id = b.tenant_id
                   JOIN profiles p ON p.id = b.profile_id
+                  LEFT JOIN calendar_rooms r ON r.id = b.room_id AND r.tenant_id = b.tenant_id
                  WHERE b.tenant_id = :tenant_id AND b.starts_at < :to AND b.ends_at > :from';
         $params = [':tenant_id' => $tenantId, ':from' => Interval::toDb($from), ':to' => Interval::toDb($to)];
+        if ($unitId !== null) {
+            $sql .= ' AND (r.unit_id = :unit_id OR EXISTS (SELECT 1 FROM calendar_staff cs
+                        WHERE cs.tenant_id = b.tenant_id AND cs.profile_id = b.profile_id AND cs.unit_id = :unit_id2))';
+            $params[':unit_id'] = $unitId;
+            $params[':unit_id2'] = $unitId;
+        }
         if ($profileIds !== []) {
             $in = [];
             foreach ($profileIds as $i => $id) {
@@ -103,7 +123,7 @@ final class BookingRepository
             }
             $sql .= ' AND b.profile_id IN (' . implode(', ', $in) . ')';
         }
-        $statuses = $statuses !== [] ? $statuses : [self::STATUS_CONFIRMED, self::STATUS_PENDING_PAYMENT];
+        $statuses = $statuses !== [] ? $statuses : self::LIVE;
         $in = [];
         foreach ($statuses as $i => $status) {
             $in[] = ':s' . $i;
@@ -174,6 +194,78 @@ final class BookingRepository
         return $stmt->rowCount() === 1;
     }
 
+    /**
+     * Mark the customer as arrived, or undo it. Only a confirmed booking can
+     * be checked in. Returns false when it is not one.
+     */
+    public function checkIn(int $tenantId, int $id, ?DateTimeImmutable $at): bool
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE calendar_bookings SET checked_in_at = :at, updated_at = :now
+              WHERE tenant_id = :tenant_id AND id = :id AND status = 'confirmed'"
+        );
+        $stmt->bindValue(':at', $at !== null ? Interval::toDb($at) : null, $at === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':now', Interval::toDb(new DateTimeImmutable()));
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->rowCount() === 1;
+    }
+
+    /** Staff suggested another time for a request (set), or the customer moved it themselves (cleared). */
+    public function markSuggested(int $tenantId, int $id, ?DateTimeImmutable $at): void
+    {
+        $stmt = $this->db->prepare('UPDATE calendar_bookings SET suggested_at = :at WHERE tenant_id = :tenant_id AND id = :id');
+        $stmt->bindValue(':at', $at !== null ? Interval::toDb($at) : null, $at === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+    }
+
+    /** Set the reminder due time (after a request is accepted). */
+    public function setReminderDue(int $tenantId, int $id, ?DateTimeImmutable $due): void
+    {
+        $stmt = $this->db->prepare('UPDATE calendar_bookings SET reminder_due_at = :due, reminder_sent_at = NULL WHERE tenant_id = :tenant_id AND id = :id');
+        $stmt->bindValue(':due', $due !== null ? Interval::toDb($due) : null, $due === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+    }
+
+    /**
+     * The Today panel: bookings that start in `[from, to)`, those checked in,
+     * open requests from `$now` on (any day: they wait for someone), and the
+     * reminders sent in `[from, to)`.
+     *
+     * @return array{booked: int, checked_in: int, requests: int, reminders_sent: int}
+     */
+    public function today(int $tenantId, DateTimeImmutable $from, DateTimeImmutable $to, DateTimeImmutable $now, ?int $unitId): array
+    {
+        $unit = '';
+        $params = [':tenant_id' => $tenantId];
+        if ($unitId !== null) {
+            $unit = ' AND (EXISTS (SELECT 1 FROM calendar_rooms r WHERE r.tenant_id = b.tenant_id AND r.id = b.room_id AND r.unit_id = :unit_id)
+                       OR EXISTS (SELECT 1 FROM calendar_staff cs WHERE cs.tenant_id = b.tenant_id AND cs.profile_id = b.profile_id AND cs.unit_id = :unit_id2))';
+            $params[':unit_id'] = $unitId;
+            $params[':unit_id2'] = $unitId;
+        }
+        $count = function (string $where, array $extra) use ($unit, $params): int {
+            $stmt = $this->db->prepare('SELECT COUNT(*) FROM calendar_bookings b WHERE b.tenant_id = :tenant_id AND ' . $where . $unit);
+            $stmt->execute($params + $extra);
+
+            return (int) $stmt->fetchColumn();
+        };
+        $day = [':from' => Interval::toDb($from), ':to' => Interval::toDb($to)];
+
+        return [
+            'booked' => $count("b.status = 'confirmed' AND b.starts_at >= :from AND b.starts_at < :to", $day),
+            'checked_in' => $count("b.status = 'confirmed' AND b.checked_in_at IS NOT NULL AND b.starts_at >= :from AND b.starts_at < :to", $day),
+            'requests' => $count("b.status = 'requested' AND b.starts_at >= :now", [':now' => Interval::toDb($now)]),
+            'reminders_sent' => $count('b.reminder_sent_at >= :from AND b.reminder_sent_at < :to', $day),
+        ];
+    }
+
     /** Claim the reminder; false when another worker already did. */
     public function markReminded(int $tenantId, int $id, DateTimeImmutable $now): bool
     {
@@ -194,7 +286,7 @@ final class BookingRepository
         $stmt = $this->db->prepare(
             "SELECT COUNT(*) FROM calendar_bookings
               WHERE tenant_id = :tenant_id AND LOWER(customer_email) = :email AND starts_at > :now
-                AND status IN ('confirmed', 'pending_payment')"
+                AND status IN ('confirmed', 'pending_payment', 'requested')"
         );
         $stmt->execute([':tenant_id' => $tenantId, ':email' => strtolower($email), ':now' => Interval::toDb($now)]);
 
@@ -232,10 +324,15 @@ final class BookingRepository
             'cancel_reason' => (string) $r['cancel_reason'],
             'payment_ref' => $r['payment_ref'] !== null ? (string) $r['payment_ref'] : null,
             'created_at' => $at($r['created_at']),
+            'room_id' => isset($r['room_id']) ? (int) $r['room_id'] : null,
+            'checked_in_at' => $at($r['checked_in_at'] ?? null),
+            'suggested_at' => $at($r['suggested_at'] ?? null),
+            'reminder_sent_at' => $at($r['reminder_sent_at'] ?? null),
         ];
         if (array_key_exists('service_name', $r)) {
             $out['service_name'] = \Whity\Core\Form\LocalizedLabel::decode((string) $r['service_name']);
             $out['staff_name'] = (string) $r['staff_name'];
+            $out['room_name'] = isset($r['room_name']) ? \Whity\Core\Form\LocalizedLabel::decode((string) $r['room_name']) : null;
         }
 
         return $out;

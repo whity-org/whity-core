@@ -128,6 +128,8 @@ final class TenantOwnedTables
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_service_staff' => '248_create_calendar_bookings.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
+        // Design 3.3: rooms a service needs, filtered by branch.
+        'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
 
         // WHIT-953 — contacts and their spreadsheet imports (design 3.3 A8).
         // Every query binds tenant_id.

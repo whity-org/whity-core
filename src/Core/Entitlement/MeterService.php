@@ -78,6 +78,34 @@ final class MeterService
     ) {
     }
 
+    /** @var (\Closure(int, string, int, int, string, string): void)|null */
+    private ?\Closure $onThreshold = null;
+
+    /**
+     * Be told when a workspace comes close to a limit (90%) or passes it on an
+     * instance that warns (EM.1 `plan-limit`). Called once per window per stage:
+     * only by the action whose count crossed the line.
+     *
+     * @param \Closure(int $tenantId, string $key, int $used, int $limit, string $stage, string $resetsAt): void $listener
+     *        `$stage` is `near` or `passed`.
+     */
+    public function onThreshold(\Closure $listener): void
+    {
+        $this->onThreshold = $listener;
+    }
+
+    private function tellThreshold(int $tenantId, string $key, int $used, int $limit, string $stage, string $resetsAt): void
+    {
+        if ($this->onThreshold === null) {
+            return;
+        }
+        try {
+            ($this->onThreshold)($tenantId, $key, $used, $limit, $stage, $resetsAt);
+        } catch (\Throwable $e) {
+            error_log('[meter] threshold listener failed: ' . $e->getMessage());
+        }
+    }
+
     /**
      * Spend one unit of every metered limit named, or none of them.
      *
@@ -156,12 +184,19 @@ final class MeterService
 
             $taken[] = ['key' => $key, 'counter' => $counter, 'units' => $units];
 
+            // Close to the limit: the action that reached 90% says so, once.
+            $near = (int) ceil($limit * 0.9);
+            if ($limit > 1 && $count >= $near && $count - $units < $near && $count <= $limit) {
+                $this->tellThreshold($tenantId, $key, $count, $limit, 'near', $this->resetsAt($tenantId, $key, $now));
+            }
+
             if ($count > $limit && $keyWarns) {
                 // Logged only on the action that crossed the line, so a
                 // workspace rendering all month past its limit is one entry
                 // per window and not one per document.
                 if ($count - $units <= $limit) {
                     error_log(sprintf('[meter] tenant %d passed %s (limit %d)', $tenantId, $key, $limit));
+                    $this->tellThreshold($tenantId, $key, $count, $limit, 'passed', $this->resetsAt($tenantId, $key, $now));
                 }
                 $passed ??= MeterDecision::warned($key, $limit, $this->resetsAt($tenantId, $key, $now));
 
