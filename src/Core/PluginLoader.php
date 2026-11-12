@@ -4477,11 +4477,17 @@ class PluginLoader
             return $drop('id must be a kebab-case slug matching ' . self::FEATURE_ID_PATTERN, is_string($id) ? $id : null);
         }
 
-        // SDK 1.101: the label may be {en, ar}; it is served resolved.
-        $label = $descriptor['label'] ?? null;
-        if (BlockText::isLocalized($label)) {
-            $label = LocalizedText::resolve($label, 'en');
-        }
+        // SDK 1.101: the label may be {en, ar}. It is KEPT as written and
+        // resolved per request, where the reader's language is known
+        // (FrontendFeaturesApiHandler via BlockText::resolve, the nav through
+        // PluginNavigationBridge::toNavItem). Resolving it to English here,
+        // once, at load, left every Arabic reader with an English page title
+        // and nav entry while the screen under it was Arabic. `$label` is the
+        // English text, for validation and log messages only.
+        $servedLabel = $descriptor['label'] ?? null;
+        $label = BlockText::isLocalized($servedLabel)
+            ? LocalizedText::resolve($servedLabel, 'en')
+            : $servedLabel;
         if (!is_string($label) || $label === '') {
             return $drop('label must be a non-empty string', $id);
         }
@@ -5193,7 +5199,7 @@ class PluginLoader
         $normalized = [
             'id' => $id,
             'plugin' => $pluginName,
-            'label' => $label,
+            'label' => $servedLabel,
             'icon' => $icon,
             'group' => $group,
             'order' => $order,
