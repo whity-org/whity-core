@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Contacts;
 
+use Whity\Core\CustomFields\CustomFieldService;
 use Whity\Core\Db\DbBool;
 
 /**
@@ -15,36 +16,29 @@ use Whity\Core\Db\DbBool;
  * email of someone in the workspace, it is linked to that person, so the
  * contact page can show their messages and bookings (which keep their own
  * `customer_profile_id`; nothing is moved).
+ *
+ * The workspace's own fields (WHIT-954) come back under `fields` and are
+ * written from `fields` in the same call, in one transaction with the rest.
  */
 final class ContactService
 {
     public const MAX_TAGS = 20;
 
-    /** @var list<callable(int, array<string, mixed>, array<string, mixed>): array<string, mixed>> */
-    private array $decorators = [];
+    public const RECORD_TYPE = 'contact';
 
     public function __construct(
         private readonly ContactRepository $contacts,
         private readonly ContactTags $tags,
+        private readonly ?CustomFieldService $customFields = null,
     ) {
     }
 
     /**
-     * Something that adds to the contact the API answers with, such as the
-     * custom fields (WHIT-954). Called with (tenantId, contact row, api shape).
-     *
-     * @param callable(int, array<string, mixed>, array<string, mixed>): array<string, mixed> $decorator
-     */
-    public function addDecorator(callable $decorator): void
-    {
-        $this->decorators[] = $decorator;
-    }
-
-    /**
      * @param array<string, mixed> $input
+     * @param (callable(string): bool)|null $hasPermission the caller's permissions, for fields that need their own
      * @return array<string, mixed> the new contact, API shape
      */
-    public function create(int $tenantId, array $input, ?int $actor): array
+    public function create(int $tenantId, array $input, ?int $actor, ?callable $hasPermission = null): array
     {
         $fields = $this->validate($tenantId, $input, null);
         if (!array_key_exists('name', $fields) || $fields['name'] === '') {
@@ -57,19 +51,25 @@ final class ContactService
         if (($fields['profile_id'] ?? null) === null) {
             $fields['profile_id'] = $this->contacts->memberProfileByEmail($tenantId, (string) ($fields['email'] ?? ''));
         }
-        $id = $this->contacts->insert($tenantId, $fields, $actor);
-        if (isset($input['tags'])) {
-            $this->tags->replace($tenantId, $id, self::tagNames($input['tags']));
-        }
+        $id = $this->contacts->transaction(function () use ($tenantId, $fields, $actor, $input, $hasPermission): int {
+            $id = $this->contacts->insert($tenantId, $fields, $actor);
+            if (isset($input['tags'])) {
+                $this->tags->replace($tenantId, $id, self::tagNames($input['tags']));
+            }
+            $this->customFields?->write($tenantId, self::RECORD_TYPE, $id, $input['fields'] ?? [], $hasPermission ?? static fn (): bool => false, true);
+
+            return $id;
+        });
 
         return $this->show($tenantId, $id);
     }
 
     /**
      * @param array<string, mixed> $input
+     * @param (callable(string): bool)|null $hasPermission the caller's permissions, for fields that need their own
      * @return array<string, mixed> the contact, API shape
      */
-    public function update(int $tenantId, int $id, array $input): array
+    public function update(int $tenantId, int $id, array $input, ?callable $hasPermission = null): array
     {
         $row = $this->contacts->find($tenantId, $id) ?? throw ContactRejectedException::notFound('Contact');
         $fields = $this->validate($tenantId, $input, $row);
@@ -81,10 +81,17 @@ final class ContactService
         if (!$customer && !$supplier) {
             throw new ContactRejectedException('A contact is a customer, a supplier, or both', 422, ['field' => 'is_customer']);
         }
-        $this->contacts->update($tenantId, $id, $fields);
-        if (isset($input['tags'])) {
-            $this->tags->replace($tenantId, $id, self::tagNames($input['tags']));
-        }
+        $this->contacts->transaction(function () use ($tenantId, $id, $fields, $input, $hasPermission): int {
+            $this->contacts->update($tenantId, $id, $fields);
+            if (isset($input['tags'])) {
+                $this->tags->replace($tenantId, $id, self::tagNames($input['tags']));
+            }
+            if (array_key_exists('fields', $input)) {
+                $this->customFields?->write($tenantId, self::RECORD_TYPE, $id, $input['fields'], $hasPermission ?? static fn (): bool => false, false);
+            }
+
+            return $id;
+        });
 
         return $this->show($tenantId, $id);
     }
@@ -98,20 +105,35 @@ final class ContactService
         $profileId = $row['profile_id'] === null ? null : (int) $row['profile_id'];
         $api['profile'] = $profileId === null ? null : ['id' => $profileId, 'display_name' => $this->contacts->profileName($profileId) ?? ''];
 
-        return $this->decorate($tenantId, $row, $api);
+        $api['fields'] = $this->customFields?->values($tenantId, self::RECORD_TYPE, [$id])[$id] ?? (object) [];
+
+        return $api;
     }
 
     /**
-     * @param array{kind?: ?string, tag_id?: ?int, q?: ?string, archived?: bool, ids?: ?list<int>} $filter
+     * `$fieldFilters` are field key => value, from `field[<key>]=value` in the query string.
+     *
+     * @param array{kind?: ?string, tag_id?: ?int, q?: ?string, archived?: bool, ids?: ?list<int>, extra?: list<array{0: string, 1: array<string, mixed>}>} $filter
+     * @param array<string, string> $fieldFilters
      * @return array{data: list<array<string, mixed>>, total: int}
      */
-    public function list(int $tenantId, array $filter, int $limit, int $offset): array
+    public function list(int $tenantId, array $filter, int $limit, int $offset, array $fieldFilters = []): array
     {
+        if ($fieldFilters !== []) {
+            if ($this->customFields === null) {
+                throw new ContactRejectedException('Filtering on fields is not available here', 422);
+            }
+            $filter['extra'] = $this->customFields->filters($tenantId, self::RECORD_TYPE, 'c', $fieldFilters);
+        }
         $rows = $this->contacts->list($tenantId, $filter, $limit, $offset);
-        $tags = $this->contacts->tagsFor($tenantId, array_map(static fn (array $r): int => (int) $r['id'], $rows));
+        $ids = array_map(static fn (array $r): int => (int) $r['id'], $rows);
+        $tags = $this->contacts->tagsFor($tenantId, $ids);
+        $values = $this->customFields?->values($tenantId, self::RECORD_TYPE, $ids) ?? [];
         $data = [];
         foreach ($rows as $row) {
-            $data[] = $this->decorate($tenantId, $row, self::toApi($row, $tags[(int) $row['id']] ?? []));
+            $api = self::toApi($row, $tags[(int) $row['id']] ?? []);
+            $api['fields'] = $values[(int) $row['id']] ?? (object) [];
+            $data[] = $api;
         }
 
         return ['data' => $data, 'total' => $this->contacts->count($tenantId, $filter)];
@@ -234,17 +256,4 @@ final class ContactService
         return $api;
     }
 
-    /**
-     * @param array<string, mixed> $row
-     * @param array<string, mixed> $api
-     * @return array<string, mixed>
-     */
-    private function decorate(int $tenantId, array $row, array $api): array
-    {
-        foreach ($this->decorators as $decorator) {
-            $api = $decorator($tenantId, $row, $api);
-        }
-
-        return $api;
-    }
 }

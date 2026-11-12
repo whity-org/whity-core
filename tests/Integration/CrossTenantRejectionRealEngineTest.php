@@ -2737,6 +2737,46 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         self::assertSame(0, $repo->count(self::TENANT_B, []));
     }
 
+    // ==================== custom fields (WHIT-954, migration 263) ====================
+
+    public function testCustomFieldsAndTheirValuesAreTenantScoped(): void
+    {
+        $fieldRepo = new \Whity\Core\CustomFields\CustomFieldRepository($this->pdo);
+        $contactRepo = new \Whity\Core\Contacts\ContactRepository($this->pdo);
+        $types = new \Whity\Core\CustomFields\CustomFieldRecordTypes();
+        $types->register(new \Whity\Core\CustomFields\CustomFieldRecordType(
+            'contact', 'Contacts', 'جهات الاتصال', 'contacts:read', 'contacts:write',
+            static fn (int $tenant, int $id): bool => $contactRepo->find($tenant, $id) !== null,
+        ));
+        $fields = new \Whity\Core\CustomFields\CustomFieldService($this->pdo, $fieldRepo, $types);
+        $contacts = new \Whity\Core\Contacts\ContactService($contactRepo, new \Whity\Core\Contacts\ContactTags($this->pdo), $fields);
+
+        $branch = $fields->create(self::TENANT_A, ['record_type' => 'contact', 'label' => 'Preferred branch', 'kind' => 'text'], null);
+        $a = $contacts->create(self::TENANT_A, ['name' => 'Example Café', 'fields' => ['preferred_branch' => 'Abdoun']], null);
+
+        self::assertSame([], $fields->definitions(self::TENANT_B, 'contact'), "Tenant A's field must be invisible to Tenant B");
+        foreach ([
+            'read' => fn () => $fields->show(self::TENANT_B, $branch['id']),
+            'change' => fn () => $fields->update(self::TENANT_B, $branch['id'], ['label' => 'Taken']),
+            'archive' => fn () => $fields->archive(self::TENANT_B, $branch['id'], true),
+            'use' => fn () => $contacts->create(self::TENANT_B, ['name' => 'Other Café', 'fields' => ['preferred_branch' => 'Abdoun']], null),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} Tenant A's field");
+            } catch (\Whity\Core\Contacts\ContactRejectedException $e) {
+                self::assertContains($e->status, [404, 422], "a foreign field is not there for Tenant B ({$what})");
+            }
+        }
+        self::assertSame([], $fields->values(self::TENANT_B, 'contact', [$a['id']]), "Tenant A's values must be invisible to Tenant B");
+        self::assertSame(0, $contacts->list(self::TENANT_B, [], 50, 0)['total'], 'the refused Tenant B contact was rolled back');
+
+        $after = $fields->show(self::TENANT_A, $branch['id']);
+        self::assertSame('Preferred branch', $after['label']['en']);
+        self::assertFalse($after['archived']);
+        self::assertSame(['preferred_branch' => 'Abdoun'], $contacts->show(self::TENANT_A, $a['id'])['fields']);
+    }
+
     private function contactService(): \Whity\Core\Contacts\ContactService
     {
         return new \Whity\Core\Contacts\ContactService(
