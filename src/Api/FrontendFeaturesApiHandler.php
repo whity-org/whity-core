@@ -15,6 +15,7 @@ use Whity\Core\Router;
 use Whity\Core\i18n\SchemaLabels;
 use Whity\Core\i18n\ServerLabels;
 use Whity\Core\Tenant\TenantContext;
+use Whity\Sdk\Frontend\Blocks\BlockText;
 use Whity\Sdk\Frontend\Blocks\BlockValidator;
 
 /**
@@ -309,7 +310,19 @@ final class FrontendFeaturesApiHandler
             }
         }
 
-        return $features;
+        // SDK 1.101 (WHIT-984): a plugin may write any visible text as
+        // {en, ar}. Resolved to the caller's language here, before the
+        // permission filter and the block validation, for the same reason as
+        // core's labels above: what is validated is what is served.
+        $language = $this->labels->languageCode();
+
+        return array_map(
+            static function (array $feature) use ($language): array {
+                /** @var array<string, mixed> */
+                return BlockText::resolve($feature, $language);
+            },
+            $features
+        );
     }
 
     /**
