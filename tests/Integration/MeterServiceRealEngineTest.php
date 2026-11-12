@@ -261,6 +261,22 @@ final class MeterServiceRealEngineTest extends TestCase
     // ── Reading without spending ────────────────────────────────────────────
 
     /** Rendering a progress bar must not cost the customer a unit. */
+    /** EM.1 plan-limit: told once at 90%, never again in the same window. */
+    public function testItSaysOnceWhenTheWorkspaceComesCloseToALimit(): void
+    {
+        $this->allow(self::PER_DAY, 10);
+        $heard = [];
+        $this->meters->onThreshold(static function (int $t, string $k, int $used, int $limit, string $stage) use (&$heard): void {
+            $heard[] = [$stage, $used, $limit];
+        });
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->meters->consume(self::TENANT, [self::PER_DAY], now: $this->at('2026-09-13 09:00'));
+        }
+
+        self::assertSame([['near', 9, 10]], $heard);
+    }
+
     public function testPeekDoesNotConsume(): void
     {
         $this->allow(self::PER_DAY, 5);
