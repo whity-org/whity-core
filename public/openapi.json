@@ -65765,11 +65765,20 @@
                     },
                     "showTechnicalDetails": {
                         "type": "boolean"
+                    },
+                    "animations": {
+                        "type": "string",
+                        "enum": [
+                            "full",
+                            "calm",
+                            "off"
+                        ]
                     }
                 },
                 "required": [
                     "textSize",
-                    "showTechnicalDetails"
+                    "showTechnicalDetails",
+                    "animations"
                 ]
             },
             "DisplayPreferencesResponse": {
@@ -65795,6 +65804,14 @@
                     },
                     "showTechnicalDetails": {
                         "type": "boolean"
+                    },
+                    "animations": {
+                        "type": "string",
+                        "enum": [
+                            "full",
+                            "calm",
+                            "off"
+                        ]
                     }
                 }
             },
