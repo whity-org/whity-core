@@ -4815,9 +4815,18 @@ class PluginLoader
                         // An `apiPath` keeps its exact-string comparison, which
                         // is stricter — nothing that validates today starts
                         // matching by shape.
+                        // The query string is a filter on the route, not part
+                        // of it: `/api/x/adjustments?status=pending` is the GET
+                        // the plugin registered as `/api/x/adjustments`, and the
+                        // dispatcher routes and checks it as that. BlockValidator
+                        // accepts a query and the renderer appends `params` after
+                        // one, so comparing the whole string dropped every screen
+                        // that filtered its source (Front Office's Stock and
+                        // Reports). Only the path is compared; the query is kept.
+                        $sourceRoute = explode('?', $source, 2)[0];
                         $owned = $sourceKind === 'apiPath'
-                            ? array_key_exists($source, $registeredGetRoutes)
-                            : self::matchesRegisteredGetRoute($source, $registeredGetRoutes);
+                            ? array_key_exists($sourceRoute, $registeredGetRoutes)
+                            : self::matchesRegisteredGetRoute($sourceRoute, $registeredGetRoutes);
                         if (!$owned) {
                             // Ownership violation — record the offending path
                             // and signal the caller to drop the feature.
