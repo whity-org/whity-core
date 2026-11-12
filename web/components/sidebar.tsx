@@ -26,7 +26,7 @@ import { TenantSwitcher as WorkspaceSwitcher } from '@whity/ui/tenant-switcher';
 import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
 import { navGroupsFromServerItems } from '@whity/features/nav';
 import { useCurrentLanguage, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
-import { roleLabel } from '@whity/features/roles';
+import { roleLabel } from '@whity/features/roles/role-label';
 import { localizedName } from '@/lib/localized-name';
 import * as TablerIcons from '@tabler/icons-react';
 import {

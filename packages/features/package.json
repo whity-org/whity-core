@@ -16,6 +16,7 @@
     "./record": "./src/record/index.ts",
     "./datetime": "./src/datetime/index.ts",
     "./roles": "./src/roles/index.ts",
+    "./roles/role-label": "./src/roles/role-label.ts",
     "./users": "./src/users/index.ts",
     "./forms": "./src/forms/index.ts",
     "./sync": "./src/sync/index.ts",
