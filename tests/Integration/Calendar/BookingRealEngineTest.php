@@ -424,9 +424,10 @@ final class BookingRealEngineTest extends TestCase
     {
         $plugins = new \Whity\Core\Calendar\CalendarPlugins();
         $asked = [];
-        $channel = new class ($asked) implements \Whity\Core\Calendar\ReminderChannel {
-            /** @param list<int> $asked */
-            public function __construct(private array &$asked)
+        $channel = new class (static function (int $id) use (&$asked): void {
+            $asked[] = $id;
+        }) implements \Whity\Core\Calendar\ReminderChannel {
+            public function __construct(private readonly \Closure $record)
             {
             }
 
@@ -437,7 +438,7 @@ final class BookingRealEngineTest extends TestCase
 
             public function remind(int $tenantId, array $booking): void
             {
-                $this->asked[] = (int) $booking['id'];
+                ($this->record)((int) $booking['id']);
                 throw new \RuntimeException('the provider is down');
             }
         };

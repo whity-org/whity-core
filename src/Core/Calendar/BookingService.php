@@ -272,14 +272,12 @@ final class BookingService
      */
     public function accept(int $tenantId, int $bookingId): array
     {
-        $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        $row = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
         if (!$this->bookings->transition($tenantId, $bookingId, [BookingRepository::STATUS_REQUESTED], BookingRepository::STATUS_CONFIRMED)) {
             throw new CalendarRejectedException('Only a request can be accepted.', 422);
         }
-        $row = $this->bookings->find($tenantId, $bookingId);
-        if ($row !== null) {
-            $this->bookings->setReminderDue($tenantId, $bookingId, $this->reminderDue(Interval::fromDb((string) $row['starts_at']), $this->settingsFor($tenantId), $this->now()));
-        }
+        // The time can't have changed: a request moves only while it is a request.
+        $this->bookings->setReminderDue($tenantId, $bookingId, $this->reminderDue(Interval::fromDb((string) $row['starts_at']), $this->settingsFor($tenantId), $this->now()));
         $booking = $this->afterWrite($tenantId, $bookingId);
         $this->announceBooking(CalendarEventNames::BOOKING_CONFIRMED, $tenantId, $booking);
         $this->tell('confirmed', $tenantId, $booking);
