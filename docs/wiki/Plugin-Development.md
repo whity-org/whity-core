@@ -421,6 +421,7 @@ Most events ignore what a listener returns. Only these use it, and only these fi
 | `document.issuing`, in a pre-issue check (`check_only` is true) | `checks` |
 | `time_window.close_report` | `unfinished` |
 | `rbac.resource_grant.verify_resource` | `exists` |
+| `membership.customer_inviting` | `annotations` |
 
 A listener on these events can still be observe-only, but then it contributes nothing.
 Every other event treats a returned payload as if nothing was returned. Refusing an

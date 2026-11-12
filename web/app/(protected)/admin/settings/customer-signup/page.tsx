@@ -31,6 +31,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { CopyBlock } from '@whity/ui/copy-block';
 import { RadioGroup, RadioGroupItem } from '@whity/ui/radio-group';
 import { SaveBar, ChangedField } from '@whity/ui/save-bar';
+import { Switch } from '@whity/ui/switch';
 import { Textarea } from '@whity/ui/textarea';
 import { IconUserCheck } from '@tabler/icons-react';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
@@ -52,6 +53,8 @@ interface SignupSettings {
   role_name: string | null;
   role_customer_safe: boolean | null;
   allowed_domains: string[];
+  /** Whether customers may invite colleagues into their own role (#1872). */
+  customer_invites?: boolean;
   eligible_roles: EligibleRole[];
   pending_count: number;
   workspace_slug: string | null;
@@ -78,6 +81,7 @@ interface Draft {
   mode: Mode;
   roleId: string;
   domains: string;
+  customerInvites: boolean;
 }
 
 function draftOf(settings: SignupSettings): Draft {
@@ -85,6 +89,7 @@ function draftOf(settings: SignupSettings): Draft {
     mode: settings.mode,
     roleId: settings.role_id === null ? '' : String(settings.role_id),
     domains: settings.allowed_domains.join('\n'),
+    customerInvites: settings.customer_invites === true,
   };
 }
 
@@ -112,6 +117,8 @@ function codeText(t: TranslateFn, details: Record<string, unknown>): string | nu
       );
     case 'domains_too_many':
       return t('settings.customerSignup.error.domainsTooMany', 'List at most {max} domains.', { max });
+    case 'customer_invites_invalid':
+      return t('settings.customerSignup.error.invitesInvalid', 'Turn customer invitations on or off.');
     case 'mode_invalid':
       return t('settings.customerSignup.error.modeInvalid', 'Choose Off, Approval required or Open.');
     case 'role_required':
@@ -185,6 +192,7 @@ export default function CustomerSignupSettingsPage() {
     current !== null &&
     (current.mode !== saved.mode ||
       current.roleId !== saved.roleId ||
+      current.customerInvites !== saved.customerInvites ||
       splitDomains(current.domains).join(',') !== splitDomains(saved.domains).join(','));
 
   if (!capabilitiesLoading && !canManage) {
@@ -214,6 +222,7 @@ export default function CustomerSignupSettingsPage() {
         mode: current.mode,
         role_id: current.roleId === '' ? null : Number(current.roleId),
         allowed_domains: splitDomains(current.domains),
+        customer_invites: current.customerInvites,
       }),
     });
     setSaving(false);
@@ -243,6 +252,8 @@ export default function CustomerSignupSettingsPage() {
     if (current.roleId !== saved.roleId) changed.push(t('settings.customerSignup.role', 'Starting role'));
     if (splitDomains(current.domains).join(',') !== splitDomains(saved.domains).join(','))
       changed.push(t('settings.customerSignup.domains', 'Allowed email domains'));
+    if (current.customerInvites !== saved.customerInvites)
+      changed.push(t('settings.customerSignup.invites', 'Customers can invite their team'));
   }
 
   return (
@@ -398,6 +409,27 @@ export default function CustomerSignupSettingsPage() {
                     'Optional. One per line, like example-bakery.com. Leave empty to accept any email address.'
                   )}
                 </p>
+              </ChangedField>
+
+              <ChangedField changed={current.customerInvites !== saved?.customerInvites}>
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <label htmlFor="signup-customer-invites" className="text-sm font-medium text-foreground">
+                      {t('settings.customerSignup.invites', 'Customers can invite their team')}
+                    </label>
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        'settings.customerSignup.invites.hint',
+                        'A customer can invite colleagues by email. They join with the same role as the customer who invited them, as customers, and never as staff. They join without waiting for approval, even when sign-up is off. Invitations are sent by email, so this needs email set up for this instance.'
+                      )}
+                    </p>
+                  </div>
+                  <Switch
+                    id="signup-customer-invites"
+                    checked={current.customerInvites}
+                    onCheckedChange={(checked) => update({ customerInvites: checked })}
+                  />
+                </div>
               </ChangedField>
 
               {saveError && (

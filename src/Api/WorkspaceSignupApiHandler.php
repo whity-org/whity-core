@@ -131,8 +131,17 @@ final class WorkspaceSignupApiHandler
                 ]);
         }
 
+        // #1872: whether customers may invite their own team. Off by default.
+        $customerInvites = array_key_exists('customer_invites', $body) ? $body['customer_invites'] : $current['customer_invites'];
+        if (!is_bool($customerInvites)) {
+            return Response::error('Validation failed', 422, [
+                'customer_invites' => 'Choose on or off.',
+                'code' => 'customer_invites_invalid',
+            ]);
+        }
+
         try {
-            $this->settings->save($tenantId, $mode, $roleId, $domains, $ctx['userId']);
+            $this->settings->save($tenantId, $mode, $roleId, $domains, $ctx['userId'], $customerInvites);
         } catch (\Throwable $e) {
             error_log('[customer-signup] settings save failed: ' . $e->getMessage());
 
@@ -148,6 +157,7 @@ final class WorkspaceSignupApiHandler
                 'mode' => $mode,
                 'role_id' => $roleId,
                 'allowed_domains' => $domains,
+                'customer_invites' => $customerInvites,
                 'previous_mode' => $current['mode'],
             ],
         ]);
@@ -274,6 +284,8 @@ final class WorkspaceSignupApiHandler
             // are refused until an admin chooses again.
             'role_customer_safe' => $current['role_id'] === null ? null : $roleSafe,
             'allowed_domains' => $current['allowed_domains'],
+            // #1872: customers may invite colleagues into their own role.
+            'customer_invites' => $current['customer_invites'],
             'eligible_roles' => $roles,
             'pending_count' => $this->service->pendingCount($tenantId),
             'workspace_slug' => $slug,
