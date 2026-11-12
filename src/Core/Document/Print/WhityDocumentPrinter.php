@@ -26,7 +26,6 @@ final class WhityDocumentPrinter
         'divider', 'pageBreak', 'table', 'image', 'file', 'record', 'chart', 'signature', 'barcode', 'qr', 'math',
     ];
 
-    private const MARGIN_MM = 16.0;
 
     /**
      * @param array<string, string|null> $values Field values by path; null is a missing value.
@@ -101,9 +100,7 @@ final class WhityDocumentPrinter
         $payload = [
             'title' => $title,
             'direction' => $doc['lang'] === 'ar' ? 'rtl' : 'ltr',
-            'page' => self::pageSize($doc['page']['size'] ?? null) + [
-                'margin' => ['topMm' => self::MARGIN_MM, 'rightMm' => self::MARGIN_MM, 'bottomMm' => self::MARGIN_MM, 'leftMm' => self::MARGIN_MM],
-            ],
+            'page' => self::pageSize($doc['page']['size'] ?? null),
             'content' => $content,
             'header' => ['start' => $letterhead['name'] ?? '', 'end' => $this->labels->continued($title), 'fromPage' => 2],
             'footer' => [
@@ -338,17 +335,21 @@ final class WhityDocumentPrinter
     }
 
     /**
-     * The paper a document names (6.1); A4 when it names none.
+     * The paper a document names (6.1, {@see PageSizes}), with its margins;
+     * A4 when it names none.
      *
-     * @return array{widthMm: float, heightMm: float}
+     * @return array{widthMm: float, heightMm: float, margin: array{topMm: float, rightMm: float, bottomMm: float, leftMm: float}}
      */
     private static function pageSize(mixed $size): array
     {
-        return match ($size) {
-            'A5' => ['widthMm' => 148.0, 'heightMm' => 210.0],
-            'Letter' => ['widthMm' => 215.9, 'heightMm' => 279.4],
-            default => ['widthMm' => 210.0, 'heightMm' => 297.0],
-        };
+        $paper = PageSizes::resolve($size);
+        $m = $paper['marginMm'];
+
+        return [
+            'widthMm'  => $paper['widthMm'],
+            'heightMm' => $paper['heightMm'],
+            'margin'   => ['topMm' => $m, 'rightMm' => $m, 'bottomMm' => $m, 'leftMm' => $m],
+        ];
     }
 
     /**
