@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.100).
+ * SDK identity (v1.102).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1237,12 +1237,21 @@ namespace Whity\Sdk;
  * such as Front Office's invoices and receipts (WHIT-978).
  *
  * Purely additive.)
+ *
+ * 1.102 (WHITY'S OWN BILLING EMAILS: the host service {@see Mail\BillingEmails} sends a
+ * {@see Mail\WorkspaceEmail} in the INSTANCE's brand to a workspace's members who hold
+ * `billing:pay`, in the workspace's language (EM.1 `payment-failed`, `whity-receipt`). Only a
+ * plugin that declares {@see PluginBillingEmailsInterface} and that the operator granted
+ * (`plugins.billing_email_senders`, empty by default) may send, a few a day per workspace at
+ * most (WHIT-985).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.100.0';
+    public const VERSION = '1.102.0';
 
     /**
      * Static identity only — never instantiated.

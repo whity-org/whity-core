@@ -2798,6 +2798,8 @@
         "settings.meta.maintenance.active.label": "Announce maintenance",
         "settings.meta.mcp.enabled.help": "Expose the MCP tool endpoint so connected AI clients can call this instance.",
         "settings.meta.mcp.enabled.label": "Model Context Protocol (MCP) endpoint",
+        "settings.meta.plugins.billing_email_senders.help": "The plugins that may send Whity's own billing emails, receipts and failed payments, to the people who pay for each workspace, in this instance's name. Plugin names separated by commas, for example whity-pay. Leave this empty so no plugin can.",
+        "settings.meta.plugins.billing_email_senders.label": "Plugins that send billing emails",
         "settings.meta.plugins.mcp_prompts_require_mark.help": "Offer AI agents the prompts of a server plugin only while the Whity store has marked its installed version Verified. Plugins added by hand or from another store have no mark, so their prompts stop while this is on. Tools are not affected.",
         "settings.meta.plugins.mcp_prompts_require_mark.label": "Prompts only from Verified plugins",
         "settings.meta.plugins.store_allowed_hosts.help": "The addresses of the stores people may install plugins from, separated by commas, for example store.example.com. Only secure (https) stores on the public internet are accepted when a plugin is installed. Leave this empty to keep the plugin store off.",

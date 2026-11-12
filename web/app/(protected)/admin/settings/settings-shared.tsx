@@ -457,6 +457,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Offer AI agents the prompts of a server plugin only while the Whity store has marked its installed version Verified. Plugins added by hand or from another store have no mark, so their prompts stop while this is on. Tools are not affected.'
       ),
     },
+    'plugins.billing_email_senders': {
+      label: t('settings.meta.plugins.billing_email_senders.label', 'Plugins that send billing emails'),
+      help: t(
+        'settings.meta.plugins.billing_email_senders.help',
+        "The plugins that may send Whity's own billing emails, receipts and failed payments, to the people who pay for each workspace, in this instance's name. Plugin names separated by commas, for example whity-pay. Leave this empty so no plugin can."
+      ),
+    },
     'plugins.store_enabled': {
       label: t('settings.meta.plugins.store_enabled.label', 'Plugin marketplace'),
       help: t(
@@ -543,7 +550,7 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'settings.section.pluginStore.description',
         'Which stores plugins can be installed from, and whether agents get prompts only from Verified plugins. The plugin marketplace switch is in Feature flags.'
       ),
-      keys: ['plugins.store_allowed_hosts', 'plugins.mcp_prompts_require_mark'],
+      keys: ['plugins.store_allowed_hosts', 'plugins.mcp_prompts_require_mark', 'plugins.billing_email_senders'],
     },
     {
       id: 'storage',

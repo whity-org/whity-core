@@ -2799,6 +2799,8 @@
         "settings.meta.maintenance.active.label": "الإعلان عن الصيانة",
         "settings.meta.mcp.enabled.help": "أتِح نقطة نهاية أدوات MCP ليتمكّن عملاء الذكاء الاصطناعي المتصلون من استدعاء هذا النظام.",
         "settings.meta.mcp.enabled.label": "نقطة نهاية بروتوكول سياق النموذج (MCP)",
+        "settings.meta.plugins.billing_email_senders.help": "الإضافات التي يجوز لها إرسال رسائل الفوترة الخاصة بـ Whity، أي الإيصالات وتعذّر الدفع، إلى من يدفعون عن كل مساحة عمل، باسم هذه النسخة. أسماء الإضافات تفصل بينها فواصل، مثل whity-pay. اتركها فارغة كي لا تستطيع أي إضافة ذلك.",
+        "settings.meta.plugins.billing_email_senders.label": "الإضافات التي ترسل رسائل الفوترة",
         "settings.meta.plugins.mcp_prompts_require_mark.help": "اعرض على وكلاء الذكاء الاصطناعي موجّهات إضافة الخادم فقط ما دام متجر Whity قد وسم نسختها المثبّتة بأنها موثّقة. الإضافات المضافة يدويًا أو من متجر آخر لا تحمل وسمًا، فتتوقف موجّهاتها ما دام هذا الخيار مفعّلًا. لا يؤثر ذلك في الأدوات.",
         "settings.meta.plugins.mcp_prompts_require_mark.label": "الموجّهات من الإضافات الموثّقة فقط",
         "settings.meta.plugins.store_allowed_hosts.help": "عناوين المتاجر التي يجوز تثبيت الإضافات منها، تفصل بينها فواصل، مثل store.example.com. لا تُقبل عند تثبيت إضافة إلا المتاجر الآمنة (https) على الإنترنت العام. اتركها فارغة لإبقاء متجر الإضافات معطّلاً.",
