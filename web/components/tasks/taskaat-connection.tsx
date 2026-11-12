@@ -8,6 +8,7 @@
  * Taskaat. Once connected, agents reach the workspace's Taskaat through Whity's MCP.
  */
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Button } from '@whity/ui/button';
@@ -124,9 +125,12 @@ export function TaskaatConnection() {
               : t('connected.body', 'Your agents reach the workspace\'s Taskaat through Whity, and their changes wait for a person to accept them.')}
           </p>
           <p className="text-muted-foreground">
-            {t('connected.soon', 'Your tasks and boards will show here soon. Until then, open them in Taskaat.')}
+            {t('connected.where', 'Your tasks are in Tasks and Boards, and always in Taskaat too.')}
           </p>
           <div className="flex flex-wrap gap-3">
+            <Button asChild variant="outline">
+              <Link href="/tasks">{t('connected.tasks', 'Go to Tasks')}</Link>
+            </Button>
             <Button asChild variant="outline">
               <a href={openUrl} target="_blank" rel="noopener noreferrer">
                 {t('connected.open', 'Open in Taskaat')}
