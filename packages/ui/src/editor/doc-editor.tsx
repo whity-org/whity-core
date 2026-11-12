@@ -17,6 +17,8 @@ import { Icon, type IconName } from "../icon"
 import { IconButton } from "../icon-button"
 import { cn } from "../utils"
 import { BlockList } from "./block-list"
+import { AgentPanel, type AgentAskStart } from "./agent-panel"
+import type { EditorAgents } from "./agents"
 import { SelectionBubble } from "./bubble"
 import { applyItem, filterCatalogue } from "./catalogue"
 import type { Actor, DocumentKind, EditorMode, PublishBlocker, ResolvedThemeTokens, WhityDocument } from "./contract"
@@ -145,6 +147,11 @@ export interface DocEditorProps {
    * Comment. Without it the editor offers Editing and Viewing only.
    */
   collab?: EditorCollab
+  /**
+   * M6: Ask an agent (EditorAgents). The person's own agent works on the
+   * request over MCP; what it writes arrives as suggestions through `collab`.
+   */
+  agents?: EditorAgents
   className?: string
 }
 
@@ -213,6 +220,7 @@ function DocEditor({
   onExportPdf,
   onPrintLabels,
   collab,
+  agents,
   className,
 }: DocEditorProps) {
   const labels = React.useMemo(() => ({ ...EDITOR_LABELS, ...labelProp }), [labelProp])
@@ -476,6 +484,18 @@ function DocEditor({
     if (wide) setRailOpen(true)
     else setDrawerOpen(true)
   }, [editor, canComment, wide])
+
+  // M6: the Ask an agent sheet; Rewrite opens it with the selection.
+  const [agentStart, setAgentStart] = React.useState<AgentAskStart | null>(null)
+  const canAskAgent = !!agents && showCollab && canSuggest
+  const askAgent = React.useCallback(() => setAgentStart({}), [])
+  const rewriteWithAgent = React.useCallback(() => {
+    if (!editor) return
+    const { from, to, $from } = editor.state.selection
+    const blockId = ($from.parent.attrs.id as string | null) ?? null
+    const quote = from === to ? "" : editor.state.doc.textBetween(from, Math.min(to, $from.end()), undefined, "\uFFFC")
+    setAgentStart({ request: labels.agentRewriteRequest, quote: quote.trim() ? quote : null, anchorBlockId: blockId })
+  }, [editor, labels.agentRewriteRequest])
 
   // ⌥⌘M (Ctrl+Alt+M): comment on the selection.
   React.useEffect(() => {
@@ -966,6 +986,7 @@ function DocEditor({
           fields={allFields}
           onCreateField={fields && editable && !suggesting ? createField : undefined}
           onComment={showCollab && canComment ? startComment : undefined}
+          onAskAgent={canAskAgent ? askAgent : undefined}
           view={view}
           onView={doc.kind === "label" ? undefined : setView}
           zoom={zoom}
@@ -986,6 +1007,16 @@ function DocEditor({
         />
       ) : (
         <div className="h-11 border-b border-border bg-card" />
+      )}
+
+      {canAskAgent && agentStart && agents && (
+        <AgentPanel
+          agents={agents}
+          labels={labels}
+          me={collab?.me?.name}
+          start={agentStart}
+          onClose={() => setAgentStart(null)}
+        />
       )}
 
       {/* Body: outline, canvas */}
@@ -1061,6 +1092,7 @@ function DocEditor({
                       labels={labels}
                       onLink={() => openLink()}
                       onComment={showCollab && canComment ? startComment : undefined}
+                      onRewrite={canAskAgent ? rewriteWithAgent : undefined}
                     />
                   </>
                 )}
