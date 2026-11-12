@@ -47,6 +47,12 @@ function DialogOverlay({
   )
 }
 
+/**
+ * Centred at 488px from 640px up. On a phone it is a sheet docked to the
+ * bottom edge, full width, never taller than the screen (its body scrolls),
+ * clear of the home bar, so a long form or a list of choices stays reachable
+ * under the thumb (04-layout; the phone designs open choices as sheets).
+ */
 function DialogContent({
   className,
   children,
@@ -67,7 +73,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           isDark && "dark",
-          "fixed top-1/2 start-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 rtl:translate-x-1/2 -translate-y-1/2 gap-3 rounded-dialog bg-popover p-6 text-sm text-popover-foreground shadow-float outline-none sm:max-w-[488px] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 start-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 rtl:translate-x-1/2 -translate-y-1/2 gap-3 rounded-dialog bg-popover p-6 text-sm text-popover-foreground shadow-float outline-none sm:max-w-[488px] max-h-[calc(100dvh-2rem)] overflow-y-auto max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:max-h-[calc(100dvh-env(safe-area-inset-top)-0.5rem)] max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:rtl:translate-x-0 max-sm:data-open:zoom-in-100 max-sm:data-open:slide-in-from-bottom-8 max-sm:data-closed:zoom-out-100 max-sm:data-closed:slide-out-to-bottom-8 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
@@ -113,7 +119,14 @@ function DialogFooter({
   return (
     <div
       data-slot="dialog-footer"
-      className={cn("flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end", className)}
+      className={cn(
+        "flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end",
+        // On a phone the buttons stay in view at the foot of the sheet while
+        // a long form scrolls behind them (M.4). The negative offsets reach
+        // over the sheet's own padding so the bar meets its edges.
+        "max-sm:sticky max-sm:-bottom-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:z-[1] max-sm:-mx-6 max-sm:-mb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:border-t max-sm:border-border max-sm:bg-popover max-sm:px-6 max-sm:pt-3 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
+        className
+      )}
       {...props}
     >
       {showCloseButton && (
