@@ -51,6 +51,9 @@ final class FrontendFeaturesBlocksTest extends TestCase
 {
     private Router $router;
 
+    /** The reader's language the next handler serves, when not English. */
+    private ?string $language = null;
+
     protected function setUp(): void
     {
         TenantContext::reset();
@@ -95,6 +98,26 @@ final class FrontendFeaturesBlocksTest extends TestCase
         // resource/action are not applicable to a blocks screen.
         $this->assertNull($byId['plugin-dashboard']['resource']);
         $this->assertNull($byId['plugin-dashboard']['action']);
+    }
+
+    public function testLocalizedTextIsServedInTheReadersLanguage(): void
+    {
+        TenantContext::setTenantId(1);
+        $this->language = 'ar';
+
+        $feature = $this->blocksFeature('plugin-stock', 'demo:read', [
+            ['type' => 'heading', 'level' => 2, 'text' => ['en' => 'Stock', 'ar' => 'المخزون']],
+            ['type' => 'text', 'value' => ['en' => 'Only English here.']],
+        ]);
+        $feature['label'] = ['en' => 'Stock', 'ar' => 'المخزون'];
+
+        $response = $this->handlerFor([$feature], ['demo:read'])->list($this->authedRequest(42));
+
+        $this->assertSame(200, $response->getStatusCode(), $response->getBody());
+        $byId = array_column(json_decode($response->getBody(), true)['data'], null, 'id');
+        $this->assertSame('المخزون', $byId['plugin-stock']['label']);
+        $this->assertSame('المخزون', $byId['plugin-stock']['blocks'][0]['text']);
+        $this->assertSame('Only English here.', $byId['plugin-stock']['blocks'][1]['value'], 'falls back to English');
     }
 
     public function testValidBlocksFeatureIsStillPermissionFiltered(): void
@@ -411,11 +434,17 @@ final class FrontendFeaturesBlocksTest extends TestCase
     {
         $pdo = new \PDO('sqlite::memory:');
 
-        return new ServerLabels(new LanguageRegistry(
+        $registry = new LanguageRegistry(
             new LanguageRepository($pdo),
             new TranslationRepository($pdo),
             new StaticTenantContextAdapter(),
-        ));
+        );
+        if ($this->language !== null) {
+            // No languages table to boot from, so set the request's language directly.
+            (new \ReflectionProperty($registry, 'currentLanguageCode'))->setValue($registry, $this->language);
+        }
+
+        return new ServerLabels($registry);
     }
 
     private function authedRequest(int $userId): Request

@@ -6444,7 +6444,7 @@ $pluginLoader->collectJobs($jobsRegistry);
 // Descriptor-derived navigation (WC-169): every validated plugin frontend
 // feature gets a menu entry pointing at the dynamic screen route /admin/x/{id}.
 // Features are read at dispatch time, so runtime disable drops the entry.
-\Whity\Core\PluginNavigationBridge::subscribe($hookManager, $pluginLoader);
+\Whity\Core\PluginNavigationBridge::subscribe($hookManager, $pluginLoader, static fn (): string => $languageRegistry->getCurrentLanguageCode());
 \Whity\Core\Plugin\Tenant\TenantPluginNavigation::subscribe($hookManager, $tenantManifestHost);
 
 // Handle requests (persistent worker mode or fallback single-request mode)
