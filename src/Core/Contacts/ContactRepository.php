@@ -117,7 +117,7 @@ final class ContactRepository
     }
 
     /**
-     * @param array{kind?: ?string, tag_id?: ?int, q?: ?string, archived?: bool, ids?: ?list<int>} $filter
+     * @param array{kind?: ?string, tag_id?: ?int, q?: ?string, archived?: bool, ids?: ?list<int>, extra?: list<array{0: string, 1: array<string, mixed>}>} $filter
      * @return list<array<string, mixed>>
      */
     public function list(int $tenantId, array $filter, int $limit, int $offset): array
@@ -134,7 +134,7 @@ final class ContactRepository
     }
 
     /**
-     * @param array{kind?: ?string, tag_id?: ?int, q?: ?string, archived?: bool, ids?: ?list<int>} $filter
+     * @param array{kind?: ?string, tag_id?: ?int, q?: ?string, archived?: bool, ids?: ?list<int>, extra?: list<array{0: string, 1: array<string, mixed>}>} $filter
      */
     public function count(int $tenantId, array $filter): int
     {
@@ -160,6 +160,8 @@ final class ContactRepository
     /** Removes a contact for good. Only an import's undo does this. */
     public function delete(int $tenantId, int $id): bool
     {
+        $values = $this->db->prepare("DELETE FROM custom_field_values WHERE tenant_id = :tenant_id AND record_type = 'contact' AND record_id = :id");
+        $values->execute([':tenant_id' => $tenantId, ':id' => $id]);
         $tags = $this->db->prepare("DELETE FROM entity_tags WHERE tenant_id = :tenant_id AND entity_type = 'contact' AND entity_id = :id");
         $tags->execute([':tenant_id' => $tenantId, ':id' => $id]);
         $stmt = $this->db->prepare('DELETE FROM contacts WHERE tenant_id = :tenant_id AND id = :id');
@@ -232,6 +234,30 @@ final class ContactRepository
         return $stmt->fetchColumn() !== false;
     }
 
+    /**
+     * Runs the work in a transaction, or inside the caller's when one is open.
+     *
+     * @template T
+     * @param callable(): T $work
+     * @return T
+     */
+    public function transaction(callable $work): mixed
+    {
+        if ($this->db->inTransaction()) {
+            return $work();
+        }
+        $this->db->beginTransaction();
+        try {
+            $result = $work();
+            $this->db->commit();
+
+            return $result;
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
     /** The display name of a linked profile, for the record page. */
     public function profileName(int $profileId): ?string
     {
@@ -243,7 +269,7 @@ final class ContactRepository
     }
 
     /**
-     * @param array{kind?: ?string, tag_id?: ?int, q?: ?string, archived?: bool, ids?: ?list<int>} $filter
+     * @param array{kind?: ?string, tag_id?: ?int, q?: ?string, archived?: bool, ids?: ?list<int>, extra?: list<array{0: string, 1: array<string, mixed>}>} $filter
      * @return array{0: string, 1: array<string, mixed>}
      */
     private function where(int $tenantId, array $filter): array
@@ -273,6 +299,10 @@ final class ContactRepository
             $params[':q3'] = $like;
             $params[':q4'] = $like;
             $params[':q5'] = $like;
+        }
+        foreach ($filter['extra'] ?? [] as [$predicate, $extraParams]) {
+            $where[] = $predicate;
+            $params += $extraParams;
         }
         $ids = $filter['ids'] ?? null;
         if (is_array($ids)) {
