@@ -145,7 +145,7 @@ final class TaskaatTools
                     : ['readOnlyHint' => true, 'openWorldHint' => true],
                 'requiredPermission' => $writes ? CorePermissions::TASKS_WRITE : CorePermissions::TASKS_READ,
                 'agentPolicy' => $writes ? ToolSurface::AGENT_PROPOSE : ToolSurface::AGENT_ALLOW,
-                'handler' => fn (array $arguments, McpToolContext $context): array => $this->forward($tool, $arguments, $context),
+                'handler' => fn (array $arguments, McpToolContext $context): array|string => $this->forward($tool, $arguments, $context),
             ], self::KEY);
             if ($reason !== null) {
                 $refused[] = $reason;
@@ -168,7 +168,7 @@ final class TaskaatTools
         try {
             $result = $this->client->callTool($context->tenantId, $tool, $arguments);
         } catch (TaskaatException $e) {
-            return ['error' => $e->getMessage()];
+            return ['error' => $e->clientMessage];
         }
 
         return $result['isError'] ? ['error' => $result['text']] : $result['text'];

@@ -44,8 +44,29 @@ final class TaskaatConnectionRealEngineTest extends TestCase
     protected function setUp(): void
     {
         $pdo = SchemaFromMigrations::make(true);
+        $pdo->exec("INSERT INTO tenants (id, name, slug) VALUES (4, 'Example Bakery', 'example-bakery'), (5, 'Example Cafe', 'example-cafe')");
         $this->settings = new TenantSettingsRepository($pdo);
         $this->secrets = new EncryptedSecretStore(['v1' => self::KEY], 'v1');
+    }
+
+    /** @return array{string, string, array<mixed>} */
+    private function lastCall(): array
+    {
+        $last = end($this->calls);
+        self::assertIsArray($last);
+
+        return $last;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function tool(AuthoredToolRegistry $registry, string $name): array
+    {
+        $tool = $registry->get($name);
+        self::assertNotNull($tool);
+
+        return $tool;
     }
 
     private function connection(): TaskaatConnection
@@ -129,7 +150,7 @@ final class TaskaatConnectionRealEngineTest extends TestCase
 
         self::assertTrue($status['connected']);
         self::assertFalse($status['needs_reconnect']);
-        $exchange = end($this->calls);
+        $exchange = $this->lastCall();
         self::assertSame(self::ORIGIN . '/api/oauth/token', $exchange[1]);
         self::assertSame('authorization_code', $exchange[2]['grant_type']);
         self::assertSame(
@@ -195,12 +216,12 @@ final class TaskaatConnectionRealEngineTest extends TestCase
 
         $this->tokenReplies[] = ['access_token' => 'at_2', 'refresh_token' => 'rt_2', 'expires_in' => 30 * 86400];
         self::assertSame('at_2', $connection->accessToken(self::TENANT));
-        self::assertSame('rt_1', end($this->calls)[2]['refresh_token']);
+        self::assertSame('rt_1', $this->lastCall()[2]['refresh_token']);
 
         $this->now += 30 * 86400 - 3600;
         $this->tokenReplies[] = ['access_token' => 'at_3', 'refresh_token' => 'rt_3', 'expires_in' => 30 * 86400];
         self::assertSame('at_3', $connection->accessToken(self::TENANT));
-        self::assertSame('rt_2', end($this->calls)[2]['refresh_token']);
+        self::assertSame('rt_2', $this->lastCall()[2]['refresh_token']);
     }
 
     public function testARevokedRefreshTokenAsksAPersonToConnectAgain(): void
@@ -233,7 +254,7 @@ final class TaskaatConnectionRealEngineTest extends TestCase
         $result = $this->client($connection)->callTool(self::TENANT, 'list_tasks', ['project_id' => 'WHIT']);
 
         self::assertSame(['text' => 'WHIT-1 — Bake [high, pending]', 'isError' => false], $result);
-        $call = end($this->calls);
+        $call = $this->lastCall();
         self::assertSame(self::ORIGIN . '/api/mcp', $call[1]);
         self::assertSame('Bearer at_1', $call[2]['headers']['Authorization']);
         self::assertSame('tools/call', $call[2]['payload']['method']);
@@ -251,7 +272,7 @@ final class TaskaatConnectionRealEngineTest extends TestCase
         $result = $this->client($connection)->callTool(self::TENANT, 'list_projects', []);
 
         self::assertSame('ok', $result['text']);
-        self::assertSame('Bearer at_2', end($this->calls)[2]['headers']['Authorization']);
+        self::assertSame('Bearer at_2', $this->lastCall()[2]['headers']['Authorization']);
     }
 
     public function testCallingWithoutAConnectionSaysWhatToDo(): void
@@ -277,16 +298,16 @@ final class TaskaatConnectionRealEngineTest extends TestCase
         foreach (TaskaatTools::forwarded() as $name) {
             self::assertTrue($registry->has('taskaat_' . $name), $name);
         }
-        self::assertSame('tasks:read', $registry->get('taskaat_get_task')['requiredPermission']);
-        self::assertSame('tasks:write', $registry->get('taskaat_create_task')['requiredPermission']);
-        self::assertSame('propose', $registry->get('taskaat_create_task')['agentPolicy']);
-        self::assertSame('allow', $registry->get('taskaat_list_tasks')['agentPolicy']);
+        self::assertSame('tasks:read', $this->tool($registry, 'taskaat_get_task')['requiredPermission']);
+        self::assertSame('tasks:write', $this->tool($registry, 'taskaat_create_task')['requiredPermission']);
+        self::assertSame('propose', $this->tool($registry, 'taskaat_create_task')['agentPolicy']);
+        self::assertSame('allow', $this->tool($registry, 'taskaat_list_tasks')['agentPolicy']);
 
         $this->mcpReplies[] = ['jsonrpc' => '2.0', 'id' => 1, 'result' => ['content' => [['type' => 'text', 'text' => 'WHIT-1']]]];
         $out = $tools->forward('get_task', ['task_id' => 'WHIT-1'], new McpToolContext(self::TENANT, 7));
 
         self::assertSame('WHIT-1', $out);
-        self::assertSame(['task_id' => 'WHIT-1', 'peek' => true], end($this->calls)[2]['payload']['params']['arguments']);
+        self::assertSame(['task_id' => 'WHIT-1', 'peek' => true], $this->lastCall()[2]['payload']['params']['arguments']);
     }
 
     public function testATaskaatErrorReachesTheAgentAsAnError(): void

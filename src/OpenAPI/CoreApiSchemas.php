@@ -16926,10 +16926,8 @@ final class CoreApiSchemas
     }
 
     /**
-     * Calendar and bookings (WHIT-941, ADR 0017). Instants are ISO 8601 with
-     * an offset on the way in and UTC with `Z` on the way out. Create, move and
-     * cancel declare no undo window, so an agent's call always becomes a
-     * proposal its person approves.
+     * The workspace's connection to Taskaat (WHIT-962, A10). Not MCP tools: agents reach
+     * Taskaat through the taskaat_* tools, and connecting is a person's act.
      *
      * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
      */
@@ -16981,6 +16979,14 @@ final class CoreApiSchemas
         ];
     }
 
+    /**
+     * Calendar and bookings (WHIT-941, ADR 0017). Instants are ISO 8601 with
+     * an offset on the way in and UTC with `Z` on the way out. Create, move and
+     * cancel declare no undo window, so an agent's call always becomes a
+     * proposal its person approves.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
     private static function calendarRoutes(): array
     {
         $range = [

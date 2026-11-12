@@ -10,8 +10,8 @@ namespace Whity\Core\Taskaat;
  */
 final class TaskaatException extends \RuntimeException
 {
-    public function __construct(string $message, public readonly int $status = 502)
+    public function __construct(public readonly string $clientMessage, public readonly int $status = 502)
     {
-        parent::__construct($message);
+        parent::__construct($clientMessage);
     }
 }

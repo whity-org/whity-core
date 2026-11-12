@@ -441,6 +441,7 @@ final class TaskaatConnection
         return $response;
     }
 
+    /** @param positive-int $bytes */
     private static function random(int $bytes = 32): string
     {
         return rtrim(strtr(base64_encode(random_bytes($bytes)), '+/', '-_'), '=');

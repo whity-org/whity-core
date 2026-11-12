@@ -97,7 +97,7 @@ final class TaskaatApiHandler
         try {
             return $work($tenantId, $actor);
         } catch (TaskaatException $e) {
-            return Response::error($e->getMessage(), $e->status);
+            return Response::error($e->clientMessage, $e->status);
         } catch (\Throwable $e) {
             error_log('[TaskaatApiHandler] failed: ' . $e->getMessage());
 
