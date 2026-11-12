@@ -29586,6 +29586,122 @@
                 }
             }
         },
+        "/api/v1/me/agent-proposals/bulk-approve": {
+            "post": {
+                "operationId": "post_api_v1_me_agent_proposals_bulk_approve",
+                "summary": "Approve several ordinary proposals together",
+                "tags": [
+                    "me"
+                ],
+                "description": "Only Ordinary (tier 1) proposals are approved; each runs, is recorded and can be undone on its own. Check first and Needs verifying ones are never approved here and come back under refused.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "minItems": 1,
+                                        "maxItems": 50,
+                                        "description": "The proposals to approve."
+                                    }
+                                },
+                                "required": [
+                                    "ids"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "What was approved and what has to be opened on its own",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentProposalBulkApproveResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No ids, or more than 50",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/agent-proposals/{id}/approve": {
             "post": {
                 "operationId": "post_api_v1_me_agent_proposals_id_approve",
@@ -62798,6 +62914,14 @@
                     "tool": {
                         "type": "string"
                     },
+                    "tier": {
+                        "type": "integer",
+                        "enum": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
                     "summary": {
                         "type": "string"
                     },
@@ -62860,6 +62984,7 @@
                     "agent",
                     "status",
                     "tool",
+                    "tier",
                     "summary",
                     "arguments",
                     "diff",
@@ -62870,6 +62995,52 @@
                     "expiresAt",
                     "createdAt",
                     "action"
+                ]
+            },
+            "AgentProposalBulkApproveResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "approved": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/AgentProposal"
+                                }
+                            },
+                            "refused": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "reason": {
+                                            "type": "string",
+                                            "enum": [
+                                                "not_found",
+                                                "open_on_its_own",
+                                                "not_waiting"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "reason"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "approved",
+                            "refused"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "AgentProposalListResponse": {

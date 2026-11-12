@@ -4287,6 +4287,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/agent-proposals/bulk-approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve several ordinary proposals together
+         * @description Only Ordinary (tier 1) proposals are approved; each runs, is recorded and can be undone on its own. Check first and Needs verifying ones are never approved here and come back under refused.
+         */
+        post: operations["post_api_v1_me_agent_proposals_bulk_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/agent-proposals/{id}/approve": {
         parameters: {
             query?: never;
@@ -9337,6 +9357,8 @@ export interface components {
             /** @enum {string} */
             status: "waiting" | "approved" | "declined" | "expired" | "undone";
             tool: string;
+            /** @enum {integer} */
+            tier: 1 | 2 | 3;
             summary: string;
             arguments: {
                 [key: string]: unknown;
@@ -9355,6 +9377,16 @@ export interface components {
             agentPaused?: boolean;
             /** @description What it would run, in plain words */
             toolInfo?: components["schemas"]["AgentToolInfo"] | null;
+        };
+        AgentProposalBulkApproveResponse: {
+            data: {
+                approved: components["schemas"]["AgentProposal"][];
+                refused: {
+                    id: number;
+                    /** @enum {string} */
+                    reason: "not_found" | "open_on_its_own" | "not_waiting";
+                }[];
+            };
         };
         AgentProposalListResponse: {
             data: components["schemas"]["AgentProposal"][];
@@ -38918,6 +38950,96 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_agent_proposals_bulk_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The proposals to approve. */
+                    ids: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description What was approved and what has to be opened on its own */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentProposalBulkApproveResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No ids, or more than 50 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

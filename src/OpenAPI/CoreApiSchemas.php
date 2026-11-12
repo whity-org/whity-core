@@ -6846,6 +6846,8 @@ final class CoreApiSchemas
                 // waiting · approved · declined · expired · undone
                 'status' => ['type' => 'string', 'enum' => ['waiting', 'approved', 'declined', 'expired', 'undone']],
                 'tool' => self::str(),
+                // AQ.1: 1 Ordinary, 2 Check first, 3 Needs verifying. Only Ordinary ones can be approved together.
+                'tier' => ['type' => 'integer', 'enum' => [1, 2, 3]],
                 'summary' => self::str(),
                 'arguments' => ['type' => 'object', 'additionalProperties' => true],
                 'diff' => ['nullable' => true, 'description' => 'What would change, when the operation can preview it'],
@@ -6859,7 +6861,7 @@ final class CoreApiSchemas
                 'action' => ['allOf' => [SchemaBuilder::ref('AgentAction')], 'nullable' => true],
                 'agentPaused' => ['type' => 'boolean', 'description' => 'The agent is paused, so this can be declined but not approved until it is resumed'],
                 'toolInfo' => ['allOf' => [SchemaBuilder::ref('AgentToolInfo')], 'nullable' => true, 'description' => 'What it would run, in plain words'],
-            ], ['id', 'agent', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt', 'action']),
+            ], ['id', 'agent', 'status', 'tool', 'tier', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt', 'action']),
             'AgentProposalListResponse' => self::listEnvelope('AgentProposal'),
             // ── Agent actions and undo (WHIT-812) ─────────────────────────────
             'AgentAction' => self::object([
@@ -6910,6 +6912,14 @@ final class CoreApiSchemas
             'AgentActionListResponse' => self::listEnvelope('AgentAction'),
             'AgentActionResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentAction')),
             'AgentProposalResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentProposal')),
+            'AgentProposalBulkApproveResponse' => self::dataEnvelope(self::object([
+                'approved' => ['type' => 'array', 'items' => SchemaBuilder::ref('AgentProposal')],
+                // not_found · open_on_its_own (tier 2 or 3) · not_waiting
+                'refused' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::int(),
+                    'reason' => ['type' => 'string', 'enum' => ['not_found', 'open_on_its_own', 'not_waiting']],
+                ], ['id', 'reason'])],
+            ], ['approved', 'refused'])),
             // ── Workspace agents and presets (WHIT-815) ──────────────────────
             'AgentPersonaFields' => self::object(self::agentPersonaProperties(), []),
             'AgentCreateRequest' => self::object(self::agentPersonaProperties() + [
@@ -15014,6 +15024,24 @@ final class CoreApiSchemas
                     'Nothing runs. The agent can ask again.',
                     false,
                 ), static fn (mixed $v): bool => $v !== null),
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/agent-proposals/bulk-approve',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Approve several ordinary proposals together',
+                    'description' => 'Only Ordinary (tier 1) proposals are approved; each runs, is recorded and can be undone on its own. Check first and Needs verifying ones are never approved here and come back under refused.',
+                    'tags' => ['me'],
+                    'request' => self::object([
+                        'ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 1, 'maxItems' => 50, 'description' => 'The proposals to approve.'],
+                    ], ['ids']),
+                    'responses' => [
+                        200 => self::jsonResponse('What was approved and what has to be opened on its own', 'AgentProposalBulkApproveResponse'),
+                        422 => self::errorResponse('No ids, or more than 50'),
+                    ] + self::authErrors(),
+                ],
             ],
         ];
     }
