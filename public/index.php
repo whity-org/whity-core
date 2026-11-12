@@ -4869,6 +4869,25 @@ $router->register('GET',  '/api/document-sources/{id:\d+}/changes',             
 // The people a comment may @mention: members who can read the document.
 $router->register('GET',  '/api/document-sources/{id:\d+}/mentionable',                     [$documentCollabHandler, 'mentionable'],      null, null, CorePermissions::DOCUMENTS_COMMENT);
 
+// Saved blocks (editor M7; E.21-E.24, E.38). Reading needs documents:read and
+// changing documents:write; managing the workspace library uses
+// documents:publish until the register's documents:library:manage is minted.
+// The usage list shows only documents the caller can see (visibleRow).
+// Deleting is agentPolicy refuse.
+$savedBlocksHandler = new \Whity\Api\SavedBlocksApiHandler(
+    new \Whity\Core\Document\SavedBlock\SavedBlockRepository($db->getPdo()),
+    $documentSourcesHandler,
+    $roleChecker,
+    $auditLogger,
+);
+$router->register('GET',    '/api/saved-blocks',                                    [$savedBlocksHandler, 'list'],    null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST',   '/api/saved-blocks',                                    [$savedBlocksHandler, 'create'],  null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('GET',    '/api/saved-blocks/{id:\d+}',                           [$savedBlocksHandler, 'show'],    null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('PATCH',  '/api/saved-blocks/{id:\d+}',                           [$savedBlocksHandler, 'update'],  null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('DELETE', '/api/saved-blocks/{id:\d+}',                           [$savedBlocksHandler, 'delete'],  null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('GET',    '/api/saved-blocks/{id:\d+}/versions/{version:\d+}',    [$savedBlocksHandler, 'version'], null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('GET',    '/api/saved-blocks/{id:\d+}/usage',                     [$savedBlocksHandler, 'usage'],   null, null, CorePermissions::DOCUMENTS_READ);
+
 // 13b-quinquies-bis. ROUTING NOTIFICATIONS (#1054) — the subscriber that turns a
 // routing broadcast into notifications.
 //

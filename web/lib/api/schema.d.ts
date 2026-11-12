@@ -7508,6 +7508,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/saved-blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the saved blocks the caller can insert
+         * @description The caller's own Only me blocks and every block shared with the workspace, not deleted, by name. Each says in usedIn how many documents use it.
+         */
+        get: operations["get_api_v1_saved_blocks"];
+        put?: never;
+        /**
+         * Save blocks as one saved block
+         * @description Synced (editing it once updates every document using it) or Copy (inserts ordinary blocks), shared with Only me or Everyone in the workspace (E.21, E.22). It starts at version 1. Sharing with the workspace needs documents:publish. Managing the workspace library needs documents:publish for now (the register's documents:library:manage is not minted yet).
+         */
+        post: operations["post_api_v1_saved_blocks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-blocks/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one saved block
+         * @description Its blocks at the current version. A deleted block still answers, with archivedAt set, so documents using it keep rendering.
+         */
+        get: operations["get_api_v1_saved_blocks_id"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a saved block
+         * @description Archives it: it leaves the / menu and the library, while documents and published templates that use it keep their version. A synced block still used by documents answers 409 with details.code in_use and details.used_in, unless a documents:publish holder sends force=1. The owner deletes their own blocks; someone else's workspace block needs documents:publish. Managing the workspace library needs documents:publish for now (the register's documents:library:manage is not minted yet). People only.
+         */
+        delete: operations["delete_api_v1_saved_blocks_id"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a saved block
+         * @description Rename it, change its description or sharing, or its blocks and per-document keys. Only the fields sent change. A change of blocks bumps the version and keeps the old one, so a published template keeps printing what it was published with until it is published again (E.38). The owner changes their own blocks; changing someone else's workspace block, or sharing one with the workspace, needs documents:publish. Managing the workspace library needs documents:publish for now (the register's documents:library:manage is not minted yet). Send version to refuse a change made in between (409 changed). mode can't change.
+         */
+        patch: operations["patch_api_v1_saved_blocks_id"];
+        trace?: never;
+    };
+    "/api/v1/saved-blocks/{id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the documents that use a saved block
+         * @description The documents the caller can see that use it, with the version each shows. meta.total counts every document using it, meta.hidden those the caller can't see.
+         */
+        get: operations["get_api_v1_saved_blocks_id_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-blocks/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one version of a saved block
+         * @description The blocks a version had; a published template prints the version it was published with (E.38).
+         */
+        get: operations["get_api_v1_saved_blocks_id_versions_version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search": {
         parameters: {
             query?: never;
@@ -14568,6 +14660,122 @@ export interface components {
         };
         RoutingRuleListResponse: {
             data: components["schemas"]["RoutingRule"][];
+        };
+        SavedBlock: {
+            id: number;
+            /** @description At most 120 characters */
+            name: string;
+            description: string | null;
+            /**
+             * @description synced: editing it once updates every document that uses it; copy: inserts ordinary blocks
+             * @enum {string}
+             */
+            mode: "synced" | "copy";
+            /**
+             * @description Only me, or everyone in the workspace
+             * @enum {string}
+             */
+            sharing: "me" | "workspace";
+            /** @description Who saved it; null when that person was removed */
+            owner: components["schemas"]["DocumentActor"] | null;
+            /** @description The contract Block[] at the current version */
+            blocks: {
+                [key: string]: unknown;
+            }[];
+            /** @description Keys of the parts each document fills itself (E.23) */
+            perDocumentKeys: string[];
+            /** @description Starts at 1; goes up by one on every change of blocks */
+            version: number;
+            /** @description How many documents use it */
+            usedIn: number;
+            /** @description When it was deleted, ISO 8601 UTC; null while it is live */
+            archivedAt: string | null;
+            /** @description ISO 8601 UTC */
+            createdAt: string;
+            /** @description ISO 8601 UTC */
+            updatedAt: string;
+        };
+        SavedBlockArchiveResponse: {
+            data: {
+                id: number;
+                archived: boolean;
+                /** @description How many documents still use it */
+                usedIn: number;
+            };
+        };
+        SavedBlockCreateRequest: {
+            /** @description At most 120 characters, for example Bank details */
+            name: string;
+            /** @description At most 1000 characters */
+            description?: string | null;
+            /** @enum {string} */
+            mode: "synced" | "copy";
+            /**
+             * @description Left out, me. workspace needs documents:publish
+             * @enum {string}
+             */
+            sharing?: "me" | "workspace";
+            /** @description The contract Block[]: 1 to 200 objects, each with a string id and type, at most 256 KiB */
+            blocks: {
+                [key: string]: unknown;
+            }[];
+            /** @description Keys used by perDocument marks in the blocks; at most 200 */
+            per_document_keys?: string[];
+        };
+        SavedBlockListResponse: {
+            data: components["schemas"]["SavedBlock"][];
+        };
+        SavedBlockResponse: {
+            data: components["schemas"]["SavedBlock"];
+        };
+        SavedBlockUpdateRequest: {
+            /** @description At most 120 characters */
+            name?: string;
+            /** @description At most 1000 characters; null clears it */
+            description?: string | null;
+            /**
+             * @description Sharing with the workspace needs documents:publish
+             * @enum {string}
+             */
+            sharing?: "me" | "workspace";
+            /** @description The new contract Block[]; a change bumps the version */
+            blocks?: {
+                [key: string]: unknown;
+            }[];
+            /** @description Keys used by perDocument marks in the blocks */
+            per_document_keys?: string[];
+            /** @description The version the change was made against; a different current version is 409 changed */
+            version?: number;
+        };
+        SavedBlockUsage: {
+            /** @description The document id */
+            id: number;
+            title: string;
+            /** @description template, letter, report, note, wiki or label */
+            kind: string;
+            /** @description The saved block version the document shows */
+            version: number;
+        };
+        SavedBlockUsageResponse: {
+            data: components["schemas"]["SavedBlockUsage"][];
+            meta: {
+                /** @description Every document using it */
+                total: number;
+                /** @description Documents using it that the caller can't see */
+                hidden: number;
+            };
+        };
+        SavedBlockVersionResponse: {
+            data: {
+                savedBlockId: number;
+                version: number;
+                /** @description The contract Block[] of that version */
+                blocks: {
+                    [key: string]: unknown;
+                }[];
+                /** @description ISO 8601 UTC */
+                createdAt: string;
+            };
         };
         SavedSignatureRequest: {
             appearance: components["schemas"]["SignatureAppearance"];
@@ -55421,6 +55629,546 @@ export interface operations {
                 };
             };
             /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_saved_blocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The saved blocks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedBlockListResponse"];
+                };
+            };
+            /** @description Tenant context is required */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_saved_blocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedBlockCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The saved block */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedBlockResponse"];
+                };
+            };
+            /** @description Tenant context is required */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid name, description, mode, sharing, blocks or per_document_keys */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_saved_blocks_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The saved block */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedBlockResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Saved block not found, or someone else's Only me block */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_saved_blocks_id: {
+        parameters: {
+            query?: {
+                /** @description `1` deletes a synced block that documents still use; needs documents:publish. */
+                force?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The deleted block */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedBlockArchiveResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Saved block not found, or someone else's Only me block */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description details.code in_use: a synced block still used; details.used_in is how many documents use it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_saved_blocks_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedBlockUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The saved block */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedBlockResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Saved block not found, or someone else's Only me block */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description details.code: changed (someone changed it in between) or archived */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid name, description, sharing, blocks or per_document_keys, or a different mode */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_saved_blocks_id_usage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The documents */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedBlockUsageResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Saved block not found, or someone else's Only me block */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_saved_blocks_id_versions_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedBlockVersionResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Saved block or version not found, or not visible to the caller */
             404: {
                 headers: {
                     [name: string]: unknown;

@@ -50407,6 +50407,696 @@
                 ]
             }
         },
+        "/api/v1/saved-blocks": {
+            "get": {
+                "operationId": "get_api_v1_saved_blocks",
+                "summary": "List the saved blocks the caller can insert",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The caller's own Only me blocks and every block shared with the workspace, not deleted, by name. Each says in usedIn how many documents use it.",
+                "responses": {
+                    "200": {
+                        "description": "The saved blocks",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SavedBlockListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Tenant context is required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_saved_blocks",
+                "summary": "Save blocks as one saved block",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Synced (editing it once updates every document using it) or Copy (inserts ordinary blocks), shared with Only me or Everyone in the workspace (E.21, E.22). It starts at version 1. Sharing with the workspace needs documents:publish. Managing the workspace library needs documents:publish for now (the register's documents:library:manage is not minted yet).",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SavedBlockCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The saved block",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SavedBlockResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Tenant context is required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid name, description, mode, sharing, blocks or per_document_keys",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/saved-blocks/{id}": {
+            "delete": {
+                "operationId": "delete_api_v1_saved_blocks_id",
+                "summary": "Delete a saved block",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Archives it: it leaves the / menu and the library, while documents and published templates that use it keep their version. A synced block still used by documents answers 409 with details.code in_use and details.used_in, unless a documents:publish holder sends force=1. The owner deletes their own blocks; someone else's workspace block needs documents:publish. Managing the workspace library needs documents:publish for now (the register's documents:library:manage is not minted yet). People only.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "force",
+                        "in": "query",
+                        "required": false,
+                        "description": "`1` deletes a synced block that documents still use; needs documents:publish.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The deleted block",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SavedBlockArchiveResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Saved block not found, or someone else's Only me block",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "details.code in_use: a synced block still used; details.used_in is how many documents use it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "get": {
+                "operationId": "get_api_v1_saved_blocks_id",
+                "summary": "Get one saved block",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Its blocks at the current version. A deleted block still answers, with archivedAt set, so documents using it keep rendering.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The saved block",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SavedBlockResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Saved block not found, or someone else's Only me block",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_saved_blocks_id",
+                "summary": "Change a saved block",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Rename it, change its description or sharing, or its blocks and per-document keys. Only the fields sent change. A change of blocks bumps the version and keeps the old one, so a published template keeps printing what it was published with until it is published again (E.38). The owner changes their own blocks; changing someone else's workspace block, or sharing one with the workspace, needs documents:publish. Managing the workspace library needs documents:publish for now (the register's documents:library:manage is not minted yet). Send version to refuse a change made in between (409 changed). mode can't change.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SavedBlockUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The saved block",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SavedBlockResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Saved block not found, or someone else's Only me block",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "details.code: changed (someone changed it in between) or archived",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid name, description, sharing, blocks or per_document_keys, or a different mode",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/saved-blocks/{id}/usage": {
+            "get": {
+                "operationId": "get_api_v1_saved_blocks_id_usage",
+                "summary": "List the documents that use a saved block",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The documents the caller can see that use it, with the version each shows. meta.total counts every document using it, meta.hidden those the caller can't see.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The documents",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SavedBlockUsageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Saved block not found, or someone else's Only me block",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/saved-blocks/{id}/versions/{version}": {
+            "get": {
+                "operationId": "get_api_v1_saved_blocks_id_versions_version",
+                "summary": "Get one version of a saved block",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The blocks a version had; a published template prints the version it was published with (E.38).",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The version",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SavedBlockVersionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Saved block or version not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/search": {
             "get": {
                 "operationId": "get_api_v1_search",
@@ -81713,6 +82403,336 @@
                         "items": {
                             "$ref": "#/components/schemas/RoutingRule"
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SavedBlock": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "At most 120 characters"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": [
+                            "synced",
+                            "copy"
+                        ],
+                        "description": "synced: editing it once updates every document that uses it; copy: inserts ordinary blocks"
+                    },
+                    "sharing": {
+                        "type": "string",
+                        "enum": [
+                            "me",
+                            "workspace"
+                        ],
+                        "description": "Only me, or everyone in the workspace"
+                    },
+                    "owner": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/DocumentActor"
+                            }
+                        ],
+                        "description": "Who saved it; null when that person was removed"
+                    },
+                    "blocks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "The contract Block[] at the current version"
+                    },
+                    "perDocumentKeys": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Keys of the parts each document fills itself (E.23)"
+                    },
+                    "version": {
+                        "type": "integer",
+                        "description": "Starts at 1; goes up by one on every change of blocks"
+                    },
+                    "usedIn": {
+                        "type": "integer",
+                        "description": "How many documents use it"
+                    },
+                    "archivedAt": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When it was deleted, ISO 8601 UTC; null while it is live"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "description": "ISO 8601 UTC"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "description": "ISO 8601 UTC"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "mode",
+                    "sharing",
+                    "owner",
+                    "blocks",
+                    "perDocumentKeys",
+                    "version",
+                    "usedIn",
+                    "archivedAt",
+                    "createdAt",
+                    "updatedAt"
+                ]
+            },
+            "SavedBlockArchiveResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "archived": {
+                                "type": "boolean"
+                            },
+                            "usedIn": {
+                                "type": "integer",
+                                "description": "How many documents still use it"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "archived",
+                            "usedIn"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SavedBlockCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "At most 120 characters, for example Bank details"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "At most 1000 characters"
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": [
+                            "synced",
+                            "copy"
+                        ]
+                    },
+                    "sharing": {
+                        "type": "string",
+                        "enum": [
+                            "me",
+                            "workspace"
+                        ],
+                        "description": "Left out, me. workspace needs documents:publish"
+                    },
+                    "blocks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "The contract Block[]: 1 to 200 objects, each with a string id and type, at most 256 KiB"
+                    },
+                    "per_document_keys": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Keys used by perDocument marks in the blocks; at most 200"
+                    }
+                },
+                "required": [
+                    "name",
+                    "mode",
+                    "blocks"
+                ]
+            },
+            "SavedBlockListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SavedBlock"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SavedBlockResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/SavedBlock"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SavedBlockUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "At most 120 characters"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "At most 1000 characters; null clears it"
+                    },
+                    "sharing": {
+                        "type": "string",
+                        "enum": [
+                            "me",
+                            "workspace"
+                        ],
+                        "description": "Sharing with the workspace needs documents:publish"
+                    },
+                    "blocks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "The new contract Block[]; a change bumps the version"
+                    },
+                    "per_document_keys": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Keys used by perDocument marks in the blocks"
+                    },
+                    "version": {
+                        "type": "integer",
+                        "description": "The version the change was made against; a different current version is 409 changed"
+                    }
+                }
+            },
+            "SavedBlockUsage": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "The document id"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "description": "template, letter, report, note, wiki or label"
+                    },
+                    "version": {
+                        "type": "integer",
+                        "description": "The saved block version the document shows"
+                    }
+                },
+                "required": [
+                    "id",
+                    "title",
+                    "kind",
+                    "version"
+                ]
+            },
+            "SavedBlockUsageResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SavedBlockUsage"
+                        }
+                    },
+                    "meta": {
+                        "type": "object",
+                        "properties": {
+                            "total": {
+                                "type": "integer",
+                                "description": "Every document using it"
+                            },
+                            "hidden": {
+                                "type": "integer",
+                                "description": "Documents using it that the caller can't see"
+                            }
+                        },
+                        "required": [
+                            "total",
+                            "hidden"
+                        ]
+                    }
+                },
+                "required": [
+                    "data",
+                    "meta"
+                ]
+            },
+            "SavedBlockVersionResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "savedBlockId": {
+                                "type": "integer"
+                            },
+                            "version": {
+                                "type": "integer"
+                            },
+                            "blocks": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                },
+                                "description": "The contract Block[] of that version"
+                            },
+                            "createdAt": {
+                                "type": "string",
+                                "description": "ISO 8601 UTC"
+                            }
+                        },
+                        "required": [
+                            "savedBlockId",
+                            "version",
+                            "blocks",
+                            "createdAt"
+                        ]
                     }
                 },
                 "required": [
