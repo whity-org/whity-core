@@ -4950,6 +4950,25 @@ $router->register('GET',  '/api/document-sources/{id:\d+}/changes',             
 // The people a comment may @mention: members who can read the document.
 $router->register('GET',  '/api/document-sources/{id:\d+}/mentionable',                     [$documentCollabHandler, 'mentionable'],      null, null, CorePermissions::DOCUMENTS_COMMENT);
 
+// Saved blocks (editor M7; E.21-E.24, E.38). Reading needs documents:read and
+// changing documents:write; managing the workspace library uses
+// documents:publish until the register's documents:library:manage is minted.
+// The usage list shows only documents the caller can see (visibleRow).
+// Deleting is agentPolicy refuse.
+$savedBlocksHandler = new \Whity\Api\SavedBlocksApiHandler(
+    new \Whity\Core\Document\SavedBlock\SavedBlockRepository($db->getPdo()),
+    $documentSourcesHandler,
+    $roleChecker,
+    $auditLogger,
+);
+$router->register('GET',    '/api/saved-blocks',                                    [$savedBlocksHandler, 'list'],    null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST',   '/api/saved-blocks',                                    [$savedBlocksHandler, 'create'],  null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('GET',    '/api/saved-blocks/{id:\d+}',                           [$savedBlocksHandler, 'show'],    null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('PATCH',  '/api/saved-blocks/{id:\d+}',                           [$savedBlocksHandler, 'update'],  null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('DELETE', '/api/saved-blocks/{id:\d+}',                           [$savedBlocksHandler, 'delete'],  null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('GET',    '/api/saved-blocks/{id:\d+}/versions/{version:\d+}',    [$savedBlocksHandler, 'version'], null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('GET',    '/api/saved-blocks/{id:\d+}/usage',                     [$savedBlocksHandler, 'usage'],   null, null, CorePermissions::DOCUMENTS_READ);
+
 // Agents in the editor (editor M6; E.30, E.31; owner's answers Q3, Q4, Q9).
 // Whity hosts no model: a person's request waits until their own agent picks
 // it up over MCP (document_agent_requests_next). The agent's tools are named by

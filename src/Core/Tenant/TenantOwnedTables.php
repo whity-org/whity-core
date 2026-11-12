@@ -226,6 +226,11 @@ final class TenantOwnedTables
         'document_comment_threads' => '184_create_document_comment_threads.php',
         'document_comments' => '185_create_document_comments.php',
         'document_agent_requests' => '252_create_document_agent_requests.php',
+        // Editor M7: saved blocks, their insert-only versions, and which
+        // documents use them (migrations 260 and 265, E.21-E.24, E.38).
+        'saved_blocks' => '260_create_saved_blocks.php',
+        'saved_block_versions' => '260_create_saved_blocks.php',
+        'saved_block_uses' => '265_create_saved_block_uses.php',
         // Whity Builder (WHIT-760): a workspace's own plugins as published
         // manifest versions, the live pointer, and the permission slugs they
         // declare (migration 164).
