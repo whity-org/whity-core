@@ -754,6 +754,11 @@ final class CalendarApiHandler
         $pick = static fn (string $k, mixed $default): mixed => array_key_exists($k, $body) ? $body[$k] : $default;
         $name = LocalizedLabel::fromInput($pick('name', $existing['name'] ?? null), 'name');
         $descriptionRaw = $pick('description', $existing['description'] ?? []);
+        // A stored empty description reads back as `{}` (an empty object), so a
+        // PATCH that leaves `description` out must treat that as empty too.
+        if ($descriptionRaw instanceof \stdClass && get_object_vars($descriptionRaw) === []) {
+            $descriptionRaw = [];
+        }
         $description = $descriptionRaw === [] || $descriptionRaw === '' || $descriptionRaw === null ? [] : LocalizedLabel::fromInput($descriptionRaw, 'description');
         $int = static function (string $k, mixed $v, int $min, int $max): int {
             if (!is_int($v) || $v < $min || $v > $max) {
