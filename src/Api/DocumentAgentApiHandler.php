@@ -323,16 +323,22 @@ final class DocumentAgentApiHandler
             return Response::error('This document has not been published; an agent reads a draft only when asked from the editor', 409, ['code' => 'not_published']);
         }
         $projection = $this->collab->projection($tenantId, $sourceId);
+        $title = (string) $row['title'];
+        $blocks = array_values(is_array($row['blocks'] ?? null) ? $row['blocks'] : []);
+        if ($published !== null && !$draft) {
+            $title = $published['title'];
+            $blocks = $published['blocks'];
+        }
 
         return Response::json(['data' => [
             'id'                => $sourceId,
             'kind'              => (string) $row['kind'],
-            'title'             => $draft || $published === null ? (string) $row['title'] : $published['title'],
+            'title'             => $title,
             'lang'              => (string) ($row['lang'] ?? 'en'),
             'reading'           => $draft ? 'draft' : 'published',
             'draft_version'     => (int) $row['draft_version'],
             'published_version' => $row['published_version'] !== null ? (int) $row['published_version'] : null,
-            'blocks'            => $draft || $published === null ? array_values(is_array($row['blocks'] ?? null) ? $row['blocks'] : []) : $published['blocks'],
+            'blocks'            => $blocks,
             'suggestions'       => $projection['suggestions'],
             'comments'          => array_values(array_filter($projection['comments'], static fn (array $t): bool => $t['resolved'] === null)),
         ]]);
