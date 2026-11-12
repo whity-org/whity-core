@@ -1,0 +1,62 @@
+<!-- @dsCard group="Templates · Near term" height=880 width=1440 subtitle="N4: receiving a delivery against its purchase order, and matching the supplier’s bill to what was ordered and received" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1440px;min-height:880px}</style><meta charset="utf-8"><title>Receiving and bills</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['customer', 'Contacts'], ['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions'], ['chart', 'Reports']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function kpi(l, v, s, cls) { return h('div', { className: 'wk-kpi' }, h('span', null, l), h('b', null, v), s ? h('small', { className: cls || '' }, s) : null); }
+  function num(v, cls) { return h('span', { className: 'wk-num' + (cls ? ' ' + cls : '') }, v); }
+  function tabs(items, on) { return h('div', { className: 'wk-bar' }, h(W.Tabs, { items: items.map(function (x, i) { return { value: String(i), label: x[0], count: x[1] }; }), defaultValue: String(on) })); }
+
+  function ln(n, o, r, b, st, off) { return h('div', { className: 'wk-3way' }, h('span', null, n), h('span', { className: 'n' }, o), h('span', { className: 'n' + (off === 'r' ? ' is-off' : '') }, r), h('span', { className: 'n' + (off === 'b' ? ' is-off' : '') }, b), st); }
+  var match = h(W.Card, { title: 'PO-0151 · Jordan Flour Mills', description: 'Ordered, received and billed, line by line', style: { padding: 0 } }, h('div', { className: 'wk-3way is-head' }, h('span', null, 'Item'), h('span', { style: { textAlign: 'end' } }, 'Ordered'), h('span', { style: { textAlign: 'end' } }, 'Received'), h('span', { style: { textAlign: 'end' } }, 'Billed'), h('span')),
+    ln('Flour, 25 kg bag', '24', '24', '24', h(W.Badge, { variant: 'success' }, 'Matches')), ln('Semolina, 25 kg bag', '6', '5', '6', h(W.Badge, { variant: 'destructive' }, '1 not received'), 'b'), ln('Delivery', '1', '1', '1', h(W.Badge, { variant: 'success' }, 'Matches')),
+    h('div', { className: 'wk-3way', style: { fontWeight: 600 } }, h('span', null, 'Total'), h('span', { className: 'n' }, '448.000'), h('span', { className: 'n' }, '437.400'), h('span', { className: 'n is-off' }, '448.000'), h('span')));
+  var recv = h(W.Card, { title: 'Received today at 08:20, Central kitchen', description: 'By Ibrahim Mansour on the phone' }, h(W.DescriptionList, { items: [{ label: 'Flour', value: '24 bags · lot L-3311 · expires 8 May' }, { label: 'Semolina', value: '5 bags · 1 short, noted by Ibrahim' }, { label: 'Delivery note', value: 'Photo attached' }] }));
+  var bill = h('div', { className: 'wk-panel' }, h('section', null, h('h3', null, 'Supplier’s bill'), h('h2', null, 'Bill 7781 · JOD 448.000'), h('div', { className: 'wk-meta' }, h('span', null, 'Due 8 December'), h('span', null, '· read from the PDF by Bookkeeping assistant'))),
+    h('section', null, h(W.Alert, { variant: 'warning', title: 'Billed for 1 bag not received' }, 'Semolina: billed 6, received 5. JOD 10.600 more than what arrived.'), h(W.ActorChip, { kind: 'agent', name: 'Bookkeeping assistant', onBehalfOf: 'Awss Haddad' }), h('div', { className: 'wk-minutes', style: { gap: 6, padding: 12 } }, h('b', null, 'Ask Jordan Flour Mills for a credit note of JOD 10.600'), h('small', { style: { color: 'var(--muted-foreground)' } }, 'By email, with the delivery note photo'))),
+    h('section', null, h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end' } }, h(W.Button, { variant: 'outline' }, 'Pay 437.400 only'), h(W.Button, { icon: 'send' }, 'Ask for the credit note'))));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Inventory', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: 'Purchases' }, { label: 'PO-0151' }], title: 'Receiving and the bill', description: 'Purchase order PO-0151 · approved by Emad · sent 9 Nov', actions: h(W.Button, { variant: 'outline', icon: 'barcode' }, 'Receive more') }),
+    tabs([['Order'], ['Receiving', 1], ['Bill', 1], ['History']], 2), h('div', { className: 'wk-split', style: { gridTemplateColumns: 'minmax(0,1fr) 420px' } }, h('div', { style: { display: 'grid', gap: 16 } }, match, recv), bill))));
+</script>
+</body>
+</html>

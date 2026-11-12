@@ -21,6 +21,9 @@ final class CalendarPlugins
     /** @var list<ExternalBusySource> */
     private array $busy = [];
 
+    /** @var array<string, ReminderChannel> */
+    private array $reminders = [];
+
     public function __construct(private readonly ?LoggerInterface $logger = null)
     {
     }
@@ -42,6 +45,29 @@ final class CalendarPlugins
     public function addBusyPlugin(string $plugin, PluginCalendarBusyInterface $source): void
     {
         $this->busy[] = new PluginBusySource($plugin, $source, $this->logger);
+    }
+
+    /**
+     * Add a reminder channel (design 3.3: WhatsApp is a paid plugin). One per
+     * name; a second with the same name is refused. Returns whether it was taken.
+     */
+    public function addReminderChannel(string $plugin, ReminderChannel $channel): bool
+    {
+        $name = $channel->name();
+        if (isset($this->reminders[$name])) {
+            $this->logger?->warning('[calendar] a second reminder channel with the same name was refused', ['plugin' => $plugin, 'channel' => $name]);
+
+            return false;
+        }
+        $this->reminders[$name] = $channel;
+
+        return true;
+    }
+
+    /** @return list<ReminderChannel> */
+    public function reminderChannels(): array
+    {
+        return array_values($this->reminders);
     }
 
     public function paymentStep(): ?BookingPaymentStep

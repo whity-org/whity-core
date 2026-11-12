@@ -1,0 +1,62 @@
+<!-- @dsCard group="Templates · Work" height=849 width=1440 subtitle="FL.1: workflows across everything, each said in a sentence, with templates to start from" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Flows</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function node(kind, ic, t, sub, sel) { return h('div', { className: 'wk-node is-' + kind + (sel ? ' is-sel' : '') }, h('span', null, I(ic, 16)), h('div', null, h('b', null, t), sub ? h('small', null, sub) : null)); }
+  function line(plus) { return h('div', { className: 'wk-line' + (plus ? ' has-plus' : '') }); }
+
+  var rows = [{ id: 1, n: 'Purchases over JOD 500', s: h('span', { className: 'wk-sentence' }, 'When a ', h('b', null, 'purchase order'), ' is created over ', h('b', null, 'JOD 500'), ', ', h('b', null, 'Emad'), ' then ', h('b', null, 'Amro'), ' approve it'), r: 34, st: ['success', 'On'] },
+    { id: 2, n: 'Late invoices', s: h('span', { className: 'wk-sentence' }, 'When an invoice is ', h('b', null, '7 days late'), ', ', h('b', null, 'Billing assistant'), ' sends a reminder; after ', h('b', null, '14 days'), ', Awss calls'), r: 12, st: ['success', 'On'] },
+    { id: 3, n: 'Leave requests', s: h('span', { className: 'wk-sentence' }, 'When a ', h('b', null, 'leave form'), ' is sent, the ', h('b', null, 'manager'), ' approves, then ', h('b', null, 'HR'), ' files it'), r: 8, st: ['success', 'On'] },
+    { id: 4, n: 'Low stock', s: h('span', { className: 'wk-sentence' }, 'When stock falls below its ', h('b', null, 'reorder level'), ', ', h('b', null, 'Stock assistant'), ' proposes an order'), r: 21, st: ['success', 'On'] },
+    { id: 5, n: 'New hire', s: h('span', { className: 'wk-sentence' }, 'When an application is ', h('b', null, 'accepted'), ', create their account, a ', h('b', null, 'welcome task'), ' and a meeting'), r: 0, st: ['secondary', 'Draft'] }];
+  var cols = [{ key: 'n', label: 'Flow', render: function (r) { return h('div', null, h('b', null, r.n), h('div', { style: { marginTop: 2 } }, r.s)); } }, { key: 'r', label: 'Ran this month', align: 'end', render: function (r) { return h('span', { className: 'wk-num' }, r.r); } }, { key: 'st', label: '', render: function (r) { return h(W.Badge, { variant: r.st[0] }, r.st[1]); } }];
+  function tpl(ic, t, sub) { return h('div', { className: 'wk-svc' }, h('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } }, I(ic, 16), h('b', null, t)), h('small', null, sub)); }
+  var side = h(W.Card, { title: 'Start from a template' }, h('div', { style: { display: 'grid', gap: 8 } }, tpl('document', 'A document’s route', 'Who reads, approves and signs'), tpl('form', 'A form’s approvals', 'From sent to filed'), tpl('money', 'Spending limits', 'Approvals by amount'), tpl('robot', 'An agent on a trigger', 'When X happens, an agent does Y'), tpl('calendar', 'On a schedule', 'Every Monday, every month end')));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Flows', h(F, null, h(W.PageHeader, { title: 'Flows', description: 'What happens, and who decides, when something happens. Document routes are flows too.', actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'robot' }, 'Describe a flow'), h(W.Button, { icon: 'plus' }, 'New flow')) }),
+    h('div', { className: 'wk-bar' }, h(W.Tabs, { items: [{ value: 'a', label: 'All', count: 9 }, { value: 'd', label: 'Documents', count: 3 }, { value: 'f', label: 'Forms', count: 2 }, { value: 'm', label: 'Money', count: 2 }, { value: 's', label: 'Stock', count: 1 }, { value: 'p', label: 'People', count: 1 }], defaultValue: 'a' })),
+    h('div', { className: 'wk-split', style: { gridTemplateColumns: 'minmax(0,1fr) 340px' } }, h(W.Card, { style: { padding: 0 } }, h(W.DataTable, { label: 'Flows', columns: cols, rows: rows, rowMenu: true })), side))));
+</script>
+</body>
+</html>

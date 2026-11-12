@@ -129,7 +129,15 @@ final class TwoFactorRecoveryApprovalsApiHandler
         }
 
         try {
-            $result = $this->service->approveForTenant($requestId, $ctx['tenantId'], $ctx['userId'], $method);
+            // The first approval only counts while its admin is still an admin here.
+            $result = $this->service->approveForTenant(
+                $requestId,
+                $ctx['tenantId'],
+                $ctx['userId'],
+                $method,
+                fn (int $profileId, int $tenantId): bool => $this->roleChecker
+                    ->hasPermissionForProfile($profileId, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE, $tenantId),
+            );
             if (is_string($result)) {
                 return self::refusal($result);
             }

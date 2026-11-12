@@ -16,7 +16,7 @@ use Whity\Core\Form\LocalizedLabel;
 final class ServiceRepository
 {
     private const COLUMNS = 'id, name, description, duration_minutes, buffer_before_minutes, buffer_after_minutes,
-                             price_minor, currency, bookable_online, active, sort_order';
+                             price_minor, currency, bookable_online, active, sort_order, room_id, needs_approval';
 
     public function __construct(private readonly PDO $db)
     {
@@ -65,8 +65,8 @@ final class ServiceRepository
     {
         $stmt = $this->db->prepare(
             'INSERT INTO calendar_services (tenant_id, name, description, duration_minutes, buffer_before_minutes,
-                    buffer_after_minutes, price_minor, currency, bookable_online, active, sort_order)
-             VALUES (:tenant_id, :name, :description, :duration, :before, :after, :price, :currency, :online, :active, :sort)
+                    buffer_after_minutes, price_minor, currency, bookable_online, active, sort_order, room_id, needs_approval)
+             VALUES (:tenant_id, :name, :description, :duration, :before, :after, :price, :currency, :online, :active, :sort, :room_id, :needs_approval)
              RETURNING id'
         );
         $this->bind($stmt, $v);
@@ -84,7 +84,7 @@ final class ServiceRepository
                 SET name = :name, description = :description, duration_minutes = :duration,
                     buffer_before_minutes = :before, buffer_after_minutes = :after, price_minor = :price,
                     currency = :currency, bookable_online = :online, active = :active, sort_order = :sort,
-                    updated_at = :now
+                    room_id = :room_id, needs_approval = :needs_approval, updated_at = :now
               WHERE tenant_id = :tenant_id AND id = :id'
         );
         $this->bind($stmt, $v);
@@ -135,6 +135,9 @@ final class ServiceRepository
         $stmt->bindValue(':online', $v['bookable_online'], PDO::PARAM_BOOL);
         $stmt->bindValue(':active', $v['active'], PDO::PARAM_BOOL);
         $stmt->bindValue(':sort', $v['sort_order'], PDO::PARAM_INT);
+        $room = $v['room_id'] ?? null;
+        $stmt->bindValue(':room_id', $room, $room === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->bindValue(':needs_approval', ($v['needs_approval'] ?? false) === true, PDO::PARAM_BOOL);
     }
 
     /**
@@ -158,6 +161,10 @@ final class ServiceRepository
             'active' => DbBool::of($r['active']),
             'sort_order' => (int) $r['sort_order'],
             'staff_profile_ids' => $staff,
+            // Design 3.3: the room the service needs, and whether a customer's
+            // booking is a request staff accept first.
+            'room_id' => $r['room_id'] !== null ? (int) $r['room_id'] : null,
+            'needs_approval' => DbBool::of($r['needs_approval']),
         ];
     }
 }

@@ -67,8 +67,9 @@ final class MessagingService implements HostWiredService
 
     /**
      * Send to a person or an address, in their open conversation on the channel
-     * or a new one. For other core modules: the calendar's reminders use this
-     * with `source: calendar.reminder`.
+     * or a new one. For other core modules, each with its own `source`. The
+     * calendar's booking emails and reminders don't go through here yet: they
+     * go to the Mailer through EmailBookingMessenger.
      *
      * @return array<string, mixed> the message
      *
@@ -106,8 +107,11 @@ final class MessagingService implements HostWiredService
      *
      * @return array<string, mixed> the message
      */
-    public function reply(int $tenantId, int $conversationId, ?int $authorProfileId, string $body, bool $byAgent = false): array
+    public function reply(int $tenantId, int $conversationId, ?int $authorProfileId, string $body, bool $byAgent = false, ?string $source = null): array
     {
+        if ($source !== null && preg_match('/^[a-z][a-z0-9_.:-]{0,63}$/', $source) !== 1) {
+            throw new MessagingException('The source must be a short lowercase word such as calendar.reminder.');
+        }
         $conversation = $this->conversations->find($tenantId, $conversationId);
         if ($conversation === null) {
             throw new MessagingException('Conversation not found.');
@@ -127,7 +131,7 @@ final class MessagingService implements HostWiredService
             $body,
             $authorProfileId,
             $byAgent,
-            $byAgent ? 'agent.reply' : 'staff.reply'
+            $source ?? ($byAgent ? 'agent.reply' : 'staff.reply')
         );
     }
 

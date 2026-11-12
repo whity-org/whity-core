@@ -1,0 +1,61 @@
+<!-- @dsCard group="Templates · Work" height=904 width=1440 subtitle="AP.1: the staff calendar by person and room, with booking requests and services beside it" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1440px;min-height:904px}</style><meta charset="utf-8"><title>Appointments</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function at(st, en, cls, who, what) { var top = (st - 9) * 64, hh = (en - st) * 64 - 4; return h('div', { className: 'wk-appt' + (cls ? ' ' + cls : ''), style: { top: top + 2, height: hh } }, h('b', null, who), what); }
+  var times = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00'];
+  function colh(av2, t, sub) { return h('div', { className: 'wk-cal__h' }, av2, h('div', null, t, h('small', null, sub))); }
+  var cal = h('div', { className: 'wk-cal' }, h('div', { style: { borderBottom: '1px solid var(--border)' } }), colh(h(W.Avatar, { name: 'Ibrahim Mansour', size: 28 }), 'Ibrahim Mansour', 'Cake consultations'), colh(h(W.Avatar, { name: 'Emad Nasser', size: 28 }), 'Emad Nasser', 'Catering tastings'), colh(h('span', { className: 'wk-chip' }, I('tenant', 14)), 'Tasting room', 'Seats 8'),
+    h('div', null, times.map(function (t) { return h('div', { key: t, className: 'wk-cal__t' }, t); })),
+    h('div', { className: 'wk-cal__c' }, at(9.5, 10.25, 'is-in', 'Awss Haddad · checked in', 'Wedding cake consultation'), at(11, 11.75, '', 'Ahmad Khalil', 'Birthday cake'), at(12.5, 13.25, 'is-req', 'Request: Emad Shami', 'Engagement cake · needs your OK'), h('div', { className: 'wk-now', style: { top: 106 } })),
+    h('div', { className: 'wk-cal__c' }, at(10, 11, '', 'Example Café', 'Catering tasting · 6 people'), at(13, 14, 'is-block', 'Lunch', '')),
+    h('div', { className: 'wk-cal__c' }, at(10, 11, '', 'Tasting with Example Café', 'Emad Nasser'), at(11.5, 12.5, '', 'Food safety committee', 'Meeting 6 prep')));
+  var side = h('div', { style: { display: 'grid', gap: 16 } }, h(W.Card, { title: 'Requests', description: 'Customers asking for a time that needs your OK' }, h('div', { style: { display: 'grid', gap: 10 } }, h('div', { className: 'wy-person' }, h(W.Avatar, { name: 'Emad Shami', size: 32 }), h('div', null, h('b', null, 'Emad Shami'), h('small', null, 'Engagement cake · today 12:30 with Ibrahim'))), h('div', { style: { display: 'flex', gap: 8 } }, h(W.Button, { variant: 'outline', size: 'sm' }, 'Suggest another time'), h(W.Button, { size: 'sm', icon: 'check' }, 'Accept')))),
+    h(W.Card, { title: 'Today' }, h(W.DescriptionList, { items: [{ label: 'Booked', value: '6' }, { label: 'Checked in', value: '1' }, { label: 'Requests', value: '1' }, { label: 'Reminders', value: 'WhatsApp, 24 h and 2 h before' }] })),
+    h(W.Card, { title: 'Services', action: h(W.Button, { variant: 'ghost', size: 'sm' }, 'Edit') }, h(W.DescriptionList, { items: [{ label: 'Wedding cake consultation', value: '45 min · free' }, { label: 'Catering tasting', value: '60 min · JOD 10.000' }, { label: 'Order pickup', value: '15 min' }] })));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Appointments', h(F, null, h(W.PageHeader, { title: 'Appointments', description: 'Sunday 8 November · Abdoun branch', actions: h(F, null, h(W.Segmented, { label: 'Range', options: [{ value: 'd', label: 'Day' }, { value: 'w', label: 'Week' }], defaultValue: 'd' }), h(W.Button, { variant: 'outline', icon: 'clock' }, 'Availability'), h(W.Button, { variant: 'outline', icon: 'external' }, 'Booking page'), h(W.Button, { icon: 'plus' }, 'New appointment')) }),
+    h('div', { className: 'wk-split', style: { gridTemplateColumns: 'minmax(0,1fr) 360px' } }, cal, side))));
+</script>
+</body>
+</html>

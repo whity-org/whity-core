@@ -2,7 +2,7 @@ import { ICONS, iconNames, type IconName } from "./icon-map"
 import { cn } from "./utils"
 
 /**
- * One of the 116 curated Tabler outline icons (decision 5.1), by its Whity
+ * One of the 156 curated Tabler outline icons (decision 5.1), by its Whity
  * name. 16px beside 14px text, 20 in touch navigation, 24 in headers and
  * empty states; the stroke is 2.25 at 16px and below and 2 above, so every
  * size reads at the same weight (5.2). Decorative unless `label` is given.

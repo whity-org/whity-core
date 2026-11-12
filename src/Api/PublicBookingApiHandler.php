@@ -108,6 +108,8 @@ final class PublicBookingApiHandler
                     'price_minor' => $service['price_minor'],
                     'currency' => $service['currency'],
                     'staff_profile_ids' => $offered,
+                    // Design 3.3: the page says "Send request" instead of "Book it".
+                    'sends_request' => $service['needs_approval'] || !$settings->instantBooking,
                 ];
             }
 
@@ -258,6 +260,21 @@ final class PublicBookingApiHandler
         });
     }
 
+    /**
+     * The customer takes the time staff suggested for their request
+     * (design 3.3). Their link changes: the answer carries the new one.
+     *
+     * @param array<string, string> $params
+     */
+    public function acceptSuggestion(Request $request, array $params): Response
+    {
+        return $this->withLink($request, $params, function (int $tenantId, int $bookingId): Response {
+            $booking = $this->booking->acceptSuggestion($tenantId, $bookingId);
+
+            return Response::json(['data' => self::forCustomer($booking) + ['manage_token' => $booking['manage_token'] ?? null]]);
+        });
+    }
+
     /** @param array<string, string> $params */
     public function cancel(Request $request, array $params): Response
     {
@@ -328,6 +345,7 @@ final class PublicBookingApiHandler
         return [
             'id' => $booking['id'],
             'status' => $booking['status'],
+            'suggested' => ($booking['suggested_at'] ?? null) !== null,
             'starts_at' => $booking['starts_at'],
             'ends_at' => $booking['ends_at'],
             'service' => [

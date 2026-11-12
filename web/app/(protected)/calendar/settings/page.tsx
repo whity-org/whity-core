@@ -38,6 +38,7 @@ import { weekOrder } from '@/lib/calendar/hours';
 
 interface Draft {
   bookingPage: boolean;
+  instantBooking: boolean;
   minNotice: string;
   maxAdvance: string;
   slotStep: string;
@@ -50,6 +51,7 @@ interface Draft {
 function draftOf(s: CalendarSettings): Draft {
   return {
     bookingPage: s.booking_page_enabled,
+    instantBooking: s.instant_booking ?? true,
     minNotice: String(s.min_notice_minutes),
     maxAdvance: String(s.max_advance_days),
     slotStep: String(s.slot_step_minutes),
@@ -88,6 +90,7 @@ export default function CalendarSettingsPage() {
   const changes: string[] = [];
   if (saved && current) {
     if (current.bookingPage !== saved.bookingPage) changes.push(t('settings.bookingPage', 'Booking page'));
+    if (current.instantBooking !== saved.instantBooking) changes.push(t('settings.instantBooking', 'Instant booking'));
     if (current.minNotice !== saved.minNotice) changes.push(t('settings.minNotice', 'Least notice'));
     if (current.maxAdvance !== saved.maxAdvance) changes.push(t('settings.maxAdvance', 'How far ahead'));
     if (current.slotStep !== saved.slotStep) changes.push(t('settings.slotStep', 'Free times every'));
@@ -114,6 +117,7 @@ export default function CalendarSettingsPage() {
 
     const body: CalendarSettingsRequest = {
       booking_page_enabled: current.bookingPage,
+      instant_booking: current.instantBooking,
       min_notice_minutes: minNotice,
       max_advance_days: maxAdvance,
       slot_step_minutes: Number(current.slotStep),
@@ -179,6 +183,23 @@ export default function CalendarSettingsPage() {
                     onCheckedChange={(bookingPage) => update({ bookingPage })}
                     aria-label={t('settings.bookingPage', 'Booking page')}
                     data-testid="settings-booking-page"
+                  />
+                </label>
+              </ChangedField>
+
+              <ChangedField changed={current.instantBooking !== saved.instantBooking}>
+                <label className="flex min-h-10 items-start justify-between gap-3">
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium text-foreground">{t('settings.instantBooking', 'Instant booking')}</span>
+                    <span className="block text-sm text-muted-foreground">
+                      {t('settings.instantBookingHint', 'On: customers book free times straight away. Off: every booking from the booking page is a request someone accepts first.')}
+                    </span>
+                  </span>
+                  <Switch
+                    checked={current.instantBooking}
+                    onCheckedChange={(instantBooking) => update({ instantBooking })}
+                    aria-label={t('settings.instantBooking', 'Instant booking')}
+                    data-testid="settings-instant-booking"
                   />
                 </label>
               </ChangedField>

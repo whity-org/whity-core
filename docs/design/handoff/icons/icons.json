@@ -580,6 +580,206 @@
    "name": "continuous",
    "tabler": "layout-rows",
    "mirrorsInRtl": false
+  },
+  {
+   "name": "shuffle",
+   "tabler": "arrows-shuffle",
+   "mirrorsInRtl": true
+  },
+  {
+   "name": "rotate",
+   "tabler": "rotate-clockwise",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "key",
+   "tabler": "key",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "archive",
+   "tabler": "archive",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "barcode",
+   "tabler": "barcode",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "signature",
+   "tabler": "signature",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "at",
+   "tabler": "at",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "fingerprint",
+   "tabler": "fingerprint",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "shield",
+   "tabler": "shield-check",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "text-size",
+   "tabler": "text-size",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "gesture",
+   "tabler": "hand-finger",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "card",
+   "tabler": "credit-card",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "pause",
+   "tabler": "player-pause",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "play",
+   "tabler": "player-play",
+   "mirrorsInRtl": true
+  },
+  {
+   "name": "attach",
+   "tabler": "paperclip",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "ban",
+   "tabler": "ban",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "wifi",
+   "tabler": "wifi",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "battery",
+   "tabler": "battery",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "microphone",
+   "tabler": "microphone",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "camera",
+   "tabler": "camera",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "apple",
+   "tabler": "brand-apple",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "kanban",
+   "tabler": "layout-kanban",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "meeting",
+   "tabler": "presentation",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "appointment",
+   "tabler": "calendar-time",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "flag",
+   "tabler": "flag",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "video",
+   "tabler": "video",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "record",
+   "tabler": "player-record",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "gavel",
+   "tabler": "gavel",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "evidence",
+   "tabler": "file-check",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "check-in",
+   "tabler": "door-enter",
+   "mirrorsInRtl": true
+  },
+  {
+   "name": "package",
+   "tabler": "package",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "transfer",
+   "tabler": "arrows-exchange",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "recipe",
+   "tabler": "chef-hat",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "batch",
+   "tabler": "stack-2",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "bank",
+   "tabler": "building-bank",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "wallet",
+   "tabler": "wallet",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "trigger",
+   "tabler": "bolt",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "branch",
+   "tabler": "git-branch",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "away",
+   "tabler": "plane-departure",
+   "mirrorsInRtl": true
+  },
+  {
+   "name": "org",
+   "tabler": "hierarchy-2",
+   "mirrorsInRtl": false
   }
  ]
 }

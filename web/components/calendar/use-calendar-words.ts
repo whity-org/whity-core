@@ -26,6 +26,8 @@ export interface CalendarWords {
   minutes: (n: number) => string;
   /** A service's name in the reader's language, else the other one. */
   serviceName: (service: CalendarService | null | undefined) => string;
+  /** A `{ar, en}` label, such as a room's name, in the reader's language. */
+  label: (names: Record<string, string> | null | undefined) => string;
   /** A refused request in plain words; `fallback` names what failed. */
   errorText: (error: unknown, fallback: string) => string;
 }
@@ -77,6 +79,8 @@ export function useCalendarWords(): CalendarWords {
           return t('booking.status.confirmed', 'Booked');
         case 'pending_payment':
           return t('booking.status.pendingPayment', 'Waiting for payment');
+        case 'requested':
+          return t('booking.status.requested', 'Request: needs your OK');
         case 'cancelled':
           return t('booking.status.cancelled', 'Cancelled');
         default:
@@ -94,6 +98,9 @@ export function useCalendarWords(): CalendarWords {
       }
     };
     const minutes = (n: number) => t('unit.minutes', '{n} min', { n });
+    /** A `{ar, en}` label, such as a room's name, in the reader's language. */
+    const label = (names: Record<string, string> | null | undefined) =>
+      localizedName(names ?? {}, language, 'en', t('room.unnamed', 'Unnamed room'));
     const serviceName = (service: CalendarService | null | undefined) =>
       service ? localizedName(service.name, language, 'en', t('service.unnamed', 'Unnamed service')) : t('service.unknown', 'A removed service');
     const errorText = (error: unknown, fallback: string) => {
@@ -114,6 +121,6 @@ export function useCalendarWords(): CalendarWords {
       }
       return fallback;
     };
-    return { weekday, weekdayShort, status, source, minutes, serviceName, errorText };
+    return { weekday, weekdayShort, status, source, minutes, serviceName, label, errorText };
   }, [t, language]);
 }

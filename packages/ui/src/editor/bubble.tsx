@@ -12,20 +12,24 @@ import type { EditorLabels } from "./labels"
 /**
  * The selection bubble (EditorInline): after a short pause above a text
  * selection, bold, italic, underline, strikethrough, code · link, highlight.
- * · Comment (M5). Rewrite with an agent (M6) joins it later. Without edit
- * rights (Viewing) only Comment shows.
+ * · Comment (M5) · Rewrite with an agent (M6, EditorAgents): the agent's
+ * version arrives as a suggestion. Without edit rights (Viewing) only Comment
+ * and Rewrite show.
  */
 function SelectionBubble({
   editor,
   labels,
   onLink,
   onComment,
+  onRewrite,
 }: {
   editor: Editor
   labels: EditorLabels
   onLink: () => void
   /** M5: Comment on the selection; with it the bubble shows even where nothing can be edited. */
   onComment?: () => void
+  /** M6: ask an agent to rewrite the selection; its version comes back as a suggestion. */
+  onRewrite?: () => void
 }) {
   const s = useEditorState({
     editor,
@@ -57,7 +61,7 @@ function SelectionBubble({
       editor={editor}
       updateDelay={250}
       shouldShow={({ editor: e, state, from, to }) =>
-        (e.isEditable || !!onComment) && isTextSelection(state.selection) && from !== to && !e.isActive("codeBlock")
+        (e.isEditable || !!onComment || !!onRewrite) && isTextSelection(state.selection) && from !== to && !e.isActive("codeBlock")
       }
       options={{ placement: "top-start", offset: 8 }}
     >
@@ -83,6 +87,12 @@ function SelectionBubble({
           <>
             {s.editable && <span aria-hidden="true" className="mx-[3px] h-[18px] w-px bg-border" />}
             {b("comment-add", labels.comment, false, onComment, "⌥⌘M")}
+          </>
+        )}
+        {onRewrite && (
+          <>
+            {(s.editable || onComment) && <span aria-hidden="true" className="mx-[3px] h-[18px] w-px bg-border" />}
+            {b("robot", labels.agentRewrite, false, onRewrite)}
           </>
         )}
       </div>

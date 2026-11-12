@@ -69,30 +69,30 @@
         h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } }, h('b', { style: { fontWeight: 600 } }, 'Comments and suggestions'), h(W.IconButton, { icon: 'close', label: 'Close', size: 'sm' })),
         h(W.ToggleGroup, { size: 'sm', label: 'Show', required: true, defaultValue: 'all', options: [{ value: 'all', label: 'All' }, { value: 'c', label: 'Comments' }, { value: 's', label: 'Suggestions' }] }),
         h('div', { className: 'wy-drawerlist' },
-          h('div', { className: 'wy-rc wy-rc--static' }, who('Omar Khalil', '13:40'), h('div', { className: 'wy-rc__q' }, 'Please pay within'), h('div', null, 'Should we mention the 2% late fee here?'), h('div', { className: 'wy-rc__time' }, '1 reply')),
-          scard({ agent: 'Billing assistant', for: 'Rana', what: h(F, null, 'Delete ', h('b', null, '“usually”')) }))));
+          h('div', { className: 'wy-rc wy-rc--static' }, who('Ahmad Khalil', '13:40'), h('div', { className: 'wy-rc__q' }, 'Please pay within'), h('div', null, 'Should we mention the 2% late fee here?'), h('div', { className: 'wy-rc__time' }, '1 reply')),
+          scard({ agent: 'Billing assistant', for: 'Amro', what: h(F, null, 'Delete ', h('b', null, '“usually”')) }))));
   var sheet = h('article', { className: 'wy-edx__sheet', style: { maxWidth: 'none', margin: 0, padding: '24px 32px 32px' } },
       cap('Suggesting: typing adds, deleting strikes through, all dashed until accepted'),
       h('p', { style: { margin: '0 0 12px', fontSize: 16, lineHeight: 1.6 } }, 'Invoice INV-1042 was due on 14 October. ', h('mark', { className: 'wy-cmt is-active' }, 'Please pay within '), h('del', { className: 'wy-sug-del' }, '30 days'), h('ins', { className: 'wy-sug-ins' }, '14 days'), ' of this letter', h('ins', { className: 'wy-sug-ins' }, ', or call us on 06 555 0100'), h('span', { className: 'wy-caret' }), '.'),
       h('p', { style: { margin: 0, fontSize: 16, lineHeight: 1.6 } }, 'Payments ', h('del', { className: 'wy-sug-del' }, 'usually '), 'take two working days to reach us.'),
       cap('A new comment on a selection, with @ to mention a person or an agent', '28px 0 10px'),
       h('div', { style: { display: 'flex', gap: 16, alignItems: 'flex-start' } },
-        h('div', { className: 'wy-rc wy-rc--static', style: { width: 300, flex: 'none' } }, who('Rana Haddad', 'now'), h('div', { className: 'wy-rc__q' }, 'Please pay within'),
-          h('div', { className: 'wy-rc__box' }, h('span', { className: 'wy-mention' }, '@Omar Khalil'), ' can you check the late fee wording?'),
+        h('div', { className: 'wy-rc wy-rc--static', style: { width: 300, flex: 'none' } }, who('Amro Saleh', 'now'), h('div', { className: 'wy-rc__q' }, 'Please pay within'),
+          h('div', { className: 'wy-rc__box' }, h('span', { className: 'wy-mention' }, '@Ahmad Khalil'), ' can you check the late fee wording?'),
           h('div', { className: 'wy-rc__foot' }, h(W.Button, { variant: 'ghost', size: 'sm' }, 'Cancel'), h(W.Button, { variant: 'outline', size: 'sm' }, 'Comment'))),
         h('div', { className: 'wy-float wy-mentionpop', style: { position: 'relative', marginTop: 60 } },
-          h('div', { className: 'wy-slash__h' }, 'People'), h('div', { className: 'wy-fpick__it is-active' }, h(W.Avatar, { name: 'Omar Khalil', size: 20 }), 'Omar Khalil', h('span', { className: 'wy-fpick__s' }, 'Accounts')), h('div', { className: 'wy-fpick__it' }, h(W.Avatar, { name: 'Lina Saad', size: 20 }), 'Lina Saad', h('span', { className: 'wy-fpick__s' }, 'HR')),
+          h('div', { className: 'wy-slash__h' }, 'People'), h('div', { className: 'wy-fpick__it is-active' }, h(W.Avatar, { name: 'Ahmad Khalil', size: 20 }), 'Ahmad Khalil', h('span', { className: 'wy-fpick__s' }, 'Accounts')), h('div', { className: 'wy-fpick__it' }, h(W.Avatar, { name: 'Awss Haddad', size: 20 }), 'Awss Haddad', h('span', { className: 'wy-fpick__s' }, 'HR')),
           h('div', { className: 'wy-slash__h' }, 'Agents'), h('div', { className: 'wy-fpick__it' }, h(W.Avatar, { kind: 'agent', name: 'Billing assistant', size: 20 }), 'Billing assistant', h('span', { className: 'wy-fpick__s' }, 'replies with a suggestion')))));
   var rail = h('div', { style: { display: 'grid', gap: 10 } }, cap('Rail: a thread, suggestions, resolved'),
       h('div', { className: 'wy-edx__railhead', style: { margin: 0 } }, h('span', null, '3 suggestions · 1 comment'), h(W.Button, { variant: 'ghost', size: 'sm', iconEnd: 'chevron-down' }, 'All')),
-      h('div', { className: 'wy-rc wy-rc--static is-active' }, h('div', { className: 'wy-rc__who' }, h(W.Avatar, { name: 'Omar Khalil', size: 24 }), h('span', { className: 'wy-rc__name' }, 'Omar Khalil'), h('span', { className: 'wy-rc__time' }, '13:40'), h('span', { className: 'wy-rc__acts' }, h(W.IconButton, { icon: 'check', label: 'Resolve', size: 'sm' }), h(W.IconButton, { icon: 'more', label: 'More', size: 'sm' }))),
+      h('div', { className: 'wy-rc wy-rc--static is-active' }, h('div', { className: 'wy-rc__who' }, h(W.Avatar, { name: 'Ahmad Khalil', size: 24 }), h('span', { className: 'wy-rc__name' }, 'Ahmad Khalil'), h('span', { className: 'wy-rc__time' }, '13:40'), h('span', { className: 'wy-rc__acts' }, h(W.IconButton, { icon: 'check', label: 'Resolve', size: 'sm' }), h(W.IconButton, { icon: 'more', label: 'More', size: 'sm' }))),
         h('div', null, 'Should we mention the 2% late fee here?'),
-        h('div', { className: 'wy-rc__replies' }, h('div', null, who('Rana Haddad', '13:44'), h('div', { style: { marginTop: 4 } }, 'Yes, after the due date sentence.'))),
+        h('div', { className: 'wy-rc__replies' }, h('div', null, who('Amro Saleh', '13:44'), h('div', { style: { marginTop: 4 } }, 'Yes, after the due date sentence.'))),
         h('div', { className: 'wy-rc__reply' }, 'Reply or add others with @')),
-      scard({ name: 'Rana Haddad', time: '13:52', what: h(F, null, 'Replace ', h('b', null, '30 days'), ' with ', h('b', null, '14 days')) }),
-      scard({ name: 'Rana Haddad', time: '13:53', what: h(F, null, 'Add ', h('b', null, '“, or call us on 06 555 0100”')) }),
-      scard({ agent: 'Billing assistant', for: 'Rana', what: h(F, null, 'Delete ', h('b', null, '“usually”')) }),
-      h('div', { className: 'wy-rc wy-rc--static is-resolved' }, h('div', { className: 'wy-rc__resolved' }, I('success', 14), 'Resolved by Rana · 12:10'), h('div', { className: 'wy-rc__what' }, 'Use the customer’s legal name'), h('div', null, h(W.Button, { variant: 'ghost', size: 'sm' }, 'Reopen'))));
+      scard({ name: 'Amro Saleh', time: '13:52', what: h(F, null, 'Replace ', h('b', null, '30 days'), ' with ', h('b', null, '14 days')) }),
+      scard({ name: 'Amro Saleh', time: '13:53', what: h(F, null, 'Add ', h('b', null, '“, or call us on 06 555 0100”')) }),
+      scard({ agent: 'Billing assistant', for: 'Amro', what: h(F, null, 'Delete ', h('b', null, '“usually”')) }),
+      h('div', { className: 'wy-rc wy-rc--static is-resolved' }, h('div', { className: 'wy-rc__resolved' }, I('success', 14), 'Resolved by Amro · 12:10'), h('div', { className: 'wy-rc__what' }, 'Use the customer’s legal name'), h('div', null, h(W.Button, { variant: 'ghost', size: 'sm' }, 'Reopen'))));
   ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { display: 'grid', gridTemplateColumns: '280px minmax(0,1fr) 300px', gap: 24, alignItems: 'start' } }, modes, sheet, rail));
 </script>
 </body>

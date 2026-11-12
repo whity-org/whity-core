@@ -12,6 +12,7 @@ use Whity\Core\Calendar\CalendarRejectedException;
 use Whity\Core\Calendar\CalendarRepository;
 use Whity\Core\Calendar\CalendarSettings;
 use Whity\Core\Calendar\Interval;
+use Whity\Core\Calendar\RoomRepository;
 use Whity\Core\Calendar\ServiceRepository;
 use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\LocalizedLabel;
@@ -54,7 +55,9 @@ final class CalendarApiHandler
         private readonly RoleChecker $roleChecker,
         private readonly ?\Whity\Core\Calendar\CalendarFeed $feed = null,
         private readonly string $feedUrlBase = '',
+        private ?RoomRepository $rooms = null,
     ) {
+        $this->rooms ??= new RoomRepository($this->calendar->db());
     }
 
     /**
@@ -111,6 +114,7 @@ final class CalendarApiHandler
                 'payment_hold_minutes' => SettingsRegistry::CALENDAR_PAYMENT_HOLD_MINUTES,
                 'week_start' => SettingsRegistry::CALENDAR_WEEK_START,
                 'weekend_days' => SettingsRegistry::CALENDAR_WEEKEND_DAYS,
+                'instant_booking' => SettingsRegistry::CALENDAR_INSTANT_BOOKING,
             ];
             $writes = [];
             foreach ($map as $field => $key) {
@@ -158,6 +162,10 @@ final class CalendarApiHandler
             $bookable = isset($body['bookable']) && is_bool($body['bookable']) ? $body['bookable'] : null;
             $sort = isset($body['sort_order']) && is_int($body['sort_order']) ? $body['sort_order'] : null;
             $this->calendar->updateStaff($tenantId, $profileId, $bookable, $sort);
+            // The branch they work in (design 3.3); null takes them out of every branch.
+            if (array_key_exists('unit_id', $body)) {
+                $this->calendar->setStaffUnit($tenantId, $profileId, $this->unitOrNull($tenantId, $body['unit_id']));
+            }
 
             return Response::json(['data' => $this->calendar->listStaff($tenantId)]);
         });
@@ -255,6 +263,33 @@ final class CalendarApiHandler
         });
     }
 
+    // ── rooms (design 3.3) ──────────────────────────────────────────────
+
+    public function listRooms(Request $request): Response
+    {
+        return $this->run($request, 'rooms', fn (int $tenantId): Response => Response::json(['data' => $this->roomRepo()->list($tenantId)]));
+    }
+
+    public function createRoom(Request $request): Response
+    {
+        return $this->run($request, 'rooms', function (int $tenantId) use ($request): Response {
+            $id = $this->roomRepo()->insert($tenantId, $this->roomValues($tenantId, JsonBody::parsed($request), null));
+
+            return Response::json(['data' => $this->roomRepo()->find($tenantId, $id)], 201);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function updateRoom(Request $request, array $params): Response
+    {
+        return $this->run($request, 'rooms', function (int $tenantId) use ($request, $params): Response {
+            $existing = $this->roomRepo()->find($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Room');
+            $this->roomRepo()->update($tenantId, $existing['id'], $this->roomValues($tenantId, JsonBody::parsed($request), $existing));
+
+            return Response::json(['data' => $this->roomRepo()->find($tenantId, $existing['id'])]);
+        });
+    }
+
     // ── services ────────────────────────────────────────────────────────
 
     public function listServices(Request $request): Response
@@ -323,8 +358,9 @@ final class CalendarApiHandler
             $statuses = array_values(array_filter(explode(',', $this->query($request)['status'] ?? ''), static fn (string $s): bool => in_array($s, [
                 BookingRepository::STATUS_CONFIRMED, BookingRepository::STATUS_PENDING_PAYMENT,
                 BookingRepository::STATUS_CANCELLED, BookingRepository::STATUS_EXPIRED,
+                BookingRepository::STATUS_REQUESTED,
             ], true)));
-            $rows = $this->bookings->list($tenantId, $profileId !== null ? [$profileId] : [], $from, $to, $statuses);
+            $rows = $this->bookings->list($tenantId, $profileId !== null ? [$profileId] : [], $from, $to, $statuses, $this->optionalInt($request, 'unit_id'));
 
             return Response::json(['data' => array_map([BookingRepository::class, 'toApi'], $rows)]);
         });
@@ -391,6 +427,59 @@ final class CalendarApiHandler
             $reason = is_string($body['reason'] ?? null) ? trim($body['reason']) : '';
 
             return Response::json(['data' => $this->booking->cancel($tenantId, (int) $params['id'], 'staff', $reason)]);
+        });
+    }
+
+    /**
+     * Accept a customer's request (design 3.3).
+     *
+     * @param array<string, string> $params
+     */
+    public function acceptBooking(Request $request, array $params): Response
+    {
+        return $this->run($request, 'bookings', function (int $tenantId) use ($params): Response {
+            $booking = $this->booking->accept($tenantId, (int) $params['id']);
+            unset($booking['manage_token']);
+
+            return Response::json(['data' => $booking]);
+        });
+    }
+
+    /**
+     * Suggest another time for a customer's request (design 3.3).
+     *
+     * @param array<string, string> $params
+     */
+    public function suggestBooking(Request $request, array $params): Response
+    {
+        return $this->run($request, 'bookings', function (int $tenantId) use ($request, $params): Response {
+            $body = JsonBody::parsed($request);
+            $start = Interval::fromApi($body['starts_at'] ?? null) ?? throw new CalendarRejectedException('starts_at must be a date and time with an offset', 422);
+            $profileId = is_int($body['profile_id'] ?? null) ? $body['profile_id'] : null;
+            $booking = $this->booking->suggest($tenantId, (int) $params['id'], $start, $profileId);
+            unset($booking['manage_token']);
+
+            return Response::json(['data' => $booking]);
+        });
+    }
+
+    /**
+     * The customer arrived (POST) or did not after all (DELETE).
+     *
+     * @param array<string, string> $params
+     */
+    public function checkIn(Request $request, array $params): Response
+    {
+        return $this->run($request, 'bookings', fn (int $tenantId): Response => Response::json(['data' => $this->booking->checkIn($tenantId, (int) $params['id'], $request->getMethod() !== 'DELETE')]));
+    }
+
+    /** The Today panel: booked, checked in, open requests and reminders sent (design 3.3). */
+    public function today(Request $request): Response
+    {
+        return $this->run($request, 'bookings', function (int $tenantId) use ($request): Response {
+            $date = $this->query($request)['date'] ?? null;
+
+            return Response::json(['data' => $this->booking->today($tenantId, is_string($date) && $date !== '' ? $date : null, $this->optionalInt($request, 'unit_id'))]);
         });
     }
 
@@ -497,6 +586,45 @@ final class CalendarApiHandler
         }
 
         return $profileId;
+    }
+
+    private function roomRepo(): RoomRepository
+    {
+        return $this->rooms ?? new RoomRepository($this->calendar->db());
+    }
+
+    /** A branch id from the body: null, or an organisational unit of this workspace. */
+    private function unitOrNull(int $tenantId, mixed $raw): ?int
+    {
+        if ($raw === null) {
+            return null;
+        }
+        if (!is_int($raw) || !$this->roomRepo()->isUnit($tenantId, $raw)) {
+            throw CalendarRejectedException::notFound('Branch');
+        }
+
+        return $raw;
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     * @param array<string, mixed>|null $existing
+     * @return array{name: array<string, string>, unit_id: ?int, active: bool, sort_order: int}
+     */
+    private function roomValues(int $tenantId, array $body, ?array $existing): array
+    {
+        $pick = static fn (string $k, mixed $default): mixed => array_key_exists($k, $body) ? $body[$k] : $default;
+        $sort = $pick('sort_order', $existing['sort_order'] ?? 0);
+        if (!is_int($sort) || $sort < 0 || $sort > 100000) {
+            throw new CalendarRejectedException('sort_order must be a whole number from 0 to 100000', 422);
+        }
+
+        return [
+            'name' => LocalizedLabel::fromInput($pick('name', $existing['name'] ?? null), 'name'),
+            'unit_id' => array_key_exists('unit_id', $body) ? $this->unitOrNull($tenantId, $body['unit_id']) : ($existing['unit_id'] ?? null),
+            'active' => $pick('active', $existing['active'] ?? true) === true,
+            'sort_order' => $sort,
+        ];
     }
 
     /** @return array{0: DateTimeImmutable, 1: DateTimeImmutable} */
@@ -626,6 +754,11 @@ final class CalendarApiHandler
         $pick = static fn (string $k, mixed $default): mixed => array_key_exists($k, $body) ? $body[$k] : $default;
         $name = LocalizedLabel::fromInput($pick('name', $existing['name'] ?? null), 'name');
         $descriptionRaw = $pick('description', $existing['description'] ?? []);
+        // A stored empty description reads back as `{}` (an empty object), so a
+        // PATCH that leaves `description` out must treat that as empty too.
+        if ($descriptionRaw instanceof \stdClass && get_object_vars($descriptionRaw) === []) {
+            $descriptionRaw = [];
+        }
         $description = $descriptionRaw === [] || $descriptionRaw === '' || $descriptionRaw === null ? [] : LocalizedLabel::fromInput($descriptionRaw, 'description');
         $int = static function (string $k, mixed $v, int $min, int $max): int {
             if (!is_int($v) || $v < $min || $v > $max) {
@@ -655,9 +788,16 @@ final class CalendarApiHandler
             $staffIds[] = $id;
         }
 
+        $room = $pick('room_id', $existing['room_id'] ?? null);
+        if ($room !== null && (!is_int($room) || $this->roomRepo()->find($tenantId, $room) === null)) {
+            throw CalendarRejectedException::notFound('Room');
+        }
+
         return [
             'name' => $name,
             'description' => $description,
+            'room_id' => $room,
+            'needs_approval' => $pick('needs_approval', $existing['needs_approval'] ?? false) === true,
             'duration_minutes' => $int('duration_minutes', $pick('duration_minutes', $existing['duration_minutes'] ?? null), 5, 1440),
             'buffer_before_minutes' => $int('buffer_before_minutes', $pick('buffer_before_minutes', $existing['buffer_before_minutes'] ?? 0), 0, 240),
             'buffer_after_minutes' => $int('buffer_after_minutes', $pick('buffer_after_minutes', $existing['buffer_after_minutes'] ?? 0), 0, 240),
