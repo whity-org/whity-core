@@ -130,7 +130,9 @@ final class SettingsRegistryTest extends TestCase
              'calendar.payment_hold_minutes',
              'calendar.week_start',
              'calendar.weekend_days',
-             'app.installable'],
+             'app.installable',
+             'website.plans',
+             'website.contact_workspace'],
             SettingsRegistry::keys()
         );
     }
@@ -459,7 +461,8 @@ final class SettingsRegistryTest extends TestCase
         // 104 since WHIT-920: forms.show_reviewer_names.
         // 106 since WHIT-925: meters.enforcement and billing.default_plan.
         // 114 since WHIT-941: eight calendar.* keys.
-        self::assertCount(114, $describe);
+        // 116 since WHIT-960: website.plans and website.contact_workspace.
+        self::assertCount(116, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

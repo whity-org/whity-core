@@ -6728,6 +6728,46 @@ final class CoreApiSchemas
                     'site_key' => self::str(),
                 ]],
             ], ['workspace_name', 'max_length'])),
+            'PublicPlansResponse' => self::object([
+                'version' => self::int(),
+                'currency' => self::str(),
+                'decimals' => self::int(),
+                'updatedAt' => self::str(),
+                'plans' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::str(),
+                    'highlight' => self::bool(),
+                    'name' => SchemaBuilder::ref('PublicLocalizedText'),
+                    'tagline' => SchemaBuilder::ref('PublicLocalizedText'),
+                    'price' => self::object(['monthly' => self::str(true)], ['monthly']),
+                    'limits' => self::object([
+                        'staff' => self::int(),
+                        'customersPerMonth' => self::int(),
+                    ], []),
+                    'features' => ['type' => 'array', 'items' => SchemaBuilder::ref('PublicLocalizedText')],
+                    'cta' => self::object([
+                        'label' => SchemaBuilder::ref('PublicLocalizedText'),
+                        'href' => self::str(),
+                    ], ['label', 'href']),
+                ], ['id', 'highlight', 'name', 'price', 'limits', 'features'])],
+                'dedicatedHosting' => self::object(['fromMonthly' => self::str(true)], ['fromMonthly']),
+            ], ['version', 'currency', 'decimals', 'updatedAt', 'plans', 'dedicatedHosting']),
+            'PublicLocalizedText' => self::object([
+                'en' => self::str(),
+                'ar' => self::str(),
+            ], ['en']),
+            'PublicContactRequest' => self::object([
+                'topic' => ['type' => 'string', 'enum' => ['question', 'demo', 'partners', 'other']],
+                'name' => self::str(),
+                'company' => self::str(),
+                'contact' => self::str(),
+                'message' => self::str(),
+                'lang' => ['type' => 'string', 'enum' => ['en', 'ar']],
+                // Left empty by people. Anything here is treated as a bot.
+                'website' => self::str(),
+            ], ['name', 'contact', 'message']),
+            'PublicContactResponse' => self::dataEnvelope(self::object([
+                'received' => self::bool(),
+            ], ['received'])),
             'PublicChatStartResponse' => self::dataEnvelope(self::object([
                 'token' => self::str(),
                 'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('CustomerMessage')],
@@ -12029,6 +12069,44 @@ final class CoreApiSchemas
                     'tags' => ['messages'],
                     'request' => 'CustomerChatRequest',
                     'responses' => [201 => self::jsonResponse('The message', 'CustomerMessageResponse')] + $notFound + $refused + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/public/plans',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The plans the website shows (public, WS.5)',
+                    'description' => 'Built from the active plans, their monthly prices and limits, plus the website.plans setting. '
+                        . 'Prices are decimal strings in normal units, or null when not set. Cached for five minutes; '
+                        . 'readable from the website origins (WHITY_SITE_ORIGINS).',
+                    'tags' => ['plans'],
+                    'responses' => [
+                        200 => self::jsonResponse('The plans', 'PublicPlansResponse'),
+                        503 => self::errorResponse('The plans could not be read'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/public/contact',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Send the website contact form (public)',
+                    'description' => 'Files the message in the inbox of the workspace named by website.contact_workspace. '
+                        . 'Limited per address. A filled website field is dropped quietly with the same answer. '
+                        . 'A form-encoded post (scripts off) is answered with a redirect back to the contact page.',
+                    'tags' => ['messages'],
+                    'request' => 'PublicContactRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The message was saved', 'PublicContactResponse'),
+                        303 => ['description' => 'Back to the contact page (form post)'],
+                        422 => self::errorResponse('A field is missing or not valid'),
+                        429 => self::errorResponse('Too many messages'),
+                        503 => self::errorResponse('The contact form is not set up'),
+                    ],
                 ],
             ],
             [

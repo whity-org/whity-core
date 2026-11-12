@@ -6997,6 +6997,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/contact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send the website contact form (public)
+         * @description Files the message in the inbox of the workspace named by website.contact_workspace. Limited per address. A filled website field is dropped quietly with the same answer. A form-encoded post (scripts off) is answered with a redirect back to the contact page.
+         */
+        post: operations["post_api_v1_public_contact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/forms/{slug}": {
         parameters: {
             query?: never;
@@ -7091,6 +7111,26 @@ export interface paths {
          * @description The channel checks the provider's signature with the workspace's own secret. For core's `email` channel: the raw RFC 822 message (or `{"raw": "..."}`) with `X-Whity-Signature: sha256=<hex HMAC-SHA256 of the body>`. Every request gets the same 202.
          */
         post: operations["post_api_v1_public_messages_inbound_channel_workspace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The plans the website shows (public, WS.5)
+         * @description Built from the active plans, their monthly prices and limits, plus the website.plans setting. Prices are decimal strings in normal units, or null when not set. Cached for five minutes; readable from the website origins (WHITY_SITE_ORIGINS).
+         */
+        get: operations["get_api_v1_public_plans"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -13904,6 +13944,22 @@ export interface components {
                 messages: components["schemas"]["CustomerMessage"][];
             };
         };
+        PublicContactRequest: {
+            /** @enum {string} */
+            topic?: "question" | "demo" | "partners" | "other";
+            name: string;
+            company?: string;
+            contact: string;
+            message: string;
+            /** @enum {string} */
+            lang?: "en" | "ar";
+            website?: string;
+        };
+        PublicContactResponse: {
+            data: {
+                received: boolean;
+            };
+        };
         PublicFormBotSettingsResponse: {
             data: {
                 provider: string | null;
@@ -14048,6 +14104,37 @@ export interface components {
             meta?: {
                 routed: boolean;
                 ignored_keys: string[];
+            };
+        };
+        PublicLocalizedText: {
+            en: string;
+            ar?: string;
+        };
+        PublicPlansResponse: {
+            version: number;
+            currency: string;
+            decimals: number;
+            updatedAt: string;
+            plans: {
+                id: string;
+                highlight: boolean;
+                name: components["schemas"]["PublicLocalizedText"];
+                tagline?: components["schemas"]["PublicLocalizedText"];
+                price: {
+                    monthly: string | null;
+                };
+                limits: {
+                    staff?: number;
+                    customersPerMonth?: number;
+                };
+                features: components["schemas"]["PublicLocalizedText"][];
+                cta?: {
+                    label: components["schemas"]["PublicLocalizedText"];
+                    href: string;
+                };
+            }[];
+            dedicatedHosting: {
+                fromMonthly: string | null;
             };
         };
         PublicSignupAcceptedResponse: {
@@ -52672,6 +52759,100 @@ export interface operations {
             };
         };
     };
+    post_api_v1_public_contact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicContactRequest"];
+            };
+        };
+        responses: {
+            /** @description The message was saved */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicContactResponse"];
+                };
+            };
+            /** @description Back to the contact page (form post) */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A field is missing or not valid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many messages */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The contact form is not set up */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_public_forms_slug: {
         parameters: {
             query?: never;
@@ -53053,6 +53234,62 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_public_plans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plans */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicPlansResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The plans could not be read */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -5406,6 +5406,21 @@ $inboundMessagesHandler = new \Whity\Api\InboundMessagesApiHandler(
     new DatabaseSharedStore($db->getPdo()),
 );
 $router->register('POST', '/api/public/messages/inbound/{channel}/{workspace}', [$inboundMessagesHandler, 'receive'], null);
+// The website (WS.5, section 29): the plans whity.dev shows and its contact form.
+// CORS for both is WebsiteCors's, set where the request starts below.
+$publicPlansHandler = new \Whity\Api\PublicPlansApiHandler(
+    new \Whity\Core\Plan\WebsitePlans($db->getPdo()),
+    $globalSettingsRepository,
+    (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+);
+$router->register('GET', '/api/public/plans', [$publicPlansHandler, 'index'], null);
+$publicContactHandler = new \Whity\Api\PublicContactApiHandler(
+    $messagingService,
+    $brandingHostRepo,
+    $globalSettingsRepository,
+    new DatabaseSharedStore($db->getPdo()),
+);
+$router->register('POST', '/api/public/contact', [$publicContactHandler, 'send'], null);
 
 $workspaceSignupHandler =new \Whity\Api\WorkspaceSignupApiHandler(
     $db->getPdo(),
@@ -6225,7 +6240,15 @@ if ($isWorker) {
 
                 // Resolve CORS headers once per request from the allowlist (WC-53).
                 // A plugin's public form sets its own (WHIT-906): they never allow credentials.
-                $corsHeaders = $publicFormGate->ownsCors($request) ? [] : Cors::headers($request->getHeader('Origin'));
+                $corsHeaders = \Whity\Http\WebsiteCors::owns($request)
+                    ? \Whity\Http\WebsiteCors::headers($request->getHeader('Origin'))
+                    : ($publicFormGate->ownsCors($request) ? [] : Cors::headers($request->getHeader('Origin')));
+
+                $websitePreflight = \Whity\Http\WebsiteCors::preflight($request);
+                if ($websitePreflight !== null) {
+                    $websitePreflight->withHeaders($securityHeaders)->send();
+                    return;
+                }
 
                 $publicFormPreflight = $publicFormGate->preflight($request);
                 if ($publicFormPreflight !== null) {
@@ -6366,7 +6389,15 @@ if ($isWorker) {
 
         // Resolve CORS headers once per request from the allowlist (WC-53).
         // A plugin's public form sets its own (WHIT-906): they never allow credentials.
-        $corsHeaders = $publicFormGate->ownsCors($request) ? [] : Cors::headers($request->getHeader('Origin'));
+        $corsHeaders = \Whity\Http\WebsiteCors::owns($request)
+            ? \Whity\Http\WebsiteCors::headers($request->getHeader('Origin'))
+            : ($publicFormGate->ownsCors($request) ? [] : Cors::headers($request->getHeader('Origin')));
+
+        $websitePreflight = \Whity\Http\WebsiteCors::preflight($request);
+        if ($websitePreflight !== null) {
+            $websitePreflight->withHeaders($securityHeaders)->send();
+            exit;
+        }
 
         $publicFormPreflight = $publicFormGate->preflight($request);
         if ($publicFormPreflight !== null) {

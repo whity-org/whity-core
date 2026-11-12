@@ -198,6 +198,11 @@ class EnforceTenantIsolation
         // WHIT-922: the instance's public signing keys, so anyone holding a
         // signature record can check its seal. Public keys only.
         '/api/v1/signing-keys',
+        // WS.5, section 29: what whity.dev reads and posts. The plans are the
+        // operator's global catalogue; the contact form files into the one
+        // workspace the operator named, throttled per address before anything.
+        '/api/v1/public/plans',
+        '/api/v1/public/contact',
     ];
 
     /**

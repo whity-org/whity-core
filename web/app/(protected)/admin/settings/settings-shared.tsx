@@ -429,6 +429,20 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Let people add this site to their phone or computer as an app that opens in its own window and shows a page of its own when there is no connection. Off removes the option and uninstalls the app’s offline support from browsers the next time they open a page. Until this is saved here, the PWA_ENABLED setting of the server decides.'
       ),
     },
+    'website.plans': {
+      label: t('settings.meta.website.plans.label', 'Plans on the website'),
+      help: t(
+        'settings.meta.website.plans.help',
+        'How your website shows the plans, as JSON: for each plan the Arabic name, a tagline, the features shown, the highlighted plan and the button. Prices, limits and order come from the plans themselves.'
+      ),
+    },
+    'website.contact_workspace': {
+      label: t('settings.meta.website.contact_workspace.label', 'Website contact form inbox'),
+      help: t(
+        'settings.meta.website.contact_workspace.help',
+        'The workspace whose Messages inbox receives the contact form on your website. Leave empty to turn the form off.'
+      ),
+    },
     'plugins.store_allowed_hosts': {
       label: t('settings.meta.plugins.store_allowed_hosts.label', 'Trusted plugin stores'),
       help: t(

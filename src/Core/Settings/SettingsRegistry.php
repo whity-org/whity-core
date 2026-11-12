@@ -280,6 +280,21 @@ final class SettingsRegistry
     public const COMPANY_PHONE = 'company.phone';
     public const COMPANY_EMAIL = 'company.email';
 
+    // THE WEBSITE (WS.5, WS.19): what whity.dev reads from this instance.
+    // Global-only: the operator's own marketing site, not any workspace's.
+    /**
+     * The plans page's marketing layer as JSON: per plan key the Arabic name,
+     * tagline, features shown, highlight and the link, plus the currency and the
+     * dedicated-hosting "from" price. Prices, limits, order and visibility come
+     * from the plans themselves. Read by {@see \Whity\Core\Plan\WebsitePlans}.
+     */
+    public const WEBSITE_PLANS = 'website.plans';
+    /**
+     * The slug of the workspace whose inbox receives the website's contact form.
+     * Empty turns the form off ({@see \Whity\Api\PublicContactApiHandler}).
+     */
+    public const WEBSITE_CONTACT_WORKSPACE = 'website.contact_workspace';
+
     // NUMBERING is GLOBAL-ONLY, unlike everything above. A per-tenant
     // override would make the meaning of the (series, number) uniqueness
     // index depend on a setting a tenant admin can change, which is how a
@@ -885,6 +900,9 @@ final class SettingsRegistry
         // Installing the web app is a property of the installation, and the
         // service worker it controls is per origin, not per workspace.
         self::APP_INSTALLABLE,
+        // The operator's own website; no workspace has one of these.
+        self::WEBSITE_PLANS,
+        self::WEBSITE_CONTACT_WORKSPACE,
     ];
 
     /**
@@ -1254,6 +1272,10 @@ final class SettingsRegistry
         self::CALENDAR_WEEKEND_DAYS => 'friday,saturday',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
+        // Empty: the plans page shows the active plans as they are, and the
+        // contact form is off until a workspace is named.
+        self::WEBSITE_PLANS => '',
+        self::WEBSITE_CONTACT_WORKSPACE => '',
     ];
 
     /**
@@ -1645,6 +1667,10 @@ final class SettingsRegistry
             self::COMPANY_EMAIL => $value === '' || filter_var($value, FILTER_VALIDATE_EMAIL) !== false
                 ? null
                 : self::COMPANY_EMAIL . ' must be an email address.',
+            self::WEBSITE_PLANS => \Whity\Core\Plan\WebsitePlans::problem($value),
+            self::WEBSITE_CONTACT_WORKSPACE => $value === '' || preg_match('/^[a-z0-9][a-z0-9-]{0,254}$/', $value) === 1
+                ? null
+                : self::WEBSITE_CONTACT_WORKSPACE . ' must be a workspace slug (lowercase letters, digits and hyphens).',
             default => "Unknown setting key: {$key}",
         };
     }
