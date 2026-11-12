@@ -1,0 +1,1 @@
+- **Plugins can message a workspace's customers.** A plugin such as Whity Pay can tell a customer about a payment through Messages: WhatsApp when the WhatsApp channel is installed and on, otherwise email. The message appears in the customer's conversation, marked as sent by the plugin (WHIT-967, SDK 1.99).
