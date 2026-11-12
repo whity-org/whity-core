@@ -88,6 +88,11 @@ export async function generateViewport(): Promise<Viewport> {
   return {
     width: "device-width",
     initialScale: 1,
+    // The on-screen keyboard shrinks the layout instead of covering it, so the
+    // app shell, a bottom sheet's buttons and a chat composer move up above it
+    // and a focused field scrolls into view (Chrome on Android; iOS Safari
+    // ignores it and scrolls the focused field into view itself).
+    interactiveWidget: "resizes-content",
     // #1733: an installed app draws edge to edge; globals.css keeps content
     // inside the safe area (the notch, the home indicator).
     ...(install.state === "on" ? { themeColor: install.themeColor, viewportFit: "cover" as const } : {}),

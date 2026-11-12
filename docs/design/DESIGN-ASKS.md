@@ -27,6 +27,20 @@ Every ask needs both languages (English and Arabic, RTL) and both themes, and fo
 
 The Whity ID consent line for acting as an agent ("Claude Code wants to act as Finance clerk for you") is built with Whity ID's existing consent screen (whity-id #26), so it needs a look rather than a new design. Background for the agents asks: `AGENT-PERSONAS-AND-WHITY-AGENT.md` §8.
 
+## The web app on a phone (WHIT-1006)
+
+The 3.3 package draws the phone as the Flutter app (`Tm*`, section 26), which is not in 0.2.29, and the web app's phone layout only as the shell (`AppShellMobile`). The web pass (WHIT-999 to WHIT-1006) made every main route usable at 375px from existing patterns: the drawer, stacked rows like the "Your fields" rows in `TmOpsMobile`, dialogs as bottom sheets, the save bar docked at the bottom (M.4). These screens still need a web phone design; each needs English and Arabic, light and dark.
+
+| Task | Ask | What the screen does | States to draw | Built meanwhile |
+| --- | --- | --- | --- | --- |
+| WHIT-1006 | **Navigation on the installed app (PWA)** | The phone app has a bottom tab bar (M.2: Home, Inbox, create, Chat, More); the web app on a phone opens a drawer from the top bar (`AppShellMobile`). Should the installed web app take the tab bar, and which five places? | Tab bar with counts; More; the create sheet (M.11); keyboard open | The drawer, 44px targets, 85% wide (WHIT-999) |
+| WHIT-1006 | **Lists on a phone** | Every data table becomes a list below 640px. Not drawn: how sorting, select-all and bulk actions look there, and whether search and the main button move to the bottom (M.4, M.7) as on the phone app. | Many rows; selection with a bulk bar; sorting; filters as a bottom sheet; empty | Stacked rows: title, label and value lines, the row menu beside the title (WHIT-1001); search and buttons stay at the top |
+| WHIT-1006 | **Document library on a phone** | `TmDocumentsMobile` shows To sign, Recent and All; the web library has folders and collections, a unit filter, sort and list or grid. | Folders open and closed; a collection; search results; grid view | Folders behind a "Folders · All documents" button above the list (WHIT-1005) |
+| WHIT-1006 | **Document editor toolbar on a phone** | `TmDocEditMobile` covers text editing in the phone app; the web editor has a full toolbar, the mode menu, Preview, PDF and Publish, and a page view. | Editing, Suggesting, Viewing; the toolbar's overflow; the publish check as a sheet; keyboard open | Header buttons on a second line; the toolbar scrolls sideways (WHIT-1005) |
+| WHIT-1006 | **Calendar week and month on a phone** | `TmAppointmentsMobile` shows a day agenda. The web calendar offers Day, Week and Month and the sub-pages Services, Rooms and branches, Hours and time off, Settings. | Week and month with bookings; many people; the sub-page switcher | The same grids at phone width; the date on its own line (WHIT-1005) |
+| WHIT-1006 | **Settings menu on a phone** | The grouped settings menu (WHIT-826) sits above the page on a phone as rows that scroll sideways. | Many groups; the current page; a page several groups deep | Groups in a sideways-scrolling row above the page (WHIT-999) |
+| WHIT-1006 | **Builders on a phone** | The route template editor and the role permissions grid are wide canvases. X.1 and FL.2 say flows are built as a list of steps in sentences on the phone; the permissions grid "stays on the web" (OR.1). Is a read-only view enough on a phone web screen? | A route with several steps; the permissions grid read-only | The canvas and grid at phone width, scrolling |
+
 ## Waiting on the brand team, not an ask
 
 - **Store revamp.** The brand team revamped the store; it isn't in this repository yet. When it lands here, the plugin and app store pages are aligned to it (WHIT-831).
