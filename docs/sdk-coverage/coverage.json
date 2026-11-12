@@ -1,8 +1,8 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.102.0",
+    "sdk_version": "1.104.0",
     "core_version": "0.2.28",
-    "updated": "2026-11-11",
+    "updated": "2026-11-12",
     "ratings": {
         "full": "A plugin can read, change, react to and extend this area through a published SDK contract.",
         "partial": "Some of it is in the SDK; the rest is missing or reachable only through internal core classes.",
@@ -164,6 +164,10 @@
                 {
                     "what": "Role grants limited to the plugin's own permissions and roles, removed only by the plugin that made them",
                     "since": "1.72"
+                },
+                {
+                    "what": "Customer-grade permissions (PluginCustomerPermissionsInterface): the plugin's own permissions that reach only the caller's records, which customers may hold and sign-up roles may include",
+                    "since": "1.104"
                 }
             ],
             "missing": [

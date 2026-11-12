@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.102).
+ * SDK identity (v1.104).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1255,12 +1255,21 @@ namespace Whity\Sdk;
  * most (WHIT-985).
  *
  * Purely additive.)
+ *
+ * 1.104 (CUSTOMER-GRADE PLUGIN PERMISSIONS: a plugin implements
+ * {@see PluginCustomerPermissionsInterface} to list those of its own permissions that reach only
+ * the caller's own records. A workspace's customers may then hold them, and Settings > Sign-up
+ * may offer a role made of them, whatever their action (`manage`, `upload`, `review`). The host
+ * refuses core and administrative resources, permissions the plugin does not own, and resources
+ * another plugin also declares, and forgets the list when the plugin is disabled (#1872, WHIT-995).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.102.0';
+    public const VERSION = '1.104.0';
 
     /**
      * Static identity only — never instantiated.

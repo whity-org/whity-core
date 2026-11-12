@@ -956,6 +956,7 @@ class PluginLoader
         $this->administrativelyDisabled = [];
         $this->claimedFeatureIds = [];
         $this->claimedPermissions = [];
+        \Whity\Core\Identity\CustomerGradePermissions::reset();
 
         // Reset lifecycle state machines. A reload re-registers every plugin
         // from disk, so each plugin (including a previously failed one whose
@@ -2296,6 +2297,10 @@ class PluginLoader
         // plugin leaves nothing reachable without tenant resolution.
         \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
         \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
+        // A disabled or uninstalled plugin vouches for nothing (#1872): its
+        // customer-grade permissions are privileged for customers again.
+        \Whity\Core\Identity\CustomerGradePermissions::remove($pluginKey);
+        \Whity\Auth\RoleChecker::clearCache();
 
         if ($this->hookManager !== null) {
             foreach ($info['hooks'] as $hook) {
@@ -3241,6 +3246,57 @@ class PluginLoader
      * A plugin's document declarations (SDK 1.56, WHIT-742): record types
      * first, so its slots can name them.
      */
+    /**
+     * Record which of this plugin's own permissions it says a customer may hold
+     * (#1872). A slug it does not own (claimed first by another plugin, or not
+     * declared at all) is refused here; the rest is decided by
+     * {@see \Whity\Core\Identity\CustomerGradePermissions}. Refusals are
+     * logged and the rest stays, like a refused role grant.
+     */
+    private function registerCustomerPermissions(PluginInterface $plugin, string $pluginKey): void
+    {
+        $declared = [];
+        $customer = [];
+        $refused = [];
+        try {
+            foreach ($plugin->getPermissions() as $permission) {
+                if (is_string($permission)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                    $declared[] = $permission;
+                }
+            }
+            if ($plugin instanceof \Whity\Sdk\PluginCustomerPermissionsInterface) {
+                foreach ($plugin->getCustomerPermissions() as $slug) {
+                    if (!is_string($slug)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                        continue;
+                    }
+                    if (($this->claimedPermissions[$slug] ?? null) !== $pluginKey) {
+                        $refused[] = $slug;
+                        continue;
+                    }
+                    $customer[] = $slug;
+                }
+            }
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'customer permission declaration');
+            \Whity\Core\Identity\CustomerGradePermissions::remove($pluginKey);
+
+            return;
+        }
+
+        $refused = [
+            ...$refused,
+            ...\Whity\Core\Identity\CustomerGradePermissions::declare($pluginKey, $declared, $customer),
+        ];
+        foreach ($refused as $slug) {
+            $this->logWarning(sprintf(
+                'Plugin %s declares "%s" customer-grade, but a plugin may vouch only for its own '
+                . 'permissions, never a core or administrative one; customers will not hold it',
+                $pluginKey,
+                $slug
+            ));
+        }
+    }
+
     private function registerDocuments(PluginInterface&PluginDocumentsInterface $plugin, string $pluginKey): void
     {
         $owner = $plugin->getName();
@@ -3913,6 +3969,15 @@ class PluginLoader
         } catch (Throwable $e) {
             $this->handlePluginThrowable($pluginKey, $e, 'permission declaration');
         }
+
+        // 2c. Customer-grade permissions (#1872, SDK 1.104): the plugin's own
+        //     permissions it scopes to the caller's own records, which a
+        //     customer membership may then hold. Only slugs this plugin claimed
+        //     above are passed on; CustomerGradePermissions refuses core and
+        //     admin resources and, at ask time, any resource another plugin
+        //     also declares. Every plugin's resources are recorded, so a later
+        //     plugin on the same resource cancels the vouch.
+        $this->registerCustomerPermissions($plugin, $pluginKey);
 
         // 3. Register hooks with the hook manager, tracking each subscription so
         //    it can be unsubscribed on a later reload/removal/disable. Hook

@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.102.0',
+            '1.104.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.102 ADDS the Mail\BillingEmails host service and PluginBillingEmailsInterface: Whity\'s own billing emails to a workspace\'s payers, operator-granted and capped (WHIT-985). '
+            'SDK 1.104 ADDS PluginCustomerPermissionsInterface: a plugin\'s own permissions that reach only the caller\'s records, which customers may hold (#1872, WHIT-995). '
+            . 'SDK 1.102 ADDS the Mail\BillingEmails host service and PluginBillingEmailsInterface: Whity\'s own billing emails to a workspace\'s payers, operator-granted and capped (WHIT-985). '
             . 'SDK 1.101 ADDS Frontend\Blocks\BlockText: block screens take {en, ar} text, served in the language of the reader (WHIT-984). '
             . 'SDK 1.100 ADDS the Mail\WorkspaceEmails host service and the Mail\WorkspaceEmail value object: plugins email as the workspace (WHIT-978). '
             . 'SDK 1.99 ADDS the Messaging\\CustomerMessages host service: a plugin tells a workspace\'s customer something through Messages, WhatsApp first then email (WHIT-967). SDK 1.98 ADDS PluginBookingPaymentInterface with Calendar\\BookingPaymentStep and the Calendar\\Bookings host service, PluginCalendarBusyInterface, the Calendar\\CalendarEvents host service, and calendar and booking events (ADR 0017, WHIT-943). '
