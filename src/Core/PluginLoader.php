@@ -3250,7 +3250,8 @@ class PluginLoader
      */
     private function registerDocumentBlocks(PluginInterface&\Whity\Sdk\PluginDocumentBlocksInterface $plugin, string $pluginKey): void
     {
-        if ($this->documentBlockRegistry === null) {
+        $registry = $this->documentBlockRegistry;
+        if ($registry === null) {
             return;
         }
         try {
@@ -3273,7 +3274,7 @@ class PluginLoader
             $blocks[$block->name] = $block->definition;
         }
         $name = $plugin->getName();
-        $this->documentBlockRegistry->register($name, ['en' => $name, 'ar' => $name], $blocks);
+        $registry->register($name, ['en' => $name, 'ar' => $name], $blocks);
     }
 
     private function registerDocuments(PluginInterface&PluginDocumentsInterface $plugin, string $pluginKey): void

@@ -636,7 +636,7 @@ final class DocumentPublishingApiHandler
         if ($missing !== []) {
             $named = [];
             $blockers = array_values(array_filter($blockers, static function (array $b) use ($missing, &$named): bool {
-                if (($b['kind'] ?? null) !== 'block-without-print-view' || !isset($missing[$b['blockId'] ?? ''])) {
+                if ($b['kind'] !== 'block-without-print-view' || !isset($missing[$b['blockId']])) {
                     return true;
                 }
                 $named[$missing[$b['blockId']]] = true;

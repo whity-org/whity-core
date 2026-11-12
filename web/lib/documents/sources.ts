@@ -1,7 +1,8 @@
 import type { Block, DocumentKind, PublishBlocker, ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
 import type { FieldGroup } from '@whity/ui/editor/fields';
 import type { BrandLogos } from '@whity/ui/editor/page-view';
-import type { EditorServices, FieldPreview, RecordView, UploadedFile } from '@whity/ui/editor/services';
+import { createElement } from 'react';
+import type { EditorServices, FieldPreview, PluginBlocks, RecordView, UploadedFile } from '@whity/ui/editor/services';
 import type {
   DocumentEditorAdapter,
   IssueResult,
@@ -10,6 +11,7 @@ import type {
   TemplateSetup,
   VersionContent,
 } from '@whity/features/document-editor';
+import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { agentsAdapter } from './agents';
@@ -134,11 +136,22 @@ function toRecordView(row: RecordResponse): RecordView {
  * the block shows as hidden rather than as an error.
  */
 async function loadServices(id: string): Promise<EditorServices> {
-  const { data } = await api.GET('/api/v1/document-embeds');
+  // Plugin blocks (editor M7, E.17-E.20): a workspace without any still edits.
+  const [{ data }, pluginBlocks] = await Promise.all([
+    api.GET('/api/v1/document-embeds'),
+    api.GET('/api/v1/document-blocks').then((r) => r.data?.data).catch(() => undefined),
+  ]);
   const fileUrl = (fileId: string) => `/api/v1/document-sources/${Number(id)}/files/${encodeURIComponent(fileId)}/content`;
 
   return {
     recordTypes: data?.data.record_types ?? [],
+    ...(pluginBlocks ? { pluginBlocks: pluginBlocks as unknown as PluginBlocks } : {}),
+    // Whity's own renderer draws a plugin block's declared view; no plugin code runs.
+    renderPluginView: (view) => createElement(BlockRenderer, { blocks: view as Parameters<typeof BlockRenderer>[0]['blocks'] }),
+    async enablePlugin(plugin) {
+      const { response } = await api.POST('/api/v1/workspace-plugins/{plugin}/enable', { params: { path: { plugin } } });
+      if (!response.ok) throw new Error(`Failed to switch the plugin on (${response.status})`);
+    },
     chartSources: data?.data.chart_sources ?? [],
     fileUrl,
     async resolveRecord(ref) {

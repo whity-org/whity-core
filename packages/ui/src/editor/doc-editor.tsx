@@ -20,7 +20,7 @@ import { BlockList } from "./block-list"
 import { AgentPanel, type AgentAskStart } from "./agent-panel"
 import type { EditorAgents } from "./agents"
 import { SelectionBubble } from "./bubble"
-import { applyItem, filterCatalogue, savedBlockItems } from "./catalogue"
+import { applyItem, filterCatalogue, pluginBlockItems, savedBlockItems } from "./catalogue"
 import type { Actor, DocumentKind, EditorMode, PublishBlocker, ResolvedThemeTokens, WhityDocument } from "./contract"
 import { fromEditorContent, toEditorContent } from "./convert"
 import { DocumentBehaviour } from "./behaviour"
@@ -699,7 +699,14 @@ function DocEditor({
     }
   }, [editor, relative])
 
-  const savedItems = React.useMemo(() => savedBlockItems(services.savedBlocks), [services.savedBlocks])
+  // Saved blocks (E.21), then each plugin's blocks for this kind of document (E.18, E.20).
+  const savedItems = React.useMemo(
+    () => [
+      ...savedBlockItems(services.savedBlocks),
+      ...pluginBlockItems(services.pluginBlocks, doc.kind, services.language ?? (doc.lang === "ar" ? "ar" : "en")),
+    ],
+    [services.savedBlocks, services.pluginBlocks, services.language, doc.kind, doc.lang]
+  )
   const slashItems = React.useMemo(() => filterCatalogue(slash.query, labels, EDITOR_LABELS, savedItems), [slash.query, labels, savedItems])
   React.useEffect(() => setSlashActive(0), [slash.query, slash.open])
   const pickSlash = React.useCallback(

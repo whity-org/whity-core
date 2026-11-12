@@ -130,6 +130,8 @@ export const QrBlock = atom("qr", { value: json([]), caption: json(null), sizeMm
 export const MathBlock = atom("math", { tex: { default: "" } })
 /** E.21: a synced saved block, drawn from the library; copies are ordinary blocks. */
 export const SavedBlockNode = atom("savedBlock", { savedBlockId: { default: "" }, version: { default: 1 }, overrides: json({}) })
+/** E.17: a plugin's block; its data is the plugin's own, drawn from the plugin's declaration. */
+export const PluginBlockNode = atom("plugin", { plugin: { default: "" }, blockType: { default: "" }, schemaVersion: { default: 1 }, data: json({}) })
 
 export const richSchemaExtensions = [
   Callout,
@@ -150,4 +152,5 @@ export const richSchemaExtensions = [
   QrBlock,
   MathBlock,
   SavedBlockNode,
+  PluginBlockNode,
 ]

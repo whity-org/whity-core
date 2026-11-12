@@ -84,7 +84,7 @@ final class DocumentBlockRegistry
             $plugins[] = self::entry($row['plugin'], $row['label'], $row['verified'], $row['blocks']);
         }
 
-        return ['plugins' => $plugins, 'off' => array_values(($this->off)($tenantId))];
+        return ['plugins' => $plugins, 'off' => ($this->off)($tenantId)];
     }
 
     /**

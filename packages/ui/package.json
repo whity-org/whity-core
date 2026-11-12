@@ -81,6 +81,7 @@
     "./editor/publish-check": "./src/editor/publish-check.tsx",
     "./editor/sample": "./src/editor/sample.ts",
     "./editor/save-block-dialog": "./src/editor/save-block-dialog.tsx",
+    "./editor/plugin-blocks": "./src/editor/plugin-blocks.ts",
     "./editor/saved-parts": "./src/editor/saved-parts.ts",
     "./editor/schema": "./src/editor/schema.ts",
     "./editor/schema-rich": "./src/editor/schema-rich.ts",
