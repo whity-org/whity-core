@@ -50,10 +50,11 @@ final class CustomerSignupMailer
                 ],
                 ctaLabel: 'Confirm and join',
                 ctaUrl: $link,
-                callout: 'Workspace: ' . $workspace,
                 footnote: 'If this wasn\'t you, ignore this message. Nothing happens until the link is used.',
+                preheader: 'The link works for 24 hours.',
+                notice: 'Sent because someone asked to join ' . $workspace . ' with this address.',
             ),
-            $branding,
+            new EmailBranding($workspace, $branding->brandColor, $branding->supportEmail, $branding->footerText, $branding->whiteLabel),
         );
 
         $this->mailer->send($email, 'Confirm your email to join ' . $workspace, $rendered->text, $rendered->html);
