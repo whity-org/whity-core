@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.101.0",
+    "sdk_version": "1.102.0",
     "core_version": "0.2.28",
     "updated": "2026-11-11",
     "ratings": {
@@ -733,6 +733,10 @@
                 {
                     "what": "WorkspaceEmails host service: send an email as the workspace (its brand, language and the EM.1 layout) to anyone, such as a customer's invoice; plain text only, one button, best effort",
                     "since": "1.100"
+                },
+                {
+                    "what": "BillingEmails host service: Whity's own email about a workspace's plan, in the instance's brand to its billing:pay members; only for a plugin that declares PluginBillingEmailsInterface and the operator granted, capped per workspace a day",
+                    "since": "1.102"
                 }
             ],
             "missing": [

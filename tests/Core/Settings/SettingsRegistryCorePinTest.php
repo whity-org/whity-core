@@ -134,6 +134,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'plugins.store_allowed_hosts',
             'plugins.store_enabled',
             'plugins.mcp_prompts_require_mark',
+            'plugins.billing_email_senders',
             'documents.render_enabled',
             'documents.theme',
             'documents.theme_by_kind',
@@ -331,6 +332,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'plugins.store_allowed_hosts' => 'app.whity.dev',
             'plugins.store_enabled' => 'true',
             'plugins.mcp_prompts_require_mark' => 'false',
+            'plugins.billing_email_senders' => '',
             // WHIT-1001: on by default; printing also needs a ready render
             // service, so an install without one still prints nothing.
             'documents.render_enabled' => 'true',

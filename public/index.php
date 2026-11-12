@@ -1756,6 +1756,16 @@ $emailNotifications->subscribe($hookManager);
 $brandedEmailSender = new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService, $logger);
 // SDK 1.99 (WHIT-978): plugins send as the workspace through the same sender.
 \Whity\register_service(\Whity\Sdk\Mail\WorkspaceEmails::class, new \Whity\Core\Mail\SdkWorkspaceEmails($brandedEmailSender)); // @phpstan-ignore-line
+// SDK 1.102 (WHIT-985): Whity's own billing emails to a workspace's payers, only from a plugin
+// the operator granted (plugins.billing_email_senders), a few a day per workspace at most.
+\Whity\register_service(\Whity\Sdk\Mail\BillingEmails::class, new \Whity\Core\Mail\SdkBillingEmails( // @phpstan-ignore-line
+    $brandedEmailSender,
+    new \Whity\Core\Mail\WorkspaceRecipients($db->getPdo(), $roleChecker),
+    $settingsService,
+    new DatabaseSharedStore($db->getPdo()),
+    $frontendUrls->base(),
+    $logger,
+));
 $accountSecurityMailer = new \Whity\Core\Mail\AccountSecurityMailer(
     $brandedEmailSender,
     $profileEmailRepository,
