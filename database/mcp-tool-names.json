@@ -411,6 +411,10 @@
     "en": "See which plugins can issue documents on their own",
     "ar": "عرض الإضافات التي تصدر مستندات من تلقاء نفسها"
   },
+  "get_api_document_blocks": {
+    "en": "List the blocks plugins add to documents",
+    "ar": "عرض الكتل التي تضيفها الإضافات إلى المستندات"
+  },
   "get_api_document_collections": {
     "en": "List your own document collections",
     "ar": "عرض مجموعات مستنداتك"

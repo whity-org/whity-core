@@ -31,6 +31,7 @@ use Whity\Core\i18n\ServerLabels;
  *   preflight.check.origin_key = The origin key can be used
  *   preflight.check.render = A PDF can be made here
  *   preflight.check.plugin = A plugin's own check
+ *   preflight.check.blocks = Every block can be printed
  *   preflight.why.invalid_request = The request has a mistake in it
  *   preflight.why.template_not_found = The template wasn't found, or you can't see it
  *   preflight.why.template_unpublished = This template hasn't been published yet
@@ -41,6 +42,7 @@ use Whity\Core\i18n\ServerLabels;
  *   preflight.why.record_not_found = The record wasn't found, or you can't see it
  *   preflight.why.field_conflict = A value was given for something the record already says
  *   preflight.why.missing_fields = Some required fields have no value
+ *   preflight.why.unprintable_block = The template has a plugin block that can't print here
  *   preflight.why.origin_key_conflict = This origin key already names another document
  *   preflight.why.render_unavailable = PDFs can't be made on this instance
  *   preflight.why.persist_unavailable = PDFs can't be stored on this instance

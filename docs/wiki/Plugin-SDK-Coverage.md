@@ -310,6 +310,7 @@ Planned: 0.2.28. Tracked in [#1815](https://github.com/whity-org/whity-core/issu
 - Issue events for documents raised by form submissions (SDK 1.94)
 - Published constants for document.routed and document.route_acted (SDK 1.94)
 - route.sent_back, route.resubmitted, route.completed, route.signed and document.finalised events (SDK 1.94)
+- Blocks a plugin adds to the document editor, drawn by Whity's renderer (documents.blocks, PluginDocumentBlocksInterface) (SDK 1.103)
 
 **Missing**
 

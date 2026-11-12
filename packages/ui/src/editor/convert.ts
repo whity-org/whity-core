@@ -203,6 +203,11 @@ export function blockToPm(block: Block): JSONContent {
       return { type: "qr", attrs: { ...common(block), value: block.value, caption: block.caption ?? null, sizeMm: block.sizeMm ?? null } }
     case "math":
       return { type: "math", attrs: { ...common(block), tex: block.tex } }
+    case "plugin":
+      return {
+        type: "plugin",
+        attrs: { ...common(block), plugin: block.plugin, blockType: block.blockType, schemaVersion: block.schemaVersion, data: block.data },
+      }
     case "savedBlock":
       return {
         type: "savedBlock",
@@ -326,6 +331,18 @@ export function blockFromPm(node: JSONContent): Block | null {
     }
     case "math":
       return withCommon({ id, type: "math", tex: String(a.tex ?? "") }, a)
+    case "plugin":
+      return withCommon(
+        {
+          id,
+          type: "plugin",
+          plugin: String(a.plugin ?? ""),
+          blockType: String(a.blockType ?? ""),
+          schemaVersion: Number(a.schemaVersion ?? 1),
+          data: (a.data ?? {}) as Of<"plugin">["data"],
+        },
+        a
+      )
     case "savedBlock":
       return withCommon(
         {

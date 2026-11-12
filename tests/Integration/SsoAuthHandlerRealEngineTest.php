@@ -429,13 +429,13 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
     {
         // A verified identity whose email matches NO local profile → provision a
         // new passwordless profile + verified email + link. It has no membership,
-        // so login bounces with no_membership (JIT membership is WC-635, next PR),
-        // but the account is provisioned and linked.
+        // so it lands on the "no workspace yet" page (WHIT-994), but the account
+        // is provisioned and linked.
         $this->primeFlow(sub: 'brand-new-sub', email: 'newperson@fresh.test', emailVerified: true);
         $_GET = ['code' => 'authcode', 'state' => 'state-1'];
 
         $res = $this->runCallback();
-        self::assertStringContainsString('/login?sso_error=no_membership', $this->location($res));
+        self::assertSame(self::APP_URL . '/welcome', $this->location($res));
 
         // A passwordless profile + verified email + link were created.
         $pid = (int) $this->col("SELECT profile_id FROM external_identities WHERE subject = 'brand-new-sub'");
@@ -583,61 +583,51 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         return (int) $this->col("SELECT profile_id FROM external_identities WHERE subject = '{$sub}'");
     }
 
-    public function testSelfProvisionOffLeavesANewPersonWithoutAWorkspace(): void
+    public function testSelfProvisionOffSendsANewPersonToThePlainNeedAnInvitationPage(): void
     {
+        // WHIT-994: no error code. They land on the "no workspace yet" page,
+        // which says they need an invitation and names the address.
         $tenantsBefore = (int) $this->col('SELECT COUNT(*) FROM tenants');
 
         $res = $this->signInNewPerson();
 
-        self::assertStringContainsString('/login?sso_error=no_membership', $this->location($res));
+        self::assertSame(self::APP_URL . '/welcome', $this->location($res));
         self::assertSame($tenantsBefore, (int) $this->col('SELECT COUNT(*) FROM tenants'));
     }
 
-    public function testSelfProvisionGivesANewPersonTheirOwnWorkspaceAndSignsThemIn(): void
+    public function testSelfProvisionOnAsksInsteadOfCreatingAWorkspaceSilently(): void
     {
         $this->enableSelfProvision();
+        $tenantsBefore = (int) $this->col('SELECT COUNT(*) FROM tenants');
 
         $res = $this->signInNewPerson();
 
-        self::assertSame(self::APP_URL . '/dashboard', $this->location($res), $res->getBody());
-        $pid = $this->profileFor('fresh-sub');
-        $stmt = $this->pdo->prepare(
-            "SELECT m.tenant_id, m.status, r.name AS role, t.name AS tenant_name
-               FROM memberships m JOIN roles r ON r.id = m.role_id JOIN tenants t ON t.id = m.tenant_id
-              WHERE m.profile_id = :p"
-        );
-        $stmt->execute([':p' => $pid]);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        self::assertCount(1, $rows);
-        self::assertSame('active', $rows[0]['status']);
-        self::assertSame('admin', $rows[0]['role']);
-        self::assertNotSame((string) $this->tenantId, (string) $rows[0]['tenant_id']);
-        self::assertNotSame('0', (string) $rows[0]['tenant_id']);
-        // The workspace went through the tenant provisioner, so it has the
-        // editor starters every tenant gets (DocumentSourceStarterSeeder).
-        self::assertGreaterThan(
-            0,
-            (int) $this->col('SELECT COUNT(*) FROM document_sources WHERE starter_key IS NOT NULL AND tenant_id = ' . (int) $rows[0]['tenant_id'])
-        );
+        self::assertSame(self::APP_URL . '/welcome', $this->location($res), $res->getBody());
+        self::assertSame($tenantsBefore, (int) $this->col('SELECT COUNT(*) FROM tenants'));
+        self::assertSame(0, (int) $this->col('SELECT COUNT(*) FROM memberships WHERE profile_id = ' . $this->profileFor('fresh-sub')));
     }
 
-    public function testSelfProvisionHappensOnceAcrossRepeatSignIns(): void
+    public function testOnceTheyHaveCreatedTheirWorkspaceASignInGoesStraightIn(): void
     {
         $this->enableSelfProvision();
         $this->signInNewPerson();
-        $tenantsAfterFirst = (int) $this->col('SELECT COUNT(*) FROM tenants');
+        $pid = $this->profileFor('fresh-sub');
+        (new \Whity\Core\Tenant\FederatedWorkspaceProvisioner($this->pdo, $this->settings))
+            ->provisionFor($pid, 'fresh@person.test', new \Whity\Core\Identity\FederatedProviderContext($this->providerId, 'google', 0), 'Example Bakery');
+        $tenantsAfter = (int) $this->col('SELECT COUNT(*) FROM tenants');
 
         $res = $this->signInNewPerson();
 
         self::assertSame(self::APP_URL . '/dashboard', $this->location($res), $res->getBody());
-        self::assertSame($tenantsAfterFirst, (int) $this->col('SELECT COUNT(*) FROM tenants'));
-        self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM memberships WHERE profile_id = ' . $this->profileFor('fresh-sub')));
+        self::assertSame($tenantsAfter, (int) $this->col('SELECT COUNT(*) FROM tenants'));
+        self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM memberships WHERE profile_id = ' . $pid));
     }
 
     public function testSelfProvisionLeavesAlonePeopleWhoAlreadyBelongSomewhere(): void
     {
         // Somebody already invited (not yet active) has been placed by a human;
-        // a fresh workspace would route around that decision.
+        // a fresh workspace would route around that decision. They land on the
+        // same page, which tells them their place is waiting (WHIT-994).
         $this->enableSelfProvision();
         $this->exec("INSERT INTO profiles
             (display_name, password_hash, two_factor_enabled, two_factor_secret,
@@ -653,11 +643,27 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
 
         $res = $this->signInNewPerson('invitee-sub', 'invitee@acme.test');
 
-        self::assertStringContainsString('/login?sso_error=no_membership', $this->location($res));
+        self::assertSame(self::APP_URL . '/welcome', $this->location($res));
         self::assertSame($tenantsBefore, (int) $this->col('SELECT COUNT(*) FROM tenants'));
     }
 
-    public function testASignInIsAnnouncedWithTheSubjectAndAnyNewWorkspace(): void
+    public function testATenantsOwnProviderIsNeverSentToTheCreateStep(): void
+    {
+        // A bring-your-own IdP is confined to its tenant: a person it signs in
+        // who is not a member there is refused, never offered a workspace.
+        $this->enableSelfProvision();
+        $tenantsBefore = (int) $this->col('SELECT COUNT(*) FROM tenants');
+        $this->primeFlow(sub: 'outsider-sub', email: 'outsider@elsewhere.test', providerId: $this->tenantProviderId, tenantId: $this->tenantId);
+        $_GET = ['code' => 'authcode', 'state' => 'state-1'];
+
+        $res = $this->runCallback();
+
+        self::assertStringContainsString('/login?sso_error=', $this->location($res));
+        self::assertStringNotContainsString('/welcome', $this->location($res));
+        self::assertSame($tenantsBefore, (int) $this->col('SELECT COUNT(*) FROM tenants'));
+    }
+
+    public function testASignInIsAnnouncedWithTheSubjectAndNoWorkspace(): void
     {
         $this->enableSelfProvision();
         $seen = [];
@@ -667,19 +673,15 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         });
 
         $this->signInNewPerson();
-        $this->signInNewPerson();
 
-        self::assertCount(2, $seen);
-        $pid = $this->profileFor('fresh-sub');
-        $tenantId = (int) $this->col("SELECT tenant_id FROM memberships WHERE profile_id = {$pid}");
-        self::assertSame($pid, $seen[0]['profile_id']);
+        self::assertCount(1, $seen);
+        self::assertSame($this->profileFor('fresh-sub'), $seen[0]['profile_id']);
         self::assertSame('fresh-sub', $seen[0]['subject']);
         self::assertSame(self::ISSUER, $seen[0]['issuer']);
         self::assertSame('google', $seen[0]['provider_key']);
         self::assertTrue($seen[0]['global_trust']);
-        self::assertSame($tenantId, $seen[0]['provisioned_tenant_id']);
-        // The second sign-in created nothing, and says so.
-        self::assertNull($seen[1]['provisioned_tenant_id']);
+        // A sign-in no longer creates a workspace (WHIT-994).
+        self::assertNull($seen[0]['provisioned_tenant_id']);
     }
 
     public function testADeactivatedAccountSigningInGetsNoWorkspace(): void
@@ -699,25 +701,6 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
 
         self::assertStringContainsString('/login?sso_error=', $this->location($res));
         self::assertSame($tenantsBefore, (int) $this->col('SELECT COUNT(*) FROM tenants'));
-    }
-
-    public function testSelfProvisionPicksAFreeNameWhenTheObviousOneIsTaken(): void
-    {
-        // The ID token names everyone "Alice"; an Alice workspace already exists.
-        $this->enableSelfProvision();
-        $this->exec("INSERT INTO tenants (name, slug, created_at) VALUES ('Alice', 'alice', NOW())");
-
-        $this->signInNewPerson();
-
-        $pid = $this->profileFor('fresh-sub');
-        $tenantId = (int) $this->col("SELECT tenant_id FROM memberships WHERE profile_id = {$pid}");
-        $stmt = $this->pdo->prepare('SELECT name, slug FROM tenants WHERE id = :id');
-        $stmt->execute([':id' => $tenantId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        self::assertIsArray($row);
-        self::assertSame('Alice 2', $row['name']);
-        // The slug is opaque: a display name must never choose a host label.
-        self::assertMatchesRegularExpression('/^ws-[0-9a-f]{12}$/', $row['slug']);
     }
 }
 

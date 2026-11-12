@@ -4899,6 +4899,176 @@
                 }
             }
         },
+        "/api/v1/auth/sso/workspace": {
+            "get": {
+                "operationId": "get_api_v1_auth_sso_workspace",
+                "summary": "Which \"no workspace yet\" screen a pending SSO sign-in gets",
+                "tags": [
+                    "sso"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Create, waiting or needs_invite, with the address signed in with",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SsoWorkspaceSetupResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No pending sign-in, or it expired",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "operationId": "post_api_v1_auth_sso_workspace",
+                "summary": "Create the pending SSO sign-in's own workspace and sign in to it",
+                "tags": [
+                    "sso"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SsoWorkspaceCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Session issued for the new workspace",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SessionUserResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No pending sign-in, or it expired",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "This sign-in may no longer create a workspace",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Name missing or too long, or an invalid language or colour",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Could not be created right now; nothing was created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/switch-tenant": {
             "post": {
                 "operationId": "post_api_v1_auth_switch_tenant",
@@ -17051,6 +17221,93 @@
                     },
                     "422": {
                         "description": "allowed is not a boolean, or the system tenant",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-blocks": {
+            "get": {
+                "operationId": "get_api_v1_document_blocks",
+                "summary": "List the blocks the workspace's plugins add to the document editor",
+                "tags": [
+                    "documents"
+                ],
+                "description": "One entry per plugin (editor M7, E.17-E.20; SDK 1.103): its name, whether it carries Whity's Verified mark, and its blocks. Each block is a declaration Whity's own renderer draws: its fields, a view and an optional print view in the screen vocabulary's display blocks, and the kinds of document it may go in (without a print view, notes and wiki pages only). `off` lists the workspace's plugins that are installed but switched off; `canEnable` says whether the caller may switch them on.",
+                "responses": {
+                    "200": {
+                        "description": "The plugin blocks",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentBlocksResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Tenant context is required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -76784,6 +77041,177 @@
                     "allowed"
                 ]
             },
+            "DocumentBlockDefinition": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "`<plugin>/<block>`"
+                    },
+                    "blockType": {
+                        "type": "string",
+                        "description": "The block's name within its plugin; a document's plugin block names it"
+                    },
+                    "label": {
+                        "$ref": "#/components/schemas/LocalizedLabel"
+                    },
+                    "description": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/LocalizedLabel"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "icon": {
+                        "type": "string",
+                        "description": "A Whity icon name"
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "fields": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "The Edit form: {key, label, type (text, longText, number, date, select), required?, options?}"
+                    },
+                    "view": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "Display blocks of the screen vocabulary, naming fields as {{data.key}}"
+                    },
+                    "print": {
+                        "oneOf": [
+                            {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "What Whity Render prints; null means notes and wiki pages only (E.18)"
+                    },
+                    "allowedIn": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "note",
+                                "wiki",
+                                "template",
+                                "letter",
+                                "report",
+                                "label"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "name",
+                    "blockType",
+                    "label",
+                    "description",
+                    "icon",
+                    "keywords",
+                    "fields",
+                    "view",
+                    "print",
+                    "allowedIn"
+                ]
+            },
+            "DocumentBlockPlugin": {
+                "type": "object",
+                "properties": {
+                    "plugin": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "$ref": "#/components/schemas/LocalizedLabel"
+                    },
+                    "verified": {
+                        "type": "boolean",
+                        "description": "Whity's Verified mark, from Whity's marks only"
+                    },
+                    "firstParty": {
+                        "type": "boolean"
+                    },
+                    "blocks": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentBlockDefinition"
+                        }
+                    }
+                },
+                "required": [
+                    "plugin",
+                    "label",
+                    "verified",
+                    "firstParty",
+                    "blocks"
+                ]
+            },
+            "DocumentBlocksResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "plugins": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/DocumentBlockPlugin"
+                                }
+                            },
+                            "off": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "plugin": {
+                                            "type": "string"
+                                        },
+                                        "label": {
+                                            "$ref": "#/components/schemas/LocalizedLabel"
+                                        }
+                                    },
+                                    "required": [
+                                        "plugin",
+                                        "label"
+                                    ]
+                                },
+                                "description": "Installed here but switched off (E.19)"
+                            },
+                            "canEnable": {
+                                "type": "boolean",
+                                "description": "The caller holds plugins:enable"
+                            }
+                        },
+                        "required": [
+                            "plugins",
+                            "off",
+                            "canEnable"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "DocumentChangesResponse": {
                 "type": "object",
                 "properties": {
@@ -94159,6 +94587,72 @@
                         "items": {
                             "$ref": "#/components/schemas/SsoProvider"
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SsoWorkspaceCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "locale": {
+                        "type": "string"
+                    },
+                    "main_color": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            },
+            "SsoWorkspaceSetupResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "create",
+                                    "waiting",
+                                    "needs_invite"
+                                ]
+                            },
+                            "email": {
+                                "type": "string"
+                            },
+                            "suggested_name": {
+                                "type": "string"
+                            },
+                            "workspaces": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "name",
+                                        "status"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "state",
+                            "email"
+                        ]
                     }
                 },
                 "required": [

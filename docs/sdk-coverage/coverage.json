@@ -353,6 +353,10 @@
                 {
                     "what": "route.sent_back, route.resubmitted, route.completed, route.signed and document.finalised events",
                     "since": "1.94"
+                },
+                {
+                    "what": "Blocks a plugin adds to the document editor, drawn by Whity's renderer (documents.blocks, PluginDocumentBlocksInterface)",
+                    "since": "1.103"
                 }
             ],
             "missing": [

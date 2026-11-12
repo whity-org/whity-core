@@ -22,6 +22,7 @@ function SelectionBubble({
   onLink,
   onComment,
   onRewrite,
+  perDocument,
 }: {
   editor: Editor
   labels: EditorLabels
@@ -30,6 +31,8 @@ function SelectionBubble({
   onComment?: () => void
   /** M6: ask an agent to rewrite the selection; its version comes back as a suggestion. */
   onRewrite?: () => void
+  /** M7, E.23: editing a saved block's original, mark text as filled per document. */
+  perDocument?: boolean
 }) {
   const s = useEditorState({
     editor,
@@ -41,6 +44,7 @@ function SelectionBubble({
       code: e.isActive("code"),
       link: e.isActive("link"),
       highlight: e.isActive("highlight"),
+      perDocument: e.isActive("perDocument"),
       editable: e.isEditable,
     }),
   })
@@ -81,6 +85,12 @@ function SelectionBubble({
             <span aria-hidden="true" className="mx-[3px] h-[18px] w-px bg-border" />
             {b("link", labels.link, s.link, onLink, "⌘K")}
             {b("highlight", labels.highlight, s.highlight, mark("highlight"))}
+            {perDocument && (
+              <>
+                <span aria-hidden="true" className="mx-[3px] h-[18px] w-px bg-border" />
+                {b("field", labels.perDocumentMark, s.perDocument, mark("perDocument"))}
+              </>
+            )}
           </>
         )}
         {onComment && (

@@ -259,6 +259,58 @@
 .wy-doc .wy-saved-action { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; border-radius: 4px; }
 .wy-doc .wy-saved-action:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
+/* E.17: a plugin's block, drawn by Whity; its source label is the saved block's (`.wy-saved-src`). */
+.wy-doc .wy-plugin:hover .wy-saved-src,
+.wy-doc .wy-plugin:focus-within .wy-saved-src,
+.wy-doc .wy-plugin.is-selected .wy-saved-src,
+.wy-doc .ProseMirror-selectednode > .wy-plugin .wy-saved-src { display: inline-flex; }
+.wy-doc .wy-plugin { margin-block: 8px; }
+/* Selected, the ring is the one every selected block has. */
+.wy-doc .wy-plugin.is-selected,
+.wy-doc .ProseMirror-selectednode > .wy-plugin { outline: none; }
+.wy-doc .wy-plugin-body { font-size: 0.9375rem; }
+.wy-doc .wy-plugin-tile {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--primary-tint);
+  color: var(--primary-tint-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.wy-doc .wy-plugin-mark { display: inline-flex; align-items: center; gap: 3px; color: var(--success-text); }
+/* E.19: a block whose plugin is off; its data is kept. */
+.wy-doc .wy-plugin-off {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--muted);
+}
+
+/* E.23: a part filled per document. In the original, marked text; in a
+   document, the field it fills (EditorCustomBlocks `.wy-fill`). */
+.wy-doc [data-per-document],
+.wy-doc .wy-part {
+  outline: 1px dotted var(--input);
+  outline-offset: 2px;
+  border-radius: 3px;
+  background: var(--muted);
+  padding: 0 3px;
+}
+.wy-doc input.wy-part {
+  border: 0;
+  color: inherit;
+  font: inherit;
+  max-width: 100%;
+}
+.wy-doc input.wy-part::placeholder { color: var(--muted-foreground); }
+.wy-doc input.wy-part:focus-visible { outline: 2px solid var(--ring); }
+
 /* Toggle: the summary line, and the blocks it hides. */
 .wy-doc [data-type="toggle"] { display: flex; gap: 4px; align-items: flex-start; }
 .wy-doc .wy-toggle-button {

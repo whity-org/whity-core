@@ -21,11 +21,13 @@ import {
   PageBreak,
   QrBlock,
   RecordBlock,
+  PluginBlockNode,
   SavedBlockNode,
   SignatureBlock,
   Table,
   Toggle,
 } from "./schema-rich"
+import { PluginBlockView } from "./plugin-block-view"
 import { SavedBlockView } from "./saved-block-view"
 import { Field, MathInline } from "./schema"
 import { formatSize, inlineText, useEditorServices, type ChartData, type RecordView } from "./services"
@@ -454,5 +456,6 @@ export const richNodeViews = [
   MathBlock.extend({ addNodeView: react(MathView) }),
   MathInline.extend({ addNodeView: react(MathInlineView) }),
   SavedBlockNode.extend({ addNodeView: react(SavedBlockView) }),
+  PluginBlockNode.extend({ addNodeView: react(PluginBlockView) }),
   Field.extend({ addNodeView: react(FieldView) }),
 ]

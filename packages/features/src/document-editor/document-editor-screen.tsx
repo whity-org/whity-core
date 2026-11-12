@@ -481,10 +481,22 @@ export function DocumentEditorScreen({
       live = false;
     };
   }, [savedOn, adapter]);
+  // Plugins' labels in the reader's language: the page's own `lang`.
+  const language: 'en' | 'ar' = typeof window !== 'undefined' && window.document.documentElement.lang.startsWith('ar') ? 'ar' : 'en';
   const editorServices = React.useMemo<EditorServices | undefined>(() => {
-    if (!savedOn) return services;
+    // M7, E.19: switching a plugin on from its placeholder reloads what the editor knows.
+    const enablePlugin = services?.enablePlugin
+      ? async (plugin: string) => {
+          await services.enablePlugin!(plugin);
+          const next = await adapter.loadServices?.(id);
+          if (next) setServices(next);
+        }
+      : undefined;
+    // Only when plugins add blocks: otherwise the services pass through unchanged.
+    const base = services?.pluginBlocks ? { ...services, language, ...(enablePlugin ? { enablePlugin } : {}) } : services;
+    if (!savedOn) return base;
     return {
-      ...services,
+      ...base,
       savedBlocks: savedBlocks ?? [],
       canShareSavedBlocks: canManageLibrary,
       ...(adapter.saveBlock
@@ -497,7 +509,7 @@ export function DocumentEditorScreen({
           }
         : {}),
     };
-  }, [savedOn, services, savedBlocks, canManageLibrary, adapter]);
+  }, [savedOn, services, savedBlocks, canManageLibrary, adapter, id, language]);
 
   const showPreview = React.useCallback(
     async (record: string | null) => {

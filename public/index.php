@@ -1205,6 +1205,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::DOCUMENTS_READ,
     ];
     $items[] = [
+        'id' => 'saved-blocks',
+        'label' => 'Saved blocks',
+        'href' => '/admin/document-sources/saved-blocks',
+        'icon' => 'stack-2',
+        'group' => 'documents',
+        'order' => 7,
+        // Editor M7 (E.21-E.22): a person's own saved blocks and the workspace
+        // library, to rename, delete, see where a synced block is used and
+        // edit the original. Mirrors GET /api/saved-blocks, gated documents:read.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::DOCUMENTS_READ,
+    ];
+    $items[] = [
         'id' => 'document-templates',
         'label' => 'Document templates',
         'href' => '/admin/document-templates',
@@ -3456,6 +3468,48 @@ $templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry(
     static fn (int $tenantId): array => $tenantManifestHost->manifestsFor($tenantId)
 );
 \Whity\register_service(\Whity\Core\Document\Slots\TemplateSlotRegistry::class, $templateSlotRegistry);
+// Blocks plugins add to the document editor (editor M7, E.17-E.20; SDK 1.103).
+// Code plugins register theirs at load; a workspace's own plugins are read per
+// request from their manifests. Verified comes from Whity's marks only.
+$codePluginVerification = new \Whity\Core\Plugin\Trust\CodePluginVerification($db->getPdo(), $storeMarks);
+$documentBlockRegistry = new \Whity\Core\Document\Blocks\DocumentBlockRegistry(
+    static function (int $tenantId) use ($tenantManifestHost, $tenantPluginRepository, $pluginTrust): array {
+        $versions = [];
+        foreach ($tenantPluginRepository->plugins($tenantId) as $row) {
+            $versions[$row['plugin']] = $row;
+        }
+        $out = [];
+        foreach ($tenantManifestHost->manifestsFor($tenantId) as $manifest) {
+            $blocks = $manifest->documentBlocks();
+            if ($blocks === []) {
+                continue;
+            }
+            $row = $versions[$manifest->name()] ?? null;
+            $out[] = [
+                'plugin' => $manifest->name(),
+                'label' => $manifest->label(),
+                'verified' => $row !== null && $pluginTrust->isVerified($row['plugin'], $row['version'], $row['hash']),
+                'blocks' => $blocks,
+            ];
+        }
+
+        return $out;
+    },
+    static function (int $tenantId) use ($tenantPluginRepository): array {
+        $off = [];
+        foreach ($tenantPluginRepository->plugins($tenantId) as $row) {
+            if (!$row['enabled']) {
+                $off[] = ['plugin' => $row['plugin'], 'label' => ['en' => $row['plugin'], 'ar' => $row['plugin']]];
+            }
+        }
+
+        return $off;
+    },
+    static fn (string $plugin): bool => $codePluginVerification->isVerified($plugin),
+);
+\Whity\register_service(\Whity\Core\Document\Blocks\DocumentBlockRegistry::class, $documentBlockRegistry);
+$documentBlocksHandler = new \Whity\Api\DocumentBlocksApiHandler($documentBlockRegistry, $roleChecker);
+$router->register('GET',    '/api/document-blocks',                     [$documentBlocksHandler, 'list'], null, null, CorePermissions::DOCUMENTS_READ);
 // A workspace's own plugins' agent presets are read per call, like its slots (WHIT-818).
 $agentPresetRegistry->useManifests(static fn (int $tenantId): array => $tenantManifestHost->manifestsFor($tenantId));
 // Template slots and the workspace's bindings (WHIT-742, DOCUMENT-AUTOMATION
@@ -3700,6 +3754,12 @@ $documentIssuing = new \Whity\Core\Document\Issuing\DocumentIssuing(
     $hookManager,
     $documentRepository,
     $documentArtifactRepository,
+    // Editor M7 (E.38): a one-off document freezes its synced blocks when issued.
+    new \Whity\Core\Document\SavedBlock\SavedBlockExpander(
+        new \Whity\Core\Document\SavedBlock\SavedBlockRepository($db->getPdo()),
+        // E.17-E.18: and its plugin blocks as printed from their print views.
+        new \Whity\Core\Document\Blocks\PluginBlockPrinter($documentBlockRegistry),
+    ),
 );
 $documentPublishingHandler = new \Whity\Api\DocumentPublishingApiHandler(
     $documentSourcesHandler,
@@ -3719,6 +3779,10 @@ $documentPublishingHandler = new \Whity\Api\DocumentPublishingApiHandler(
     $documentThemeRepository,
     $documentCollab,
     new \Whity\Core\Document\Print\WorkspaceName($db->getPdo()),
+    // Editor M7 (E.38): drafts print synced blocks as the library has them; publishing freezes them.
+    new \Whity\Core\Document\SavedBlock\SavedBlockRepository($db->getPdo()),
+    // Editor M7 (E.17-E.19): plugin blocks print from their print views; an off plugin blocks publishing.
+    $documentBlockRegistry,
 );
 $router->register('GET',  '/api/document-fields',                         [$documentPublishingHandler, 'fields'],       null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/document-fields/records',                 [$documentPublishingHandler, 'records'],      null, null, CorePermissions::DOCUMENTS_READ);
@@ -5800,7 +5864,8 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     ),
     $settingsService,
     (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
-    // Off unless the operator sets auth.sso_self_provision_workspace.
+    // Where a sign-in with no workspace lands (WHIT-994): the create step only
+    // when the operator sets auth.sso_self_provision_workspace.
     new \Whity\Core\Tenant\FederatedWorkspaceProvisioner($db->getPdo(), $settingsService, $hookManager),
     // Announces each verified federated sign-in (auth.federated.signed_in).
     $hookManager,
@@ -5819,6 +5884,19 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
 $router->register('GET', '/api/auth/sso/providers',                      [$ssoAuthHandler, 'providers'], null);
 $router->register('GET', '/api/auth/sso/{provider:[a-z0-9_]+}/start',    [$ssoAuthHandler, 'start'],    null);
 $router->register('GET', '/api/auth/sso/{provider:[a-z0-9_]+}/callback', [$ssoAuthHandler, 'callback'], null);
+// WHIT-994: after a sign-in that found no workspace. Public like select-tenant:
+// the caller holds only the short-lived workspace_setup cookie the callback
+// set (no session). The POST creates their workspace only when every gate in
+// FederatedWorkspaceProvisioner still holds, then signs them into it.
+$ssoWorkspaceSetupHandler = new \Whity\Api\SsoWorkspaceSetupHandler(
+    $jwtParser,
+    new \Whity\Core\Identity\IdentityProviderRepository($db->getPdo()),
+    new \Whity\Core\Tenant\FederatedWorkspaceProvisioner($db->getPdo(), $settingsService, $hookManager),
+    $authHandler,
+    $settingsService,
+);
+$router->register('GET', '/api/auth/sso/workspace', [$ssoWorkspaceSetupHandler, 'show'], null);
+$router->register('POST', '/api/auth/sso/workspace', [$ssoWorkspaceSetupHandler, 'create'], null);
 
 // 13g. Authenticated "connected accounts" management (WC-f3b17bd2): the caller
 // lists / unlinks their own federated identities. Self-authenticating via the
@@ -6443,7 +6521,7 @@ $hostLicenceSales = new \Whity\Core\Billing\HostLicenceSales($logger);
 \Whity\register_service(\Whity\Sdk\Billing\LicenceSales::class, $hostLicenceSales);
 $pluginLoader->setLicenceSales($hostLicenceSales);
 // Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
-$pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
+$pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry, $documentBlockRegistry);
 $pluginLoader->load();
 $pluginLoader->collectMcpPrompts($promptRegistry, $agentContextGrantedNow());
 $pluginLoader->collectMcpResources($pluginResources, $agentContextGrantedNow());

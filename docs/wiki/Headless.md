@@ -39,17 +39,21 @@ Two settings tell the backend where your frontend lives.
 `APP_URL` stays the backend's own address, because the SSO callback is built on
 it. If your routes don't match the defaults (`/verify-email`, `/reset-password`,
 `/accept-invitation`, `/account-recovery`, `/dashboard`, `/login`, `/f`,
-`/verify`, `/admin/errors`, `/join/confirm`), override any single link with its full URL:
+`/verify`, `/admin/errors`, `/join/confirm`, `/welcome`), override any single link with its full URL:
 `EMAIL_VERIFICATION_URL`, `PASSWORD_RESET_URL`, `TWO_FACTOR_RECOVERY_URL`,
 `INVITATION_ACCEPT_URL`, `SSO_SUCCESS_URL`, `SSO_LOGIN_URL`, `PUBLIC_FORM_URL`,
-`DOCUMENT_VERIFY_URL`, `ERROR_DETAILS_URL`, `SIGNUP_CONFIRM_URL`. See `.env.example` for each one.
+`DOCUMENT_VERIFY_URL`, `ERROR_DETAILS_URL`, `SIGNUP_CONFIRM_URL`, `SSO_NO_WORKSPACE_URL`. See `.env.example` for each one.
 
 What your pages receive:
 
 - **Email links** get the token appended: `/reset-password?token=…`.
 - **SSO** bounces back to `SSO_LOGIN_URL` with `?sso_error=<code>` on failure,
   or `?sso=select` when the user must pick a tenant. Success lands on
-  `SSO_SUCCESS_URL` with the session cookies set.
+  `SSO_SUCCESS_URL` with the session cookies set. Somebody the operator's
+  own provider signed in who belongs to no workspace lands on
+  `SSO_NO_WORKSPACE_URL` holding only a short-lived `workspace_setup_token`
+  cookie; read `GET /api/v1/auth/sso/workspace` to choose the screen, and
+  `POST` it to create their workspace when `may_create` is true.
 - **Public forms and QR codes** append the token as a path segment: `/f/<token>`,
   `/verify/<token>`.
 
