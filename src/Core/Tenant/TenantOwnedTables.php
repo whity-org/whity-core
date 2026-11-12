@@ -58,6 +58,7 @@ final class TenantOwnedTables
         'resource_role_assignments' => '088_create_resource_role_assignments.php',
         'permission_delegations' => '014_create_permission_delegations.php',
         'audit_log' => '016_create_audit_log.php',
+        'away_periods' => '251_add_two_admin_resets_and_away.php',
         'persons' => '018_create_persons.php',
         'relations' => '020_create_relations.php',
         'tenant_settings' => '025_create_tenant_settings.php',

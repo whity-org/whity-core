@@ -259,6 +259,10 @@
     "en": "See the audit log of your workspace",
     "ar": "عرض سجل التدقيق"
   },
+  "get_api_away_periods": {
+    "en": "List who is away and who decides for them",
+    "ar": "عرض الغائبين ومن يقرر نيابةً عنهم"
+  },
   "get_api_billing_invoices": {
     "en": "List your workspace's invoices",
     "ar": "عرض الفواتير"
@@ -1043,16 +1047,24 @@
     "ar": "إلزام التحقق بخطوتين"
   },
   "post_api_2fa_recovery_force_reset": {
-    "en": "Turn off a user's two-step sign-in without a request",
-    "ar": "إلغاء التحقق بخطوتين لمستخدم مباشرة"
+    "en": "Start a two-step reset for a user, which a second admin then approves",
+    "ar": "بدء إعادة تعيين التحقق بخطوتين لمستخدم ليوافق عليها مسؤول ثانٍ"
   },
   "post_api_2fa_recovery_id_approve": {
     "en": "Approve recovery: turn off the user's two-step sign-in and send a password reset link",
     "ar": "الموافقة على استعادة التحقق بخطوتين"
   },
+  "post_api_2fa_recovery_id_checks": {
+    "en": "Record a check that a two-step reset is really from the person",
+    "ar": "تسجيل تحقق من أن طلب إعادة تعيين التحقق بخطوتين من صاحبه فعلاً"
+  },
   "post_api_2fa_recovery_id_reject": {
     "en": "Reject a two-step sign-in recovery request",
     "ar": "رفض طلب استعادة التحقق بخطوتين"
+  },
+  "post_api_2fa_recovery_identity_check": {
+    "en": "Start an admin's check that it's them before approving a two-step reset",
+    "ar": "بدء تحقق المسؤول من هويته قبل الموافقة على إعادة تعيين التحقق بخطوتين"
   },
   "post_api_affiliates": {
     "en": "Create an affiliate",

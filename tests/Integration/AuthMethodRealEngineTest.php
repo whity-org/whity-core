@@ -651,8 +651,9 @@ final class AuthMethodRealEngineTest extends TestCase
         // approval — the window an approval queue necessarily has.
         $this->becomeIdpOnly($id);
 
+        $admin = $this->seedProfile('admin-2fa@example.com', 'pw');
         self::assertNull(
-            $recovery->approveForTenant((int) $confirmed['request_id'], 1),
+            $recovery->approveForTenant((int) $confirmed['request_id'], 1, $admin, 'totp'),
             'an approval that would mint a local credential must find nothing approvable'
         );
         self::assertTrue($this->twoFactorEnrolled($id), 'a refused recovery must not disarm the account');
@@ -678,8 +679,9 @@ final class AuthMethodRealEngineTest extends TestCase
         $this->seedTenantMembership($id, 1);
         $this->enrolTwoFactor($id);
 
+        $admin = $this->seedProfile('admin-force@example.com', 'pw');
         self::assertNull(
-            $this->twoFactorRecovery()->forceResetForTenant($id, 1),
+            $this->twoFactorRecovery()->forceResetForTenant($id, 1, $admin, 'totp'),
             'a forced reset for an IdP-backed account must be refused'
         );
         self::assertTrue($this->twoFactorEnrolled($id));
@@ -699,9 +701,15 @@ final class AuthMethodRealEngineTest extends TestCase
         $this->seedTenantMembership($id, 1);
         $this->enrolTwoFactor($id);
 
-        $result = $this->twoFactorRecovery()->forceResetForTenant($id, 1);
+        $first  = $this->seedProfile('admin-one@example.com', 'pw');
+        $second = $this->seedProfile('admin-two@example.com', 'pw');
+        $started = $this->twoFactorRecovery()->forceResetForTenant($id, 1, $first, 'totp');
+        self::assertIsArray($started);
+        self::assertTrue($this->twoFactorEnrolled($id), 'starting a reset clears nothing (AG.1)');
 
-        self::assertNotNull($result);
+        $result = $this->twoFactorRecovery()->approveForTenant($started['request_id'], 1, $second, 'totp');
+
+        self::assertIsArray($result);
         self::assertNotSame('', (string) $result['reset_token']);
         self::assertFalse($this->twoFactorEnrolled($id), 'a successful recovery clears the enrolment');
     }
