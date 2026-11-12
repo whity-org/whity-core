@@ -1681,5 +1681,73 @@
   "put_api_tenants_id_subscription": {
     "en": "Set a workspace's subscription or apply a plan",
     "ar": "تعيين اشتراك مساحة عمل أو باقتها"
+  },
+  "taskaat_add_milestone": {
+    "en": "Add a milestone to a task",
+    "ar": "إضافة مرحلة إلى مهمة"
+  },
+  "taskaat_complete_milestone": {
+    "en": "Tick a task's milestone",
+    "ar": "تعليم مرحلة من مهمة كمنجزة"
+  },
+  "taskaat_complete_task": {
+    "en": "Mark a task done",
+    "ar": "تعليم مهمة كمنجزة"
+  },
+  "taskaat_create_kb_entry": {
+    "en": "Record a decision",
+    "ar": "تسجيل قرار"
+  },
+  "taskaat_create_task": {
+    "en": "Create a task in Taskaat",
+    "ar": "إنشاء مهمة في Taskaat"
+  },
+  "taskaat_get_project": {
+    "en": "Read a Taskaat board",
+    "ar": "قراءة لوحة في Taskaat"
+  },
+  "taskaat_get_task": {
+    "en": "Read a task in Taskaat",
+    "ar": "قراءة مهمة في Taskaat"
+  },
+  "taskaat_get_task_activity": {
+    "en": "See what happened on a task",
+    "ar": "عرض ما جرى على مهمة"
+  },
+  "taskaat_get_task_gate_history": {
+    "en": "See a task's review verdicts",
+    "ar": "عرض قرارات مراجعة مهمة"
+  },
+  "taskaat_list_kb_entries": {
+    "en": "List a board's decisions",
+    "ar": "عرض قرارات لوحة"
+  },
+  "taskaat_list_projects": {
+    "en": "List the Taskaat boards",
+    "ar": "عرض لوحات Taskaat"
+  },
+  "taskaat_list_tasks": {
+    "en": "List tasks in Taskaat",
+    "ar": "عرض المهام في Taskaat"
+  },
+  "taskaat_set_output_contract": {
+    "en": "Write a task's done-when check",
+    "ar": "كتابة شرط إنجاز مهمة"
+  },
+  "taskaat_store_artifact": {
+    "en": "Attach evidence to a task",
+    "ar": "إرفاق دليل بمهمة"
+  },
+  "taskaat_submit_task_review": {
+    "en": "Accept a task or send it back",
+    "ar": "قبول مهمة أو إعادتها"
+  },
+  "taskaat_uncomplete_task": {
+    "en": "Reopen a done task",
+    "ar": "إعادة فتح مهمة منجزة"
+  },
+  "taskaat_update_task": {
+    "en": "Change a task in Taskaat",
+    "ar": "تعديل مهمة في Taskaat"
   }
 }

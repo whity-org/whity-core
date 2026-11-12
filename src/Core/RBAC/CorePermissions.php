@@ -487,6 +487,14 @@ final class CorePermissions
     public const CALENDAR_WRITE = 'calendar:write';
     public const CALENDAR_MANAGE = 'calendar:manage';
 
+    // TASKS on Taskaat (A10, T.3). Tasks and boards live in the workspace's
+    // Taskaat; these gate Whity's way into them. Read and write go to every
+    // staff role (anchor documents:read); manage (connecting the workspace to
+    // Taskaat) to the roles that run the workspace.
+    public const TASKS_READ = 'tasks:read';
+    public const TASKS_WRITE = 'tasks:write';
+    public const TASKS_MANAGE = 'tasks:manage';
+
     /**
      * Return the full list of core permission strings.
      *
@@ -590,6 +598,9 @@ final class CorePermissions
             self::CALENDAR_READ,
             self::CALENDAR_WRITE,
             self::CALENDAR_MANAGE,
+            self::TASKS_READ,
+            self::TASKS_WRITE,
+            self::TASKS_MANAGE,
         ];
     }
 }
