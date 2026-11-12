@@ -45,7 +45,7 @@ function AgentTag({ label = "Agent", className }: { label?: string; className?: 
     <span
       data-slot="agent-tag"
       className={cn(
-        "inline-flex h-[18px] items-center gap-[3px] rounded-[5px] bg-primary-tint px-1.5 text-[0.6875rem] font-semibold text-primary-tint-foreground",
+        "inline-flex h-5 items-center gap-[3px] rounded-[5px] bg-primary-tint px-1.5 text-xs font-semibold text-primary-tint-foreground",
         className
       )}
     >
