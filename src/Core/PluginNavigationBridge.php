@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core;
 
 use Whity\Core\Hooks\HookManager;
+use Whity\Sdk\I18n\LocalizedText;
 
 /**
  * Descriptor-derived navigation (WC-169).
@@ -44,9 +45,11 @@ final class PluginNavigationBridge
      *
      * @param HookManager  $hooks  The host hook manager.
      * @param PluginLoader $loader The loader whose validated descriptors drive the items.
+     * @param (\Closure(): string)|null $language The caller's language, for a
+     *        label written as {en, ar} (SDK 1.101); English when absent.
      * @return void
      */
-    public static function subscribe(HookManager $hooks, PluginLoader $loader): void
+    public static function subscribe(HookManager $hooks, PluginLoader $loader, ?\Closure $language = null): void
     {
         $hooks->listen(
             'navigation.register',
@@ -54,11 +57,12 @@ final class PluginNavigationBridge
              * @param array<string, mixed> $data
              * @return array<string, mixed>
              */
-            static function (array $data) use ($loader): array {
+            static function (array $data) use ($loader, $language): array {
                 $items = $data['items'] ?? [];
+                $code = $language !== null ? $language() : 'en';
 
                 foreach ($loader->getFrontendFeatures() as $feature) {
-                    $items[] = self::toNavItem($feature);
+                    $items[] = self::toNavItem($feature, $code);
                 }
 
                 return ['items' => $items];
@@ -73,16 +77,22 @@ final class PluginNavigationBridge
      * The nav id is prefixed `plugin-` so descriptor ids can never collide
      * with core navigation ids.
      *
-     * @param array<string, mixed> $feature A normalized descriptor.
+     * @param array<string, mixed> $feature  A normalized descriptor.
+     * @param string               $language The reader's language, for a label
+     *                                       written as {en, ar} (SDK 1.101).
      * @return array<string, mixed> The navigation item.
      */
-    public static function toNavItem(array $feature): array
+    public static function toNavItem(array $feature, string $language = 'en'): array
     {
         $icon = $feature['icon'] ?? null;
+        $label = $feature['label'] ?? '';
+        if (is_array($label)) {
+            $label = LocalizedText::resolve($label, $language) ?? '';
+        }
 
         return [
             'id' => 'plugin-' . (string) $feature['id'],
-            'label' => (string) $feature['label'],
+            'label' => is_string($label) ? $label : '',
             'href' => '/admin/x/' . (string) $feature['id'],
             'icon' => is_string($icon) && $icon !== '' ? $icon : self::FALLBACK_ICON,
             'group' => (string) ($feature['group'] ?? 'plugins'),

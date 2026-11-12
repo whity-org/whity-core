@@ -60,6 +60,8 @@ export interface SignPanelProps {
   documentId: number;
   route: DocumentRoute;
   onActed: () => void;
+  /** Called once the signature is recorded, before `onActed` refetches. */
+  onSigned?: () => void;
 }
 
 async function errorOf(response: Response, fallback: string): Promise<string> {
@@ -68,7 +70,7 @@ async function errorOf(response: Response, fallback: string): Promise<string> {
   return typeof error === 'string' && error !== '' ? error : fallback;
 }
 
-export function SignPanel({ documentId, route, onActed }: SignPanelProps) {
+export function SignPanel({ documentId, route, onActed, onSigned }: SignPanelProps) {
   const t = useTranslation('documents');
   const { apiClient } = useAuth();
   const { addToast } = useToast();
@@ -185,6 +187,7 @@ export function SignPanel({ documentId, route, onActed }: SignPanelProps) {
         return;
       }
       addToast(t('signing.done', 'Signed. Your electronic signature is recorded with the audit trail.'), 'success');
+      onSigned?.();
       onActed();
     } catch {
       setRefusal(t('signing.error', 'The signature could not be recorded.'));

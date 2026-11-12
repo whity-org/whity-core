@@ -115,6 +115,7 @@ export function ApprovalsList({ proposals, words, onOpen, onApproveTogether, onD
   if (proposals.length === 0) {
     return (
       <EmptyState
+        moment="all-caught-up"
         title={t('approvals.queue.doneTitle', 'All caught up')}
         description={t('approvals.queue.doneDescription', 'Nothing is waiting for you. New requests from agents appear here.')}
       />

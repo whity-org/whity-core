@@ -40,6 +40,21 @@ final class ServerLabels
     }
 
     /**
+     * The caller's language code (`ar`, `en`, ...), or `en` when the registry
+     * cannot say. Used to resolve a plugin's {en, ar} text (SDK 1.101).
+     */
+    public function languageCode(): string
+    {
+        try {
+            $code = $this->languages->getCurrentLanguageCode();
+        } catch (\Throwable) {
+            return 'en';
+        }
+
+        return $code !== '' ? $code : 'en';
+    }
+
+    /**
      * The caller's wording for `$key`, or `$english` if there is none.
      *
      * @param string $domain  Catalogue domain — bare for core (`documents`),

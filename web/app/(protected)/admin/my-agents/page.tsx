@@ -136,6 +136,8 @@ export default function MyAgentsPage() {
       ) : list.length === 0 ? (
         <EmptyFirstTime
           icon="robot"
+          moment="agents-propose"
+          onceEver="agents-first"
           title={t('myAgents.empty.title', 'No agents yet')}
           description={t('myAgents.empty.description', 'Someone who manages agents for this workspace adds them. Then you can start using one.')}
         />
