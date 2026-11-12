@@ -1,0 +1,46 @@
+<!-- @dsCard group="Mobile" height=954 width=1880 subtitle="M.23: each preference shows real UI in motion so people see what it will mean, then the guided tour" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1880px;min-height:954px}</style><meta charset="utf-8"><title>Mobile onboarding preferences</title><style>html,body{height:100%;margin:0} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 22 }); }
+  var T0 = { home: 'Home', inbox: 'Inbox', create: 'Create', agents: 'Chat', agentsIcon: 'comment', more: 'More' };
+  function status() { return h('div', { className: 'wm-status', 'aria-hidden': 'true' }, h('span', null, '9:41'), h('i'), h('span', null, I('wifi', 16), I('battery', 18))); }
+  function tabbar(active, T, badges) { T = T || T0; badges = badges || { inbox: 3 };
+    function tab(k, icon) { return h('div', { key: k, className: 'wm-tab' + (active === k ? ' is-on' : '') }, I(icon, 24), T[k], badges[k] ? h('b', null, badges[k]) : null); }
+    return h('nav', { className: 'wm-tabbar', 'aria-label': 'Main' }, tab('home', 'dashboard'), tab('inbox', 'inbox'), h('button', { key: 'c', className: 'wm-create', 'aria-label': T.create }, I('plus', 28)), tab('agents', T.agentsIcon || 'robot'), tab('more', 'menu')); }
+  function bottom(o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.tabs === false ? null : tabbar(o.active, o.T, o.badges), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function phone(label, kids, o) { o = o || {}; return h('div', { className: 'wm-col' }, h('div', { className: 'wm-label' }, label), h('div', { className: 'wm-phone', dir: o.dir }, status(), kids, o.overlay || null)); }
+  function search(t, f) { return h('div', { className: 'wm-search' }, I('search', 20), h('span', null, t), f ? h('button', { type: 'button' }, I('filter', 16), f) : null); }
+  function stage(blue, tag, kids, keys) { var LOT = { 'YOUR BRAND, OUR PLATFORM': ['brand-sheet-platform', 'view'], 'AGENTS PROPOSE': ['agents-propose', 'view'], 'YOU DECIDE': ['approve-set-down', 'view'], 'IN THE APP': ['approve-set-down', 'view'], 'UPDATING · LOOPS': ['updating', 'loop'], 'ALL CAUGHT UP': ['all-caught-up', 'view'] }; var l = LOT[tag]; if (!l) return h('div', { className: 'wm-lottie' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, 'LOTTIE · ' + tag), kids, keys ? h('div', { className: 'wm-keys' }, keys.map(function (k, i) { return h('span', { key: i }, k); })) : null); return h('div', { className: 'wm-lottie has-file' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, l[0] + '.json'), h('div', { className: 'w-lottie', 'data-lottie': 'lottie/' + l[0] + '.json', 'data-play': l[1] }, h('div', { className: 'w-lottie__fallback' }, kids))); }
+  function at(cls, x, y, extra) { return h('div', { className: cls, style: Object.assign({ left: x, top: y }, extra || {}) }); }
+  function dots(n, on) { var a = []; for (var i = 0; i < n; i++) a.push(h('i', { key: i, className: i === on ? 'is-on' : '' })); return h('div', { className: 'wm-dots' }, a); }
+  function foot(kids) { return h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-form', style: { borderTop: 0 } }, kids), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function q(title, sub, step, of) { return h(F, null, h('div', { className: 'wm-progress', 'aria-hidden': 'true' }, h('i', { style: { width: Math.round(step / of * 100) + '%' } })), h('div', { className: 'wm-q' }, h('h1', null, title), sub ? h('p', null, sub) : null)); }
+  function choice(t, sub, on, icon) { return h('div', { className: 'wm-choice' + (on ? ' is-on' : '') }, icon ? I(icon, 24) : null, h('span', null, t, sub ? h('small', null, sub) : null), h('i', { className: 'wm-radio' })); }
+  function navbar(t) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), h('span')); }
+
+  var size = h(F, null, q('How big should text be?', 'Drag until it’s comfortable. You can change it any time.', 2, 5),
+    h('div', { className: 'wm-preview', style: { marginTop: 14 } }, h('span', { className: 'wm-preview__tag' }, 'LIVE PREVIEW · GROWS AS YOU DRAG'), h('div', { className: 'wm-dcard', style: { padding: 16, fontSize: 19 } }, h('div', { className: 'wm-dcard__top' }, h(W.ActorChip, { kind: 'agent', name: 'Billing assistant', onBehalfOf: 'you', forLabel: 'for' })), h('h3', { style: { fontSize: 22 } }, 'Send a payment reminder'), h('div', { className: 'wm-amt', style: { fontSize: 26 } }, 'JOD 312.000'))),
+    h('div', { style: { height: 18 } }), h('div', { className: 'wm-slider' }, h('span', { style: { fontSize: 14 } }, 'A'), h('div', null, h('i'), h('b')), h('span', { style: { fontSize: 26 } }, 'A')), h('div', { className: 'wm-cap', style: { textAlign: 'center', padding: '8px 20px' } }, h('b', null, 'Larger'), ' · follows your phone’s setting until you change it'),
+    h('div', { style: { flex: 1 } }), foot(h(W.Button, null, 'Continue')));
+  function demoRow(off, label) { return h('div', { className: 'wm-swipe is-ok' }, h('div', { className: 'wm-swipe__under' }, I('check', 20), label), h('div', { className: 'wm-swipe__row', style: { transform: 'translateX(' + off + 'px)' } }, h('span', { className: 'wm-li__ic' }, I('robot', 20)), h('b', null, 'Credit note CN-0031'), h('span', { className: 'wm-li__end' }, 'JOD 48.000'))); }
+  var gestures = h(F, null, q('How should swipes work?', 'Watch each one. Swipes always offer Undo.', 3, 5),
+    h('div', { className: 'wm-preview', style: { marginTop: 14 } }, h('span', { className: 'wm-preview__tag' }, 'REAL UI IN MOTION · LOOPS'), demoRow(120, 'Approved'), h('div', { className: 'wm-cap' }, 'With swipe to approve, a swipe right approves ordinary items. Anything that needs Face ID stays put and asks.')),
+    h('div', { className: 'wm-pad', style: { paddingTop: 14 } }, choice('Safe swipes only', 'Swipe to mark read or archive; approve with buttons', true), choice('Swipe to approve too', 'For people who decide a lot, quickly', false)),
+    h('div', { style: { flex: 1 } }), foot(h(W.Button, null, 'Continue')));
+  var notif = h(F, null, q('What should reach you?', 'We’ll only buzz for these. The rest waits in your Inbox.', 4, 5),
+    h('div', { className: 'wm-preview', style: { marginTop: 14 } }, h('span', { className: 'wm-preview__tag' }, 'REAL UI IN MOTION · SLIDES DOWN'), h('div', { className: 'wm-li is-agent', style: { border: '1px solid var(--border)', borderRadius: 18, background: 'var(--card)' } }, h('span', { className: 'wm-li__ic' }, I('robot', 20)), h('div', null, h('b', null, 'Example Bakery'), h('small', null, 'Billing assistant asks: send a reminder?')), h('div', { className: 'wm-li__end' }, 'now'))),
+    h('div', { className: 'wm-pad', style: { paddingTop: 14 } }, h(W.Switch, { label: 'Decisions waiting for me', defaultChecked: true }), h(W.Switch, { label: 'Sign-in approvals', defaultChecked: true }), h(W.Switch, { label: 'What my agents did today, once a day' }), h(W.Switch, { label: 'Mentions and comments', defaultChecked: true })),
+    h('div', { style: { flex: 1 } }), foot(h(W.Button, null, 'Allow notifications')));
+  var tour = h(F, null, h('div', { className: 'wm-head' }, h('div', { className: 'wm-head__top' }, h(W.TenantLogo, { name: 'Example Bakery', size: 28 }), h(W.Avatar, { name: 'Amro Saleh', size: 36 })), h('h1', null, 'Good morning, Amro')),
+    h('div', { className: 'wm-body' }), h('div', { className: 'wm-bottom' }, tabbar('home'), h('div', { className: 'wm-home-ind' }, h('i'))));
+  var coach = h('div', { className: 'wm-coach' }, h('div', { className: 'wm-coach__hole', style: { left: 157, bottom: 46, width: 76, height: 72 } }),
+    h('div', { className: 'wm-coach__tip', style: { bottom: 136 } }, h('b', null, 'Create anything from here'), h('p', null, 'Ask an agent, fill a form, scan a receipt. It’s always under your thumb.'), h('footer', null, h('span', null, '2 of 4'), h('div', { style: { display: 'flex', gap: 8 } }, h(W.Button, { variant: 'ghost', size: 'sm' }, 'Skip tour'), h(W.Button, { size: 'sm' }, 'Next')))));
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wm-row' }, phone('Text size, with a live preview', size), phone('Gestures, shown in motion', gestures), phone('Notifications', notif), phone('Guided tour on the real Home', tour, { overlay: coach })));
+</script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!-- @dsCard group="Templates · Work" height=972 width=1440 subtitle="AQ.1: the list view of Approvals: ordinary tier-1 items can be approved together; the rest open one at a time" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Approvals list</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function tag() { return h('span', { className: 'wk-agenttag' }, I('robot', 10), 'Agent'); }
+  function msg(n, agent, forWho, time, body, extra) { return h('div', { className: 'wk-msg' + (agent ? ' is-agent' : '') }, h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: 32 }), h('div', null, h('div', { className: 'wk-msg__who' }, h('b', null, n), agent ? tag() : null, agent && forWho ? h('span', null, 'for ' + forWho) : null, h('span', null, time)), h('div', { className: 'wk-msg__body' }, body, extra || null))); }
+  function sys(ic, t) { return h('div', { className: 'wk-sys' }, I(ic, 12), t); }
+  function crow(av2, t, sub, end, sel) { return h('div', { className: 'wk-crow' + (sel ? ' is-sel' : '') }, av2, h('div', { style: { minWidth: 0 } }, h('b', null, t), h('small', null, sub)), end || h('span')); }
+  function gic(ic) { return h('span', { className: 'wk-gicon' }, I(ic || 'users', 18)); }
+  function mem(n, sub, agent, end) { return h('div', { className: 'wk-mem' }, h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: 32 }), h('div', { style: { minWidth: 0 } }, h('b', null, n, ' ', agent ? tag() : null), h('small', null, sub)), end || h('span')); }
+  var CHATS = h('div', { className: 'wk-chats' }, h('header', null, h(W.Input, { label: '', placeholder: 'Search chats', 'aria-label': 'Search chats' }), h(W.Segmented, { label: 'Show', options: [{ value: 'a', label: 'All' }, { value: 'p', label: 'People' }, { value: 'g', label: 'Agents' }], defaultValue: 'a' })),
+    h('div', { className: 'wk-chats__sec' }, 'Groups'), crow(gic('kanban'), 'Ramadan boxes', 'Stock assistant: I’ve prepared the order…', h('em', null, 3), 1), crow(gic('tenant'), 'Abdoun branch', 'Awss: opening at 7 from the 15th', null),
+    h('div', { className: 'wk-chats__sec' }, 'Direct'), crow(h(W.Avatar, { name: 'Emad Nasser', size: 36, status: 'online' }), 'Emad Nasser', 'Can you sign PO-0142 today?', h('em', null, 1)), crow(h(W.Avatar, { name: 'Stock assistant', kind: 'agent', size: 36 }), 'Stock assistant', 'Agent · counted shelf A', null), crow(h(W.Avatar, { name: 'Billing assistant', kind: 'agent', size: 36 }), 'Billing assistant', 'Agent · 3 reminders ready', h('em', null, 1)), crow(h(W.Avatar, { name: 'Awss Haddad', size: 36 }), 'Awss Haddad', 'Thanks!', null));
+  var THREAD = h('div', { className: 'wk-thread' }, h('header', null, gic('kanban'), h('div', { style: { flex: 1 } }, h('b', null, 'Ramadan boxes'), h('small', null, '4 people and 2 agents · linked to the Ramadan boxes board')), h(W.IconButton, { icon: 'video', label: 'Call' }), h(W.IconButton, { icon: 'more', label: 'More' })),
+    h('div', { className: 'wk-msgs' }, sys('robot', 'Emad added Stock assistant on 6 Nov. It reads this chat from then on and can propose orders.'),
+      msg('Emad Nasser', 0, null, '09:02', 'How many gift boxes do we have for the first week?'),
+      msg('Stock assistant', 1, 'Emad', '09:02', '120 at the Central kitchen, none in the branches. At last year’s pace the first week needs about 400.'),
+      msg('Amro Saleh', 0, null, '09:05', h(F, null, h('span', { className: 'wk-mention' }, '@Stock assistant'), ' order 300 more. ', h('span', { className: 'wk-mention' }, '@Marketing assistant'), ' start the announcement once they’re confirmed.')),
+      msg('Stock assistant', 1, 'Amro', '09:06', 'I’ve prepared the order. It’s over JOD 250, so it needs your approval, Amro.', h('div', { className: 'wk-msg__card' }, h('b', null, 'Purchase order · 300 gift boxes'), h('span', { style: { fontSize: 14 } }, 'Amman Print · JOD 285.000 · delivery Wednesday'), h('footer', null, h(W.Badge, { variant: 'warning' }, 'Waiting for Amro'), h('span', { style: { marginInlineStart: 'auto', display: 'flex', gap: 6 } }, h(W.Button, { variant: 'outline', size: 'sm' }, 'View'), h(W.Button, { size: 'sm', icon: 'check' }, 'Approve'))))),
+      sys('transfer', 'Stock assistant handed the announcement to Marketing assistant. It starts when the order is confirmed.'),
+      h('div', { className: 'wk-working' }, h(W.Avatar, { name: 'Marketing assistant', kind: 'agent', size: 20 }), 'Marketing assistant is drafting the announcement', h('span', { className: 'wk-dots' }, h('i'), h('i'), h('i')))),
+    h('div', { className: 'wk-compose' }, h('span', null, 'Message Ramadan boxes · type @ for a person or an agent'), h('div', null, h(W.IconButton, { icon: 'attach', label: 'Attach' }), h(W.IconButton, { icon: 'at', label: 'Mention' }), h(W.IconButton, { icon: 'microphone', label: 'Voice' }), h(W.Button, { size: 'sm', icon: 'send' }, 'Send'))));
+
+  var rows = [{ id: 1, t: 'Payment reminder to Example Café', a: 'Billing assistant', amt: 'JOD 312.000', tier: 1, w: '2 d' }, { id: 2, t: 'Payment reminder to Example Mart', a: 'Billing assistant', amt: 'JOD 96.000', tier: 1, w: '2 d' }, { id: 3, t: 'Receipt to Ibrahim Mansour by WhatsApp', a: 'Billing assistant', amt: '–', tier: 1, w: '5 h' }, { id: 4, t: 'Tag 12 bank lines as fuel', a: 'Bookkeeping assistant', amt: 'JOD 290.000', tier: 1, w: '3 h' },
+    { id: 5, t: 'Purchase order, 300 gift boxes', a: 'Stock assistant', amt: 'JOD 285.000', tier: 2, w: '1 h' }, { id: 6, t: 'Credit note CN-0031', a: 'Billing assistant', amt: 'JOD 48.000', tier: 2, w: '3 h' }, { id: 7, t: 'Remove Ahmad Khalil from Abdoun', a: 'HR assistant', amt: '–', tier: 3, w: '20 min' }];
+  var TL = { 1: ['secondary', 'Ordinary'], 2: ['warning', 'Check first'], 3: ['destructive', 'Needs verifying'] };
+  var cols = [{ key: 't', label: 'Proposal', render: function (r) { return h('div', { className: 'wy-person' }, h(W.Avatar, { name: r.a, kind: 'agent', size: 28 }), h('div', null, h('b', null, r.t), h('small', null, r.a + ' · for you'))); } }, { key: 'amt', label: 'Amount', align: 'end', render: function (r) { return h('span', { className: 'wk-num' }, r.amt); } },
+    { key: 'tier', label: 'Kind', render: function (r) { return h(W.Badge, { variant: TL[r.tier][0], icon: r.tier === 3 ? 'lock' : undefined }, TL[r.tier][1]); } }, { key: 'w', label: 'Waiting', align: 'end' }, { key: 'x', label: '', align: 'end', render: function (r) { return r.tier > 1 ? h(W.Button, { variant: 'outline', size: 'sm' }, 'Open') : null; } }];
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Approvals', h(F, null, h(W.PageHeader, { title: 'Approvals', description: 'What agents propose to do for you', actions: h(W.Segmented, { label: 'View', options: [{ value: 'o', label: 'One at a time' }, { value: 'l', label: 'List' }], defaultValue: 'l' }) }),
+    h('div', { className: 'wk-bar' }, h(W.Tabs, { items: [{ value: 'w', label: 'Waiting', count: 7 }, { value: 'd', label: 'Decided' }, { value: 'a', label: 'All activity' }], defaultValue: 'w' })),
+    h(W.Alert, { variant: 'info', title: 'Only ordinary items can be approved together' }, 'Anything to check first, or that needs verifying, opens on its own so you see its details.'), h('div', { style: { height: 14 } }),
+    h(W.Card, { className: 'wk-t1only', style: { padding: 0 } }, h(W.DataTable, { label: 'Waiting', columns: cols, rows: rows, selectable: true, defaultSelected: [1, 2, 3, 4], selectionSum: function () { return 'JOD 698.000 in reminders and tags'; }, bulkActions: h(F, null, h(W.Button, { variant: 'outline', size: 'sm' }, 'Decline'), h(W.Button, { size: 'sm', icon: 'check' }, 'Approve 4')) })))));
+</script>
+</body>
+</html>

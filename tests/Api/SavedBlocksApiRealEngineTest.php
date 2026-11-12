@@ -26,7 +26,7 @@ use Whity\Sdk\Http\Response;
 
 /**
  * Real-engine tests for saved blocks (editor M7, {@see SavedBlocksApiHandler},
- * migrations 253-254). Runs on SQLite by default and on PostgreSQL when
+ * migrations 260 and 265). Runs on SQLite by default and on PostgreSQL when
  * PHPUNIT_PG_DSN is set (Tests\Support\SchemaFromMigrations).
  *
  * What matters: a person sees their own Only me blocks and every workspace

@@ -1,0 +1,1 @@
+- **Two name-to-key helpers no longer use a slow regex.** Field keys in the document editor and MCP connection names are trimmed in linear time, so a very long name can no longer stall the page. The results are unchanged.

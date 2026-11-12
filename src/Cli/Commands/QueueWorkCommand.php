@@ -165,6 +165,7 @@ final class QueueWorkCommand implements CliCommand
                 (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
             );
             \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messaging);
+            \Whity\register_service(\Whity\Sdk\Messaging\CustomerMessages::class, new \Whity\Core\Messaging\HostCustomerMessages(static fn (): \Whity\Core\Messaging\MessagingService => $messaging));
             $registry->register(
                 \Whity\Core\Messaging\Jobs\DeliverMessageJob::NAME,
                 new \Whity\Core\Messaging\Jobs\DeliverMessageJob(static fn (): \Whity\Core\Messaging\MessagingService => $messaging),

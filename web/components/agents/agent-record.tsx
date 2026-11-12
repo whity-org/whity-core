@@ -21,6 +21,7 @@ import { Input } from '@whity/ui/input';
 import { SaveBar, ChangedField } from '@whity/ui/save-bar';
 import { ScopeGrant, type ScopeGrantMode } from '@whity/ui/scope-grant';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
+import { Switch } from '@whity/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { Textarea } from '@whity/ui/textarea';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -48,7 +49,7 @@ const NAME_MAX = 60;
 const ROLE_MAX = 200;
 const INSTRUCTIONS_MAX = 4000;
 
-type AgentDraft = AgentPersona & { mayRead: number[] };
+type AgentDraft = AgentPersona & { mayRead: number[]; notifyByEmail: boolean };
 
 const personaOf = (agent: WorkspaceAgent): AgentDraft => ({
   name: agent.name,
@@ -62,6 +63,7 @@ const personaOf = (agent: WorkspaceAgent): AgentDraft => ({
   toolsets: [...agent.toolsets],
   grant: { ...agent.grant },
   mayRead: agent.mayRead.map((source) => source.id),
+  notifyByEmail: agent.notifyByEmail ?? true,
 });
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -95,6 +97,7 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
     changed('name', 'nameAr', 'role', 'roleAr') && t('agentRecord.changed.name', 'Name and job'),
     changed('instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'mayRead') && t('agentRecord.changed.instructions', 'Instructions'),
     changed('grant') && t('agentRecord.changed.grant', 'What it may do'),
+    changed('notifyByEmail') && t('agentRecord.changed.notifications', 'Notifications'),
   ].filter((name): name is string => typeof name === 'string');
   const dirty = sections.length > 0;
 
@@ -259,6 +262,7 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
             {t('agentRecord.tab.scope', 'What it may do')}
             {grantCount > 0 && <span className="rounded-full bg-muted px-2 text-xs">{grantCount}</span>}
           </TabsTrigger>
+          <TabsTrigger value="notifications">{t('agentRecord.tab.notifications', 'Notifications')}</TabsTrigger>
           <TabsTrigger value="activity">{t('agentRecord.tab.activity', 'Activity')}</TabsTrigger>
         </TabsList>
 
@@ -407,6 +411,26 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
               />
             </ChangedField>
           )}
+        </TabsContent>
+
+        <TabsContent value="notifications" className="mt-6 space-y-4">
+          <ChangedField changed={changed('notifyByEmail')}>
+            <div className="flex max-w-prose items-start gap-3">
+              <Switch
+                id="agent-notify-email"
+                checked={draft.notifyByEmail}
+                onCheckedChange={(checked) => set('notifyByEmail', checked)}
+              />
+              <div className="space-y-1">
+                <label htmlFor="agent-notify-email" className="text-sm font-medium">
+                  {t('agentRecord.notifications.email', 'Email the person it works for when something needs them')}
+                </label>
+                <p className="text-sm text-muted-foreground">
+                  {t('agentRecord.notifications.emailHelp', 'At most one email an hour, except sign-in approvals. The email only opens Whity: nothing is approved from it. Each person can still turn these off in Preferences › Notifications.')}
+                </p>
+              </div>
+            </div>
+          </ChangedField>
         </TabsContent>
 
         <TabsContent value="activity" className="mt-6">

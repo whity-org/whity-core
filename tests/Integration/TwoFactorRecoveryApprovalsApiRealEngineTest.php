@@ -19,7 +19,9 @@ use Whity\Core\Identity\TwoFactorRecoveryService;
 use Whity\Core\Mail\EmailLayout;
 use Whity\Core\Mail\Mailer;
 use Whity\Core\RBAC\PermissionRegistry;
+use Whity\Core\Document\Signing\SigningChallengeRepository;
 use Whity\Core\Request;
+use Whity\Core\Security\IdentityCheck;
 use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
@@ -50,6 +52,8 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
     private const ADMIN_A = 10;
     private const ADMIN_B = 11;
     private const NOPERM_A = 12;
+    private const ADMIN_A2 = 13;
+    private const CODE = '123456';
 
     private PDO $pdo;
     private TwoFactorRecoveryService $service;
@@ -120,8 +124,16 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
         $requestId = $this->confirmRequestFor($target);
 
         TenantContext::setTenantId(self::TENANT_A);
-        $res = $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A), ['id' => (string) $requestId]);
+        $res = $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
         self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        self::assertSame('waiting_for_second_admin', $this->decode($res)['data']['status']);
+        $still = $this->fetchOneRow("SELECT two_factor_enabled FROM profiles WHERE id = {$target}");
+        self::assertContains((string) $still['two_factor_enabled'], ['1', 't', 'true'], 'one admin changes nothing');
+        self::assertSame(0, $this->auditCount('auth.2fa_recovery.two_factor_cleared'));
+
+        $res = $this->handler->approve($this->req(self::ADMIN_A2, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        self::assertSame('approved', $this->decode($res)['data']['status']);
 
         $row = $this->fetchOneRow(
             "SELECT two_factor_enabled, two_factor_secret, two_factor_backup_codes_version FROM profiles WHERE id = {$target}"
@@ -150,7 +162,8 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
         $this->enableTwoFactorOn(self::ADMIN_A);
 
         TenantContext::setTenantId(self::TENANT_A);
-        $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A), ['id' => (string) $requestId]);
+        $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+        $this->handler->approve($this->req(self::ADMIN_A2, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
 
         $adminRow = $this->fetchOneRow(
             "SELECT two_factor_enabled, two_factor_secret FROM profiles WHERE id = " . self::ADMIN_A
@@ -165,7 +178,7 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
         $requestId = $this->confirmRequestFor($target);
 
         TenantContext::setTenantId(self::TENANT_B);
-        $res = $this->handler->approve($this->req(self::ADMIN_B, self::TENANT_B), ['id' => (string) $requestId]);
+        $res = $this->handler->approve($this->req(self::ADMIN_B, self::TENANT_B, ['code' => self::CODE]), ['id' => (string) $requestId]);
         self::assertSame(404, $res->getStatusCode());
 
         $row = $this->fetchOneRow("SELECT two_factor_enabled FROM profiles WHERE id = {$target}");
@@ -195,20 +208,98 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
 
     // ==================== secondary fallback: force-reset ====================
 
-    public function testForceResetClearsTargetsTwoFactorWithNoPriorRequest(): void
+    public function testForceResetIsTheFirstApprovalAndASecondAdminClearsIt(): void
     {
         $target = $this->seedProfileWithTwoFactor('forced@acme.test', self::TENANT_A);
 
         TenantContext::setTenantId(self::TENANT_A);
-        $request = new Request('POST', '/api/2fa-recovery/force-reset', [], (string) json_encode(['profile_id' => $target]));
-        $request->user = (object) ['profile_id' => self::ADMIN_A, 'active_tenant_id' => self::TENANT_A];
-
-        $res = $this->handler->forceReset($request);
+        $res = $this->handler->forceReset($this->req(self::ADMIN_A, self::TENANT_A, ['profile_id' => $target, 'code' => self::CODE, 'reason' => 'Lost his phone']));
         self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        $data = $this->decode($res)['data'];
+        self::assertSame('waiting_for_second_admin', $data['status']);
+        self::assertSame(1, $this->auditCount('auth.2fa_recovery.forced'));
+
+        $row = $this->fetchOneRow("SELECT two_factor_enabled FROM profiles WHERE id = {$target}");
+        self::assertContains((string) $row['two_factor_enabled'], ['1', 't', 'true'], 'starting a reset clears nothing');
+
+        $listed = $this->decode($this->handler->listPending($this->req(self::ADMIN_A2, self::TENANT_A)))['data'];
+        self::assertSame('admin-a', $listed[0]['first_approval']['display_name']);
+        self::assertSame('Lost his phone', $listed[0]['reason']);
+
+        self::assertSame(409, $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $data['id']])->getStatusCode(), 'the admin who started it cannot finish it');
+        $res = $this->handler->approve($this->req(self::ADMIN_A2, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $data['id']]);
+        self::assertSame('approved', $this->decode($res)['data']['status'], $res->getBody());
 
         $row = $this->fetchOneRow("SELECT two_factor_enabled FROM profiles WHERE id = {$target}");
         self::assertContains((string) $row['two_factor_enabled'], ['0', 'f', 'false', '']);
-        self::assertSame(1, $this->auditCount('auth.2fa_recovery.forced'));
+    }
+
+    // ==================== two admins (AG.1) ====================
+
+    public function testOneAdminCannotGiveBothApprovals(): void
+    {
+        $target = $this->seedProfileWithTwoFactor('once@acme.test', self::TENANT_A);
+        $requestId = $this->confirmRequestFor($target);
+
+        TenantContext::setTenantId(self::TENANT_A);
+        $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+        $again = $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+
+        self::assertSame(409, $again->getStatusCode(), $again->getBody());
+        $row = $this->fetchOneRow("SELECT two_factor_enabled FROM profiles WHERE id = {$target}");
+        self::assertContains((string) $row['two_factor_enabled'], ['1', 't', 'true']);
+        self::assertSame('pending', (string) $this->col("SELECT status FROM two_factor_recovery_requests WHERE id = {$requestId}"));
+    }
+
+    public function testTheRequesterCannotApproveTheirOwnReset(): void
+    {
+        $this->enableTwoFactorOn(self::ADMIN_A2);
+        $this->pdo->exec("INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at) VALUES (" . self::ADMIN_A2 . ", 'a2@acme.test', true, true, datetime('now'))");
+        $requestId = $this->confirmRequestFor(self::ADMIN_A2);
+
+        TenantContext::setTenantId(self::TENANT_A);
+        $own = $this->handler->approve($this->req(self::ADMIN_A2, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+        self::assertSame(403, $own->getStatusCode(), 'not as the first approval');
+
+        $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+        $own = $this->handler->approve($this->req(self::ADMIN_A2, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+        self::assertSame(403, $own->getStatusCode(), 'nor as the second');
+
+        $own = $this->handler->forceReset($this->req(self::ADMIN_A2, self::TENANT_A, ['profile_id' => self::ADMIN_A2, 'code' => self::CODE]));
+        self::assertSame(403, $own->getStatusCode(), 'nor by starting one');
+
+        $row = $this->fetchOneRow('SELECT two_factor_enabled FROM profiles WHERE id = ' . self::ADMIN_A2);
+        self::assertContains((string) $row['two_factor_enabled'], ['1', 't', 'true']);
+    }
+
+    public function testEveryApprovalNeedsTheAdminToConfirmItsThem(): void
+    {
+        $target = $this->seedProfileWithTwoFactor('unverified@acme.test', self::TENANT_A);
+        $requestId = $this->confirmRequestFor($target);
+
+        TenantContext::setTenantId(self::TENANT_A);
+        foreach ([[], ['code' => '000000']] as $body) {
+            $res = $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A, $body), ['id' => (string) $requestId]);
+            self::assertSame(403, $res->getStatusCode());
+            self::assertStringContainsString('identity_check_failed', $res->getBody());
+        }
+        self::assertNull($this->col("SELECT first_approver_profile_id FROM two_factor_recovery_requests WHERE id = {$requestId}"));
+        self::assertSame(403, $this->handler->forceReset($this->req(self::ADMIN_A, self::TENANT_A, ['profile_id' => $target]))->getStatusCode());
+    }
+
+    public function testChecksAreRecordedWithWhoMadeThem(): void
+    {
+        $target = $this->seedProfileWithTwoFactor('checked@acme.test', self::TENANT_A);
+        $requestId = $this->confirmRequestFor($target);
+
+        TenantContext::setTenantId(self::TENANT_A);
+        $res = $this->handler->addCheck($this->req(self::ADMIN_A, self::TENANT_A, ['text' => 'Called him on the number on file']), ['id' => (string) $requestId]);
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+
+        $listed = $this->decode($this->handler->listPending($this->req(self::ADMIN_A, self::TENANT_A)))['data'][0];
+        self::assertSame('Called him on the number on file', $listed['checks'][0]['text']);
+        self::assertSame('admin-a', $listed['checks'][0]['by_name']);
+        self::assertNull($listed['first_approval']);
     }
 
     public function testForceResetRejectsTargetInAnotherTenant(): void
@@ -216,13 +307,95 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
         $target = $this->seedProfileWithTwoFactor('crossforce@acme.test', self::TENANT_A);
 
         TenantContext::setTenantId(self::TENANT_B);
-        $request = new Request('POST', '/api/2fa-recovery/force-reset', [], (string) json_encode(['profile_id' => $target]));
-        $request->user = (object) ['profile_id' => self::ADMIN_B, 'active_tenant_id' => self::TENANT_B];
-
-        $res = $this->handler->forceReset($request);
+        $res = $this->handler->forceReset($this->req(self::ADMIN_B, self::TENANT_B, ['profile_id' => $target, 'code' => self::CODE]));
         self::assertSame(404, $res->getStatusCode());
 
         $row = $this->fetchOneRow("SELECT two_factor_enabled FROM profiles WHERE id = {$target}");
+        self::assertContains((string) $row['two_factor_enabled'], ['1', 't', 'true']);
+    }
+
+    // ==================== one workspace, still standing (AG.1) ====================
+
+    public function testAFirstApprovalFromAnotherWorkspaceDoesNotCount(): void
+    {
+        $target = $this->seedProfileWithTwoFactor('both@acme.test', self::TENANT_A);
+        $this->pdo->exec("INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES ({$target}, " . self::TENANT_B . ", 1, 'active', datetime('now'))");
+        // B's admin is an admin in A too, so only the workspace it was given in tells the approvals apart.
+        $this->pdo->exec('INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES (' . self::ADMIN_B . ', ' . self::TENANT_A . ", 1, 'active', datetime('now'))");
+
+        TenantContext::setTenantId(self::TENANT_B);
+        $started = $this->decode($this->handler->forceReset($this->req(self::ADMIN_B, self::TENANT_B, ['profile_id' => $target, 'code' => self::CODE])))['data'];
+
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT_A);
+        $listed = $this->decode($this->handler->listPending($this->req(self::ADMIN_A, self::TENANT_A)))['data'][0];
+        self::assertNull($listed['first_approval'], "workspace B's approval is not shown in A");
+
+        $res = $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $started['id']]);
+        self::assertSame('waiting_for_second_admin', $this->decode($res)['data']['status'], 'it becomes the first approval in A');
+        $this->assertTwoFactorOn($target);
+
+        $res = $this->handler->approve($this->req(self::ADMIN_A2, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $started['id']]);
+        self::assertSame('approved', $this->decode($res)['data']['status']);
+    }
+
+    public function testAFirstApprovalFromSomeoneNoLongerAnAdminDoesNotCount(): void
+    {
+        $target = $this->seedProfileWithTwoFactor('demoted@acme.test', self::TENANT_A);
+        $requestId = $this->confirmRequestFor($target);
+
+        TenantContext::setTenantId(self::TENANT_A);
+        $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+        $this->pdo->exec('UPDATE memberships SET role_id = 101 WHERE profile_id = ' . self::ADMIN_A . ' AND tenant_id = ' . self::TENANT_A);
+        RoleChecker::clearCache();
+
+        $res = $this->handler->approve($this->req(self::ADMIN_A2, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+
+        self::assertSame('waiting_for_second_admin', $this->decode($res)['data']['status'], $res->getBody());
+        $this->assertTwoFactorOn($target);
+    }
+
+    public function testAnExpiredRequestCannotBeApprovedOrSeen(): void
+    {
+        $target = $this->seedProfileWithTwoFactor('late@acme.test', self::TENANT_A);
+        $requestId = $this->confirmRequestFor($target);
+
+        TenantContext::setTenantId(self::TENANT_A);
+        $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+        $this->pdo->exec("UPDATE two_factor_recovery_requests SET expires_at = '2000-01-01 00:00:00' WHERE id = {$requestId}");
+
+        $res = $this->handler->approve($this->req(self::ADMIN_A2, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+        self::assertSame(404, $res->getStatusCode());
+        $this->assertTwoFactorOn($target);
+        self::assertSame([], $this->decode($this->handler->listPending($this->req(self::ADMIN_A, self::TENANT_A)))['data']);
+    }
+
+    public function testAConfirmedRequestStaysApprovableForAWeek(): void
+    {
+        $target = $this->seedProfileWithTwoFactor('week@acme.test', self::TENANT_A);
+        $requestId = $this->confirmRequestFor($target);
+
+        $until = strtotime((string) $this->col("SELECT expires_at FROM two_factor_recovery_requests WHERE id = {$requestId}") . ' UTC');
+        self::assertGreaterThan(time() + 6 * 86400, $until);
+    }
+
+    public function testChecksMadeInAnotherWorkspaceAreNotShown(): void
+    {
+        $target = $this->seedProfileWithTwoFactor('checks@acme.test', self::TENANT_A);
+        $this->pdo->exec("INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES ({$target}, " . self::TENANT_B . ", 1, 'active', datetime('now'))");
+        $requestId = $this->confirmRequestFor($target);
+
+        TenantContext::setTenantId(self::TENANT_B);
+        $this->handler->addCheck($this->req(self::ADMIN_B, self::TENANT_B, ['text' => 'Called the number on file']), ['id' => (string) $requestId]);
+
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT_A);
+        self::assertSame([], $this->decode($this->handler->listPending($this->req(self::ADMIN_A, self::TENANT_A)))['data'][0]['checks']);
+    }
+
+    private function assertTwoFactorOn(int $profileId): void
+    {
+        $row = $this->fetchOneRow("SELECT two_factor_enabled FROM profiles WHERE id = {$profileId}");
         self::assertContains((string) $row['two_factor_enabled'], ['1', 't', 'true']);
     }
 
@@ -320,7 +493,19 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
             $this->service,
             $roleChecker,
             new AuditLogger($this->pdo, new NullLogger()),
-            $resetMailer
+            $resetMailer,
+            // The admin's own check is IdentityCheck's to prove (IdentityCheckTest); here a fixed code stands in.
+            new class ($this->pdo) extends IdentityCheck {
+                public function __construct(PDO $pdo)
+                {
+                    parent::__construct($pdo, new SigningChallengeRepository($pdo));
+                }
+
+                public function verify(int $tenantId, int $profileId, string $purpose, ?string $code): ?string
+                {
+                    return $code === '123456' ? self::TOTP : null;
+                }
+            },
         );
     }
 
@@ -332,9 +517,10 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
         return $db;
     }
 
-    private function req(int $userId, int $tenantId): Request
+    /** @param array<string, mixed> $body */
+    private function req(int $userId, int $tenantId, array $body = []): Request
     {
-        $request = new Request('GET', '/api/2fa-recovery/pending', [], '');
+        $request = new Request('POST', '/api/2fa-recovery/pending', ['Content-Type' => 'application/json'], $body === [] ? '' : (string) json_encode($body));
         $request->user = (object) ['profile_id' => $userId, 'active_tenant_id' => $tenantId];
 
         return $request;
@@ -366,14 +552,16 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
             INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at) VALUES
                 (" . self::ADMIN_A . ", 'admin-a', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
                 (" . self::ADMIN_B . ", 'admin-b', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-                (" . self::NOPERM_A . ", 'noperm-a', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                (" . self::NOPERM_A . ", 'noperm-a', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (" . self::ADMIN_A2 . ", 'admin-a2', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ");
 
         $pdo->exec("
             INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES
                 (" . self::ADMIN_A . ", " . self::TENANT_A . ", 1,   'active', datetime('now')),
                 (" . self::ADMIN_B . ", " . self::TENANT_B . ", 1,   'active', datetime('now')),
-                (" . self::NOPERM_A . ", " . self::TENANT_A . ", 101, 'active', datetime('now'))
+                (" . self::NOPERM_A . ", " . self::TENANT_A . ", 101, 'active', datetime('now')),
+                (" . self::ADMIN_A2 . ", " . self::TENANT_A . ", 1,   'active', datetime('now'))
         ");
 
         return $pdo;

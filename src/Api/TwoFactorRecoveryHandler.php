@@ -102,7 +102,12 @@ final class TwoFactorRecoveryHandler
             if ($row !== null) {
                 try {
                     $profileId = (int) $row['profile_id'];
-                    $token = $this->service->issue($profileId);
+                    // AG.1: the admins see where the request came from.
+                    $token = $this->service->issue(
+                        $profileId,
+                        TwoFactorRecoveryService::DEFAULT_TTL_SECONDS,
+                        \Whity\Core\Http\DeviceLabel::fromUserAgent($request->getHeader('User-Agent')),
+                    );
                     $this->mailer->sendConfirmationLink($email, $token);
                     $this->audit->record('auth.2fa_recovery.requested', [
                         'tenant_id'   => self::SYSTEM_TENANT_ID,

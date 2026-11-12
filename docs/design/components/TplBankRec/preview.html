@@ -1,0 +1,61 @@
+<!-- @dsCard group="Templates · Near term" height=900 width=1440 subtitle="N6: bank lines matched to invoices, bills and claims, with the Bookkeeping assistant’s suggested matches" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Bank reconciliation</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['customer', 'Contacts'], ['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions'], ['chart', 'Reports']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function kpi(l, v, s, cls) { return h('div', { className: 'wk-kpi' }, h('span', null, l), h('b', null, v), s ? h('small', { className: cls || '' }, s) : null); }
+  function num(v, cls) { return h('span', { className: 'wk-num' + (cls ? ' ' + cls : '') }, v); }
+  function tabs(items, on) { return h('div', { className: 'wk-bar' }, h(W.Tabs, { items: items.map(function (x, i) { return { value: String(i), label: x[0], count: x[1] }; }), defaultValue: String(on) })); }
+
+  function rec(l1, l2, tag, r1, r2, cls) { return h('div', { className: 'wk-rec' }, h('div', { className: 'wk-rec__l' }, h('b', null, l1), h('small', null, l2)), h('div', { className: 'wk-rec__m' }, h('span', null, tag)), h('div', { className: 'wk-rec__r' + (cls ? ' ' + cls : '') }, r1, h('small', null, r2))); }
+  var list = h('div', { className: 'wk-recs' }, h('div', { className: 'wk-map is-head', style: { gridTemplateColumns: '1fr 56px 1fr', borderRadius: 8 } }, h('span', null, 'Arab Bank, from the statement'), h('span'), h('span', null, 'In Whity')),
+    rec('+ 96.000 · 6 Nov', 'CLIQ EXAMPLE MART', '=', h('b', null, 'INV-1038 paid'), 'Example Mart · exact amount', ''), rec('− 384.000 · 7 Nov', 'TRF JORDAN FLOUR MILLS', '=', h('b', null, 'Bill 7766'), 'Jordan Flour Mills · exact amount', ''),
+    rec('+ 180.000 · 7 Nov', 'CLIQ LAMA ODEH', '?', h(F, null, h('b', null, 'Order ORD-2190, deposit'), h('span', { style: { marginInlineStart: 6 } }, h(W.Badge, { variant: 'info' }, 'Likely'))), 'Bookkeeping assistant · same name, half the order total', 'is-agent'),
+    rec('− 35.000 · 8 Nov', 'ORANGE JO', '?', h('b', null, '6400 Phone and internet'), 'A guess from last month · no bill in Whity', 'is-agent'), rec('− 150.000 · 8 Nov', 'TRF A. SALEH', '!', h('b', null, 'Nothing matches'), 'Choose an account, or attach a bill', 'is-none'));
+  var side = h('div', { style: { display: 'grid', gap: 16 } }, h(W.Card, { title: 'November so far' }, h(W.DescriptionList, { items: [{ label: 'Bank says', value: h('b', { className: 'wk-num' }, 'JOD 18,240.350') }, { label: 'Whity says', value: h('span', { className: 'wk-num' }, 'JOD 18,390.350') }, { label: 'Difference', value: h('b', { className: 'wk-num wk-low' }, 'JOD 150.000') }, { label: 'Lines left', value: '3 of 46' }] }), h('small', { style: { color: 'var(--muted-foreground)', display: 'block', marginTop: 8 } }, 'The difference is the unmatched transfer to A. Saleh.')),
+    h(W.Card, { title: 'Bank feed' }, h(W.DescriptionList, { items: [{ label: 'Arab Bank', value: 'Statement uploaded 8 Nov' }, { label: 'Next', value: 'Upload or forward the next statement' }] })));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Money and expenses', h(F, null, h(W.PageHeader, { title: 'Bank reconciliation', description: 'Arab Bank •••• 0412 · November 2026', actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'upload' }, 'Upload a statement'), h(W.Button, { icon: 'check' }, 'Confirm 2 exact matches')) }),
+    tabs([['To match', 3], ['Matched', 43], ['All']], 0), h('div', { className: 'wk-split', style: { gridTemplateColumns: 'minmax(0,1fr) 360px' } }, list, side))));
+</script>
+</body>
+</html>

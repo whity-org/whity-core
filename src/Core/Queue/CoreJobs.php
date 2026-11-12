@@ -127,6 +127,37 @@ final class CoreJobs
                 $calendarQueue,
                 $calendarLogger
             );
+            // EM.1 daily summary: what agents did today, at 18:00 in each
+            // workspace's time zone. Internal: the scheduler queues it hourly.
+            $summarySender = new \Whity\Core\Mail\BrandedEmailSender(
+                new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
+                    $calendarSettings,
+                    new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+                    $calendarLogger
+                )),
+                new \Whity\Core\Mail\EmailLayout(),
+                $calendarSettings,
+                $calendarLogger
+            );
+            $summarySender->useBranding(new \Whity\Core\Branding\BrandingService(
+                $calendarSettings,
+                entitlements: new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo))
+            ));
+            $registry->register(
+                \Whity\Core\Notification\Jobs\AgentDailySummaryJob::NAME,
+                new \Whity\Core\Notification\Jobs\AgentDailySummaryJob(
+                    $pdo,
+                    $calendarSettings,
+                    new \Whity\Core\Agent\AgentStatsRepository($pdo),
+                    new \Whity\Core\Notification\NotificationPreferenceRepository($pdo),
+                    new \Whity\Core\Identity\ProfileEmailRepository($pdo),
+                    new \Whity\Core\Store\DatabaseSharedStore($pdo),
+                    $summarySender,
+                    \Whity\Core\Http\FrontendUrls::fromEnv()->base(),
+                ),
+                false
+            );
             $registry->register(\Whity\Core\Calendar\BookingHoldExpiryJob::NAME, new \Whity\Core\Calendar\BookingHoldExpiryJob($calendarBookings), false);
             $registry->register(
                 \Whity\Core\Calendar\BookingReminderJob::NAME,

@@ -1,0 +1,62 @@
+<!-- @dsCard group="Templates · Near term" height=840 width=1440 subtitle="N2: adding a field to a record type without code; it shows in lists, filters, document merge fields and flow conditions" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1440px;min-height:840px}</style><meta charset="utf-8"><title>Custom fields</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['customer', 'Contacts'], ['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions'], ['chart', 'Reports']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function kpi(l, v, s, cls) { return h('div', { className: 'wk-kpi' }, h('span', null, l), h('b', null, v), s ? h('small', { className: cls || '' }, s) : null); }
+  function num(v, cls) { return h('span', { className: 'wk-num' + (cls ? ' ' + cls : '') }, v); }
+  function tabs(items, on) { return h('div', { className: 'wk-bar' }, h(W.Tabs, { items: items.map(function (x, i) { return { value: String(i), label: x[0], count: x[1] }; }), defaultValue: String(on) })); }
+
+  var rows = [{ id: 1, n: 'Name', k: 'Short text', o: 'Whity', u: 'Lists, documents' }, { id: 2, n: 'Tax number', k: 'Short text', o: 'Whity', u: 'Invoices (JoFotara)' }, { id: 3, n: 'Delivery window', k: 'Time range', o: 'Amro Saleh', u: 'Lists, flows' }, { id: 4, n: 'Tray size', k: 'Choose one', o: 'Amro Saleh', u: 'Documents, filters' }, { id: 5, n: 'Allergies to note', k: 'Short text', o: 'Emad Nasser', u: 'Delivery note' }];
+  var cols = [{ key: 'n', label: 'Field', render: function (r) { return h('b', null, r.n); } }, { key: 'k', label: 'Kind' }, { key: 'o', label: 'Added by', render: function (r) { return r.o === 'Whity' ? h(W.Badge, { variant: 'secondary' }, 'Built in') : r.o; } }, { key: 'u', label: 'Used in' }];
+  function kind(ic, t, on) { return h('span', { className: on ? 'is-on' : '' }, I(ic, 18), t); }
+  var modal = h('div', { className: 'wk-modal', role: 'dialog', 'aria-label': 'New field', style: { width: 560, top: 40 } }, h('h2', null, 'Add a field to Contacts'),
+    h('div', { className: 'wk-fieldkinds' }, kind('text', 'Short text'), kind('page', 'Long text'), kind('list-bullet', 'Choose one', 1), kind('list-todo', 'Choose several'), kind('money', 'Amount'), kind('calendar', 'Date'), kind('clock', 'Time range'), kind('user', 'A person'), kind('customer', 'A contact'), kind('check', 'Yes or no'), kind('attach', 'File'), kind('field', 'Formula')),
+    h(W.Input, { label: 'Name', defaultValue: 'Preferred branch' }), h(W.Input, { label: 'Choices, one per line', defaultValue: 'Abdoun · Sweifieh · Either' }),
+    h('div', null, h('div', { className: 'wk-perm' }, h('div', null, 'Show in the contacts list'), h(W.Switch, { defaultChecked: true, 'aria-label': 'Show in list' })), h('div', { className: 'wk-perm' }, h('div', null, 'Required', h('small', null, 'New contacts can’t be saved without it')), h(W.Switch, { defaultChecked: false, 'aria-label': 'Required' })), h('div', { className: 'wk-perm' }, h('div', null, 'Who can change it', h('small', null, 'Everyone who can edit contacts')), I('chevron-down', 14))),
+    h('div', { className: 'wk-sync', style: { fontFamily: 'var(--font-sans)', fontSize: 13 } }, I('info', 12), 'Usable at once in documents as {{contact.preferred_branch}} and in flow conditions.'), h('footer', null, h(W.Button, { variant: 'ghost' }, 'Cancel'), h(W.Button, null, 'Add the field')));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Settings', h('div', { className: 'wk-modalwrap' }, h(F, null, h(W.PageHeader, { breadcrumb: [{ label: 'Settings' }, { label: 'Fields' }], title: 'Fields on Contacts', description: 'Add what your company needs to know. No code.', actions: h(W.Button, { icon: 'plus' }, 'Add a field') }),
+    tabs([['Contacts', 5], ['Items', 2], ['Tasks', 1], ['Appointments', 0]], 0), h(W.Card, { style: { padding: 0 } }, h(W.DataTable, { label: 'Fields', columns: cols, rows: rows, rowMenu: true }))), h('div', { className: 'wk-scrim' }), modal)));
+</script>
+</body>
+</html>

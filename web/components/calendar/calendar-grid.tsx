@@ -16,7 +16,9 @@
  * STATES OF AN ITEM. A confirmed booking is the main tint with a solid edge; a
  * booking waiting for payment is dashed, because dashed means "not happened
  * yet" in this design system; a busy event is the info tint; an event that
- * does not block bookings is muted.
+ * does not block bookings is muted. Design 3.3 adds a customer's request,
+ * dashed amber ("needs your OK"), and a checked-in booking, green.
+ * The tints are tokens, never palette classes.
  */
 
 import { useEffect, useRef } from 'react';
@@ -48,7 +50,7 @@ export interface GridItem {
   subtitle: string;
   /** Who it belongs to, shown when the calendar shows everyone. */
   person: string;
-  tone: 'booking' | 'pending' | 'busy' | 'free';
+  tone: 'booking' | 'pending' | 'request' | 'checkedIn' | 'busy' | 'free';
   booking?: CalendarBooking;
   event?: CalendarEvent;
 }
@@ -72,6 +74,11 @@ function toneClass(tone: GridItem['tone']): string {
       return 'border-s-4 border-primary bg-primary-tint text-primary-tint-foreground';
     case 'pending':
       return 'border border-dashed border-warning bg-warning-tint text-warning-text';
+    case 'request':
+      // As the kit's time grid draws a request: dashed amber, nothing filled in yet.
+      return 'border-[1.5px] border-dashed border-warning bg-transparent text-warning-text';
+    case 'checkedIn':
+      return 'border-s-4 border-success bg-success-tint text-success-text';
     case 'busy':
       return 'border-s-4 border-info bg-info-tint text-info-text';
     default:

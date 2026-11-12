@@ -7,8 +7,8 @@ namespace Whity\Core\Document\SavedBlock;
 use PDO;
 
 /**
- * Data access for saved blocks (editor M7; E.21-E.24, E.38; migrations 253
- * and 254): `saved_blocks`, the insert-only `saved_block_versions`, and
+ * Data access for saved blocks (editor M7; E.21-E.24, E.38; migrations 260
+ * and 265): `saved_blocks`, the insert-only `saved_block_versions`, and
  * `saved_block_uses`.
  *
  * TENANT-OWNED: every statement binds an explicit `tenant_id` predicate

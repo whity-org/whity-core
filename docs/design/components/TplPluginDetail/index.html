@@ -14,7 +14,7 @@
       { label: L.Documents || 'Documents', items: [it('document', 'Library'), it('routing', 'Routing')] },
       { label: L.Platform || 'Platform', items: [it('tenant', 'Tenants'), it('plugin', 'Plugins'), it('branding', 'Branding'), it('audit', 'Audit log')] }]; }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: 'Rana Haddad', role: 'Owner', nav: nav('Plugins', o.L), topActions: topBar, labels: o.shellLabels }, kids); }
+  function shell(kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: 'Amro Saleh', role: 'Owner', nav: nav('Plugins', o.L), topActions: topBar, labels: o.shellLabels }, kids); }
   function logo(p, size) { return h('span', { className: size === 'lg' ? 'wy-pdetail__ic' : 'wy-ptile__ic', style: { background: p.color }, 'aria-hidden': 'true' }, p.whity ? h(W.Mark, { size: size === 'lg' ? 34 : 22, tone: 'onbrand', label: '' }) : p.initial || p.name.charAt(0)); }
   function trust(p, L) { L = L || {}; return p.whity ? h('span', { className: 'wy-trust wy-trust--whity' }, I('success', 12), L.byWhity || 'By Whity') : p.verified ? h('span', { className: 'wy-trust wy-trust--verified' }, I('success', 12), L.verified || 'Verified') : h('span', { className: 'wy-trust wy-trust--sandbox' }, I('lock', 12), L.sandboxed || 'Sandboxed'); }
   function adds(p, L) { L = L || {}; return h('div', { className: 'wy-adds' }, (p.adds || []).map(function (a) { var m = { screens: ['dashboard', L.screens || 'Screens'], blocks: ['page', L.blocks || 'Document blocks'], agent: ['robot', L.agent || 'Agent tools'], fields: ['field', L.fields || 'Fields'], connect: ['link', L.connect || 'Connects out'] }[a];
@@ -40,7 +40,7 @@
   var shot = h('div', { style: { padding: 12, display: 'grid', gap: 8 } },
     h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, h('b', { style: { fontSize: 14 } }, 'Stock · Abdoun branch'), h(W.Badge, { variant: 'warning' }, '3 below reorder level')),
     h(W.DataTable, { columns: [{ key: 'item', label: 'Item' }, { key: 'qty', label: 'In stock', align: 'end' }, { key: 'min', label: 'Reorder at', align: 'end' }], rows: [{ id: 1, item: 'Flour, 25 kg', qty: '4', min: '6' }, { id: 2, item: 'Butter, 10 kg', qty: '2', min: '3' }, { id: 3, item: 'Sugar, 25 kg', qty: '9', min: '4' }] }));
-  var shot2 = h('div', { style: { padding: 12, display: 'grid', gap: 8 } }, h(W.AgentRunStatus, { status: 'waiting', agent: 'Stock assistant', onBehalfOf: 'Omar', title: 'Reorder flour and butter from Example Mills', detail: 'JOD 412.500 · orders from your usual supplier', time: 'Asked 2 min ago', onReview: function () {} }));
+  var shot2 = h('div', { style: { padding: 12, display: 'grid', gap: 8 } }, h(W.AgentRunStatus, { status: 'waiting', agent: 'Stock assistant', onBehalfOf: 'Ahmad', title: 'Reorder flour and butter from Example Mills', detail: 'JOD 412.500 · orders from your usual supplier', time: 'Asked 2 min ago', onReview: function () {} }));
   ReactDOM.createRoot(document.getElementById('root')).render(shell(h(F, null,
     h(W.Breadcrumb, { items: [{ label: 'Plugins' }, { label: 'Store' }, { label: 'Inventory for Whity' }] }),
     h('div', { className: 'wy-pdetail', style: { marginTop: 16 } },

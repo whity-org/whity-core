@@ -191,8 +191,13 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.payment_hold_minutes',
             'calendar.week_start',
             'calendar.weekend_days',
+            // Design 3.3: off makes booking-page bookings requests.
+            'calendar.instant_booking',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
+            // WS.5, WS.19: the operator's website (global-only).
+            'website.plans',
+            'website.contact_workspace',
         ];
     }
 
@@ -408,9 +413,12 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.payment_hold_minutes' => '15',
             'calendar.week_start' => 'saturday',
             'calendar.weekend_days' => 'friday,saturday',
+            'calendar.instant_booking' => 'true',
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',
+            'website.plans' => '',
+            'website.contact_workspace' => '',
         ];
     }
 
@@ -579,6 +587,11 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['calendar.weekend_days', 'fri', false],
             ['app.installable', 'false', true],
             ['app.installable', '1', false],
+            ['website.plans', '', true],
+            ['website.plans', '{"plans":{"team":{"highlight":true}}}', true],
+            ['website.plans', 'not json', false],
+            ['website.contact_workspace', 'whity-team', true],
+            ['website.contact_workspace', 'Whity Team', false],
             ['branding_favicon', 'anything', false],
             ['not_a_setting_at_all', 'x', false],
         ];

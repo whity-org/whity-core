@@ -59,6 +59,17 @@ final class TwoFactorRecoveryService
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
 
+    /** AG.1: why an admin's approval was refused. */
+    public const REFUSED_OWN_REQUEST = 'own_request';
+    public const REFUSED_SAME_ADMIN = 'same_admin';
+
+    /**
+     * How long a pending request stays approvable, from when the person
+     * confirmed it (or an admin started it). Past this it is no longer listed
+     * or approvable, and a first approval goes with it.
+     */
+    public const APPROVAL_TTL_SECONDS = 7 * 86400;
+
     public function __construct(
         private readonly PDO $db,
         private readonly PasswordResetService $passwordResets,
@@ -71,7 +82,7 @@ final class TwoFactorRecoveryService
      *
      * @return string The raw token to embed in the confirmation link.
      */
-    public function issue(int $profileId, int $ttlSeconds = self::DEFAULT_TTL_SECONDS): string
+    public function issue(int $profileId, int $ttlSeconds = self::DEFAULT_TTL_SECONDS, ?string $requestedFrom = null): string
     {
         $rawToken  = bin2hex(random_bytes(self::TOKEN_BYTES));
         $tokenHash = hash('sha256', $rawToken);
@@ -88,11 +99,12 @@ final class TwoFactorRecoveryService
             )->execute([':pid' => $profileId]);
 
             $this->db->prepare(
-                "INSERT INTO two_factor_recovery_requests (profile_id, token_hash, status, expires_at, created_at, updated_at)
-                 VALUES (:pid, :hash, '" . self::STATUS_PENDING_CONFIRMATION . "', :expires_at, NOW(), NOW())"
+                "INSERT INTO two_factor_recovery_requests (profile_id, token_hash, status, requested_from, expires_at, created_at, updated_at)
+                 VALUES (:pid, :hash, '" . self::STATUS_PENDING_CONFIRMATION . "', :from, :expires_at, NOW(), NOW())"
             )->execute([
                 ':pid'        => $profileId,
                 ':hash'       => $tokenHash,
+                ':from'       => $requestedFrom !== null ? mb_substr($requestedFrom, 0, 255) : null,
                 ':expires_at' => $expiresAt,
             ]);
 
@@ -156,9 +168,15 @@ final class TwoFactorRecoveryService
                     SET status = '" . self::STATUS_PENDING . "',
                         reason = :reason,
                         consumed_at = :now,
+                        expires_at = :approvable_until,
                         updated_at = NOW()
                   WHERE id = :id AND consumed_at IS NULL"
-            )->execute([':reason' => $reason, ':now' => $now, ':id' => $requestId]);
+            )->execute([
+                ':reason' => $reason,
+                ':now' => $now,
+                ':approvable_until' => gmdate('Y-m-d H:i:s', time() + self::APPROVAL_TTL_SECONDS),
+                ':id' => $requestId,
+            ]);
 
             if ($ownTx) {
                 $this->db->commit();
@@ -183,38 +201,81 @@ final class TwoFactorRecoveryService
      *
      * `$limit` and `$offset` page the queue; {@see self::countPendingForTenant()} is its total.
      *
-     * @return list<array{id:int, profile_id:int, email:string, display_name:string, reason:string|null, created_at:string}>
+     * AG.1: each request also says where it came from, when the person last
+     * signed in to this workspace, the checks admins made, and the first
+     * admin's approval when there is one.
+     *
+     * @return list<array{id:int, profile_id:int, email:string, display_name:string, reason:string|null, created_at:string,
+     *   requested_from:string|null, last_signed_in_at:string|null,
+     *   checks:list<array{text:string, by_profile_id:int, by_name:string, at:string}>,
+     *   first_approval:array{profile_id:int, display_name:string, at:string, method:string}|null}>
      */
     public function listPendingForTenant(int $tenantId, int $limit = PHP_INT_MAX, int $offset = 0): array
     {
         // Joins the global two_factor_recovery_requests/profiles tables to memberships, scoped by the tenant_id predicate below
         $stmt = $this->db->prepare(
-            "SELECT DISTINCT tfr.id, tfr.profile_id, tfr.created_at, tfr.reason,
-                    p.display_name,
-                    pe.email AS email
+            "SELECT DISTINCT tfr.id, tfr.profile_id, tfr.created_at, tfr.reason, tfr.requested_from, tfr.checks,
+                    tfr.first_approver_profile_id, tfr.first_approver_tenant_id, tfr.first_approved_at, tfr.first_approval_method,
+                    p.display_name, fa.display_name AS first_approver_name,
+                    pe.email AS email,
+                    (SELECT MAX(s.created_at) FROM sessions s
+                      WHERE s.profile_id = tfr.profile_id AND s.tenant_id = m.tenant_id) AS last_signed_in_at
              FROM two_factor_recovery_requests tfr
              JOIN memberships m ON m.profile_id = tfr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
              JOIN profiles p ON p.id = tfr.profile_id
+             LEFT JOIN profiles fa ON fa.id = tfr.first_approver_profile_id
              LEFT JOIN profile_emails pe ON pe.profile_id = tfr.profile_id AND pe.is_primary = TRUE
-             WHERE tfr.status = '" . self::STATUS_PENDING . "'
+             WHERE tfr.status = '" . self::STATUS_PENDING . "' AND tfr.expires_at > :now
              ORDER BY tfr.created_at ASC, tfr.id ASC
              LIMIT :limit OFFSET :offset"
         );
         $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':now', gmdate('Y-m-d H:i:s'), PDO::PARAM_STR);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        $checks = [];
+        foreach ($rows as $row) {
+            // Only this workspace's own checks: another workspace's are not shown here.
+            $checks[(int) $row['id']] = array_values(array_filter(
+                self::decodeChecks($row['checks'] ?? null),
+                static fn (array $c): bool => $c['tenant'] === $tenantId,
+            ));
+        }
+        $names = $this->displayNames(array_merge(...array_map(
+            static fn (array $list): array => array_column($list, 'by'),
+            array_values($checks) ?: [[]],
+        )));
+
         $items = [];
         foreach ($rows as $row) {
+            // A first approval given in another workspace is not this workspace's to see or build on.
+            $firstBy = isset($row['first_approver_tenant_id']) && (int) $row['first_approver_tenant_id'] === $tenantId
+                ? ($row['first_approver_profile_id'] ?? null)
+                : null;
             $items[] = [
-                'id'           => (int) $row['id'],
-                'profile_id'   => (int) $row['profile_id'],
-                'email'        => (string) ($row['email'] ?? ''),
-                'display_name' => (string) ($row['display_name'] ?? ''),
-                'reason'       => isset($row['reason']) ? (string) $row['reason'] : null,
-                'created_at'   => (string) ($row['created_at'] ?? ''),
+                'id'                => (int) $row['id'],
+                'profile_id'        => (int) $row['profile_id'],
+                'email'             => (string) ($row['email'] ?? ''),
+                'display_name'      => (string) ($row['display_name'] ?? ''),
+                'reason'            => isset($row['reason']) ? (string) $row['reason'] : null,
+                'created_at'        => (string) ($row['created_at'] ?? ''),
+                'requested_from'    => isset($row['requested_from']) ? (string) $row['requested_from'] : null,
+                'last_signed_in_at' => isset($row['last_signed_in_at']) ? (string) $row['last_signed_in_at'] : null,
+                'checks'            => array_map(static fn (array $c): array => [
+                    'text'          => $c['text'],
+                    'by_profile_id' => $c['by'],
+                    'by_name'       => $names[$c['by']] ?? '',
+                    'at'            => $c['at'],
+                ], $checks[(int) $row['id']]),
+                'first_approval'    => $firstBy !== null ? [
+                    'profile_id'   => (int) $firstBy,
+                    'display_name' => (string) ($row['first_approver_name'] ?? ''),
+                    'at'           => (string) ($row['first_approved_at'] ?? ''),
+                    'method'       => (string) ($row['first_approval_method'] ?? ''),
+                ] : null,
             ];
         }
 
@@ -231,30 +292,44 @@ final class TwoFactorRecoveryService
             "SELECT COUNT(DISTINCT tfr.id)
              FROM two_factor_recovery_requests tfr
              JOIN memberships m ON m.profile_id = tfr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
-             WHERE tfr.status = '" . self::STATUS_PENDING . "'"
+             WHERE tfr.status = '" . self::STATUS_PENDING . "' AND tfr.expires_at > :now"
         );
-        $stmt->execute([':tenant_id' => $tenantId]);
+        $stmt->execute([':tenant_id' => $tenantId, ':now' => gmdate('Y-m-d H:i:s')]);
 
         return (int) $stmt->fetchColumn();
     }
 
     /**
-     * Admin-approve a pending 2FA-recovery request: clear the TARGET profile's
-     * 2FA (same fields {@see \Whity\Api\TwoFactorHandler::disable()} clears —
-     * two_factor_secret, two_factor_enabled, two_factor_backup_codes_version —
-     * plus invalidating its outstanding backup codes), mark the row approved,
-     * then issue a fresh password-reset token for the SAME profile so the
-     * caller can email it (a full clean recovery).
+     * An admin approves a pending 2FA-recovery request (AG.1). It takes TWO
+     * different admins, and neither can be the person asking:
+     *
+     *  - the first approval is recorded (who, when, how they confirmed it was
+     *    them) and the request stays pending: nothing about the account changes;
+     *  - a second approval by a different admin clears the TARGET profile's 2FA
+     *    (same fields {@see \Whity\Api\TwoFactorHandler::disable()} clears,
+     *    plus invalidating its backup codes), marks the row approved, and issues
+     *    a fresh password-reset token for the SAME profile so the caller can
+     *    email it (a full clean recovery).
+     *
+     * Both steps are guarded in SQL as well as here: the first only lands on a
+     * row with no first approver, and the clearing only on a row whose first
+     * approver is someone else, so two tabs or a race can't let one admin do both.
      *
      * Tenant-scoped: the target profile must hold an ACTIVE membership in
-     * $tenantId (never trust a bare request id). The atomic status guard makes
-     * a concurrent double-approve a safe no-op for the loser.
+     * $tenantId (never trust a bare request id).
      *
-     * @return array{profile_id:int, email:string, reset_token:string}|null
-     *   null = not found, not pending, or the target is not a member of $tenantId.
+     * @param string $method how the approving admin confirmed it was them
+     * @return array{stage:string, request_id:int, profile_id:int, email:string, reset_token:string}|string|null
+     *   'first' or 'cleared' as the stage (email and reset_token empty for 'first'); a REFUSED_* reason; null = not found,
+     *   not pending, not a member of $tenantId, or an account a sign-in provider governs.
      */
-    public function approveForTenant(int $requestId, int $tenantId): ?array
-    {
+    public function approveForTenant(
+        int $requestId,
+        int $tenantId,
+        int $approverProfileId,
+        string $method,
+        ?\Closure $mayStillApprove = null,
+    ): array|string|null {
         $ownTx = !$this->db->inTransaction();
         if ($ownTx) {
             $this->db->beginTransaction();
@@ -263,76 +338,164 @@ final class TwoFactorRecoveryService
         try {
             // Joins the global two_factor_recovery_requests table to memberships, scoped by the tenant_id predicate below
             $stmt = $this->db->prepare(
-                "SELECT tfr.id, tfr.profile_id, pe.email, p.two_factor_backup_codes_version
+                "SELECT tfr.id, tfr.profile_id, tfr.first_approver_profile_id, tfr.first_approver_tenant_id,
+                        pe.email, p.two_factor_backup_codes_version
                  FROM two_factor_recovery_requests tfr
                  JOIN memberships m ON m.profile_id = tfr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
                  JOIN profiles p ON p.id = tfr.profile_id
                  LEFT JOIN profile_emails pe ON pe.profile_id = tfr.profile_id AND pe.is_primary = TRUE
-                 WHERE tfr.id = :id AND tfr.status = '" . self::STATUS_PENDING . "'
+                 WHERE tfr.id = :id AND tfr.status = '" . self::STATUS_PENDING . "' AND tfr.expires_at > :now
                  LIMIT 1"
             );
-            $stmt->execute([':id' => $requestId, ':tenant_id' => $tenantId]);
+            $stmt->execute([':id' => $requestId, ':tenant_id' => $tenantId, ':now' => gmdate('Y-m-d H:i:s')]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($row === false) {
-                if ($ownTx) {
-                    $this->db->commit();
-                }
-                return null;
-            }
-
-            // #917: recovery ends in a password-reset token, so for an
-            // IdP-backed profile it would hand out a LOCAL credential for an
-            // account the provider governs alone. Checked here, before the
-            // status flip and before clearTwoFactor(), so the request stays
-            // pending and the target's 2FA stays enrolled — a refusal that had
-            // already stripped 2FA would leave the account weaker than it
-            // started. PasswordResetService::issue() refuses regardless; this
-            // is what stops it doing so halfway through.
-            if ((new AuthMethod($this->db))->refusesLocalPassword((int) $row['profile_id'])) {
-                if ($ownTx) {
-                    $this->db->commit();
-                }
-                return null;
-            }
-
-            // The status guard makes this idempotent-safe under a concurrent
-            // second approve for the same row.
-            $stmt2 = $this->db->prepare(
-                "UPDATE two_factor_recovery_requests
-                    SET status = '" . self::STATUS_APPROVED . "', updated_at = NOW()
-                  WHERE id = :id AND status = '" . self::STATUS_PENDING . "'"
-            );
-            $stmt2->execute([':id' => $requestId]);
-
-            if ($stmt2->rowCount() === 0) {
-                if ($ownTx) {
-                    $this->db->rollBack();
-                }
-                return null;
-            }
-
-            $profileId = (int) $row['profile_id'];
-            $email     = (string) ($row['email'] ?? '');
-
-            $this->clearTwoFactor($profileId, (int) $row['two_factor_backup_codes_version']);
-            $resetToken = $this->passwordResets->issue($profileId);
+            $outcome = $this->decide($row, $requestId, $tenantId, $approverProfileId, $method, $mayStillApprove);
 
             if ($ownTx) {
-                $this->db->commit();
+                is_array($outcome) ? $this->db->commit() : $this->db->rollBack();
             }
 
-            return [
-                'profile_id'  => $profileId,
-                'email'       => $email,
-                'reset_token' => $resetToken,
-            ];
+            return $outcome;
         } catch (\Throwable $e) {
             if ($ownTx && $this->db->inTransaction()) {
                 $this->db->rollBack();
             }
             throw $e;
         }
+    }
+
+    /**
+     * @param array<string, mixed>|false $row
+     * @return array{stage:string, request_id:int, profile_id:int, email:string, reset_token:string}|string|null
+     */
+    private function decide(
+        array|false $row,
+        int $requestId,
+        int $tenantId,
+        int $approverProfileId,
+        string $method,
+        ?\Closure $mayStillApprove,
+    ): array|string|null {
+        if ($row === false) {
+            return null;
+        }
+        $profileId = (int) $row['profile_id'];
+        if ($profileId === $approverProfileId) {
+            return self::REFUSED_OWN_REQUEST;
+        }
+
+        // #917: recovery ends in a password-reset token, so for an
+        // IdP-backed profile it would hand out a LOCAL credential for an
+        // account the provider governs alone. Refused before either approval
+        // lands, so the request stays pending and the target's 2FA enrolled.
+        if ((new AuthMethod($this->db))->refusesLocalPassword($profileId)) {
+            return null;
+        }
+
+        // Both approvals must come from the same workspace, and the first must
+        // still stand: given here, by someone who is still an admin here. A
+        // first approval that doesn't count is replaced by this one.
+        $first = $row['first_approver_profile_id'] ?? null;
+        $firstCounts = $first !== null
+            && isset($row['first_approver_tenant_id'])
+            && (int) $row['first_approver_tenant_id'] === $tenantId
+            && ($mayStillApprove === null || $mayStillApprove((int) $first, $tenantId) === true);
+        if (!$firstCounts) {
+            $mark = $this->db->prepare(
+                "UPDATE two_factor_recovery_requests
+                    SET first_approver_profile_id = :approver, first_approver_tenant_id = :tenant_id,
+                        first_approved_at = NOW(), first_approval_method = :method, updated_at = NOW()
+                  WHERE id = :id AND status = '" . self::STATUS_PENDING . "'
+                    AND first_approver_profile_id IS NOT DISTINCT FROM :previous"
+            );
+            $mark->bindValue(':approver', $approverProfileId, PDO::PARAM_INT);
+            $mark->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+            $mark->bindValue(':method', $method, PDO::PARAM_STR);
+            $mark->bindValue(':id', $requestId, PDO::PARAM_INT);
+            $mark->bindValue(':previous', $first === null ? null : (int) $first, $first === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+            $mark->execute();
+
+            return $mark->rowCount() === 1
+                ? ['stage' => 'first', 'request_id' => $requestId, 'profile_id' => $profileId, 'email' => '', 'reset_token' => '']
+                : null;
+        }
+
+        if ((int) $first === $approverProfileId) {
+            return self::REFUSED_SAME_ADMIN;
+        }
+
+        // The guard makes a concurrent second approve a no-op for the loser,
+        // and refuses a row whose first approver is this same admin.
+        $close = $this->db->prepare(
+            "UPDATE two_factor_recovery_requests
+                SET status = '" . self::STATUS_APPROVED . "', updated_at = NOW()
+              WHERE id = :id AND status = '" . self::STATUS_PENDING . "' AND expires_at > :now
+                AND first_approver_profile_id IS NOT NULL AND first_approver_profile_id <> :approver
+                AND first_approver_tenant_id = :tenant_id"
+        );
+        $close->execute([
+            ':id' => $requestId,
+            ':approver' => $approverProfileId,
+            ':tenant_id' => $tenantId,
+            ':now' => gmdate('Y-m-d H:i:s'),
+        ]);
+        if ($close->rowCount() === 0) {
+            return null;
+        }
+
+        $this->clearTwoFactor($profileId, (int) $row['two_factor_backup_codes_version']);
+        $resetToken = $this->passwordResets->issue($profileId);
+
+        return [
+            'stage'       => 'cleared',
+            'request_id'  => $requestId,
+            'profile_id'  => $profileId,
+            'email'       => (string) ($row['email'] ?? ''),
+            'reset_token' => $resetToken,
+        ];
+    }
+
+    /**
+     * Record a check an admin made that it is really the person (AG.1): "Called
+     * him on the number on file", "His manager confirmed he lost his phone".
+     * Checks are kept with who made them and when, and shown to the second admin.
+     */
+    public function addCheckForTenant(int $requestId, int $tenantId, int $byProfileId, string $text): bool
+    {
+        $text = trim($text);
+        if ($text === '' || mb_strlen($text) > 300) {
+            return false;
+        }
+
+        // Joins the global two_factor_recovery_requests table to memberships, scoped by the tenant_id predicate below
+        $stmt = $this->db->prepare(
+            "SELECT tfr.checks
+             FROM two_factor_recovery_requests tfr
+             JOIN memberships m ON m.profile_id = tfr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
+             WHERE tfr.id = :id AND tfr.status = '" . self::STATUS_PENDING . "' AND tfr.expires_at > :now
+             LIMIT 1"
+        );
+        $stmt->execute([':id' => $requestId, ':tenant_id' => $tenantId, ':now' => gmdate('Y-m-d H:i:s')]);
+        $current = $stmt->fetchColumn();
+        if ($current === false) {
+            return false;
+        }
+
+        $checks = self::decodeChecks($current);
+        $ours = array_filter($checks, static fn (array $c): bool => $c['tenant'] === $tenantId);
+        if (count($ours) >= 20) {
+            return false;
+        }
+        $checks[] = ['text' => $text, 'by' => $byProfileId, 'tenant' => $tenantId, 'at' => gmdate('Y-m-d H:i:s')];
+
+        $update = $this->db->prepare(
+            "UPDATE two_factor_recovery_requests SET checks = :checks, updated_at = NOW()
+              WHERE id = :id AND status = '" . self::STATUS_PENDING . "'"
+        );
+        $update->execute([':checks' => json_encode($checks, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), ':id' => $requestId]);
+
+        return $update->rowCount() === 1;
     }
 
     /**
@@ -377,72 +540,134 @@ final class TwoFactorRecoveryService
     }
 
     /**
-     * Secondary fallback (no prior request): an admin directly forces the same
-     * clear-2FA-and-trigger-reset primitive onto a named profile, for a user
-     * who cannot even receive email and reaches an admin out-of-band.
+     * Secondary fallback (no prior request): an admin starts a two-step reset
+     * for a named profile, for a user who cannot even receive email and
+     * reaches an admin out-of-band.
      *
-     * Tenant-scoped: $targetProfileId must hold an ACTIVE membership in
-     * $tenantId.
+     * Since AG.1 this no longer clears anything by itself: it opens a pending
+     * request carrying this admin's approval as the first one, and a second,
+     * different admin clears it through {@see self::approveForTenant()}. Any
+     * earlier unconfirmed request for the profile is superseded.
      *
-     * @return array{profile_id:int, email:string, reset_token:string}|null
-     *   null = target not found or not a member of $tenantId.
+     * Tenant-scoped: $targetProfileId must hold an ACTIVE membership in $tenantId.
+     *
+     * @return array{stage:string, request_id:int, profile_id:int}|string|null
+     *   REFUSED_OWN_REQUEST for the admin's own account; null = not a member
+     *   of $tenantId, or an account a sign-in provider governs.
      */
-    public function forceResetForTenant(int $targetProfileId, int $tenantId): ?array
+    public function forceResetForTenant(int $targetProfileId, int $tenantId, int $approverProfileId, string $method, ?string $reason = null): array|string|null
     {
+        if ($targetProfileId === $approverProfileId) {
+            return self::REFUSED_OWN_REQUEST;
+        }
+
+        // Joins the global profiles table to memberships, scoped by the tenant_id predicate below
+        $stmt = $this->db->prepare(
+            "SELECT p.id
+             FROM profiles p
+             JOIN memberships m ON m.profile_id = p.id AND m.tenant_id = :tenant_id AND m.status = 'active'
+             WHERE p.id = :pid
+             LIMIT 1"
+        );
+        $stmt->execute([':pid' => $targetProfileId, ':tenant_id' => $tenantId]);
+        if ($stmt->fetchColumn() === false) {
+            return null;
+        }
+
+        // #917: a reset for an IdP-backed profile would mint a local credential.
+        if ((new AuthMethod($this->db))->refusesLocalPassword($targetProfileId)) {
+            return null;
+        }
+
         $ownTx = !$this->db->inTransaction();
         if ($ownTx) {
             $this->db->beginTransaction();
         }
 
         try {
-            // Joins the global profiles table to memberships, scoped by the tenant_id predicate below
-            $stmt = $this->db->prepare(
-                "SELECT p.id, pe.email, p.two_factor_backup_codes_version
-                 FROM profiles p
-                 JOIN memberships m ON m.profile_id = p.id AND m.tenant_id = :tenant_id AND m.status = 'active'
-                 LEFT JOIN profile_emails pe ON pe.profile_id = p.id AND pe.is_primary = TRUE
-                 WHERE p.id = :pid
-                 LIMIT 1"
-            );
-            $stmt->execute([':pid' => $targetProfileId, ':tenant_id' => $tenantId]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $this->db->prepare(
+                'DELETE FROM two_factor_recovery_requests WHERE profile_id = :pid AND consumed_at IS NULL'
+            )->execute([':pid' => $targetProfileId]);
 
-            if ($row === false) {
-                if ($ownTx) {
-                    $this->db->commit();
-                }
-                return null;
-            }
-
-            // #917: same refusal as approveForTenant(), for the same reason —
-            // a forced recovery for an IdP-backed profile would mint a local
-            // credential. Before clearTwoFactor(), so a refused force-reset
-            // leaves the account exactly as it found it.
-            if ((new AuthMethod($this->db))->refusesLocalPassword($targetProfileId)) {
-                if ($ownTx) {
-                    $this->db->commit();
-                }
-                return null;
-            }
-
-            $this->clearTwoFactor($targetProfileId, (int) $row['two_factor_backup_codes_version']);
-            $resetToken = $this->passwordResets->issue($targetProfileId);
+            $this->db->prepare(
+                "INSERT INTO two_factor_recovery_requests
+                     (profile_id, token_hash, status, reason, requested_from, first_approver_profile_id, first_approver_tenant_id,
+                      first_approved_at, first_approval_method, expires_at, consumed_at, created_at, updated_at)
+                 VALUES (:pid, :hash, '" . self::STATUS_PENDING . "', :reason, 'admin', :approver, :tenant_id,
+                      NOW(), :method, :expires_at, NOW(), NOW(), NOW())"
+            )->execute([
+                ':pid'        => $targetProfileId,
+                // No link is ever sent for this row; the hash only fills the column.
+                ':hash'       => hash('sha256', bin2hex(random_bytes(self::TOKEN_BYTES))),
+                ':reason'     => $reason !== null && trim($reason) !== '' ? mb_substr(trim($reason), 0, 500) : null,
+                ':approver'   => $approverProfileId,
+                ':tenant_id'  => $tenantId,
+                ':method'     => $method,
+                ':expires_at' => gmdate('Y-m-d H:i:s', time() + self::APPROVAL_TTL_SECONDS),
+            ]);
+            $requestId = (int) $this->db->lastInsertId();
 
             if ($ownTx) {
                 $this->db->commit();
             }
 
-            return [
-                'profile_id'  => $targetProfileId,
-                'email'       => (string) ($row['email'] ?? ''),
-                'reset_token' => $resetToken,
-            ];
+            return ['stage' => 'first', 'request_id' => $requestId, 'profile_id' => $targetProfileId];
         } catch (\Throwable $e) {
             if ($ownTx && $this->db->inTransaction()) {
                 $this->db->rollBack();
             }
             throw $e;
         }
+    }
+
+    /**
+     * @return list<array{text:string, by:int, tenant:int, at:string}>
+     */
+    private static function decodeChecks(mixed $json): array
+    {
+        $decoded = is_string($json) && $json !== '' ? json_decode($json, true) : null;
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $checks = [];
+        foreach ($decoded as $c) {
+            if (is_array($c) && is_string($c['text'] ?? null) && is_numeric($c['by'] ?? null) && is_string($c['at'] ?? null)) {
+                $checks[] = [
+                    'text'   => $c['text'],
+                    'by'     => (int) $c['by'],
+                    // Checks recorded before workspaces were kept count for no workspace.
+                    'tenant' => is_numeric($c['tenant'] ?? null) ? (int) $c['tenant'] : 0,
+                    'at'     => $c['at'],
+                ];
+            }
+        }
+
+        return $checks;
+    }
+
+    /**
+     * @param list<int> $profileIds
+     * @return array<int, string>
+     */
+    private function displayNames(array $profileIds): array
+    {
+        $profileIds = array_values(array_unique($profileIds));
+        if ($profileIds === []) {
+            return [];
+        }
+        $placeholders = implode(', ', array_map(static fn (int $i): string => ':p' . $i, array_keys($profileIds)));
+        // profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        $stmt = $this->db->prepare('SELECT id, display_name FROM profiles WHERE id IN (' . $placeholders . ')');
+        foreach ($profileIds as $i => $id) {
+            $stmt->bindValue(':p' . $i, $id, PDO::PARAM_INT);
+        }
+        $stmt->execute();
+        $names = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $names[(int) $row['id']] = (string) $row['display_name'];
+        }
+
+        return $names;
     }
 
     /**

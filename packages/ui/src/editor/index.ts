@@ -8,6 +8,7 @@ export { type FieldDef, type FieldGroup } from "./fields"
 export { type Letterhead } from "./page-view"
 export { type FieldPreview } from "./services"
 export * from "./collab"
+export * from "./agents"
 export {
   collectPatches,
   renderSuggestions,

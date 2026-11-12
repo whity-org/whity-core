@@ -58,6 +58,7 @@ final class TenantOwnedTables
         'resource_role_assignments' => '088_create_resource_role_assignments.php',
         'permission_delegations' => '014_create_permission_delegations.php',
         'audit_log' => '016_create_audit_log.php',
+        'away_periods' => '251_add_two_admin_resets_and_away.php',
         'persons' => '018_create_persons.php',
         'relations' => '020_create_relations.php',
         'tenant_settings' => '025_create_tenant_settings.php',
@@ -127,6 +128,14 @@ final class TenantOwnedTables
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_service_staff' => '248_create_calendar_bookings.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
+        // Design 3.3: rooms a service needs, filtered by branch.
+        'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
+
+        // WHIT-953 — contacts and their spreadsheet imports (design 3.3 A8).
+        // Every query binds tenant_id.
+        'contacts' => '261_create_contacts.php',
+        'contact_imports' => '261_create_contacts.php',
+        'contact_import_changes' => '261_create_contacts.php',
         // Messages (ADR 0016, WHIT-938): conversations with customers, their
         // messages, web chat visitors and the per-workspace settings. Every
         // query binds tenant_id. The public chat and inbound webhook routes find
@@ -135,6 +144,9 @@ final class TenantOwnedTables
         'messages' => '243_create_conversations_and_messages.php',
         'webchat_visitors' => '245_create_webchat_and_messaging_settings.php',
         'messaging_settings' => '245_create_webchat_and_messaging_settings.php',
+        // Team chat (CH.1, CH.2): a team chat and its people and agents.
+        'chats' => '253_create_team_chat.php',
+        'chat_members' => '253_create_team_chat.php',
 
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says
@@ -209,11 +221,12 @@ final class TenantOwnedTables
         'document_suggestions' => '183_create_document_suggestions.php',
         'document_comment_threads' => '184_create_document_comment_threads.php',
         'document_comments' => '185_create_document_comments.php',
+        'document_agent_requests' => '252_create_document_agent_requests.php',
         // Editor M7: saved blocks, their insert-only versions, and which
-        // documents use them (migrations 253-254, E.21-E.24, E.38).
-        'saved_blocks' => '253_create_saved_blocks.php',
-        'saved_block_versions' => '253_create_saved_blocks.php',
-        'saved_block_uses' => '254_create_saved_block_uses.php',
+        // documents use them (migrations 260 and 265, E.21-E.24, E.38).
+        'saved_blocks' => '260_create_saved_blocks.php',
+        'saved_block_versions' => '260_create_saved_blocks.php',
+        'saved_block_uses' => '265_create_saved_block_uses.php',
         // Whity Builder (WHIT-760): a workspace's own plugins as published
         // manifest versions, the live pointer, and the permission slugs they
         // declare (migration 164).

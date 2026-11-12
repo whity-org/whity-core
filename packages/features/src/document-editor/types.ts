@@ -1,3 +1,4 @@
+import type { EditorAgentChoice, EditorAgentRequest, NewAgentRequest } from '@whity/ui/editor/agents';
 import type {
   DecideAllFilter,
   Decision,
@@ -97,6 +98,15 @@ export interface DocumentEditorAdapter {
   reopenThread?(id: string, threadId: string): Promise<RailThread>;
   /** People to @mention: workspace members who can read the document. Never called with an empty query. */
   searchPeople?(id: string, query: string): Promise<MentionPerson[]>;
+
+  /* M6: Ask an agent (EditorAgents). Without them the editor offers no agent. */
+
+  /** The agents this person uses, ending with "any of my agents" (`anyLabel`). */
+  agentChoices?(anyLabel: string): Promise<EditorAgentChoice[]>;
+  /** This person's requests on the document, newest first. */
+  agentRequests?(id: string): Promise<EditorAgentRequest[]>;
+  askAgent?(id: string, request: NewAgentRequest): Promise<EditorAgentRequest>;
+  stopAgentRequest?(requestId: string): Promise<EditorAgentRequest>;
 }
 
 export interface CollabSnapshot {

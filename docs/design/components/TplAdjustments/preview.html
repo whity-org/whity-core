@@ -1,0 +1,58 @@
+<!-- @dsCard group="Templates · Near term" height=820 width=1440 subtitle="N5: end-of-day waste and stock adjustments with a reason, and approval above a value" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Waste and adjustments</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['customer', 'Contacts'], ['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions'], ['chart', 'Reports']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function kpi(l, v, s, cls) { return h('div', { className: 'wk-kpi' }, h('span', null, l), h('b', null, v), s ? h('small', { className: cls || '' }, s) : null); }
+  function num(v, cls) { return h('span', { className: 'wk-num' + (cls ? ' ' + cls : '') }, v); }
+  function tabs(items, on) { return h('div', { className: 'wk-bar' }, h(W.Tabs, { items: items.map(function (x, i) { return { value: String(i), label: x[0], count: x[1] }; }), defaultValue: String(on) })); }
+
+  var rows = [{ id: 1, w: 'Today 21:05', p: 'Abdoun', it: 'Croissants', q: '−18', r: 'End of day, unsold', v: '6.300', by: 'Awss Haddad', st: ['success', 'Done'] }, { id: 2, w: 'Today 21:02', p: 'Abdoun', it: 'Bread, white loaf', q: '−11', r: 'End of day, unsold', v: '3.850', by: 'Awss Haddad', st: ['success', 'Done'] }, { id: 3, w: 'Today 14:30', p: 'Central', it: 'Butter, 10 kg', q: '−1', r: 'Fridge failed overnight', v: '42.000', by: 'Ibrahim Mansour', st: ['warning', 'Waiting for Emad'] }, { id: 4, w: 'Yesterday', p: 'Sweifieh', it: 'Maamoul, box of 12', q: '−8', r: 'Expired (B-1102)', v: '21.304', by: 'Ahmad Khalil', st: ['success', 'Approved by Emad'] }, { id: 5, w: 'Yesterday', p: 'Central', it: 'Sugar, 50 kg', q: '+1', r: 'Count found more', v: '18.000', by: 'Stock assistant', st: ['success', 'Done'] }];
+  var cols = [{ key: 'w', label: 'When' }, { key: 'p', label: 'Where' }, { key: 'it', label: 'Item', render: function (r) { return h('b', null, r.it); } }, { key: 'q', label: 'Change', align: 'end', render: function (r) { return num(r.q, r.q.charAt(0) === '−' ? 'wk-low' : ''); } }, { key: 'r', label: 'Reason' }, { key: 'v', label: 'Value, JOD', align: 'end', render: function (r) { return num(r.v); } }, { key: 'by', label: 'By' }, { key: 'st', label: '', render: function (r) { return h(W.Badge, { variant: r.st[0] }, r.st[1]); } }];
+  var side = h('div', { style: { display: 'grid', gap: 16 } }, h(W.Card, { title: 'Waste this week', description: 'At cost, by reason' }, h(W.BarChart, { height: 150, data: [{ label: 'Unsold', value: 62 }, { label: 'Expired', value: 21 }, { label: 'Damaged', value: 42 }, { label: 'Other', value: 4 }] })), h(W.Card, { title: 'Rules' }, h(W.DescriptionList, { items: [{ label: 'Needs approval', value: 'Over JOD 25 a line' }, { label: 'Approved by', value: 'The branch manager' }, { label: 'End-of-day waste', value: 'Reminded at 21:00' }] })));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Inventory', h(F, null, h(W.PageHeader, { title: 'Waste and adjustments', description: 'Every change to stock that isn’t a sale, a delivery or a transfer', actions: h(W.Button, { icon: 'plus' }, 'Record waste') }),
+    h('div', { className: 'wk-kpis' }, kpi('This week, at cost', 'JOD 129.454', '1.9% of sales', 'is-bad'), kpi('Waiting for approval', '1', 'Butter, JOD 42.000'), kpi('Most wasted', 'Croissants', 'Abdoun, evenings'), kpi('Found in counts', '+JOD 18.000')),
+    h('div', { className: 'wk-split', style: { gridTemplateColumns: 'minmax(0,1fr) 360px' } }, h(W.Card, { style: { padding: 0 } }, h(W.DataTable, { label: 'Adjustments', columns: cols, rows: rows, rowMenu: true })), side))));
+</script>
+</body>
+</html>

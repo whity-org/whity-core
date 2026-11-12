@@ -341,7 +341,7 @@ A Notion-, Gutenberg- and Google Docs–inspired editor for whity-core's Documen
 | E.1 | Deliverable | Design-system definition: components, states, rules and contract. Implementation by the Whity team. |
 | E.2 | Surface | Blocks (Notion/Gutenberg) on a continuous sheet, with an A4 page view (Google Docs) for what Whity Render prints. |
 | E.3 | First version | Merge fields, comments and suggestions, rich blocks. Live collaboration (cursors, presence, version history) comes later. |
-| E.4 | Agent edits | Agents write as suggestions: dashed, attributed ("Billing assistant for Rana"), nothing lands until a person accepts. |
+| E.4 | Agent edits | Agents write as suggestions: dashed, attributed ("Billing assistant for Amro"), nothing lands until a person accepts. |
 | E.5 | Formatting tools | A fixed Google Docs–style toolbar, plus the selection bubble and the / menu. |
 | E.6 | Comments and suggestions | Cards in a margin rail beside the text they belong to; a drawer list under 1024px. |
 | E.7 | Default view | By document type: templates and anything Whity Render prints open in the page view; notes and wiki pages open continuous. Either can switch. |
@@ -524,7 +524,7 @@ The Settings area, a person's account, billing, the audit log, and the operators
 | W.1 | Settings | One Settings entry in the sidebar; each settings page has a grouped sub-nav beside it (Workspace, Sign-in and security, Email, Data, Advanced) and keeps its own address, as built. |
 | W.2 | Operators | Install-wide pages (Tenants, Plans and pricing, Promotions, System, Errors, Notification delivery, and the install's email, storage, feature flags and languages) live in the sidebar's **Platform** group, shown only to the system tenant. Workspace admins never see them. |
 | W.3 | Account | A person's own settings in tabs: Profile, Sign-in and security, Sessions and devices, Preferences (language, theme, **text size** Standard or Larger, Show technical details). |
-| W.4 | Audit log | Sentences grouped by day ("Rana Haddad changed Omar Khalil's unit to Abdoun"), with filters for person, agent, area and date; raw details behind Show technical details. |
+| W.4 | Audit log | Sentences grouped by day ("Amro Saleh changed Ahmad Khalil's unit to Abdoun"), with filters for person, agent, area and date; raw details behind Show technical details. |
 
 Values set while drawing, open to change:
 - The settings sub-nav adds a Devices group (Licensed devices), which had no link in the built app.
@@ -533,6 +533,237 @@ Values set while drawing, open to change:
 - Prices and discounts are typed with MoneyInput in normal units with the currency's decimals; Promotions default to JOD.
 - System refreshes every minute and says so. Errors lead with plain words; technical details on request.
 - Platform settings: install-wide switches as sentences; Email, File storage, Languages and Error tracking as tabs.
+
+## Whity mobile (version 3.0, coverage complete 8 November 2026)
+The phone app, designed mobile first and for one-handed use. Decided one part at a time from 8 Nov 2026:
+
+| # | Decision | Locked value |
+| --- | --- | --- |
+| M.1 | Scope | A do-on-the-go companion: everything people do away from a desk (approvals, inbox, agents, forms, documents to read and sign, stock counts, notifications). Setup, builders and admin stay on the web. |
+| M.2 | Navigation | A bottom tab bar in the thumb zone: Home, Inbox, a centre **Create** button, Agents, More. Apps and settings live in More. |
+| M.3 | Platform | One Whity look on iPhone and Android (Flutter), with native behaviour: system back gesture, share sheet, haptics, date pickers and keyboard. |
+| M.4 | Main action | A sticky bar at the bottom, above the tab bar, holds the screen's one main button, full width; secondary actions sit beside it or in a sheet. The top of the screen is for reading. |
+| M.5 | Size | Body text 17px, nothing below 14px; every tappable target at least 48 × 48. The app follows the phone's own text-size setting. |
+| M.6 | Gestures | Customisable per person. By default, swipes only do safe things (mark read, archive, snooze), always with Undo, and approve and decline are buttons. Power users can opt in to swipe to approve and decline in their preferences. |
+| M.7 | Search | On list screens the search bar sits at the bottom, above the tab bar; filters open as a bottom sheet. The title stays at the top. |
+| M.8 | Security | Face or fingerprint to open the app after a while and to confirm tier-3 actions (instead of typing a name); a 6-digit app PIN as the fallback. |
+| M.9 | Swipe limits | With swipe to approve turned on, a swipe approves only tier-1 and tier-2 items, with Undo. Security-sensitive or irreversible items (tier 3) always open and ask for Face or fingerprint. |
+| M.10 | Home | Waiting for you shows one decision card at a time by default (next card after each decision); a list is a personal option. Tapping opens the full decision with Approve in the bottom bar. |
+| M.11 | Create | The centre button opens a sheet: Ask an agent on top, then six large tiles chosen by role (Fill a form, Scan a receipt, Stock count, New note and others), which each person can change. |
+| M.12 | Agents tab | Chat plus activity: talk to your agents (type, or hold to speak) and see what they did and proposed today in one feed. |
+| M.13 | Themed by the installation | The app connects to a Whity installation, pulls its design tokens on connection, and styles itself accordingly, so custom installations get their own mobile app for free. |
+| M.14 | Connecting | Email first: the person types their work email and the app finds their installation and workspace. Or they scan a QR code from the web app, or type the installation's address. |
+| M.15 | Theme scope | The installation's full published tokens (colours, type, corners, logo, name, light and dark), with Whity defaults filling any gap. Guard rails: the 17px and 48px minimums (M.5) always hold, and a colour pair that fails contrast falls back to its Whity default. |
+| M.16 | App identity | Free: the Whity app, fully branded inside once connected; its store icon and name stay Whity. Paid add-on: an installation's own app in the stores, with its icon and name, built from the same code. |
+| M.17 | Switching | A person can add several installations and workspaces and switch between them; switching re-themes the whole app, and notifications say which workspace they come from. |
+| M.18 | Onboarding | First-time mobile screens set up the person's preferences and show them around the app. |
+| M.19 | Motion with meaning | Lottie animations enhance onboarding and key moments, and every animation follows resistance and animation principles so it tells the app's story and explains the interaction, never motion just to look good. |
+| M.20 | Destructive swipes | Delete and other destructive swipes feel hard and resistant. |
+| M.21 | Tier 3 swipes | Swiping a tier-3 card makes it feel stuck: it barely moves, then a popup says tier 3 needs verification and asks for it (Face or fingerprint, M.8). |
+| M.22 | Onboarding contents | People may be new to Whity entirely, so onboarding also handles creating their Whity ID (and what comes with it), as well as the story, preferences and the guided tour. |
+| M.23 | Lottie, two kinds | Brand animations make the Whity brand make sense (the story). Real UI in motion explains what each preference will mean for the person when they choose it. |
+| M.24 | Destructive swipe feel | Heavy, with a point of no return: the row follows the thumb at about a third of its speed, the red grows, a firm haptic tick at 70%; let go before it and it springs back. Undo after. |
+| M.25 | Reduce motion | When the phone asks for less motion: Lottie stops on its last frame, movement becomes fades, resistance stays as haptics and colour, and the tier-3 "stuck" becomes a short buzz and the popup. |
+| M.26 | Whity ID | One account for every installation: sign in once with Whity ID and reach all your workspaces on any installation. Installations may also keep their own sign-in (Google, Microsoft, their SSO). |
+| M.27 | Creating a Whity ID | A combination: email and password as the basic way; signing up with Google or Apple also creates a Whity ID; the phone's passkey is linked to the Whity ID as a trusted device, and from then on the person approves their sign-ins elsewhere from their phone (like Google's prompts). Authenticator apps can be set up too. |
+| M.28 | Onboarding order | Story → Whity ID → workspace → preferences → guided tour. |
+| M.29 | No workspace yet | Two cases. A **tenant creator** creates a tenant (workspace) on an installation: app.whity.dev or a custom deployment built with Whity. A **customer of a tenant** needs the least resistance possible to sign up and use that tenant's product, on Whity or on a custom installation. |
+| M.30 | Tenant creator | Creates the essentials on the phone, then goes: choose the installation (app.whity.dev or a custom address), name, logo from a photo, main colour with a live preview, invite people, and plan and trial if the installation sells plans. The rest happens on the web, with a link emailed. |
+| M.31 | Tenant's customer | Arrives by the tenant's link, website or a QR (on a receipt, say); the app opens already in the tenant's brand, and Continue with Apple or Google creates their Whity ID and joins them in one step. No story or tour unless they ask. |
+| M.32 | Approving sign-ins | The phone asks "Is this you signing in?" with the place and device; the person taps the number shown on the other screen, then Face or fingerprint. |
+| M.33 | Protecting the account | A "Protect your account" step in onboarding: save this phone as a passkey (the default), or set up an authenticator app; required only when the workspace demands two-step sign-in. |
+| M.34 | Your picture | Onboarding helps people make their picture: a pattern generated from a random seed, or an uploaded profile photo. |
+| M.35 | The patterns | Built from Whity's own shapes (the sheet with its offset, the dashed sheet, the platform), arranged by a seed from the person's Whity ID, so the same person always looks the same. |
+| M.36 | Picking | The pattern made from their name, a Shuffle button, and a row of six alternatives to tap. |
+| M.37 | Pattern colours | From the palette of the installation where the Whity ID was made, with contrast guard rails; the picture keeps those colours in every installation. |
+| M.38 | Photo | Take a photo or choose one, with a round crop; the step comes right after confirming the email; the Google picture is offered first when they signed up with Google; skippable, keeping the pattern. |
+| M.39 | Full app pages | Whity mobile gets its full set of pages: Inbox, More, preferences, sign-in and security, and management pages, with the states between them. |
+| M.40 | Management on the phone | On-the-go essentials: approve, let people in, invite, pause or remove people, pause agents, see activity and billing, sign documents, fill forms, count stock. Deep setup (roles, route templates, form builder, branding, plugins) opens on the web, with a one-time link emailed and approved on the phone. |
+| M.41 | More tab | The person's card on top (picture, name, role, workspace), the workspace switcher, then grouped 56px rows: My work, Manage (admins only), You (preferences, sign-in and security), Help and about. |
+| M.42 | Sign-in and security | A status checklist on top ("Well protected, 3 of 4": strong password, this phone as a passkey, recovery codes, authenticator app) with the missing step as a button; then ways to sign in, devices, recent sign-ins, app lock, recovery. |
+| M.43 | Inbox tab | Three tabs at the top (Waiting for me, Mentions, Updates); search and filters at the bottom (M.7); swipes as the person set them (M.6). |
+| M.44 | Push notifications | Notifications only open the app: no Approve or Decline on a notification. Opening asks for Face ID and lands on that decision. |
+| M.45 | Arabic | Fully mirrored: tab order, back arrows, lists, sheets and swipe directions. Numbers, amounts and codes stay Western digits, left to right. |
+| M.46 | Which hand | A preference, right hand by default, that moves the main button in two-button bars and steppers to the thumb's side and flips the swipe-to-approve direction. |
+| M.47 | Tablets | Same app; from 744 points wide, lists and their detail show side by side and a side rail replaces the tab bar. |
+
+Values set while drawing the picture step (open to change):
+- The step is 3 of 5 in creating a Whity ID, before Protect your account; changed later from More › Profile › Picture with the same screens.
+- Four pattern layouts (sheet on the platform, stacked sheets, dashed sheet with a dot, sheet on a diagonal band), a slight rotation, at most three shapes so each reads at 24px. Fixed lightness: pale background near the brand hue, the brand colour, its dark (the mark's offset colour), one accent hue.
+- The preview is 168px; the six alternatives are 48px with 52px targets; Shuffle and Use a photo sit side by side in the lower half.
+- The crop is a 300px circle on a dark screen; a zoom slider and a Turn button make it work with one thumb (pinch still works); "How it'll look" shows 48, 32 and 24px.
+- Apple shares no picture, so Apple and email sign-ups start from their pattern. Customers who join a tenant with Google (M.31) get their Google picture without this step.
+- Patterns are for people only: agents keep the robot, the system keeps the mark. Removing a photo goes back to the pattern.
+- Components: `Avatar pattern=… hue=…`, `W.avatarPattern(seed, hue)` and `W.brandHue(hex)`; two icons added (shuffle, rotate), 123 in all.
+
+Values set while drawing the full app pages (open to change):
+- Inbox: Waiting for me is oldest first; Updates group by day and show Undo with the time left; filters are what, from, how long waiting, and order.
+- More shows the Manage group only to people with admin rights. Help and about includes a help assistant (an agent), replay the tour, the story, reporting a problem with a screenshot and log.
+- Preferences: Display, Using Whity, Feel (haptics, sounds, reduce motion), Data (Wi-Fi only downloads). Swipe left and right are each chosen from a list; swipe right to approve is off by default. Sign-in approvals can't be turned off; quiet hours default 22:00 to 07:00; the lock screen hides amounts by default.
+- Security: app lock asks again after 5 minutes by default; three failed Face IDs fall back to the 6-digit PIN; tier-3 decisions always ask for Face ID. Authenticator setup on the same phone uses a direct link or a copyable key instead of a QR. Showing recovery codes asks for Face ID; ten codes.
+- People: tabs Everyone, Want to join, Invited; search at the bottom with a + beside it to invite; pausing, resetting two-step and removing a person are tier 3 (Face ID). A request to join gets the Member role unless changed.
+- Agents (managing): Pause all agents is the emergency stop; pausing one agent needs no Face ID, since it's safe and reversible; permissions change on the web.
+- Documents: To sign first; signing is always Face ID; Return sends it back with a comment.
+- Forms: one step per screen, saved as you go; stock count with a 72px stepper, + on the thumb side.
+- Offline: tier-1 and tier-2 decisions queue and send later; signing and tier 3 wait for a connection.
+- Links to the web work once, for 15 minutes, and the sign-in is approved on the phone.
+- Fourteen icons added for these pages (key, archive, barcode, signature, at, fingerprint, shield, text-size, gesture, card, pause, play, attach, ban): 137 in all.
+
+Values set while completing mobile coverage (open to change):
+- In Arabic the main button follows the hand setting, not the reading direction: with the right hand (default) Approve stays on the right.
+- Notifications name their workspace, hide amounts on the lock screen by default, stack per agent, and open on a press-and-hold with Open in Whity; in-app banners last 4 seconds and never cover the bottom bars.
+- Unlocking: Face ID straight away, app PIN fallback, five wrong PINs sign the phone out. A new phone signs in by number matching on the old one or with a passkey; a lost phone uses a recovery code or the admin resets two-step.
+- Tier-3 verification lasts 2 minutes. Decline asks for an optional reason and, by default, tells the agent. Editing an agent's draft shows how much changed.
+- Receipt scanning marks each read field Sure or Check. Voice: hold to speak, let go to send, slide left to cancel. Unclear requests make the agent ask one question with tappable answers first.
+- Search everything is reached by pulling down on Home or setting a list's scope to Everything; results group by kind; nothing found offers an agent.
+- The customer app uses the tenant plugin's tabs; payments offer CliQ (default), card and cash on delivery.
+- Largest text sizes stack rows and show the tab bar as icons, with labels on press and hold. Screen readers read a decision card as one sentence.
+- Tablets: list pane 400 points; sheets become centred dialogs or popovers; actions sit at the bottom right of the detail.
+- Sessions end after 30 days by default; an update can be required by the installation; no-access pages offer "Ask for access"; errors show a reference code.
+- Section 26 lists the mobile screens as MB01–MB62.
+
+## Work and operations (version 3.1, coverage complete 8 November 2026)
+
+Decided from 8 November 2026. Sixteen areas: documents, flows, agents, agent chats, meetings, inventory, tasks, boards, organisational units, roles and delegations, approvals, approval gating, forms, applications, money and expenses, subscriptions and tiers, appointments.
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| X.1 | Surfaces | These sixteen areas are designed for web and mobile in full, including setup and builders on the phone. For them, this replaces M.40's "deep setup on the web". |
+| X.2 | Boards | Kanban boards for work. |
+| X.3 | Meetings | Both: everyday meetings, and formal meeting bodies (committees with members, terms, quorum, minutes and resolutions). |
+| X.4 | Applications | Requests people submit (a permit, membership, a job, a grant), with review stages and a decision. |
+| T.1 | Agents and tasks | Agents complete their tasks on their own when their scope allows; "Ask first" actions still become proposals. |
+| T.2 | Boards and tasks | A board is a view of tasks: each board is a project, columns are task statuses, and the same task shows in lists, calendars and boards. |
+| T.3 | Taskaat | Tasks integrate with Taskaat (taskaat.dev), which is the engine: tasks, boards, checks, evidence and decisions live in Taskaat; Whity's Tasks and Boards pages read and write them with Whity's people, permissions, approvals and look. Whity works with Taskaat on the integration. |
+| T.4 | Done when | Agents' tasks must have a "done when" check written before work starts, and submit evidence for a person to accept; people may add a check when it helps. A task closed without passing evidence stays "Done, unverified". |
+| MT.1 | Minutes | An agent drafts minutes, resolutions and action items from typed notes and an optional recording (everyone told); the secretary approves, the chair signs. |
+| AP.1 | Appointments | Customers and staff both book: customers on the tenant's booking page or in the customer app; staff manage calendars of people and rooms, services and availability. |
+| IN.1 | Inventory | Stock in every place (counts, transfers, reorder levels, the Stock assistant proposing reorders), plus recipes (what goes into what you make, and its cost) and batches with expiry dates. |
+| MO.1 | Money and expenses | Light accounting: expense claims, company cards and petty cash, invoices and payments, budgets, plus a chart of accounts, journal entries and the sales tax return. Companies with an accountant's system export to it. |
+| SU.1 | Subscriptions and tiers | Both: the workspace's own Whity plan (Billing), and plans a tenant sells its customers, in tiers, with subscribers, renewals and failed payments. |
+| AA.1 | Applications review | Each application type has a form, stages and scoring criteria; reviewers score against the criteria; an agent checks documents first and asks for what's missing. |
+| CH.1 | Chat | Agents' chats and people's chats share one chat: agents are part of the team, join direct chats and groups, and are clearly marked (robot face, an Agent tag, who they work for, what they may do in that chat). |
+| CH.2 | Chat members | One-to-one by default; any chat can add people and several agents, who hand work to each other in the open. Adding an agent says what it can read (from now on by default), who it works for there, and what it may do. |
+| AQ.1 | Approvals in bulk | Reviewing one at a time stays the default; a list view lets ordinary tier-1 items be approved together; tier 2 and 3 always open one by one. |
+| AG.1 | Approval gating | Every gating approval asks for Face ID or a passkey; clearing someone's two-step also needs a second admin, who can't be the requester. |
+| FL.1 | Flows | Workflows across everything: a trigger, steps where people decide and agents act, conditions and waits. A document's route is one kind of flow. |
+| FL.2 | Building on the phone | Flows and forms are built on the phone as a list of steps in sentences, no canvas; a step can be added between any two. |
+| OR.1 | Organisation on the phone | Browse units level by level, change someone's role, and hand your decisions to someone while you're away ("I'm away"), with dates. |
+| DC.1 | Documents on the phone | Read and sign, comment and suggest, edit text and checklists; tables, fields and templates show and take comments, with editing on the web; an agent helps with text. |
+
+Values set while drawing round 1 (open to change):
+- Sidebar: a **Work** group (Tasks, Boards, Meetings, Appointments, Applications) after the top items, and **Operations** (Inventory, Money and expenses); Agent chats joins AI.
+- Tasks: tabs My tasks, Assigned by me, Agents' tasks, All; groups Overdue, Today, This week, Later, Done today; List, Board or Calendar. The task panel: Done when (blue box), evidence item by item, the gate (Send back, Accept as done), decisions, and the Taskaat task and sync time. "Open in Taskaat" opens the same task.
+- Boards: columns To do, Doing, Awaiting review, Done by default; **Awaiting review is the gate** and can't be skipped by dragging (skipping marks the task unverified). Dragged cards lift onto the plane, tilted 2°.
+- Meetings: formal meetings have a blue edge; bodies list chair, secretary, members, schedule and quorum. Resolutions are numbered per meeting (14/1) with votes. Action items become Taskaat tasks when the minutes are approved; agents' items get a drafted done-when check. Recordings are kept 30 days by default.
+- Appointments: day and week views with people and rooms as columns; booked blue, checked in green, requests dashed amber; reminders by WhatsApp 24 hours and 2 hours before; cancel or move up to 24 hours before by default.
+- Nine icons added (kanban, meeting, appointment, flag, video, record, gavel, evidence, check-in): 146 in all.
+
+Values set while drawing round 2 (open to change):
+- Sidebar: Operations holds Inventory, Money and expenses, and Subscriptions.
+- Inventory: tabs Stock, Batches, Recipes, Counts, Transfers; a low figure is red; expiring within 7 days is flagged; first expiring, first out. Making a batch takes the ingredients out, adds the product with a batch number and expiry (made date + shelf life), and prints labels; a shortage says what to do.
+- Money: tabs Overview, Expenses, Invoices, Payments, Budgets, Accounts, Sales tax. Account names are plain words with the codes beside them. The Bookkeeping assistant sorts bank lines into accounts; matched lines can be posted together, guesses need a choice. The sales tax return is for two-month periods with JoFotara reporting counts; Whity prepares it, the company files it. Over budget changes who approves (here, the owner).
+- Subscriptions: retries 3 times over 7 days, a WhatsApp each time with a link to pay, then pause (not cancel); CliQ and card. "Chosen most" comes from real numbers. Cancelling asks once whether to pause instead.
+- Applications: others' scores stay hidden until a reviewer saves their own; the average shows once two have scored. Stages in a pipeline with counts; bulk moves with a message template per stage.
+- Six icons added (package, transfer, recipe, batch, bank, wallet): 152 in all.
+
+Values set while drawing round 3 (open to change):
+- **CH.3, the phone's fourth tab becomes Chat** (it was Agents, M.2 and M.12): people and agents together, with Agents today as its second view. Arabic: المحادثات. Reverse this if the Agents tab should stay.
+- The sidebar gets **Chat** among the top items (with an unread count); the AI group keeps Agents, Connected AI apps and What AI can do.
+- In chat, agents' messages have a blue edge (web) or a blue-tinted bubble (phone); proposals are dashed cards showing who must decide, and only that person sees Approve; hand-offs and "is drafting" are system lines. Agents read a chat only from when they joined (unless set otherwise, which everyone sees) and never other chats.
+- Approvals list: kinds are named Ordinary (tier 1), Check first (tier 2) and Needs verifying (tier 3, with a lock); bulk approval keeps a separate Undo for each item.
+- Gating shows request dates and the identity checks done (who called whom, when).
+- Agents can be created on the phone in four steps: preset, instructions, what it may do, where it works.
+
+Values set while drawing round 4 (open to change):
+- Sidebar: **Flows** joins the Work group; Route templates move into Flows (a document still shows its route on its Routing tab).
+- Each flow reads as a sentence with its changeable words highlighted. Kinds of step: trigger (blue), condition (amber, Yes and No side by side), a person decides (a person, a role, a unit's manager), an agent acts (dashed), wait, done. "Describe a flow" lets an agent draft one. Publishing a new version applies to new runs; runs in progress finish on their version. If no one answers: remind after a day, then pass it on after two (per step).
+- I'm away: dates, a delegate, what goes to them (approvals in flows, agents' proposals, documents to sign); anything above what the delegate may approve waits; a message for people who write; coming back early ends it.
+- Role changes on the phone describe each role in plain words; more powerful roles ask for Face ID; the permissions grid stays on the web.
+- Suggesting on the phone shows a green "Suggesting" chip; deletions red and struck, additions green and underlined; the document's owner accepts or rejects; an agent's text help arrives as suggestions.
+- Four icons added (trigger, branch, away, org): 156 in all.
+- All sixteen areas now have web and phone designs (coverage table in section 27).
+
+## Roadmap (8 November 2026)
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| R.1 | Near term | The low-hanging fruit joins the plan. Design next: contacts, custom fields on existing records, spreadsheet import, receiving goods and supplier bills, waste and stock adjustments, bank reconciliation, basic reports, the 80 mm receipt, agent notifications by email and WhatsApp. Build after A6: A7 quick wins on built pages, A8 contacts and import, A9 custom fields, A10 tasks and boards on Taskaat. |
+| R.2 | Long term | Everything else goes to the long-term plan, in order: Studio (custom records, views, formulas, page builder), the flows engine with code steps, sales and point of sale, full inventory and production, full accounting, HR and payroll, projects with time tracking, building the 3.1 modules, Whity mobile, reporting, integrations, platform (several companies and currencies, test and live, packaging customizations), live collaboration. Section 28. |
+
+## Near-term pages (version 3.2, 8 November 2026)
+
+The roadmap's near-term design items N1–N9 (R.1) are drawn. Values set while drawing (open to change):
+- Sidebar: Operations holds Contacts, Inventory, Money and expenses, Subscriptions and Reports.
+- Contacts: one record for customers and suppliers (a contact can be both); balances in mono, late red; a contact's page shows the workspace's own fields.
+- Custom fields: twelve kinds (short and long text, choose one or several, amount, date, time range, a person, a contact, yes or no, file, formula); usable at once in lists, filters, document merge fields and flow conditions.
+- Import: Excel or CSV; Whity suggests matches and fixes what it can (adds +962), says what will be created, updated and skipped before anything changes, and the whole import can be undone for 24 hours.
+- Receiving and bills: three-way match (ordered, received, billed) line by line; the Bookkeeping assistant reads the bill and proposes the fix for a mismatch.
+- Waste: reasons from a short list; approval above JOD 25 a line by the branch manager; end-of-day reminder at closing time.
+- Bank reconciliation: statements uploaded or forwarded; exact matches confirmed together; the assistant's likely matches dashed; the month closes at a zero difference.
+- Reports: profit and loss against the previous period, who owes us and whom we owe by 0, 1–30, 31–60 and 60+ days, balance sheet, stock value, sales tax; PDF and a monthly email.
+- The 80 mm receipt: 72 mm printable, Geist Mono, sales tax 16%, JOD to 3 decimals, the JoFotara QR, Arabic mirrored with Western digits.
+- Agent notifications by email and WhatsApp only open Whity, like push (M.44); at most one per agent per hour except sign-in approvals.
+
+## Websites (8 November 2026)
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| WS.1 | whity.dev | Two doors, companies first: the page speaks to small companies (what Whity does, agents, made for here, your brand, plans in JOD), with a second door to builders (open source, SDK, MCP) |
+| WS.2 | Deliverable | Each site as design-system cards plus build-ready static pages: whity.dev, brand.whity.dev, health.whity.dev, id.whity.dev (sign in, approve on the phone, account), docs.whity.dev (home and an article). Section 29 |
+| WS.3 | Languages | English and Arabic, fully mirrored under `/ar/`; the name stays "Whity" in Latin letters |
+| WS.4 | People in the designs | The Whity team stands in for every person in cards, pages and docs: Amro Saleh, Awss Haddad, Ahmad Khalil, Ibrahim Mansour, Emad Nasser (Arabic: عمرو صالح، أوس حداد، أحمد خليل، إبراهيم منصور، عماد ناصر). Where a screen needs more than five people, a team first name takes another common surname. Companies stay fictional (Example Bakery and friends) |
+| WS.5 | Plans on whity.dev | Prices, limits and features are read from Whity's backend (`GET /api/public/plans`, built from the entitlement bundles of ADR 0010), with fallback to the copy last saved in the visitor's browser, then to the plans built into the page. Contract in section 29 |
+| WS.6 | whity.dev hero | Headline kept ("Your company's work, in one place. Agents prepare it. You approve it."); the picture is the web Home with the phone in front, both showing what's waiting for approval; Book a demo opens Whity's own booking page |
+| WS.7 | What it does, and module pages | The home section leads with four large cards (invoices and money, stock and recipes, approvals, documents and signing), each with a small screen and a link to its page; the other four sit in a compact row. Each of the four gets its own page from one template (hero with a screen, what you can do, agents, works with, questions, final call), in English and Arabic |
+| WS.8 | whity.dev Agents | One proposal visitors try themselves: Approve sets it down on the plane, Undo plays it back, and the three steps light up as it goes; then an "Agents never" list (do more than you allow, have more rights than their person, hide what they did, pass for a person). "Your name on it" lets visitors try a colour on the brand animation; each module page has its own animation |
+| WS.9 | whity.dev Made for here | Five points (Arabic and English, JoFotara, CliQ, WhatsApp, dinars to three decimals), each with a small animation, beside a receipt visitors switch between English and Arabic: the layout mirrors, the numbers don't change |
+| WS.10 | Small details on the sites | The hero sets down once on load (the web Home lands on its plane, then the phone slides in); approving on the hero's phone updates the web Home behind it, with Undo; sections ease in once (10 px, 400 ms); the main button lifts and its plane grows on hover; clickable cards lift onto the plane; the nav gets a line once the page scrolls. None of it runs when less motion is asked for, and every page works without it |
+| WS.11 | whity.dev For builders | A terminal types the real install commands from whity.dev/install once when seen, with Copy and Play again; three cards (open source, build apps, agents can run it) with small animations; one line for agencies ("sell Whity under your own brand") linking to a partners page to design later. The terminal stays left to right in Arabic |
+| WS.12 | whity.dev Questions, final call, footer | Eight straight answers, always open (free, growing past 5, agents, where data is kept, leaving, Arabic, developers, who approves), then "Book 30 minutes with the team"; the final call sits on its own sheet on the plane with four ticks (free for 5, no card, Arabic and English, leave with your data); the footer shows live status from health.whity.dev (a plain link if it doesn't answer), the four promises and Back to top |
+| WS.13 | whity.dev Security page | One page at `whity.dev/security` (Arabic under `/ar/`): a plain promise and a lock that sets down on view; six areas done properly (signing in, who can see what, agents, risky steps need two people, your data, open to inspection), three ticks each; "What we don't have yet" says plainly there are no certifications or outside audits so far; reporting is by email to security@whity.dev and `/.well-known/security.txt`, four steps, and credit by name (no money for now) in a "Thank you" list that starts empty; hosting is not named yet |
+| WS.14 | Mega footer on every whity.dev page | A deep-blue blueprint band: the logo, one line on what Whity is, live status, language and a colour switch (same as my device, light, dark; remembered on that browser); "Talk to the team" with Amman's time and Book a call; all eight things Whity does as white tiles that set down one by one onto a long plane when they come into view; five link columns (Product, Company, Builders, Trust, Your account); a giant faint "Whity" that rises letter by letter onto a dark plane; the legal line, the four promises and Back to top. A soft light follows the mouse. Nothing moves when less motion is asked for, and it all works without scripts |
+| WS.15 | whity.dev Partners page | One page at `whity.dev/partners` for four kinds of partner: agencies selling Whity as their own, companies setting it up for clients, plugin developers, and hosts running it for regulated clients. Visitors type their agency's name and pick a colour to see the sign-in page their clients would get (`id.youragency.jo`, no Whity name anywhere). Terms are contact-based for now: no prices, discounts or shares on the page; a call (`app.whity.dev/book/whity/partners`) agrees them partner by partner. "None yet. We're looking for the first." with empty slots. Four straight answers and a final Book a call. This supersedes showing the BM.10 partner price and revenue share publicly until they're set |
+| WS.16 | whity.dev About page | One page at `whity.dev/about`: the story is repeated client work ("We kept building the same system. So we built it once, and opened it."), shown as three client copies of the same system that slide together into one base on the plane when the page opens. Facts: started 2026, made in Amman, Jordan (no street address), open source, Arabic and English. The four promises. A short note from the founder, signed Amro K. Saleh, Founder (Whity has one founder; initials, no photo). No registered company name yet, so none is shown. The site keeps saying "the team" |
+| WS.17 | Global, not Jordan-only | Whity is a global tool. Marketing never says it is built for companies in Jordan or the region. Hero eyebrow "For small and growing companies"; "Made for here" becomes "Works locally: Local where it matters" (your tax system's e-invoicing with Jordan's JoFotara first, local payments like CliQ in Jordan, your currency to the right decimals); prices are "published, monthly" with no currency named in copy (the plans feed sets the currency); data is kept "in a region your country's data protection law accepts, with an in-country option"; footer: "Open source, for companies anywhere". Jordan stays only as the origin (built in Amman, Amman time for calls) and as examples. Updates the wording of WS.1, WS.9, WS.13, WS.15, WS.16 and how BM.9 is described publicly; BM.9 itself (which regions are offered) is to be re-checked for a global offer |
+| WS.18 | Hosted in the EU | Whity's own hosting is in the EU: servers and database on EU servers (the provider is not named), files on Cloudflare R2 (EU), backups on Cloudflare (EU); domains and connections go through Cloudflare's worldwide network, which stores nothing of the customer's. The sites say "Hosted in the EU" (a footer badge linking to the Security page) and "stored in the EU"; no GDPR claim until a lawyer checks it. The Security page lists the providers (what, who, where), as is standard. Data inside one country: we host a dedicated installation there for a fee, or the company runs Whity on its own servers and pays for the Whity services it uses. Replaces the Jordan-region wording of BM.9 and lifts WS.13's "hosting is not named yet" |
+| WS.19 | whity.dev Contact page | One page at `whity.dev/contact`. "Talk to us." with Amman's time, and a "Who are you?" card that sends people the right way: new to Whity (book a call, write a message, hello@), my company uses Whity (Help inside Whity, the guides, support@), I run Whity Core myself (GitHub issues, docs, install), agency or host (partners call, Partners page, partners@). A message form (topic chips, name, optional company, email or phone, message) posts to `app.whity.dev/api/public/contact`; if sending fails the message stays and hello@ is offered. Four addresses with copy buttons: hello@, support@, partners@, security@. No promise on reply time ("We read everything") |
+| LT.4 | Lottie in the app | The web app and the phone use Lottie at five kinds of moment: empty states, done moments, the first run, waiting, and errors (14 new files, 31 in all). Approving **one** item plays `approve-set-down` (1.2 s) and Undo plays it back; **bulk** approval stays the 200 ms set-down in code (5.4 now covers bulk only). Lively but short: everyday moments 1–1.5 s, first-time and rare ones up to 3 s; empty states once a session per list, first-run scenes once ever; loops only while really waiting. One scene at most on a screen, never blocking, and the words always say what happened. New **Animations** setting (Full, Calm, Off; reduce motion means Off). Cards `TplMoments`, `TmMoments` |
+| WS.20 | Install in one line | `curl -fsSL https://whity.dev/install.sh \| sh` (the team writes the script, spec in section 29): checks Docker and Node.js and stops with plain words if one is missing, downloads Whity Core into `./whity-core`, starts PostgreSQL 15 and the app in Docker, sets up the database with sample data (`--empty` for none), prints an admin sign-in with a one-time password, opens localhost:3000; options `--dir`, `--empty`, `--version`. `whity.dev/install` shows the line, the five steps, the manual README steps (no local PHP: `make setup`; the old `composer install` step was wrong) and where next. The home page's builders terminal now shows the one line |
+| WS.21 | Privacy page | `whity.dev/privacy`: privacy in plain words (what we keep, why, where: the EU, who can see it, how long, what you can do), the other questions (your customers and staff, cookies: only sign-in and language, agents, changes), and a marked place for the full policy once a lawyer has checked it. Retention numbers in brackets until decided |
+| WS.22 | Licence page | `whity.dev/license`: AGPL-3.0 with the Whity Plugin Exception in plain words (you can, you must, the plugin exception), a "Can I…?" table of common cases, the name ("The code is free; the name is not"), and links to LICENSE on GitHub and gnu.org rather than a copy. Marked as a guide, not legal advice |
+| WS.23 | whity.dev 404 | The not-found animation, "This page isn't here.", and five ways on: Home, What it does, Plans, Docs, Contact |
+| EM.1 | Emails | Fifteen emails in English and Arabic, build-ready in `handoff/emails/` with placeholders: account (invitation, verify email, reset password, new sign-in, two-step turned off), money to a workspace's customers (invoice, quote, payment reminder, receipt), agents (needs your approval, which only opens the app; daily summary at 18:00), workspace and billing (workspace ready; from Whity itself: plan limit, payment failed, Whity receipt). White-label: the workspace's logo, name and colour, "Sent with Whity" removed with white-label. Body 17 px, one main button, dark mode supported. Security emails can't be turned off |
+
+The build plan gains A11 (receiving, waste and bank), A12 (reports and agent notifications) and W1–W5 (the websites, in the order whity.dev, health, id, brand, docs).
+
+## Business model and positioning (8 November 2026)
+
+Approved by the owner on 9 November 2026, for now; trusted reviewers have the one-page summary (English and Arabic) and their feedback may change the numbers.
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| BM.1 | Positioning | Company-first: "Your company's work in one place. Agents prepare it, you approve it." Builders and agencies come second: "Run it, or sell it as your own." Matches WS.1 |
+| BM.2 | Three ways to run Whity | **Whity Cloud** (app.whity.dev, shared): the free way in, with Whity's own apps only, no third-party plugins or custom code. **Dedicated hosting**: we host a company's own installation and the company manages its Whity; needed for plugins and custom code, because plugins need a dedicated installation. **Own server**: Whity Core, free and open source |
+| BM.3 | Free limits | Whity's paid services (Whity ID, Whity Render, the mobile app, agents) are free up to **5 staff accounts** and **500 customers a month**. Agents and customers don't count as staff. A customer is someone outside the company who signs in with Whity ID, books, uses the customer app or portal, or pays online; contacts stored in records are always unlimited. The same limits apply on every installation, ours or theirs |
+| BM.4 | Paid steps | Plans with clear limits: Free (5 people, 500 customers), Team (25 people, 5,000 customers), Business (100 people, 25,000 customers), then a quote. Extra people or customers come in packs. These numbers are the starting point to test with first customers; plan names and prices stay `[plan name]` and `[price]`. Agent work stays base plus usage |
+| BM.5 | White-label, what's paid | A workspace's logo and colour are free on every plan. Paid: its own web address, sign-in page and email sender, removing "Built on Whity", and its own app in the stores (M.16) |
+| BM.6 | White-label, how far | Every Whity service is white-labelled on every level, including domain masking: sign-in (id.examplebakery.jo), documents and their QR check links, emails, notifications and the customer app run under the company's own domains, and Whity's name never shows to its customers |
+| BM.7 | Hosting fee | A dedicated installation is a flat monthly fee by size (small, medium, large: `[price]`), plus Whity services above the free limits |
+| BM.8 | Who hosts the services | Whity is the only host of Whity ID and Whity Render by default, for every installation, under the same limits. The exception is a paid on-premises licence (minimum contract, usage reported back) for regulated companies (banks, clinics, government) and large partners. Self-hosted installations keep working for a while if Whity ID can't be reached (open sessions continue; a local owner sign-in for emergencies). Core keeps supporting standard sign-in (OIDC), so Whity ID wins on convenience, not lock-in |
+| BM.9 | Data region | Hosted services run in a region Jordan's data protection law (No. 24 of 2023) accepts for transfers, to be confirmed by a Jordanian lawyer; a Jordan-only setup is offered at a higher price for regulated companies |
+| BM.10 | Partners | Agencies resell Whity to their clients under their own brand and choose how: a **partner price** (`[n]`% off; they invoice their clients; full white-label including domains) or a **revenue share** (clients pay Whity; the agency gets `[n]`% every month) |
+| BM.11 | Promises | Published on whity.dev and in the docs: **Open stays open** (Core stays open source for good; nothing free moves behind a paywall); **Your data is yours** (export everything any time in open formats; leaving costs nothing; Core works with any standard sign-in provider); **Free means free** (the full product, not a trial, no card; passing a limit warns first and never locks out or deletes); **Plain pricing** (published prices in JOD, monthly for small companies, no hidden fees; charges for hosting, services, white-label and support) |
+
+Open: prices, the partner discount and share, pack sizes, the agent work included in each plan, the hosting sizes. Core is AGPL, so others may host Core commercially; the closed services, the partner programme and the trademark (section 11) are what only Whity sells.
+
+## Lottie (9 November 2026)
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| LT.1 | Where | The website and the app together: whity.dev (Agents, Your name on it, the module pages), the phone app's onboarding story, and empty and loading states. Inside the product, approving stays the 200 ms set-down in code (5.4) |
+| LT.2 | How people interact | Try it yourself: people press Approve and Undo and watch it happen; other animations play once when seen and replay on a click or tap; nothing loops forever except real loading; less motion shows the last frame |
+| LT.3 | How they're made | Real Lottie files written in code from the brand's shapes, with no text inside and every colour named after a token, so players recolour them for dark mode and each workspace's colour; editable in LottieFiles or After Effects, and a motion designer can polish them later |
 
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.

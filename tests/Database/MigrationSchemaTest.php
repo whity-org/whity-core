@@ -195,6 +195,11 @@ final class MigrationSchemaTest extends TestCase
             // Confirmed by the orchestrator (2026-11-12): 246 was left over from
             // the core messages block (243 to 245) and is in no commit.
             246 => 'left over from the core messages block 243-245; never used',
+            // 0.2.29 lanes (2026-11-12): numbers were taken by landing order and
+            // these four were never used by any lane. None is in any commit.
+            254 => 'unused in the 0.2.29 numbering (chat took 253, emails 257)',
+            255 => 'unused in the 0.2.29 numbering',
+            256 => 'unused in the 0.2.29 numbering',
         ];
 
         $deleted = array_values(array_filter(

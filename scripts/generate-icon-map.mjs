@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Generates packages/ui/src/icon-map.ts from docs/design/handoff/icons/icons.json:
-// the 116 curated Tabler outline icons by their Whity name (decision 5.1).
+// the 156 curated Tabler outline icons by their Whity name (decision 5.1).
 // Run: node scripts/generate-icon-map.mjs [--check]
 import fs from 'node:fs';
 import path from 'node:path';

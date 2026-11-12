@@ -8,6 +8,7 @@ use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Agent\AgentActionRepository;
 use Whity\Core\Agent\AgentProposalEvents;
 use Whity\Core\Agent\AgentProposalRepository;
+use Whity\Core\Agent\ProposalTier;
 use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -25,6 +26,7 @@ use Whity\Mcp\Tools\ToolsCallHandler;
  *   GET  /api/me/agent-proposals                 the caller's proposals (?status=waiting)
  *   POST /api/me/agent-proposals/{id}/approve    run it, optionally with edited `arguments`
  *   POST /api/me/agent-proposals/{id}/decline    don't
+ *   POST /api/me/agent-proposals/bulk-approve    several Ordinary (tier-1) ones together (AQ.1)
  *
  * ONLY THE GRANTING PERSON DECIDES (owner decision 10), because approving runs
  * the operation as their delegate. Every query is scoped to the caller's
@@ -41,6 +43,9 @@ use Whity\Mcp\Tools\ToolsCallHandler;
  */
 final class AgentProposalsApiHandler
 {
+    /** Most proposals approved in one go (AQ.1). */
+    public const BULK_LIMIT = 50;
+
     public function __construct(
         private readonly AgentProposalRepository $proposals,
         private readonly ToolsCallHandler $toolsCall,
@@ -101,6 +106,73 @@ final class AgentProposalsApiHandler
             return Response::error('arguments must be an object', 422);
         }
 
+        $outcome = $this->approveOne($tenantId, $profileId, $id, $arguments);
+        if ($outcome instanceof Response) {
+            return $outcome;
+        }
+
+        return Response::json(['data' => $outcome], 200);
+    }
+
+    /**
+     * POST /api/me/agent-proposals/bulk-approve `{ "ids": [..] }` (AQ.1).
+     *
+     * Approves several Ordinary (tier-1) proposals together, each exactly as a
+     * single approval would: its own atomic decision, its own run, its own
+     * audit entry and its own Undo. A proposal that is Check first or Needs
+     * verifying is never approved here, whatever the screen sent; it is listed
+     * under `refused` so it can be opened on its own. The ids are as sent, so
+     * the result reads in the order the person ticked them.
+     */
+    public function bulkApprove(Request $request): Response
+    {
+        $caller = $this->caller($request);
+        if ($caller instanceof Response) {
+            return $caller;
+        }
+        [$tenantId, $profileId] = $caller;
+
+        $body = json_decode($request->getBody(), true);
+        $ids  = is_array($body) && is_array($body['ids'] ?? null) ? $body['ids'] : null;
+        if ($ids === null || $ids === []) {
+            return Response::error('ids must be a list of proposal ids', 422);
+        }
+        $ids = array_values(array_unique(array_map('intval', array_filter($ids, 'is_numeric'))));
+        if ($ids === [] || count($ids) > self::BULK_LIMIT) {
+            return Response::error('Approve between 1 and ' . self::BULK_LIMIT . ' proposals at a time', 422);
+        }
+
+        $approved = [];
+        $refused  = [];
+        foreach ($ids as $id) {
+            $proposal = $this->proposals->find($id, $tenantId);
+            if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
+                $refused[] = ['id' => $id, 'reason' => 'not_found'];
+                continue;
+            }
+            if (ProposalTier::of($proposal['permissions'], $proposal['undo_window_seconds']) !== ProposalTier::ORDINARY) {
+                $refused[] = ['id' => $id, 'reason' => 'open_on_its_own'];
+                continue;
+            }
+            $outcome = $this->approveOne($tenantId, $profileId, $id, null);
+            if ($outcome instanceof Response) {
+                $refused[] = ['id' => $id, 'reason' => $outcome->getStatusCode() === 409 ? 'not_waiting' : 'not_found'];
+                continue;
+            }
+            $approved[] = $outcome;
+        }
+
+        return Response::json(['data' => ['approved' => $approved, 'refused' => $refused]], 200);
+    }
+
+    /**
+     * One approval: re-checks the grant, decides atomically, runs, records.
+     *
+     * @param array<string, mixed>|null $arguments edited arguments, or null to run as proposed
+     * @return array<string, mixed>|Response the presented proposal, or the refusal
+     */
+    private function approveOne(int $tenantId, int $profileId, int $id, ?array $arguments): array|Response
+    {
         $proposal = $this->proposals->find($id, $tenantId);
         if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
             return Response::error('Proposal not found', 404);
@@ -160,12 +232,12 @@ final class AgentProposalsApiHandler
         ]);
         $this->proposals->events()?->decided($tenantId, $id, AgentProposalEvents::APPROVED, $profileId, $profileId, (string) $proposal['tool'], is_array($result) && ($result['isError'] ?? false) === true);
 
-        $fresh = $this->proposals->find($id, $tenantId);
-        return Response::json(['data' => $fresh !== null ? self::present(
+        $fresh = $this->proposals->find($id, $tenantId) ?? $proposal;
+        return self::present(
             $fresh,
             $this->proposals->agentNames($tenantId, [(string) $fresh['agent_principal_id']]),
             $this->actions?->forProposals($tenantId, [$id])[$id] ?? null,
-        ) : null], 200);
+        );
     }
 
     /** @param array<string, string> $params */
@@ -235,6 +307,8 @@ final class AgentProposalsApiHandler
             'agentPaused'       => $agentPaused,
             'status'            => $proposal['status'],
             'tool'              => $proposal['tool'],
+            // AQ.1: 1 Ordinary, 2 Check first, 3 Needs verifying. Only 1 may be approved together.
+            'tier'              => ProposalTier::of($proposal['permissions'], $proposal['undo_window_seconds']),
             'summary'           => $proposal['summary'],
             'arguments'         => $proposal['arguments'] === [] ? new \stdClass() : $proposal['arguments'],
             'diff'              => $proposal['diff'],
