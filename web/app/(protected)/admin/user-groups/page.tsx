@@ -371,6 +371,8 @@ export default function UserGroupsPage() {
                   }),
                 }
               : {
+                  moment: 'empty-people',
+                  once: 'user-groups',
                   title: t('userGroups.empty.title', 'No groups yet'),
                   description: t(
                     'userGroups.empty.description',

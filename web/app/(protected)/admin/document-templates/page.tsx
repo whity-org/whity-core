@@ -388,6 +388,8 @@ export default function DocumentTemplatesPage() {
               }
             : startersAvailable && canWrite
               ? {
+                  moment: 'empty-documents',
+                  once: 'document-templates',
                   title: t('documentTemplates.empty.starters.title', 'No templates of your own yet'),
                   description: t(
                     'documentTemplates.empty.starters.description',

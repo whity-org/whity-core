@@ -12,6 +12,7 @@ import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { BrandingSettings } from '@/components/branding-settings';
+import { FirstVisitScene } from '@/components/first-visit-scene';
 import { useTranslation } from '@whity/features/i18n';
 import {
   SETTINGS_READ,
@@ -70,6 +71,8 @@ export default function BrandingSettingsPage() {
           'Language, logos, favicon, and colors for this tenant.'
         )}
       />
+      {/* Your brand, the first visit only (LT.4): the workspace's sheet sets down on the platform. */}
+      <FirstVisitScene name="brand-sheet-platform" storageKey="branding-first" />
       <LocaleSection canWrite={canWrite} tenantOverridable={tenantOverridable} addToast={addToast} />
       <BrandingSettings variant="tenant" tenantOverridable={tenantOverridable} />
       {isSystemTenant && <BrandingSettings variant="global" />}
