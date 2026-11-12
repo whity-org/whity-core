@@ -9795,6 +9795,7 @@ final class CoreApiSchemas
                 'checked_in_at' => self::str(true) + ['description' => 'When the customer arrived.'],
                 'suggested_at' => self::str(true) + ['description' => 'When staff suggested this time for a request.'],
                 'reminder_sent_at' => self::str(true),
+                'room_name' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => self::str(), 'description' => 'In lists: the room\'s name, language code => text.'],
             ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
             'CalendarBookingCreateRequest' => self::object([
                 'service_id' => self::int() + ['description' => 'The service to book.'],

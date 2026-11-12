@@ -64828,6 +64828,14 @@
                     "reminder_sent_at": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "room_name": {
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "In lists: the room's name, language code => text."
                     }
                 },
                 "required": [

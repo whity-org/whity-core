@@ -9755,6 +9755,10 @@ export interface components {
             /** @description When staff suggested this time for a request. */
             suggested_at?: string | null;
             reminder_sent_at?: string | null;
+            /** @description In lists: the room's name, language code => text. */
+            room_name?: {
+                [key: string]: string;
+            } | null;
         };
         CalendarBookingCancelRequest: {
             /** @description Why, in a few words; shown to the customer. */
