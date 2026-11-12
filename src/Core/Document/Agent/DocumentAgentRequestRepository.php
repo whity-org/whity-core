@@ -7,7 +7,7 @@ namespace Whity\Core\Document\Agent;
 use PDO;
 
 /**
- * Data access for `document_agent_requests` (editor M6, migration 260): a
+ * Data access for `document_agent_requests` (editor M6, migration 252): a
  * person's "Ask an agent" from inside the editor, waiting for the person's own
  * agent to pick it up over MCP (owner's answer Q3).
  *

@@ -94,7 +94,7 @@ final class CoreTables
         'document_suggestions' => '183_create_document_suggestions.php',
         'document_comment_threads' => '184_create_document_comment_threads.php',
         'document_comments' => '185_create_document_comments.php',
-        'document_agent_requests' => '260_create_document_agent_requests.php',
+        'document_agent_requests' => '252_create_document_agent_requests.php',
         'plugin_manifest_versions' => '164_create_tenant_plugin_manifests.php',
         'tenant_plugins' => '164_create_tenant_plugin_manifests.php',
         'tenant_plugin_permissions' => '164_create_tenant_plugin_manifests.php',

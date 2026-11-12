@@ -16011,6 +16011,12 @@ final class CoreApiSchemas
     private static function documentAgentRoutes(): array
     {
         $refuse = ['agentPolicy' => 'refuse'];
+        // The agent's tools change nothing a person hasn't decided: a suggestion
+        // waits for a person to accept it, and the suggestion is the approval
+        // (Q9). Without this, a write with no undo is always Ask first, which
+        // would wrap a proposal around every suggestion and make the agent ask
+        // before it could even pick up the request it was asked to do.
+        $suggestsOnly = ['readOnlyHint' => true];
         $hidden = self::errorResponse('Document not found or not visible to the caller');
 
         return [
@@ -16051,6 +16057,7 @@ final class CoreApiSchemas
             ]),
             self::permissionRoute('POST', '/api/document-agent-requests/next', 'documents:read', [
                 'operationId' => 'document_agent_requests_next',
+                'mcp_annotations' => $suggestsOnly,
                 'summary' => 'Pick up the next document request your person asked of you',
                 'description' =>
                     'For agents. Returns the oldest waiting request (now running) with document_id and what to do '
@@ -16064,6 +16071,7 @@ final class CoreApiSchemas
             ]),
             self::permissionRoute('POST', '/api/document-agent-requests/{rid:\d+}/progress', 'documents:read', [
                 'operationId' => 'document_agent_request_update',
+                'mcp_annotations' => $suggestsOnly,
                 'summary' => 'Report how a document request is going',
                 'description' =>
                     'For the agent working on it. Say what you are doing now in plain words, with done and total '
@@ -16098,6 +16106,7 @@ final class CoreApiSchemas
             ]),
             self::permissionRoute('POST', '/api/document-sources/{id:\d+}/agent-suggestions/blocks', 'documents:suggest', [
                 'operationId' => 'document_suggest_blocks',
+                'mcp_annotations' => $suggestsOnly,
                 'summary' => 'Suggest new blocks after a block of an editor document',
                 'description' =>
                     'A suggestion a person accepts or rejects; the draft is not changed. Records you and the '
@@ -16112,6 +16121,7 @@ final class CoreApiSchemas
             ]),
             self::permissionRoute('POST', '/api/document-sources/{id:\d+}/agent-suggestions/rewrite', 'documents:suggest', [
                 'operationId' => 'document_suggest_rewrite',
+                'mcp_annotations' => $suggestsOnly,
                 'summary' => 'Suggest replacing text in a block of an editor document',
                 'description' =>
                     'The text is found by what it says (delete_text, its occurrence), not by position. A '
@@ -16126,6 +16136,7 @@ final class CoreApiSchemas
             ]),
             self::permissionRoute('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/reply', 'documents:comment', [
                 'operationId' => 'document_comment_reply',
+                'mcp_annotations' => $suggestsOnly,
                 'summary' => 'Reply in a comment thread on an editor document',
                 'description' => 'Plain text, optionally naming the suggestions the reply made. Records you and the person you act for.',
                 'tags' => ['documents'],

@@ -327,12 +327,12 @@ final class DocumentAgentApiHandler
         return Response::json(['data' => [
             'id'                => $sourceId,
             'kind'              => (string) $row['kind'],
-            'title'             => $draft ? (string) $row['title'] : (string) ($published['title'] ?? $row['title']),
+            'title'             => $draft || $published === null ? (string) $row['title'] : $published['title'],
             'lang'              => (string) ($row['lang'] ?? 'en'),
             'reading'           => $draft ? 'draft' : 'published',
             'draft_version'     => (int) $row['draft_version'],
             'published_version' => $row['published_version'] !== null ? (int) $row['published_version'] : null,
-            'blocks'            => $draft ? array_values(is_array($row['blocks'] ?? null) ? $row['blocks'] : []) : ($published['blocks'] ?? []),
+            'blocks'            => $draft || $published === null ? array_values(is_array($row['blocks'] ?? null) ? $row['blocks'] : []) : $published['blocks'],
             'suggestions'       => $projection['suggestions'],
             'comments'          => array_values(array_filter($projection['comments'], static fn (array $t): bool => $t['resolved'] === null)),
         ]]);

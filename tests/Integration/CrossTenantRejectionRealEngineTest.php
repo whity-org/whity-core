@@ -2578,7 +2578,7 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         self::assertCount(1, $repo->commentsFor(self::TENANT_A, [$threadId])[$threadId] ?? []);
     }
 
-    // ============ document agent requests (editor M6, migration 260) ============
+    // ============ document agent requests (editor M6, migration 252) ============
     //
     // A person's Ask an agent. Every read, claim, report and stop binds
     // tenant_id, so another workspace's ids reach nothing.
