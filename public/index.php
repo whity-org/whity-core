@@ -1901,14 +1901,23 @@ $twoFactorRecoveryApprovalsHandler = new \Whity\Api\TwoFactorRecoveryApprovalsAp
     $twoFactorRecoveryService,
     $roleChecker,
     $auditLogger,
-    $passwordResetMailer
+    $passwordResetMailer,
+    // AG.1: each approval confirms the admin is who they say first.
+    new \Whity\Core\Security\IdentityCheck(
+        $db->getPdo(),
+        new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo()),
+        $totpService,
+        new \Whity\Core\Security\IdentityCheckMailer($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService),
+    )
 );
 $router->register('GET',  '/api/2fa-recovery/pending',           [$twoFactorRecoveryApprovalsHandler, 'listPending'], null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
 $router->register('POST', '/api/2fa-recovery/{id:\d+}/approve',  [$twoFactorRecoveryApprovalsHandler, 'approve'],     null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
 $router->register('POST', '/api/2fa-recovery/{id:\d+}/reject',   [$twoFactorRecoveryApprovalsHandler, 'reject'],      null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
-// Secondary fallback (no prior request): an admin forces the same primitive
-// directly onto a named profile, e.g. when the locked-out user cannot even
-// receive email and reaches an admin out-of-band.
+$router->register('POST', '/api/2fa-recovery/{id:\d+}/checks',   [$twoFactorRecoveryApprovalsHandler, 'addCheck'],    null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
+$router->register('POST', '/api/2fa-recovery/identity-check',    [$twoFactorRecoveryApprovalsHandler, 'identityCheck'], null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
+// Secondary fallback (no prior request): an admin starts a reset for a named
+// profile, e.g. when the locked-out user cannot even receive email and reaches
+// an admin out-of-band. It is the first approval; a second admin still approves.
 $router->register('POST', '/api/2fa-recovery/force-reset',       [$twoFactorRecoveryApprovalsHandler, 'forceReset'],  null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
 
 // 10d. Tenant invitations (WHIT-417 / #797 item 3) — how a tenant administrator
@@ -2624,6 +2633,13 @@ $router->register('POST', '/api/time-windows/{id:\d+}/reopen', [$timeWindowsHand
 // invariant is enforced independently inside DelegationService.
 $delegationsHandler = new DelegationsApiHandler($db->getPdo(), $delegationService, $logger);
 $router->register('GET', '/api/delegations', [$delegationsHandler, 'list'], null, null, CorePermissions::DELEGATION_MANAGE);
+// OR.1: "I'm away". A person sets their own, from their own account (session,
+// self-scoped); the Delegations list shows everyone's.
+$awayHandler = new \Whity\Api\AwayApiHandler(new \Whity\Core\Delegation\AwayService($db->getPdo()), $auditLogger);
+$router->register('GET', '/api/me/away', [$awayHandler, 'show'], null);
+$router->register('PUT', '/api/me/away', [$awayHandler, 'set'], null);
+$router->register('DELETE', '/api/me/away', [$awayHandler, 'end'], null);
+$router->register('GET', '/api/away-periods', [$awayHandler, 'list'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('POST', '/api/delegations', [$delegationsHandler, 'create'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('DELETE', '/api/delegations/{id:\d+}', [$delegationsHandler, 'revoke'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('POST', '/api/delegations/{id:\d+}/restore', [$delegationsHandler, 'restore'], null, null, CorePermissions::DELEGATION_MANAGE);
@@ -4868,6 +4884,31 @@ $router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/reo
 $router->register('GET',  '/api/document-sources/{id:\d+}/changes',                         [$documentCollabHandler, 'changes'],          null, null, CorePermissions::DOCUMENTS_READ);
 // The people a comment may @mention: members who can read the document.
 $router->register('GET',  '/api/document-sources/{id:\d+}/mentionable',                     [$documentCollabHandler, 'mentionable'],      null, null, CorePermissions::DOCUMENTS_COMMENT);
+
+// Agents in the editor (editor M6; E.30, E.31; owner's answers Q3, Q4, Q9).
+// Whity hosts no model: a person's request waits until their own agent picks
+// it up over MCP (document_agent_requests_next). The agent's tools are named by
+// their operationId and only ever write suggestions and comments, through the
+// collab handler above, with the agent and the person it acts for.
+$documentAgentHandler = new \Whity\Api\DocumentAgentApiHandler(
+    $documentSourcesHandler,
+    $documentCollabHandler,
+    $documentCollab,
+    new \Whity\Core\Document\Agent\DocumentAgentRequestRepository($db->getPdo()),
+    new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
+    new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo()),
+    $roleChecker,
+    $auditLogger,
+);
+$router->register('POST', '/api/document-sources/{id:\d+}/agent-requests',               [$documentAgentHandler, 'ask'],            null, null, CorePermissions::DOCUMENTS_SUGGEST);
+$router->register('GET',  '/api/document-sources/{id:\d+}/agent-requests',               [$documentAgentHandler, 'listRequests'],   null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-agent-requests/{rid:\d+}/stop',                 [$documentAgentHandler, 'stop'],           null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-agent-requests/next',                           [$documentAgentHandler, 'next'],           null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-agent-requests/{rid:\d+}/progress',             [$documentAgentHandler, 'progress'],       null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('GET',  '/api/document-sources/{id:\d+}/agent-view',                   [$documentAgentHandler, 'read'],           null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-sources/{id:\d+}/agent-suggestions/blocks',     [$documentAgentHandler, 'suggestBlocks'],  null, null, CorePermissions::DOCUMENTS_SUGGEST);
+$router->register('POST', '/api/document-sources/{id:\d+}/agent-suggestions/rewrite',    [$documentAgentHandler, 'suggestRewrite'], null, null, CorePermissions::DOCUMENTS_SUGGEST);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/reply',     [$documentAgentHandler, 'reply'],          null, null, CorePermissions::DOCUMENTS_COMMENT);
 
 // 13b-quinquies-bis. ROUTING NOTIFICATIONS (#1054) — the subscriber that turns a
 // routing broadcast into notifications.
