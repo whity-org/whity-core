@@ -5047,6 +5047,15 @@ $router->register('POST',   '/api/calendar/bookings',                       [$ca
 $router->register('GET',    '/api/calendar/bookings/{id:\d+}',              [$calendarHandler, 'showBooking'],     null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/move',         [$calendarHandler, 'moveBooking'],     null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/cancel',       [$calendarHandler, 'cancelBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
+// Design 3.3: rooms, requests (Accept, Suggest another time), check-in, Today.
+$router->register('GET',    '/api/calendar/rooms',                          [$calendarHandler, 'listRooms'],       null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/rooms',                          [$calendarHandler, 'createRoom'],      null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('PATCH',  '/api/calendar/rooms/{id:\d+}',                 [$calendarHandler, 'updateRoom'],      null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/accept',       [$calendarHandler, 'acceptBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/suggest',      [$calendarHandler, 'suggestBooking'],  null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/check-in',     [$calendarHandler, 'checkIn'],         null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('DELETE', '/api/calendar/bookings/{id:\d+}/check-in',     [$calendarHandler, 'checkIn'],         null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/today',                          [$calendarHandler, 'today'],           null, null, CorePermissions::CALENDAR_READ);
 $router->register('GET',    '/api/calendar/events',                         [$calendarHandler, 'listEvents'],      null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/events',                         [$calendarHandler, 'createEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('PATCH',  '/api/calendar/events/{id:\d+}',                [$calendarHandler, 'updateEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
@@ -5279,6 +5288,7 @@ $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}',          
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/slots',       [$publicBookingHandler, 'manageSlots'], null);
 $router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/move',        [$publicBookingHandler, 'move'],        null);
 $router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/cancel',      [$publicBookingHandler, 'cancel'],      null);
+$router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/accept',      [$publicBookingHandler, 'acceptSuggestion'], null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/ics',         [$publicBookingHandler, 'ics'],         null);
 $router->register('GET',  '/api/public/calendar/feeds/{token:[a-f0-9]{64}\.ics}', [$publicBookingHandler, 'feed'],        null);
 $brandingHandler = new \Whity\Api\BrandingApiHandler(

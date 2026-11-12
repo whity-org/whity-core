@@ -71,6 +71,16 @@ final class EmailBookingMessenger implements BookingMessenger
         $this->send($tenantId, $booking, 'held');
     }
 
+    public function requested(int $tenantId, array $booking): void
+    {
+        $this->send($tenantId, $booking, 'requested');
+    }
+
+    public function suggested(int $tenantId, array $booking): void
+    {
+        $this->send($tenantId, $booking, 'suggested');
+    }
+
     /**
      * The email for one booking, without sending it. Public for tests.
      *
@@ -242,6 +252,10 @@ final class EmailBookingMessenger implements BookingMessenger
         'held.until' => 'If the payment is not finished by %s, the time is let go.',
         'confirmed.paid' => 'Your payment went through. To move or cancel, use the link in the email we sent when you booked.',
         'reminder.lead' => 'This is a reminder of your booking.',
+        'requested.heading' => 'Request sent: %s',
+        'requested.lead' => 'We have your request. The time is not booked yet: you will get an email when it is accepted, or if another time is suggested.',
+        'suggested.heading' => 'Another time for: %s',
+        'suggested.lead' => 'The time you asked for is not possible. Here is another one. Open the link to take it or to pick a different time.',
         'line.when' => 'When: %s',
         'line.with' => 'With: %s',
         'line.price' => 'Price: %s',
@@ -263,6 +277,10 @@ final class EmailBookingMessenger implements BookingMessenger
         'held.until' => 'إذا لم يكتمل الدفع حتى الساعة %s يُلغى الحجز.',
         'confirmed.paid' => 'تم الدفع. لتغيير الموعد أو إلغائه استخدم الرابط في رسالة الحجز السابقة.',
         'reminder.lead' => 'هذا تذكير بحجزك.',
+        'requested.heading' => 'تم إرسال الطلب: %s',
+        'requested.lead' => 'وصلنا طلبك. لم يُحجز الموعد بعد: ستصلك رسالة عند قبوله أو عند اقتراح موعد آخر.',
+        'suggested.heading' => 'موعد آخر لـ: %s',
+        'suggested.lead' => 'الموعد الذي طلبته غير متاح، وهذا موعد آخر. افتح الرابط لقبوله أو لاختيار موعد مختلف.',
         'line.when' => 'الموعد: %s',
         'line.with' => 'مع: %s',
         'line.price' => 'السعر: %s',

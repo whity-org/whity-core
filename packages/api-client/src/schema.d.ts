@@ -1233,6 +1233,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/bookings/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a customer's request; it becomes a confirmed booking */
+        post: operations["post_api_v1_calendar_bookings_id_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/bookings/{id}/cancel": {
         parameters: {
             query?: never;
@@ -1250,6 +1267,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/bookings/{id}/check-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check the customer in: they arrived */
+        post: operations["post_api_v1_calendar_bookings_id_check_in"];
+        /** Undo a check-in */
+        delete: operations["delete_api_v1_calendar_bookings_id_check_in"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/bookings/{id}/move": {
         parameters: {
             query?: never;
@@ -1261,6 +1296,26 @@ export interface paths {
         put?: never;
         /** Move a booking to another time, or another person */
         post: operations["post_api_v1_calendar_bookings_id_move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/bookings/{id}/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest another time for a customer's request
+         * @description The request moves to the new time and stays a request; the customer is emailed and takes it from their link.
+         */
+        post: operations["post_api_v1_calendar_bookings_id_suggest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1304,6 +1359,41 @@ export interface paths {
         head?: never;
         /** Change an event; fields left out keep their value */
         patch: operations["patch_api_v1_calendar_events_id"];
+        trace?: never;
+    };
+    "/api/v1/calendar/rooms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List rooms */
+        get: operations["get_api_v1_calendar_rooms"];
+        put?: never;
+        /** Add a room a service can need */
+        post: operations["post_api_v1_calendar_rooms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/rooms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a room; fields left out keep their value */
+        patch: operations["patch_api_v1_calendar_rooms_id"];
         trace?: never;
     };
     "/api/v1/calendar/services": {
@@ -1472,6 +1562,23 @@ export interface paths {
         post?: never;
         /** Remove time off or extra hours */
         delete: operations["delete_api_v1_calendar_time_off_id"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Today at a glance: booked, checked in, open requests and reminders sent */
+        get: operations["get_api_v1_calendar_today"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6854,6 +6961,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/bookings/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take the time the business suggested for a request (public); the link changes and the new one is emailed */
+        post: operations["post_api_v1_public_bookings_token_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/bookings/{token}/cancel": {
         parameters: {
             query?: never;
@@ -9609,8 +9733,11 @@ export interface components {
             blocks_from?: string;
             /** @description End including the buffer after. */
             blocks_until?: string;
-            /** @enum {string} */
-            status: "pending_payment" | "confirmed" | "cancelled" | "expired";
+            /**
+             * @description `requested`: the customer asked for this time and staff accept it first.
+             * @enum {string}
+             */
+            status: "pending_payment" | "requested" | "confirmed" | "cancelled" | "expired";
             hold_expires_at?: string | null;
             /** @enum {string} */
             source: "staff" | "public" | "agent";
@@ -9621,6 +9748,13 @@ export interface components {
             /** @description The reference from the payment plugin, once paid (SDK 1.98). */
             payment_ref?: string | null;
             created_at?: string | null;
+            /** @description The room it holds. */
+            room_id?: number | null;
+            /** @description When the customer arrived. */
+            checked_in_at?: string | null;
+            /** @description When staff suggested this time for a request. */
+            suggested_at?: string | null;
+            reminder_sent_at?: string | null;
         };
         CalendarBookingCancelRequest: {
             /** @description Why, in a few words; shown to the customer. */
@@ -9653,6 +9787,12 @@ export interface components {
             profile_id?: number;
             /** @description Refuse a time outside working hours. Always on for agents. */
             keep_to_hours?: boolean;
+        };
+        CalendarBookingSuggestRequest: {
+            /** @description The time to suggest, ISO 8601 with an offset. */
+            starts_at: string;
+            /** @description Suggest another person. Default: the same one. */
+            profile_id?: number;
         };
         CalendarEvent: {
             id: number;
@@ -9698,6 +9838,24 @@ export interface components {
             /** @description Every working-hours row for the week; the list replaces what is there. */
             hours: components["schemas"]["CalendarHours"][];
         };
+        CalendarRoom: {
+            id: number;
+            name: components["schemas"]["LocalizedLabel"];
+            /** @description The branch (organisational unit) it is in. */
+            unit_id: number | null;
+            active: boolean;
+            sort_order: number;
+        };
+        CalendarRoomRequest: {
+            /** @description Text, or a `{ar, en}` map. */
+            name?: string | components["schemas"]["LocalizedLabel"];
+            /** @description The branch it is in; null for none. */
+            unit_id?: number | null;
+            /** @description Inactive rooms are not shown as columns. */
+            active?: boolean;
+            /** @description Position in lists; lower comes first. */
+            sort_order?: number;
+        };
         CalendarService: {
             id: number;
             name: components["schemas"]["LocalizedLabel"];
@@ -9712,6 +9870,10 @@ export interface components {
             active: boolean;
             sort_order: number;
             staff_profile_ids: number[];
+            /** @description The room it needs; booked with the person. */
+            room_id?: number | null;
+            /** @description A customer's booking is a request staff accept first. */
+            needs_approval?: boolean;
         };
         CalendarServiceRequest: {
             /** @description Text, or a `{ar, en}` map. */
@@ -9736,6 +9898,10 @@ export interface components {
             sort_order?: number;
             /** @description The staff who provide it; the list replaces what is there. */
             staff_profile_ids?: number[];
+            /** @description The room it needs; null for none. */
+            room_id?: number | null;
+            /** @description Customers send a request instead of booking. */
+            needs_approval?: boolean;
         };
         CalendarSettings: {
             /** @description The workspace time zone (IANA). */
@@ -9750,6 +9916,8 @@ export interface components {
             week_start: string;
             weekend_days: string[];
             currency: string;
+            /** @description Off: every booking from the booking page is a request. */
+            instant_booking?: boolean;
         };
         CalendarSettingsRequest: {
             /** @description Turn the public booking page on or off. */
@@ -9771,6 +9939,8 @@ export interface components {
             week_start?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
             /** @description Days shown as the weekend. */
             weekend_days?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[];
+            /** @description Off turns every booking from the booking page into a request staff accept. */
+            instant_booking?: boolean;
         };
         CalendarSlot: {
             starts_at: string;
@@ -9785,8 +9955,12 @@ export interface components {
             bookable: boolean;
             sort_order: number;
             feed_enabled: boolean;
+            /** @description The branch (organisational unit) they work in. */
+            unit_id?: number | null;
         };
         CalendarStaffRequest: {
+            /** @description The branch they work in; null for none. */
+            unit_id?: number | null;
             /** @description Offer this person on the public booking page. */
             bookable?: boolean;
             /** @description Position in lists and in "anyone" order; lower comes first. */
@@ -9815,6 +9989,18 @@ export interface components {
             ends_at: string;
             /** @description A short note for the team. */
             note?: string;
+        };
+        CalendarToday: {
+            /** @description The local day, `YYYY-MM-DD`. */
+            date: string;
+            /** @description Confirmed bookings that start that day. */
+            booked: number;
+            /** @description Of those, the customers who arrived. */
+            checked_in: number;
+            /** @description Open requests from now on, any day. */
+            requests: number;
+            /** @description Reminders sent that day. */
+            reminders_sent: number;
         };
         CapabilityDenial: {
             /** @enum {string} */
@@ -13800,8 +13986,13 @@ export interface components {
         };
         PublicBooking: {
             id: number;
-            /** @enum {string} */
-            status: "pending_payment" | "confirmed" | "cancelled" | "expired";
+            /**
+             * @description `requested`: the customer asked for this time and staff accept it first.
+             * @enum {string}
+             */
+            status: "pending_payment" | "requested" | "confirmed" | "cancelled" | "expired";
+            /** @description The business suggested this time for the request; the customer can take it. */
+            suggested?: boolean;
             starts_at: string;
             ends_at: string;
             service: {
@@ -13855,6 +14046,8 @@ export interface components {
                 price_minor: number | null;
                 currency: string;
                 staff_profile_ids: number[];
+                /** @description Booking it sends a request the business accepts first. */
+                sends_request?: boolean;
             }[];
             staff: {
                 profile_id: number;
@@ -21499,8 +21692,10 @@ export interface operations {
                 to: string;
                 /** @description Only this member of staff. */
                 profile_id?: number;
-                /** @description Comma-separated statuses. Default: `confirmed,pending_payment`. */
+                /** @description Comma-separated statuses. Default: `confirmed,pending_payment,requested`. */
                 status?: string;
+                /** @description Only this branch: bookings whose person or room is in it. */
+                unit_id?: number;
             };
             header?: never;
             path?: never;
@@ -21733,6 +21928,84 @@ export interface operations {
             };
         };
     };
+    post_api_v1_calendar_bookings_id_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a request */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_calendar_bookings_id_cancel: {
         parameters: {
             query?: never;
@@ -21805,6 +22078,162 @@ export interface operations {
                 };
             };
             /** @description Already cancelled */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_bookings_id_check_in: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a confirmed booking */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_calendar_bookings_id_check_in: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a confirmed booking */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -21905,6 +22334,106 @@ export interface operations {
                 };
             };
             /** @description A cancelled booking, or outside the booking window */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_bookings_id_suggest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarBookingSuggestRequest"];
+            };
+        };
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description That time was just taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a request */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -22170,6 +22699,244 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CalendarEventResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_rooms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rooms */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarRoom"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_rooms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarRoomRequest"];
+            };
+        };
+        responses: {
+            /** @description The room */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarRoom"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such branch */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A missing name */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_calendar_rooms_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarRoomRequest"];
+            };
+        };
+        responses: {
+            /** @description The room */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarRoom"];
+                    };
                 };
             };
             /** @description Invalid request body */
@@ -23318,6 +24085,78 @@ export interface operations {
                             id: number;
                             deleted: boolean;
                         };
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_today: {
+        parameters: {
+            query?: {
+                /** @description A local day, `YYYY-MM-DD`. Default: today. */
+                date?: string;
+                /** @description Only this branch. */
+                unit_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Today */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarToday"];
                     };
                 };
             };
@@ -51994,6 +52833,76 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_public_bookings_token_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The 64-character token from the customer's email. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Booked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicBooking"];
+                    };
+                };
+            };
+            /** @description This link is invalid or has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No suggested time to take */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

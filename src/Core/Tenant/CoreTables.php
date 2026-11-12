@@ -61,6 +61,7 @@ final class CoreTables
         'calendar_availability_exceptions' => '247_create_calendar.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
         'calendar_events' => '247_create_calendar.php',
+        'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
         'calendar_service_staff' => '248_create_calendar_bookings.php',
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_staff' => '247_create_calendar.php',

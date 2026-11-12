@@ -28,6 +28,15 @@ use Whity\Core\Settings\SettingsService;
  * at a time, so no request holds two locks except a move between two people,
  * which takes both in profile-id order.
  *
+ * A service that needs a room (design 3.3) also takes that room's lock,
+ * AFTER the people's, and the room's live bookings count as busy time.
+ *
+ * REQUESTS (design 3.3)
+ * A customer's booking is a request when the service needs approval or the
+ * workspace turned instant booking off. A request holds its time like a
+ * booking; staff accept it or suggest another time, and the customer takes
+ * the suggestion from their manage link.
+ *
  * Events and messages go out only after the commit.
  */
 final class BookingService
@@ -42,6 +51,8 @@ final class BookingService
     private ?CalendarPlugins $plugins = null;
 
     private string $manageUrlBase = '';
+
+    private ?RoomRepository $rooms = null;
 
     public function __construct(
         private readonly PDO $db,
@@ -162,7 +173,10 @@ final class BookingService
 
         $end = $start->modify('+' . $service['duration_minutes'] . ' minutes');
         $block = Availability::blockFor($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes']);
-        $step = $this->plugins?->paymentStep();
+        // A request is not paid for until it is accepted: no payment step.
+        $asRequest = $request['public'] && ($service['needs_approval'] || !$settings->instantBooking);
+        $step = $asRequest ? null : $this->plugins?->paymentStep();
+        $room = $this->roomLock($tenantId, $service);
         foreach ($candidates as $candidate) {
             // Asked before the lock: a plugin never runs while a person's
             // calendar is held. A step that fails refuses the booking rather
@@ -178,7 +192,7 @@ final class BookingService
                 }
             }
             $hold = $requirement !== null ? $now->modify('+' . $settings->paymentHoldMinutes . ' minutes') : null;
-            $id = $this->underLock([[$tenantId, $candidate]], function () use ($tenantId, $candidate, $service, $settings, $request, $start, $end, $block, $now, $hold): ?int {
+            $id = $this->underLock([[$tenantId, $candidate]], function () use ($tenantId, $candidate, $service, $settings, $request, $start, $end, $block, $now, $hold, $asRequest): ?int {
                 if (!$this->isFree($tenantId, $candidate, $service, $settings, $start, $now, null, $request['enforce_hours'])) {
                     return null;
                 }
@@ -194,19 +208,26 @@ final class BookingService
                     'starts_at' => $start,
                     'ends_at' => $end,
                     'block' => $block,
-                    'status' => $hold !== null ? BookingRepository::STATUS_PENDING_PAYMENT : BookingRepository::STATUS_CONFIRMED,
+                    'status' => $asRequest ? BookingRepository::STATUS_REQUESTED : ($hold !== null ? BookingRepository::STATUS_PENDING_PAYMENT : BookingRepository::STATUS_CONFIRMED),
                     'hold_expires_at' => $hold,
                     'source' => $request['source'],
                     'price_minor' => $service['price_minor'],
                     'currency' => $service['currency'],
-                    'reminder_due_at' => $this->reminderDue($start, $settings, $now),
+                    'reminder_due_at' => $asRequest ? null : $this->reminderDue($start, $settings, $now),
                     'created_by_profile_id' => $request['created_by_profile_id'],
+                    'room_id' => $service['room_id'] ?? null,
                 ]);
-            });
+            }, $room);
             if ($id !== null) {
                 $booking = $this->afterWrite($tenantId, $id);
                 if ($requirement !== null && $hold !== null) {
                     return $this->startPayment($tenantId, $booking, $quote, $requirement, $hold, $step);
+                }
+                if ($asRequest) {
+                    $this->announceBooking(CalendarEventNames::BOOKING_CREATED, $tenantId, $booking);
+                    $this->tell('requested', $tenantId, $booking);
+
+                    return $booking;
                 }
                 $this->announceBooking(CalendarEventNames::BOOKING_CREATED, $tenantId, $booking);
                 $this->announceBooking(CalendarEventNames::BOOKING_CONFIRMED, $tenantId, $booking);
@@ -226,10 +247,128 @@ final class BookingService
      */
     public function move(int $tenantId, int $bookingId, DateTimeImmutable $start, ?int $profileId, bool $enforceHours): array
     {
+        $booking = $this->moveUnderLock($tenantId, $bookingId, $start, $profileId, $enforceHours);
+        if ($booking['status'] === BookingRepository::STATUS_REQUESTED) {
+            // The customer (or staff) changed the time of a request: it is
+            // still a request, and no longer staff's suggestion.
+            $this->bookings->markSuggested($tenantId, $bookingId, null);
+            $booking['suggested_at'] = null;
+            $this->announceBooking(CalendarEventNames::BOOKING_RESCHEDULED, $tenantId, $booking);
+            $this->tell('requested', $tenantId, $booking);
+
+            return $booking;
+        }
+        $this->announceBooking(CalendarEventNames::BOOKING_RESCHEDULED, $tenantId, $booking);
+        $this->tell('rescheduled', $tenantId, $booking);
+
+        return $booking;
+    }
+
+    /**
+     * Accept a customer's request: it becomes a confirmed booking, the
+     * customer is told, and the reminder is queued.
+     *
+     * @return array<string, mixed>
+     */
+    public function accept(int $tenantId, int $bookingId): array
+    {
+        $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        if (!$this->bookings->transition($tenantId, $bookingId, [BookingRepository::STATUS_REQUESTED], BookingRepository::STATUS_CONFIRMED)) {
+            throw new CalendarRejectedException('Only a request can be accepted.', 422);
+        }
+        $row = $this->bookings->find($tenantId, $bookingId);
+        if ($row !== null) {
+            $this->bookings->setReminderDue($tenantId, $bookingId, $this->reminderDue(Interval::fromDb((string) $row['starts_at']), $this->settingsFor($tenantId), $this->now()));
+        }
+        $booking = $this->afterWrite($tenantId, $bookingId);
+        $this->announceBooking(CalendarEventNames::BOOKING_CONFIRMED, $tenantId, $booking);
+        $this->tell('confirmed', $tenantId, $booking);
+
+        return $booking;
+    }
+
+    /**
+     * Suggest another time for a request: the request moves there, stays a
+     * request, and the customer takes it from their link
+     * ({@see self::acceptSuggestion()}) or picks another time.
+     *
+     * @return array<string, mixed>
+     */
+    public function suggest(int $tenantId, int $bookingId, DateTimeImmutable $start, ?int $profileId): array
+    {
         $current = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
-        if (!in_array($current['status'], [BookingRepository::STATUS_CONFIRMED, BookingRepository::STATUS_PENDING_PAYMENT], true)) {
+        if ($current['status'] !== BookingRepository::STATUS_REQUESTED) {
+            throw new CalendarRejectedException('Another time can only be suggested for a request.', 422);
+        }
+        $booking = $this->moveUnderLock($tenantId, $bookingId, $start, $profileId, false);
+        $this->bookings->markSuggested($tenantId, $bookingId, $this->now());
+        $booking['suggested_at'] = Interval::toApi($this->now());
+        $this->announceBooking(CalendarEventNames::BOOKING_RESCHEDULED, $tenantId, $booking);
+        $this->tell('suggested', $tenantId, $booking);
+
+        return $booking;
+    }
+
+    /**
+     * The customer takes the time staff suggested.
+     *
+     * @return array<string, mixed>
+     */
+    public function acceptSuggestion(int $tenantId, int $bookingId): array
+    {
+        $row = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        if ($row['status'] !== BookingRepository::STATUS_REQUESTED || $row['suggested_at'] === null) {
+            throw new CalendarRejectedException('There is no suggested time to take.', 422);
+        }
+
+        return $this->accept($tenantId, $bookingId);
+    }
+
+    /**
+     * Mark the customer as arrived (or undo it). Only a confirmed booking.
+     *
+     * @return array<string, mixed>
+     */
+    public function checkIn(int $tenantId, int $bookingId, bool $arrived): array
+    {
+        $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        if (!$this->bookings->checkIn($tenantId, $bookingId, $arrived ? $this->now() : null)) {
+            throw new CalendarRejectedException('Only a confirmed booking can be checked in.', 422);
+        }
+
+        return $this->bookingOrFail($tenantId, $bookingId);
+    }
+
+    /**
+     * The Today panel for one local day (design 3.3).
+     *
+     * @return array{date: string, booked: int, checked_in: int, requests: int, reminders_sent: int}
+     */
+    public function today(int $tenantId, ?string $date, ?int $unitId): array
+    {
+        $settings = $this->settingsFor($tenantId);
+        $now = $this->now();
+        $day = $date !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1
+            ? new DateTimeImmutable($date . ' 00:00:00', $settings->zone)
+            : $now->setTimezone($settings->zone)->setTime(0, 0);
+        $from = $day->setTimezone(new DateTimeZone('UTC'));
+        $to = $day->modify('+1 day')->setTimezone(new DateTimeZone('UTC'));
+
+        return ['date' => $day->format('Y-m-d')] + $this->bookings->today($tenantId, $from, $to, $now, $unitId);
+    }
+
+    /**
+     * Move a live booking or request under the lock, without telling anyone.
+     *
+     * @return array<string, mixed>
+     */
+    private function moveUnderLock(int $tenantId, int $bookingId, DateTimeImmutable $start, ?int $profileId, bool $enforceHours): array
+    {
+        $current = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        if (!in_array($current['status'], BookingRepository::LIVE, true)) {
             throw new CalendarRejectedException('Only a booking that is still on can be moved.', 422);
         }
+        $isRequest = $current['status'] === BookingRepository::STATUS_REQUESTED;
         $service = $this->service($tenantId, (int) $current['service_id'], false);
         $settings = $this->settingsFor($tenantId);
         $now = $this->now();
@@ -246,23 +385,19 @@ final class BookingService
         sort($locks);
         $end = $start->modify('+' . $service['duration_minutes'] . ' minutes');
         $block = Availability::blockFor($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes']);
-        $moved = $this->underLock(array_map(static fn (int $p): array => [$tenantId, $p], $locks), function () use ($tenantId, $bookingId, $to, $service, $settings, $start, $end, $block, $now, $enforceHours): bool {
+        $moved = $this->underLock(array_map(static fn (int $p): array => [$tenantId, $p], $locks), function () use ($tenantId, $bookingId, $to, $service, $settings, $start, $end, $block, $now, $enforceHours, $isRequest): bool {
             if (!$this->isFree($tenantId, $to, $service, $settings, $start, $now, $bookingId, $enforceHours)) {
                 return false;
             }
-            $this->bookings->move($tenantId, $bookingId, $to, $start, $end, $block, $this->reminderDue($start, $settings, $now));
+            $this->bookings->move($tenantId, $bookingId, $to, $start, $end, $block, $isRequest ? null : $this->reminderDue($start, $settings, $now));
 
             return true;
-        });
+        }, $this->roomLock($tenantId, $service));
         if (!$moved) {
             throw CalendarRejectedException::taken();
         }
 
-        $booking = $this->afterWrite($tenantId, $bookingId);
-        $this->announceBooking(CalendarEventNames::BOOKING_RESCHEDULED, $tenantId, $booking);
-        $this->tell('rescheduled', $tenantId, $booking);
-
-        return $booking;
+        return $this->afterWrite($tenantId, $bookingId);
     }
 
     /** @return array<string, mixed> */
@@ -272,7 +407,7 @@ final class BookingService
         $done = $this->bookings->transition(
             $tenantId,
             $bookingId,
-            [BookingRepository::STATUS_CONFIRMED, BookingRepository::STATUS_PENDING_PAYMENT],
+            BookingRepository::LIVE,
             BookingRepository::STATUS_CANCELLED,
             ['cancelled_by' => $by, 'cancel_reason' => mb_substr($reason, 0, 500)],
         );
@@ -357,7 +492,7 @@ final class BookingService
                 BookingRepository::STATUS_CONFIRMED,
                 ['payment_ref' => mb_substr($paymentRef, 0, 255)],
             );
-        });
+        }, $this->roomLock($tenantId, $service));
         if (!$done) {
             return false;
         }
@@ -479,7 +614,16 @@ final class BookingService
         if (!$this->bookings->markReminded($tenantId, $bookingId, $this->now())) {
             return 'already sent';
         }
-        $this->tell('remind', $tenantId, $this->bookingOrFail($tenantId, $bookingId));
+        $booking = $this->bookingOrFail($tenantId, $bookingId);
+        $this->tell('remind', $tenantId, $booking);
+        // Other channels a plugin adds (design 3.3: WhatsApp is paid).
+        foreach ($this->plugins?->reminderChannels() ?? [] as $channel) {
+            try {
+                $channel->remind($tenantId, $booking);
+            } catch (Throwable $e) {
+                error_log('[calendar] the ' . $channel->name() . ' reminder failed: ' . $e->getMessage());
+            }
+        }
 
         return 'sent';
     }
@@ -573,7 +717,7 @@ final class BookingService
 
         return Availability::slots(
             $windows,
-            $this->busyFor($tenantId, $profileId, $from, $to, $now, $exceptBookingId),
+            $this->busyFor($tenantId, $profileId, $from, $to, $now, $exceptBookingId, $service['room_id'] ?? null),
             $service['duration_minutes'],
             $service['buffer_before_minutes'],
             $service['buffer_after_minutes'],
@@ -591,7 +735,7 @@ final class BookingService
     private function isFree(int $tenantId, int $profileId, array $service, CalendarSettings $settings, DateTimeImmutable $start, DateTimeImmutable $now, ?int $exceptBookingId, bool $enforceHours): bool
     {
         $block = Availability::blockFor($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes']);
-        $busy = $this->busyFor($tenantId, $profileId, $block->start->modify('-1 day'), $block->end->modify('+1 day'), $now, $exceptBookingId);
+        $busy = $this->busyFor($tenantId, $profileId, $block->start->modify('-1 day'), $block->end->modify('+1 day'), $now, $exceptBookingId, $service['room_id'] ?? null);
         if (Availability::clashes($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes'], $busy)) {
             return false;
         }
@@ -609,10 +753,19 @@ final class BookingService
         return Availability::withinWindows($start, $service['duration_minutes'], $windows);
     }
 
-    /** @return list<Interval> */
-    private function busyFor(int $tenantId, int $profileId, DateTimeImmutable $from, DateTimeImmutable $to, DateTimeImmutable $now, ?int $exceptBookingId): array
+    /**
+     * The person's busy time, and the room's when the service needs one.
+     *
+     * @return list<Interval>
+     */
+    private function busyFor(int $tenantId, int $profileId, DateTimeImmutable $from, DateTimeImmutable $to, DateTimeImmutable $now, ?int $exceptBookingId, ?int $roomId = null): array
     {
         $busy = $this->calendar->busy($tenantId, $profileId, $from, $to, $now, $exceptBookingId);
+        if ($roomId !== null) {
+            foreach ($this->rooms()->busy($tenantId, $roomId, $from, $to, $now, $exceptBookingId) as $interval) {
+                $busy[] = $interval;
+            }
+        }
         $sources = $this->busySources;
         foreach ($this->plugins?->busySources() ?? [] as $source) {
             $sources[] = $source;
@@ -667,9 +820,10 @@ final class BookingService
      * @template T
      * @param list<array{0: int, 1: int}> $locks [tenantId, profileId] pairs
      * @param callable(): T $work
+     * @param array{0: int, 1: int}|null $room [tenantId, roomId], locked after the people
      * @return T
      */
-    private function underLock(array $locks, callable $work): mixed
+    private function underLock(array $locks, callable $work, ?array $room = null): mixed
     {
         $own = !$this->db->inTransaction();
         if ($own) {
@@ -678,6 +832,9 @@ final class BookingService
         try {
             foreach ($locks as [$tenantId, $profileId]) {
                 $this->calendar->lockStaff($tenantId, $profileId);
+            }
+            if ($room !== null) {
+                $this->rooms()->lock($room[0], $room[1]);
             }
             $result = $work();
             if ($own) {
@@ -691,6 +848,22 @@ final class BookingService
             }
             throw $e;
         }
+    }
+
+    private function rooms(): RoomRepository
+    {
+        return $this->rooms ??= new RoomRepository($this->db);
+    }
+
+    /**
+     * @param array<string, mixed> $service
+     * @return array{0: int, 1: int}|null
+     */
+    private function roomLock(int $tenantId, array $service): ?array
+    {
+        $roomId = $service['room_id'] ?? null;
+
+        return is_int($roomId) ? [$tenantId, $roomId] : null;
     }
 
     /** @param array<string, mixed> $booking */
@@ -732,6 +905,8 @@ final class BookingService
                 'rescheduled' => $this->messenger->rescheduled($tenantId, $booking),
                 'remind' => $this->messenger->remind($tenantId, $booking),
                 'awaitingPayment' => $this->messenger->awaitingPayment($tenantId, $booking),
+                'requested' => $this->messenger->requested($tenantId, $booking),
+                'suggested' => $this->messenger->suggested($tenantId, $booking),
                 default => $this->messenger->cancelled($tenantId, $booking),
             };
         } catch (Throwable $e) {
