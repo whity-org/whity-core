@@ -47,12 +47,12 @@ final class AccountSecurityMailerTest extends TestCase
 
         $this->pdo->exec(
             "INSERT INTO profiles (display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
-             VALUES ('Amro Saleh', 'x', false, 0, 0, datetime('now'), datetime('now'))"
+             VALUES ('Amro Saleh', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
         );
         $this->profileId = (int) $this->pdo->lastInsertId();
         $this->pdo->exec(
             "INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
-             VALUES ({$this->profileId}, 'amro@example.test', true, true, datetime('now'))"
+             VALUES ({$this->profileId}, 'amro@example.test', true, true, CURRENT_TIMESTAMP)"
         );
     }
 
@@ -60,7 +60,7 @@ final class AccountSecurityMailerTest extends TestCase
     {
         $stmt = $this->pdo->prepare(
             "INSERT INTO sessions (profile_id, tenant_id, refresh_jti, access_jti, user_agent, ip_address, expires_at)
-             VALUES (:p, 0, :r, :a, :ua, '203.0.113.9', datetime('now', '+7 days'))"
+             VALUES (:p, 0, :r, :a, :ua, '203.0.113.9', '2099-01-01 00:00:00')"
         );
         $stmt->execute([':p' => $this->profileId, ':r' => 'r' . $n, ':a' => 'a' . $n, ':ua' => $ua]);
     }

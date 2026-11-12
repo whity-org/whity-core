@@ -25,6 +25,7 @@ final class PlanLimitMailerTest extends TestCase
     private CapturingMailer $mailer;
     private SettingsService $settings;
 
+    /** @param list<string> $recipients */
     private function mailer(array $recipients): PlanLimitMailer
     {
         $pdo = SchemaFromMigrations::make(true);
