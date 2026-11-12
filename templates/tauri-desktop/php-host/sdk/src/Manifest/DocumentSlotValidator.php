@@ -61,10 +61,12 @@ final class DocumentSlotValidator
             return;
         }
         foreach (array_keys($documents) as $key) {
-            if ($key !== 'slots' && $key !== 'starters') {
+            if ($key !== 'slots' && $key !== 'starters' && $key !== 'blocks') {
                 $errors[] = "documents: unknown key '{$key}'";
             }
         }
+        // SDK 1.103: blocks the plugin adds to the document editor.
+        DocumentBlockValidator::check($documents['blocks'] ?? null, $label, $errors);
         // SDK 1.81: starter templates, checked against the slots declared here.
         DocumentStarterValidator::check($documents['starters'] ?? null, $documents['slots'] ?? null, $records, $label, $errors);
 

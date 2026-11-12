@@ -8243,6 +8243,33 @@ final class CoreApiSchemas
                 'kind' => self::str() + ['description' => 'template, letter, report, note, wiki or label'],
                 'version' => self::int() + ['description' => 'The saved block version the document shows'],
             ], ['id', 'title', 'kind', 'version']),
+            // Editor M7 (E.17-E.20, SDK 1.103): a plugin's document blocks, declarations Whity draws.
+            'DocumentBlockDefinition' => self::object([
+                'name' => self::str() + ['description' => '`<plugin>/<block>`'],
+                'blockType' => self::str() + ['description' => 'The block\'s name within its plugin; a document\'s plugin block names it'],
+                'label' => SchemaBuilder::ref('LocalizedLabel'),
+                'description' => ['oneOf' => [SchemaBuilder::ref('LocalizedLabel'), ['type' => 'null']]],
+                'icon' => self::str() + ['description' => 'A Whity icon name'],
+                'keywords' => ['type' => 'array', 'items' => self::str()],
+                'fields' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The Edit form: {key, label, type (text, longText, number, date, select), required?, options?}'],
+                'view' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'Display blocks of the screen vocabulary, naming fields as {{data.key}}'],
+                'print' => ['oneOf' => [['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]], ['type' => 'null']], 'description' => 'What Whity Render prints; null means notes and wiki pages only (E.18)'],
+                'allowedIn' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['note', 'wiki', 'template', 'letter', 'report', 'label']]],
+            ], ['name', 'blockType', 'label', 'description', 'icon', 'keywords', 'fields', 'view', 'print', 'allowedIn']),
+            'DocumentBlockPlugin' => self::object([
+                'plugin' => self::str(),
+                'label' => SchemaBuilder::ref('LocalizedLabel'),
+                'verified' => ['type' => 'boolean', 'description' => 'Whity\'s Verified mark, from Whity\'s marks only'],
+                'firstParty' => ['type' => 'boolean'],
+                'blocks' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentBlockDefinition')],
+            ], ['plugin', 'label', 'verified', 'firstParty', 'blocks']),
+            'DocumentBlocksResponse' => self::object([
+                'data' => self::object([
+                    'plugins' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentBlockPlugin')],
+                    'off' => ['type' => 'array', 'items' => self::object(['plugin' => self::str(), 'label' => SchemaBuilder::ref('LocalizedLabel')], ['plugin', 'label']), 'description' => 'Installed here but switched off (E.19)'],
+                    'canEnable' => ['type' => 'boolean', 'description' => 'The caller holds plugins:enable'],
+                ], ['plugins', 'off', 'canEnable']),
+            ], ['data']),
             'SavedBlockUsageResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('SavedBlockUsage')],
                 'meta' => self::object([
@@ -17143,6 +17170,22 @@ final class CoreApiSchemas
         $library = 'Managing the workspace library needs documents:publish for now (the register\'s documents:library:manage is not minted yet).';
 
         return [
+            self::permissionRoute('GET', '/api/document-blocks', 'documents:read', [
+                'summary' => 'List the blocks the workspace\'s plugins add to the document editor',
+                'description' =>
+                    'One entry per plugin (editor M7, E.17-E.20; SDK 1.103): its name, whether it carries Whity\'s '
+                    . 'Verified mark, and its blocks. Each block is a declaration Whity\'s own renderer draws: its '
+                    . 'fields, a view and an optional print view in the screen vocabulary\'s display blocks, and the '
+                    . 'kinds of document it may go in (without a print view, notes and wiki pages only). `off` lists '
+                    . 'the workspace\'s plugins that are installed but switched off; `canEnable` says whether the '
+                    . 'caller may switch them on.',
+                'tags' => ['documents'],
+                'mcp' => ['toolset' => 'core.documents'],
+                'responses' => [
+                    200 => self::jsonResponse('The plugin blocks', 'DocumentBlocksResponse'),
+                    400 => self::errorResponse('Tenant context is required'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/saved-blocks', 'documents:read', [
                 'summary' => 'List the saved blocks the caller can insert',
                 'description' =>

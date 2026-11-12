@@ -79,6 +79,7 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
     private DocumentSourceFileStore $files;
     private string $storageRoot;
     private SavedBlockRepository $savedBlocks;
+    private \Whity\Core\Document\Blocks\DocumentBlockRegistry $pluginBlocks;
 
     protected function setUp(): void
     {
@@ -123,6 +124,11 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
             $files,
             logo: new LetterheadLogo($this->settings, new LocalStorageDriver($this->storageRoot)),
             savedBlocks: $this->savedBlocks = new SavedBlockRepository($this->pdo),
+            documentBlocks: $this->pluginBlocks = new \Whity\Core\Document\Blocks\DocumentBlockRegistry(
+                static fn (int $tenantId): array => [],
+                static fn (int $tenantId): array => [],
+                static fn (string $plugin): bool => false,
+            ),
         );
     }
 
@@ -229,17 +235,17 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
             ]],
         ]);
 
+        // E.19: blocks of a plugin that isn't here name the plugin, once.
         $blockers = $this->data($this->check(self::OWNER, $id));
         self::assertSame([
             ['kind' => 'unknown-field', 'path' => 'customer.vat'],
-            ['kind' => 'block-without-print-view', 'blockId' => 'p1'],
-            ['kind' => 'block-without-print-view', 'blockId' => 'p2'],
+            ['kind' => 'missing-plugin', 'plugin' => 'com.example.maps'],
         ], $blockers);
 
         // Calling Publish directly runs the same check.
         $res = $this->publish(self::OWNER, $id, '"1"');
         self::assertSame(409, $res->getStatusCode());
-        self::assertCount(3, json_decode($res->getBody(), true)['details']['blockers']);
+        self::assertCount(2, json_decode($res->getBody(), true)['details']['blockers']);
     }
 
     /**
@@ -312,6 +318,38 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
         self::assertSame(201, $this->publish(self::OWNER, $id, '"1"')->getStatusCode());
         self::assertSame(200, $this->renderPdf(self::OWNER, $id, ['record' => 'document:' . $doc])->getStatusCode());
         self::assertSame('Signed by Awss Haddad on 12 November', $this->render->flowCalls[0]['content'][1]['text']);
+    }
+
+    /**
+     * Editor M7, E.17-E.19: a plugin block prints from its print view as
+     * Whity's own blocks, frozen into the version at publish. A block whose
+     * plugin is off blocks publishing by the plugin's name; one without a
+     * print view blocks as a block with no print view.
+     */
+    public function testAPluginBlockPrintsFromItsPrintViewAndAnOffPluginBlocksPublishing(): void
+    {
+        $delivery = \Tests\Sdk\Manifest\DocumentBlockValidatorTest::delivery();
+        $notes = $delivery;
+        unset($notes['print'], $notes['allowedIn']);
+        $this->pluginBlocks->register('Shipping', ['en' => 'Shipping', 'ar' => 'Shipping'], ['delivery_status' => $delivery, 'notes_only' => $notes]);
+        $block = static fn (string $id, string $plugin, string $type): array => ['id' => $id, 'type' => 'plugin', 'plugin' => $plugin, 'blockType' => $type, 'schemaVersion' => 1, 'data' => ['order' => 'SO-2207', 'stage' => 'packed']];
+
+        $id = $this->template(self::OWNER, [$this->para('Your order:'), $block('d1', 'Shipping', 'delivery_status')]);
+        $doc = $this->issue(self::OWNER, 'Payment reminder');
+        self::assertSame([], $this->data($this->check(self::OWNER, $id)));
+        self::assertSame(201, $this->publish(self::OWNER, $id, '"1"')->getStatusCode());
+        $v1 = $this->data($this->handler->version($this->request('GET', "/api/document-sources/{$id}/versions/1", self::OWNER), ['id' => (string) $id, 'version' => '1']));
+        self::assertNotContains('plugin', array_column($v1['blocks'], 'type'), 'the version keeps what it prints');
+        self::assertSame(200, $this->renderPdf(self::OWNER, $id, ['record' => 'document:' . $doc])->getStatusCode());
+        $printed = (string) json_encode($this->render->flowCalls[0]);
+        self::assertStringContainsString('Order SO-2207', $printed);
+        self::assertStringContainsString('Packed', $printed, 'a select prints the label of its option');
+
+        $off = $this->template(self::OWNER, [$block('g1', 'DeliveryTracker', 'x'), $block('g2', 'DeliveryTracker', 'y'), $block('n1', 'Shipping', 'notes_only')]);
+        self::assertSame([
+            ['kind' => 'block-without-print-view', 'blockId' => 'n1'],
+            ['kind' => 'missing-plugin', 'plugin' => 'DeliveryTracker'],
+        ], $this->data($this->check(self::OWNER, $off)));
     }
 
     public function testATemplateTooLargeToPrintIsBlockedFromPublishing(): void

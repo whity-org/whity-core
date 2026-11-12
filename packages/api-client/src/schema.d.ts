@@ -2547,6 +2547,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/document-blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the blocks the workspace's plugins add to the document editor
+         * @description One entry per plugin (editor M7, E.17-E.20; SDK 1.103): its name, whether it carries Whity's Verified mark, and its blocks. Each block is a declaration Whity's own renderer draws: its fields, a view and an optional print view in the screen vocabulary's display blocks, and the kinds of document it may go in (without a print view, notes and wiki pages only). `off` lists the workspace's plugins that are installed but switched off; `canEnable` says whether the caller may switch them on.
+         */
+        get: operations["get_api_v1_document_blocks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/document-collections": {
         parameters: {
             query?: never;
@@ -12115,6 +12135,50 @@ export interface components {
         DocumentBackgroundIssuingRequest: {
             /** @description true lets the plugin issue from its own slots with no person, with only the permissions it declares; false stops it */
             allowed: boolean;
+        };
+        DocumentBlockDefinition: {
+            /** @description `<plugin>/<block>` */
+            name: string;
+            /** @description The block's name within its plugin; a document's plugin block names it */
+            blockType: string;
+            label: components["schemas"]["LocalizedLabel"];
+            description: components["schemas"]["LocalizedLabel"] | null;
+            /** @description A Whity icon name */
+            icon: string;
+            keywords: string[];
+            /** @description The Edit form: {key, label, type (text, longText, number, date, select), required?, options?} */
+            fields: {
+                [key: string]: unknown;
+            }[];
+            /** @description Display blocks of the screen vocabulary, naming fields as {{data.key}} */
+            view: {
+                [key: string]: unknown;
+            }[];
+            /** @description What Whity Render prints; null means notes and wiki pages only (E.18) */
+            print: {
+                [key: string]: unknown;
+            }[] | null;
+            allowedIn: ("note" | "wiki" | "template" | "letter" | "report" | "label")[];
+        };
+        DocumentBlockPlugin: {
+            plugin: string;
+            label: components["schemas"]["LocalizedLabel"];
+            /** @description Whity's Verified mark, from Whity's marks only */
+            verified: boolean;
+            firstParty: boolean;
+            blocks: components["schemas"]["DocumentBlockDefinition"][];
+        };
+        DocumentBlocksResponse: {
+            data: {
+                plugins: components["schemas"]["DocumentBlockPlugin"][];
+                /** @description Installed here but switched off (E.19) */
+                off: {
+                    plugin: string;
+                    label: components["schemas"]["LocalizedLabel"];
+                }[];
+                /** @description The caller holds plugins:enable */
+                canEnable: boolean;
+            };
         };
         DocumentChangesResponse: {
             data: {
@@ -31565,6 +31629,80 @@ export interface operations {
             };
             /** @description allowed is not a boolean, or the system tenant */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_document_blocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plugin blocks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentBlocksResponse"];
+                };
+            };
+            /** @description Tenant context is required */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

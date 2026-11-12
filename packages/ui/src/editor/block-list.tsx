@@ -48,8 +48,9 @@ function BlockList({
       <div ref={listRef} id={id} role="listbox" aria-label={labels.insert} className="grid max-h-[320px] gap-0.5 overflow-y-auto">
         {items.length === 0 && <div className="px-2 py-3 text-muted-foreground">{labels.noBlocks}</div>}
         {items.map((item, index) => {
-          const heading = item.group !== lastGroup ? labels[item.group] : null
-          lastGroup = item.group
+          const group = item.groupTitle ?? item.group
+          const heading = group !== lastGroup ? (item.groupTitle ?? labels[item.group]) : null
+          lastGroup = group
           const on = index === active
           return (
             <React.Fragment key={item.id}>
@@ -84,7 +85,7 @@ function BlockList({
                     {item.title ?? labels[item.label]}
                   </span>
                   <span className={cn("truncate text-xs text-muted-foreground", on && "text-current opacity-80")}>
-                    {labels[item.hint]}
+                    {item.hintText ?? labels[item.hint]}
                   </span>
                 </span>
                 {item.markdown && <span className="font-mono text-2xs text-muted-foreground">{item.markdown}</span>}

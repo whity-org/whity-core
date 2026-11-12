@@ -206,6 +206,9 @@ class PluginLoader
     // Where code plugins' template slots and merge-field record types go
     // (SDK 1.56, WHIT-742). Set by both entry points before load().
     private ?\Whity\Core\Document\Slots\TemplateSlotRegistry $templateSlotRegistry = null;
+
+    /** Blocks plugins add to the document editor (SDK 1.103, editor M7). */
+    private ?\Whity\Core\Document\Blocks\DocumentBlockRegistry $documentBlockRegistry = null;
     private ?\Whity\Core\Agent\AgentPresetRegistry $agentPresetRegistry = null;
     private ?\Whity\Core\Document\Fields\DocumentFieldRegistry $documentFieldRegistry = null;
 
@@ -918,9 +921,12 @@ class PluginLoader
     public function setDocumentRegistries(
         \Whity\Core\Document\Slots\TemplateSlotRegistry $slots,
         \Whity\Core\Document\Fields\DocumentFieldRegistry $fields,
+        // SDK 1.103 (editor M7): blocks plugins add to the document editor.
+        ?\Whity\Core\Document\Blocks\DocumentBlockRegistry $blocks = null,
     ): void {
         $this->templateSlotRegistry = $slots;
         $this->documentFieldRegistry = $fields;
+        $this->documentBlockRegistry = $blocks;
     }
 
     /**
@@ -940,6 +946,7 @@ class PluginLoader
             // A reload re-declares them from the plugin as it is now.
             $this->templateSlotRegistry?->unregister($info['plugin']->getName());
             $this->documentFieldRegistry?->removeOwner($info['plugin']->getName());
+            $this->documentBlockRegistry?->unregister($info['plugin']->getName());
             // A reload must not leave a removed plugin's webhook public (WHIT-671).
             \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
         \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
@@ -3241,6 +3248,35 @@ class PluginLoader
      * A plugin's document declarations (SDK 1.56, WHIT-742): record types
      * first, so its slots can name them.
      */
+    private function registerDocumentBlocks(PluginInterface&\Whity\Sdk\PluginDocumentBlocksInterface $plugin, string $pluginKey): void
+    {
+        $registry = $this->documentBlockRegistry;
+        if ($registry === null) {
+            return;
+        }
+        try {
+            $declared = $plugin->getDocumentBlocks();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'document blocks');
+
+            return;
+        }
+        $blocks = [];
+        foreach ($declared as $block) {
+            if (!$block instanceof \Whity\Sdk\Documents\DocumentBlock) { // @phpstan-ignore instanceof.alwaysTrue (plugin-supplied value; the SDK type is PHPDoc only)
+                $this->logWarning("Plugin {$pluginKey} declares a document block that is not a DocumentBlock");
+                continue;
+            }
+            if (isset($blocks[$block->name])) {
+                $this->logWarning("Plugin {$pluginKey} declares document block '{$block->name}' twice; the second is dropped");
+                continue;
+            }
+            $blocks[$block->name] = $block->definition;
+        }
+        $name = $plugin->getName();
+        $registry->register($name, ['en' => $name, 'ar' => $name], $blocks);
+    }
+
     private function registerDocuments(PluginInterface&PluginDocumentsInterface $plugin, string $pluginKey): void
     {
         $owner = $plugin->getName();
@@ -3843,6 +3879,14 @@ class PluginLoader
         //     record type the host serves once the plugin's own are in.
         if ($plugin instanceof PluginDocumentsInterface) {
             $this->registerDocuments($plugin, $pluginKey);
+        }
+
+        // 2a-sexies-bis. Document blocks (SDK 1.103, editor M7): declarations
+        //     Whity's renderer draws. A DocumentBlock can't be built invalid, so
+        //     only a non-DocumentBlock or a name used twice is dropped, with a
+        //     logged reason, while the plugin keeps loading.
+        if ($plugin instanceof \Whity\Sdk\PluginDocumentBlocksInterface) {
+            $this->registerDocumentBlocks($plugin, $pluginKey);
         }
 
         // 2a-quater-bis. Agent presets (SDK 1.61, WHIT-818). Same shape: optional,

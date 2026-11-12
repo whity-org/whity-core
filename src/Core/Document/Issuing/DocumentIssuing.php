@@ -134,7 +134,8 @@ final class DocumentIssuing
         $last = $this->published($tenantId, $source);
         $theme = $this->print->theme($tenantId, $source['theme'] ?? null, (string) $source['kind']);
         $blocks = is_array($source['blocks'] ?? null) ? array_values($source['blocks']) : [];
-        $blocks = $this->savedBlocks?->expand($tenantId, $blocks) ?? $blocks;
+        $lang = (string) ($source['lang'] ?? 'en');
+        $blocks = $this->savedBlocks?->expand($tenantId, $blocks, $lang) ?? $blocks;
         // Compared without key order: PostgreSQL's JSONB stores object keys in its own order.
         if ($last !== null
             && $last['title'] === (string) $source['title']
@@ -145,7 +146,7 @@ final class DocumentIssuing
             return $last;
         }
         $expander = $this->savedBlocks;
-        $freeze = $expander !== null ? static fn (array $b): array => $expander->expand($tenantId, $b) : null;
+        $freeze = $expander !== null ? static fn (array $b): array => $expander->expand($tenantId, $b, $lang) : null;
         $version = $this->versions->publish((int) $source['id'], $tenantId, (int) $source['draft_version'], $callerId, $theme, $freeze);
 
         return $version === null ? null : $this->versions->find((int) $source['id'], $tenantId, $version);
@@ -162,6 +163,49 @@ final class DocumentIssuing
         }
 
         return $value;
+    }
+
+    /**
+     * The ids of plugin blocks in these blocks, nested ones included: blocks
+     * Whity can't print as they are (editor M7, E.18-E.19).
+     *
+     * @param array<mixed> $blocks
+     * @return list<string>
+     */
+    public static function unprintableBlocks(array $blocks): array
+    {
+        $ids = [];
+        foreach ($blocks as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+            $type = $block['type'] ?? null;
+            if ($type === 'plugin') {
+                $ids[] = (string) ($block['id'] ?? '');
+            }
+            if ($type === 'toggle' && is_array($block['children'] ?? null)) {
+                array_push($ids, ...self::unprintableBlocks($block['children']));
+            }
+            if ($type === 'columns' && is_array($block['columns'] ?? null)) {
+                foreach ($block['columns'] as $column) {
+                    if (is_array($column)) {
+                        array_push($ids, ...self::unprintableBlocks($column));
+                    }
+                }
+            }
+        }
+
+        return $ids;
+    }
+
+    public static function unprintable(): DocumentIssueRefused
+    {
+        return new DocumentIssueRefused(
+            'unprintable_block',
+            "This template has a plugin block that can't print here; turn its plugin on and publish the template again",
+            422,
+            ['code' => 'unprintable_block'],
+        );
     }
 
     /**
@@ -189,6 +233,13 @@ final class DocumentIssuing
     {
         [$tenantId, $callerId] = [$actor->tenantId, $actor->issuerId()];
         [$source, $version, $values, $originKey] = [$request->source, $request->version, $request->values, $request->originKey];
+        // Editor M7 (E.18, E.19): a plugin block left in a version has no print
+        // here, so the document would print without it. Refuse before anything is
+        // written. Publishing turns plugin blocks into Whity's own, so a version
+        // only keeps one when it was published past that (a plugin's starter).
+        if (self::unprintableBlocks(is_array($version['blocks'] ?? null) ? $version['blocks'] : []) !== []) {
+            throw self::unprintable();
+        }
         if ($originKey !== null) {
             $existing = $this->documents?->findByOriginKey($originKey, $tenantId);
             if ($existing !== null) {

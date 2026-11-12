@@ -554,6 +554,40 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry($liveManifests);
         $agentPresetRegistry->useManifests($liveManifests);
         \Whity\register_service(\Whity\Core\Document\Slots\TemplateSlotRegistry::class, $templateSlotRegistry);
+        // Editor M7 (SDK 1.103): plugins' document blocks, as in public/index.php.
+        // Verified only labels blocks in the editor, so here nothing claims it.
+        $cliTenantPlugins = new \Whity\Core\Plugin\Tenant\TenantPluginRepository($db->getPdo());
+        $documentBlockRegistry = new \Whity\Core\Document\Blocks\DocumentBlockRegistry(
+            static function (int $tenantId) use ($liveManifests): array {
+                $out = [];
+                foreach ($liveManifests($tenantId) as $manifest) {
+                    $blocks = $manifest->documentBlocks();
+                    if ($blocks === []) {
+                        continue;
+                    }
+                    $out[] = [
+                        'plugin' => $manifest->name(),
+                        'label' => $manifest->label(),
+                        'verified' => false,
+                        'blocks' => $blocks,
+                    ];
+                }
+
+                return $out;
+            },
+            static function (int $tenantId) use ($cliTenantPlugins): array {
+                $off = [];
+                foreach ($cliTenantPlugins->plugins($tenantId) as $row) {
+                    if (!$row['enabled']) {
+                        $off[] = ['plugin' => $row['plugin'], 'label' => ['en' => $row['plugin'], 'ar' => $row['plugin']]];
+                    }
+                }
+
+                return $off;
+            },
+            static fn (string $plugin): bool => false,
+        );
+        \Whity\register_service(\Whity\Core\Document\Blocks\DocumentBlockRegistry::class, $documentBlockRegistry);
         // #1151: one document stack for this process, shared by issuing and
         // the SDK's DocumentRenderer, built on first use.
         $documentParts = new \Whity\Core\Document\Issuing\WorkerDocumentParts(
@@ -669,7 +703,7 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         \Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannelRegistry);
         $pluginLoader->setInboxSources($inboxSourceRegistry);
         $pluginLoader->setMessageChannels($messageChannelRegistry);
-        $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
+        $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry, $documentBlockRegistry);
         $pluginLoader->load();
 
 

@@ -1,9 +1,11 @@
 import type { Editor, JSONContent } from "@tiptap/core"
 
-import type { IconName } from "../icon"
+import { iconNames, type IconName } from "../icon"
 import { currentBlock } from "./behaviour"
 import type { SavedBlock } from "./contract"
 import { freshEditorBlocks } from "./convert"
+import { defaultData, localized } from "./plugin-blocks"
+import type { PluginBlocks } from "./services"
 import type { EditorLabels } from "./labels"
 
 /**
@@ -13,11 +15,15 @@ import type { EditorLabels } from "./labels"
  */
 export interface CatalogueItem {
   id: string
-  group: "groupBasic" | "groupLists" | "groupStructure" | "groupMedia" | "groupWhity" | "groupSaved"
+  group: "groupBasic" | "groupLists" | "groupStructure" | "groupMedia" | "groupWhity" | "groupSaved" | "groupPlugin"
+  /** A group heading of its own (a plugin's name, E.20), shown instead of the group's label. */
+  groupTitle?: string
   label: keyof EditorLabels
   hint: keyof EditorLabels
   /** A name of its own (a saved block's), shown instead of `label`. */
   title?: string
+  /** A one-line hint of its own (a plugin block's description), shown instead of `hint`. */
+  hintText?: string
   /** Several blocks at once (a saved block's copy), inserted instead of `node`. */
   nodes?: JSONContent[]
   icon: IconName
@@ -77,13 +83,40 @@ export function savedBlockItems(saved: SavedBlock[] | undefined): CatalogueItem[
   }))
 }
 
+/**
+ * Each plugin's blocks, in a group of its own under the plugin's name, after
+ * Whity's blocks (E.20); only those allowed in this kind of document (E.18).
+ * The `hint` label is unused: a plugin block's hint is its own description.
+ */
+export function pluginBlockItems(blocks: PluginBlocks | undefined, kind: string, lang: "en" | "ar"): CatalogueItem[] {
+  return (blocks?.plugins ?? []).flatMap((source) =>
+    source.blocks
+      .filter((b) => b.allowedIn.includes(kind))
+      .map(
+        (b): CatalogueItem => ({
+          id: `plugin:${b.name}`,
+          group: "groupPlugin",
+          groupTitle: localized(source.label, lang),
+          label: "groupPlugin",
+          hint: "groupPlugin",
+          title: localized(b.label, lang),
+          hintText: localized(b.description ?? null, lang) || localized(source.label, lang),
+          icon: (iconNames as readonly string[]).includes(b.icon) ? (b.icon as IconName) : "plugin",
+          keywords: [...b.keywords, localized(source.label, "en"), localized(b.label, "en")],
+          textBlock: false,
+          node: { type: "plugin", attrs: { plugin: source.plugin, blockType: b.blockType, schemaVersion: 1, data: defaultData(b) } },
+        })
+      )
+  )
+}
+
 /** Filter by the item's name, hint and keywords, in the current language and in English. */
 export function filterCatalogue(query: string, labels: EditorLabels, english: EditorLabels, extra: CatalogueItem[] = []): CatalogueItem[] {
   const all = extra.length ? [...CATALOGUE, ...extra] : CATALOGUE
   const q = query.trim().toLowerCase()
   if (!q) return all
   return all.filter((item) =>
-    [item.title ?? labels[item.label], labels[item.hint], english[item.label], english[item.hint], item.id, ...item.keywords]
+    [item.title ?? labels[item.label], item.hintText ?? labels[item.hint], english[item.label], english[item.hint], item.id, ...item.keywords]
       .some((word) => String(word).toLowerCase().includes(q))
   )
 }
