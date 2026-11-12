@@ -192,6 +192,9 @@ final class MigrationSchemaTest extends TestCase
             235 => 'reserved for #1775, which needed no migration',
             236 => 'reserved for #1776, which needed no migration',
             237 => 'reserved for #1778, which needed no migration',
+            // Confirmed by the orchestrator (2026-11-12): 246 was left over from
+            // the core messages block (243 to 245) and is in no commit.
+            246 => 'left over from the core messages block 243-245; never used',
         ];
 
         $deleted = array_values(array_filter(

@@ -97,7 +97,9 @@ const MAX_MATH_LENGTH = 2000;
  * of a document's look is the register's and is not the caller's to change,
  * so the greys and rules (ink, muted, line, tint) are no longer accepted.
  */
-const THEME_KEYS = ['accent', 'accentUse'];
+const THEME_KEYS = ['accent', 'accentUse', 'titleFace', 'largePrint'];
+/** E.46: the title in Readex Pro (the default) or in the body face. */
+const TITLE_FACES = ['readex', 'noto'];
 const THEME_COLOURS = ['accent'];
 const ACCENT_USES = ['title', 'title-and-headings'];
 const HEX_COLOUR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -723,6 +725,18 @@ function validateFlowPayload(payload) {
         }
         continue;
       }
+      if (key === 'titleFace') {
+        if (!TITLE_FACES.includes(value)) {
+          return `"theme.titleFace" must be one of ${TITLE_FACES.join(', ')}`;
+        }
+        continue;
+      }
+      if (key === 'largePrint') {
+        if (typeof value !== 'boolean') {
+          return '"theme.largePrint" must be true or false';
+        }
+        continue;
+      }
       // Hex only: the value is written into a stylesheet, and a colour NAME
       // is one short step from a value that closes the rule.
       if (typeof value !== 'string' || !HEX_COLOUR.test(value)) {
@@ -935,6 +949,13 @@ function normaliseTheme(theme) {
   }
   if (out.accent && theme.accentUse === 'title-and-headings') {
     out.accentUse = 'title-and-headings';
+  }
+  // E.46 and E.47 hold without a print colour.
+  if (theme.titleFace === 'noto') {
+    out.titleFace = 'noto';
+  }
+  if (theme.largePrint === true) {
+    out.largePrint = true;
   }
   return Object.keys(out).length > 0 ? out : null;
 }
