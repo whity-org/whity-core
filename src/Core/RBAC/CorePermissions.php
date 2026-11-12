@@ -502,6 +502,11 @@ final class CorePermissions
     public const TASKS_WRITE = 'tasks:write';
     public const TASKS_MANAGE = 'tasks:manage';
 
+    // CUSTOM FIELDS (migrations 263 and 264, design 3.3 A9). Defining the
+    // workspace's own fields on its records; filling them in needs only the
+    // record's own permissions.
+    public const FIELDS_MANAGE = 'fields:manage';
+
     /**
      * Return the full list of core permission strings.
      *
@@ -608,6 +613,7 @@ final class CorePermissions
             self::CONTACTS_READ,
             self::CONTACTS_WRITE,
             self::CONTACTS_IMPORT,
+            self::FIELDS_MANAGE,
             self::TASKS_READ,
             self::TASKS_WRITE,
             self::TASKS_MANAGE,

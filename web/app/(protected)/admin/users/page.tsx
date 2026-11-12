@@ -578,6 +578,8 @@ export default function UsersPage() {
                         ),
                       }
                   : {
+                      moment: 'empty-people',
+                      once: 'users',
                       title: t('users.empty.title', 'No one here yet'),
                       description: t(
                         'users.empty.description',
