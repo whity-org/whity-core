@@ -246,6 +246,7 @@ export default function AiPrincipalsPage() {
       ) : principals.length === 0 ? (
         <EmptyFirstTime
           icon="link"
+          moment="spot-mcp"
           title={t('aiPrincipals.empty.title', 'No AI apps connected')}
           description={t('aiPrincipals.empty.description', 'Connect Claude, ChatGPT, Cursor or another app so it can work with your data, asking you first for changes.')}
         />

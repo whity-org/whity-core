@@ -176,6 +176,8 @@ export default function AgentsPage() {
       ) : empty ? (
         <EmptyFirstTime
           icon="robot"
+          moment="agents-propose"
+          onceEver="agents-first"
           title={t('agents.empty.title', 'No agents yet')}
           description={t('agents.empty.description', 'Start from a ready-made agent. It asks you before doing anything that matters.')}
         />

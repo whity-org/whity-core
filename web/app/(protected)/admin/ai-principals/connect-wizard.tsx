@@ -18,6 +18,7 @@ import { Badge } from '@whity/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@whity/ui/radio-group';
 import { Spinner } from '@whity/ui/spinner';
+import { Lottie } from '@whity/ui/lottie';
 import { Checkbox } from '@whity/ui/checkbox';
 import {
   Select,
@@ -605,6 +606,7 @@ function ConnectionStatus({ connected, waitedLong, app }: { connected: boolean; 
   }
   return (
     <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+      <Lottie name="waiting-reply" play="loop" className="mx-auto h-20 w-[120px]" />
       <div className="flex items-center gap-2 text-sm">
         <IconPlugConnected size={16} className="text-muted-foreground" />
         <span>{t('aiPrincipals.connect.status.waiting', 'Waiting for {app} to connect…', { app })}</span>

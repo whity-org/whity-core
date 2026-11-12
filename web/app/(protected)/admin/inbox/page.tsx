@@ -318,6 +318,8 @@ export default function InboxPage() {
             if (meta !== null) router.push(routingHref(meta));
           }}
           emptyState={{
+            moment: openOnly ? 'all-caught-up' : 'empty-documents',
+            once: openOnly ? 'inbox-open' : 'inbox-all',
             title: openOnly
               ? t('inbox.empty.open.title', 'Nothing is waiting for you')
               : t('inbox.empty.all.title', 'Nothing has reached you yet'),

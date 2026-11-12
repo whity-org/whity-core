@@ -292,6 +292,8 @@ export default function BillingPage() {
         onRowClick={(row) => void openDetail(row)}
         emptyState={{
           title: t('billing.invoices.empty', 'No invoices yet'),
+          moment: 'empty-invoices',
+          once: 'billing-invoices',
           description: t(
             'billing.invoices.emptyDescription',
             'Invoices appear here once your subscription is billed.'
