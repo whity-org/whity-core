@@ -141,6 +141,9 @@ final class AccountSecurityMailer
     private function isNewDevice(int $profileId, ?string $userAgent): bool
     {
         $ua = $userAgent !== null ? substr($userAgent, 0, 512) : null;
+        // One person's sessions in every workspace: a browser is new to the
+        // account, not to one workspace, so these reads span tenants on purpose.
+        // @tenant-guard-ignore: a browser is new to the person's account, which spans workspaces
         $total = $this->db->prepare('SELECT COUNT(*) FROM sessions WHERE profile_id = :p');
         $total->execute([':p' => $profileId]);
         if ((int) $total->fetchColumn() <= 1) {
@@ -148,9 +151,11 @@ final class AccountSecurityMailer
         }
 
         if ($ua === null) {
+            // @tenant-guard-ignore: a browser is new to the person's account, which spans workspaces
             $same = $this->db->prepare('SELECT COUNT(*) FROM sessions WHERE profile_id = :p AND user_agent IS NULL');
             $same->execute([':p' => $profileId]);
         } else {
+            // @tenant-guard-ignore: a browser is new to the person's account, which spans workspaces
             $same = $this->db->prepare('SELECT COUNT(*) FROM sessions WHERE profile_id = :p AND user_agent = :ua');
             $same->execute([':p' => $profileId, ':ua' => $ua]);
         }
