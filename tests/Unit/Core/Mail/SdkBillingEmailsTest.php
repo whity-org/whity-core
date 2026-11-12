@@ -17,6 +17,7 @@ use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Core\Settings\TenantSettingsRepository;
 use Whity\Core\Store\ArraySharedStore;
+use Whity\Core\Store\SharedStoreInterface;
 use Whity\Sdk\Mail\BillingEmails;
 use Whity\Sdk\Mail\WorkspaceEmail;
 use Whity\Sdk\PluginBillingEmailsInterface;
@@ -113,6 +114,65 @@ final class SdkBillingEmailsTest extends TestCase
         $unloaded = self::declaringUnbound('whity-pay');
         self::assertFalse($this->emails->isAllowed($unloaded));
         self::assertSame(0, $this->emails->send($unloaded, 7, 'Your Whity receipt', self::receipt()));
+        self::assertSame([], $this->mailer->sent);
+    }
+
+    public function testTheGrantIsForTheExactNameNotOneThatSharesItsSlug(): void
+    {
+        $plugin = self::declaring('Billing_Test_Exact');
+        $this->settings->setGlobal(SettingsRegistry::PLUGINS_BILLING_EMAIL_SENDERS, 'billing-test-exact');
+        self::assertFalse($this->emails->isAllowed($plugin));
+
+        $this->settings->setGlobal(SettingsRegistry::PLUGINS_BILLING_EMAIL_SENDERS, 'Billing_Test_Exact');
+        self::assertTrue($this->emails->isAllowed($plugin));
+    }
+
+    public function testTheWordsCannotLinkOutsideTheApp(): void
+    {
+        $plugin = self::declaring('billing-test-links');
+        $this->settings->setGlobal(SettingsRegistry::PLUGINS_BILLING_EMAIL_SENDERS, 'billing-test-links');
+
+        $phishing = [
+            new WorkspaceEmail(heading: 'Payment failed', paragraphs: ['Update it at https://whity-billing-update.com/login within a day.']),
+            new WorkspaceEmail(heading: 'Payment failed', rows: [['Pay now', 'evil.example/pay']]),
+            new WorkspaceEmail(heading: 'Payment failed', note: 'Or go to www.evil.example'),
+            new WorkspaceEmail(heading: 'Go to http://localhost.evil.example now'),
+            new WorkspaceEmail(heading: 'Payment failed', preheader: 'Pay at app.example.test.evil.example'),
+            new WorkspaceEmail(heading: 'Payment failed', notice: 'Questions: ftp://files.evil.example'),
+        ];
+        foreach ($phishing as $i => $email) {
+            self::assertSame(0, $this->emails->send($plugin, 7, 'Payment failed', $email), 'email ' . $i);
+        }
+        self::assertSame(0, $this->emails->send($plugin, 7, 'Pay at evil.example', new WorkspaceEmail(heading: 'Payment failed')));
+        self::assertSame([], $this->mailer->sent);
+        self::assertSame([], $this->asked, 'refused before anyone is looked up');
+
+        // Money, receipt numbers, dates and this app's own address are fine.
+        $ok = new WorkspaceEmail(
+            heading: 'Thank you. Here’s your receipt.',
+            paragraphs: ['You paid JOD 49.000 on 12 Nov 2026. See ' . self::APP . '/billing or app.example.test/billing.'],
+            rows: [['Receipt', 'INV-2026.0042'], ['Total', 'JOD 3,412.000'], ['Plan', 'Team (e.g. 5 people)']],
+        );
+        self::assertSame(2, $this->emails->send($plugin, 7, 'Your receipt for November 2026', $ok));
+    }
+
+    public function testAnUnavailableCountSendsNothing(): void
+    {
+        $plugin = self::declaring('billing-test-store-down');
+        $this->settings->setGlobal(SettingsRegistry::PLUGINS_BILLING_EMAIL_SENDERS, 'billing-test-store-down');
+        $store = $this->createStub(SharedStoreInterface::class);
+        $store->method('increment')->willThrowException(new \RuntimeException('database is down'));
+        $who = $this->createStub(WorkspaceRecipients::class);
+        $who->method('holding')->willReturn(['amro@example.test']);
+        $emails = new SdkBillingEmails(
+            new BrandedEmailSender($this->mailer, new EmailLayout(), $this->settings),
+            $who,
+            $this->settings,
+            $store,
+            self::APP,
+        );
+
+        self::assertSame(0, $emails->send($plugin, 7, 'Receipt', self::receipt()));
         self::assertSame([], $this->mailer->sent);
     }
 

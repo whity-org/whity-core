@@ -461,7 +461,7 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
       label: t('settings.meta.plugins.billing_email_senders.label', 'Plugins that send billing emails'),
       help: t(
         'settings.meta.plugins.billing_email_senders.help',
-        "The plugins that may send Whity's own billing emails, receipts and failed payments, to the people who pay for each workspace, in this instance's name. Plugin names separated by commas, for example whity-pay. Leave this empty so no plugin can."
+        "The plugins that may send Whity's own billing emails, receipts and failed payments, to the people who pay for each workspace, in this instance's name. Plugin names exactly as the plugins page shows them, separated by commas, for example WhityPay. Leave this empty so no plugin can."
       ),
     },
     'plugins.store_enabled': {

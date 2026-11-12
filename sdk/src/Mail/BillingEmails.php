@@ -25,13 +25,15 @@ use Whity\Sdk\PluginInterface;
  * OPERATOR-GRANTED. Mail in the instance's brand to any workspace's payers is
  * a phishing path, so only a plugin that declares it
  * ({@see PluginBillingEmailsInterface}) and that the operator has granted
- * (the global setting `plugins.billing_email_senders`) may send. Everyone
+ * (the global setting `plugins.billing_email_senders`, by the exact name the
+ * plugin was loaded under) may send. Everyone
  * else is refused: {@see isAllowed()} says which, and {@see send()} sends
  * nothing. Pass the plugin itself (`$this`): the host knows it by how it was
  * loaded, not by the name it reports.
  *
  * The one button, if any, must open this app ({@see billingUrl()} or below
- * the same address); an email with a button elsewhere is refused.
+ * the same address), and the words may name no other web address or domain
+ * (mail clients make them clickable); such an email is refused.
  *
  * CAPPED. A workspace gets at most a few of these a day, whoever sends them,
  * so a bug can't flood its payers. A send over the cap is refused like any
