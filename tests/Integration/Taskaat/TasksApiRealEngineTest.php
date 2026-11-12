@@ -52,7 +52,9 @@ final class TasksApiRealEngineTest extends TestCase
             $this->pdo->prepare("INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
                                  VALUES (?, ?, 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")->execute([$id, $name]);
         }
-        $role = (int) $this->pdo->query('SELECT id FROM roles ORDER BY id LIMIT 1')->fetchColumn();
+        $roles = $this->pdo->query('SELECT id FROM roles ORDER BY id LIMIT 1');
+        self::assertNotFalse($roles);
+        $role = (int) $roles->fetchColumn();
         foreach ([[self::AMRO, self::BAKERY], [self::AWSS, self::BAKERY], [self::OUTSIDER, self::CAFE]] as [$profile, $tenant]) {
             $this->pdo->prepare("INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP)")
                 ->execute([$profile, $tenant, $role]);
@@ -61,7 +63,9 @@ final class TasksApiRealEngineTest extends TestCase
         $agents = new AgentRepository($this->pdo);
         $this->pdo->prepare("INSERT INTO agents (tenant_id, slug, name, status, created_at, updated_at) VALUES (?, 'stock', 'Stock assistant', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
             ->execute([self::BAKERY]);
-        $this->agentId = (int) $this->pdo->query("SELECT id FROM agents WHERE slug = 'stock'")->fetchColumn();
+        $agent = $this->pdo->query("SELECT id FROM agents WHERE slug = 'stock'");
+        self::assertNotFalse($agent);
+        $this->agentId = (int) $agent->fetchColumn();
 
         $secrets = new EncryptedSecretStore(['v1' => self::KEY], 'v1');
         $settings = new TenantSettingsRepository($this->pdo);
@@ -85,7 +89,9 @@ final class TasksApiRealEngineTest extends TestCase
             static fn (): int => $now,
         );
         parse_str((string) parse_url($connection->start(self::BAKERY, self::AMRO), PHP_URL_QUERY), $query);
-        $connection->complete(self::BAKERY, 'code', (string) $query['state'], self::AMRO);
+        $state = $query['state'] ?? '';
+        self::assertIsString($state);
+        $connection->complete(self::BAKERY, 'code', $state, self::AMRO);
 
         $client = new TaskaatClient($connection, function (string $url, array $payload, array $headers): array {
             $name = (string) $payload['params']['name'];

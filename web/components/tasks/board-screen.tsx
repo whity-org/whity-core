@@ -136,7 +136,7 @@ export function BoardScreen({ board }: { board: string }) {
                     badge={column === 'done' || column === 'review' ? <GateBadge gate={task.gate} column={task.column} /> : undefined}
                     labels={(task.labels ?? []).map((label) => ({ name: label.name, color: label.color ?? undefined }))}
                     checks={task.checks ? { met: task.checks.met, total: task.checks.total, label: t('card.checks', '{met} of {total} checks met') } : undefined}
-                    due={task.due_date ? (dates.date(task.due_date) ?? undefined) : undefined}
+                    due={task.due_date ? (dates.date(task.due_date) ?? '') : ''}
                     assignee={task.assignee ? { name: task.assignee.name, kind: task.assignee.kind } : undefined}
                     onOpen={() => setOpen(task.id)}
                   />
