@@ -29,6 +29,14 @@ use Whity\Core\Settings\SettingsService;
  * the provider has already verified the address, so there is no password to
  * set and no approval queue to wait in.
  *
+ * ASKED, NOT SILENT (WHIT-994)
+ * ---------------------------
+ * The sign-in callback no longer creates the workspace itself. It signs the
+ * person in to a short-lived "no workspace yet" state, and they land on a
+ * "Create your workspace" step ({@see stateFor()} picks the screen); only
+ * their POST of that step calls {@see provisionFor()}, with the name they
+ * chose. Every gate below is still checked here, under the lock, on that POST.
+ *
  * WHEN IT ACTS — every condition, checked HERE, or nothing
  * --------------------------------------------------------
  * Each gate is re-checked inside this class rather than trusted from the
@@ -63,7 +71,8 @@ use Whity\Core\Settings\SettingsService;
  *    runs INSIDE this transaction, exactly as on the admin path: a listener that
  *    throws rolls the workspace back and the person bounces with no_membership.
  *    Plugin work with outside side effects belongs on `tenant.created.async`.
- *  - Its NAME is the person's display name with control and bidi-override
+ *  - Its NAME is the one they typed on the "Create your workspace" step
+ *    (WHIT-994), or else their display name, with control and bidi-override
  *    characters removed, numbered when taken; never their email address.
  *  - Its SLUG is opaque (`ws-` + 12 hex). A slug is a host label under
  *    BRANDING_BASE_DOMAIN, and a display name an outsider chose must never be
@@ -80,6 +89,15 @@ final class FederatedWorkspaceProvisioner
 {
     /** The base (global, NULL-tenant) role the workspace owner is granted. */
     public const OWNER_ROLE = 'admin';
+
+    /** May create a workspace: every gate holds (WHIT-994). */
+    public const STATE_CREATE = 'create';
+    /** Already placed somewhere (invited, pending approval or suspended), nothing active. */
+    public const STATE_WAITING = 'waiting';
+    /** Belongs nowhere, and this instance does not let them create a workspace. */
+    public const STATE_NEEDS_INVITE = 'needs_invite';
+    /** Deactivated, gone, or not this instance's own provider: nothing to offer. */
+    public const STATE_REFUSED = 'refused';
 
     /** How many "Name 2", "Name 3"… to try before giving up on a free name. */
     private const NAME_ATTEMPTS = 50;
@@ -100,7 +118,84 @@ final class FederatedWorkspaceProvisioner
     }
 
     /**
+     * Which "no workspace yet" screen this person gets after a sign-in that
+     * found no active membership (WHIT-994). The same gates
+     * {@see provisionFor()} applies, read WITHOUT a lock: it chooses a screen
+     * and grants nothing, and {@see provisionFor()} checks every gate again
+     * under the row lock before anything is created.
+     *
+     * A tenant's own provider is always REFUSED here: its sign-ins are
+     * confined to that tenant, so it is never offered a workspace or told
+     * about another tenant's invitations.
+     *
+     * @return self::STATE_*
+     */
+    public function stateFor(int $profileId, FederatedProviderContext $provider): string
+    {
+        if (!$provider->isGlobalTrust()) {
+            return self::STATE_REFUSED;
+        }
+        // Profiles is a sanctioned GLOBAL table (ADR 0005 §1)
+        $stmt = $this->db->prepare('SELECT status FROM profiles WHERE id = :id');
+        $stmt->execute([':id' => $profileId]);
+        $status = $stmt->fetchColumn();
+        if ($status === false || (string) $status === 'inactive') {
+            return self::STATE_REFUSED;
+        }
+        if ($this->hasAnyMembership($profileId)) {
+            return self::STATE_WAITING;
+        }
+        return $this->enabled() ? self::STATE_CREATE : self::STATE_NEEDS_INVITE;
+    }
+
+    public function mayOffer(int $profileId, FederatedProviderContext $provider): bool
+    {
+        return $this->stateFor($profileId, $provider) === self::STATE_CREATE;
+    }
+
+    /**
+     * The workspaces this person holds a membership in that is not active yet
+     * (invited, pending approval, suspended), so the "waiting" screen can say
+     * which. Their own memberships only.
+     *
+     * @return list<array{name: string, status: string}>
+     */
+    public function waitingWorkspaces(int $profileId): array
+    {
+        // @tenant-guard-ignore: the person's OWN memberships across every tenant, as at sign-in (ADR 0005 §6)
+        $stmt = $this->db->prepare(
+            "SELECT t.name, m.status
+               FROM memberships m
+               JOIN tenants t ON t.id = m.tenant_id
+              WHERE m.profile_id = :id AND m.status <> 'active' AND m.tenant_id <> 0
+              ORDER BY m.id ASC"
+        );
+        $stmt->execute([':id' => $profileId]);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $out[] = ['name' => (string) $row['name'], 'status' => (string) $row['status']];
+        }
+        return $out;
+    }
+
+    /**
+     * The person's display name as a workspace name, to prefill the step.
+     */
+    public function suggestedName(int $profileId): string
+    {
+        // Profiles is a sanctioned GLOBAL table (ADR 0005 §1)
+        $stmt = $this->db->prepare('SELECT display_name FROM profiles WHERE id = :id');
+        $stmt->execute([':id' => $profileId]);
+        $name = $stmt->fetchColumn();
+        $clean = self::cleanName(is_string($name) ? $name : '');
+        return $clean === 'Workspace' ? '' : $clean;
+    }
+
+    /**
      * Create the person's workspace, or do nothing.
+     *
+     * @param string|null $name What the person typed on the create step, or null
+     *                          for their display name. Cleaned the same way.
      *
      * @return int|null the new tenant id, or null when nothing was created
      *                  (switched off, not global trust, deactivated, already a
@@ -108,7 +203,7 @@ final class FederatedWorkspaceProvisioner
      *
      * @throws \LogicException when called inside an open transaction
      */
-    public function provisionFor(int $profileId, string $email, FederatedProviderContext $provider): ?int
+    public function provisionFor(int $profileId, string $email, FederatedProviderContext $provider, ?string $name = null): ?int
     {
         if (!$provider->isGlobalTrust() || !$this->enabled()) {
             return null;
@@ -134,7 +229,7 @@ final class FederatedWorkspaceProvisioner
                 return null;
             }
 
-            $name = $this->freeName(self::cleanName($profile['display_name']));
+            $name = $this->freeName(self::cleanName($name ?? $profile['display_name']));
             $slug = $this->freeSlug();
 
             $tenantId = TenantProvisioner::withCoreSteps($this->db, $this->hooks)->create($name, $slug);

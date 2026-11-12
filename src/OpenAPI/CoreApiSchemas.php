@@ -5131,6 +5131,25 @@ final class CoreApiSchemas
                 'display_name' => self::str(),
             ], ['provider_key', 'display_name']),
             'SsoProviderListResponse' => self::listEnvelope('SsoProvider'),
+            // WHIT-994: GET /api/auth/sso/workspace. `suggested_name` only with
+            // state=create, `workspaces` only with state=waiting.
+            'SsoWorkspaceSetupResponse' => self::object([
+                'data' => self::object([
+                    'state' => ['type' => 'string', 'enum' => ['create', 'waiting', 'needs_invite']],
+                    'email' => self::str(),
+                    'suggested_name' => self::str(),
+                    'workspaces' => ['type' => 'array', 'items' => self::object([
+                        'name' => self::str(),
+                        'status' => self::str(),
+                    ], ['name', 'status'])],
+                ], ['state', 'email']),
+            ], ['data']),
+            // WHIT-994: POST /api/auth/sso/workspace
+            'SsoWorkspaceCreateRequest' => self::object([
+                'name' => self::str(),
+                'locale' => self::str(),
+                'main_color' => self::str(),
+            ], ['name']),
             // A caller's linked external identity (connected account). `email` and
             // `last_login_at` may be null (asserted-at-link email; never-since-linked).
             'MeIdentity' => self::object([
@@ -11945,6 +11964,41 @@ final class CoreApiSchemas
             ],
         ];
 
+        // WHIT-994: after a sign-in that found no workspace. Public: the caller
+        // holds only the short-lived workspace_setup cookie the callback set.
+        $ssoWorkspaceShow = [
+            'method' => 'GET',
+            'path' => '/api/auth/sso/workspace',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => [
+                'summary' => 'Which "no workspace yet" screen a pending SSO sign-in gets',
+                'tags' => ['sso'],
+                'responses' => [
+                    200 => self::jsonResponse('Create, waiting or needs_invite, with the address signed in with', 'SsoWorkspaceSetupResponse'),
+                    401 => self::errorResponse('No pending sign-in, or it expired'),
+                ],
+            ],
+        ];
+        $ssoWorkspaceCreate = [
+            'method' => 'POST',
+            'path' => '/api/auth/sso/workspace',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => [
+                'summary' => 'Create the pending SSO sign-in\'s own workspace and sign in to it',
+                'tags' => ['sso'],
+                'request' => 'SsoWorkspaceCreateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Session issued for the new workspace', 'SessionUserResponse'),
+                    401 => self::errorResponse('No pending sign-in, or it expired'),
+                    403 => self::errorResponse('This sign-in may no longer create a workspace'),
+                    422 => self::errorResponse('Name missing or too long, or an invalid language or colour'),
+                    503 => self::errorResponse('Could not be created right now; nothing was created'),
+                ],
+            ],
+        ];
+
         // Authenticated self-service: the caller's linked external identities.
         // Cookie-authenticated by the handler — no requiredRole/requiredPermission.
         $meIdentitiesList = [
@@ -11981,6 +12035,8 @@ final class CoreApiSchemas
         ];
 
         return [
+            $ssoWorkspaceShow,
+            $ssoWorkspaceCreate,
             self::permissionRoute('GET', '/api/identity-providers', 'auth_providers:manage', [
                 'summary' => 'List the tenant\'s configured identity providers',
                 'tags' => ['sso'],

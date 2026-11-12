@@ -46,6 +46,8 @@ final class FrontendUrls
     public const BOOKING_MANAGE = 'BOOKING_MANAGE_URL';
     /** WHIT-962: where Taskaat returns a person who connected the workspace to it. */
     public const TASKAAT_CONNECT = 'TASKAAT_CONNECT_URL';
+    /** WHIT-994: where an SSO sign-in that belongs to no workspace lands (create one, or ask for an invitation). */
+    public const SSO_NO_WORKSPACE = 'SSO_NO_WORKSPACE_URL';
 
     /**
      * The bundled admin's path for each link — what an override replaces.
@@ -64,6 +66,7 @@ final class FrontendUrls
         self::STORE_CONNECT => '/admin/plugins/store/connect',
         self::BOOKING_MANAGE => '/booking',
         self::TASKAAT_CONNECT => '/tasks/connect',
+        self::SSO_NO_WORKSPACE => '/welcome',
     ];
 
     /**

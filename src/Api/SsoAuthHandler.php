@@ -41,8 +41,7 @@ final class SsoAuthHandler
 {
     /**
      * Dispatched once per VERIFIED federated sign-in, after the identity has a
-     * local profile (and, when self-service workspaces are on, after any new
-     * workspace exists) and BEFORE the session is minted, so whatever a listener
+     * local profile and BEFORE the session is minted, so whatever a listener
      * applies is already true for the session that follows.
      *
      * A notification: the payload is not read back, and a listener that throws
@@ -54,7 +53,9 @@ final class SsoAuthHandler
      *   subject               string   the ID token's `sub`, stable per issuer
      *   global_trust          bool     operator (tenant 0) provider, or a tenant's own
      *   provider_tenant_id    int      0 for global trust
-     *   provisioned_tenant_id int|null the workspace created by THIS sign-in, if any
+     *   provisioned_tenant_id null     always null since WHIT-994: a sign-in no longer
+     *                                  creates a workspace (the "Create your workspace"
+     *                                  step does, and announces `tenant.created`)
      *
      * Nothing from the token beyond `iss` and `sub` is passed on: a listener that
      * needs more about the person asks its own source with the subject.
@@ -73,10 +74,11 @@ final class SsoAuthHandler
         private readonly \Whity\Core\Settings\SettingsService $settings,
         private readonly string $appUrl,
         /**
-         * Gives a first-time global-trust sign-in with no membership a workspace
-         * of its own, when the operator has switched that on. Null (tests, and
-         * any composition that does not offer it) keeps the old behaviour: such
-         * a person bounces with `no_membership`.
+         * Decides where a global-trust sign-in with no active membership lands
+         * (WHIT-994): the "Create your workspace" step, a "your place is
+         * waiting" note, or "you need an invitation". Null (tests, and any
+         * composition that does not offer it) keeps the old behaviour: such a
+         * person bounces with `no_membership`.
          */
         private readonly ?\Whity\Core\Tenant\FederatedWorkspaceProvisioner $workspaces = null,
         /**
@@ -495,21 +497,6 @@ final class SsoAuthHandler
 
         $email = $this->loginEmailFor($profileId, $identity->normalizedEmail());
 
-        // Self-service workspace (global trust only): somebody the operator's own
-        // provider vouches for, who belongs to nothing yet, gets a workspace of
-        // their own instead of a dead end. The provisioner re-checks every
-        // condition itself (switched on, no membership in any status) and does
-        // nothing otherwise. A failure here is logged and falls through to the
-        // ordinary `no_membership` bounce rather than a 500.
-        $provisionedTenantId = null;
-        if ($this->workspaces !== null && $ctx->isGlobalTrust()) {
-            try {
-                $provisionedTenantId = $this->workspaces->provisionFor($profileId, $email, $ctx);
-            } catch (\Throwable $e) {
-                error_log('[sso] self-service workspace failed for profile ' . $profileId . ': ' . $e->getMessage());
-            }
-        }
-
         if ($this->hooks !== null) {
             try {
                 $this->hooks->dispatch(self::SIGNED_IN_EVENT, [
@@ -520,7 +507,9 @@ final class SsoAuthHandler
                     'subject'               => $identity->subject,
                     'global_trust'          => $ctx->isGlobalTrust(),
                     'provider_tenant_id'    => $tenantId,
-                    'provisioned_tenant_id' => $provisionedTenantId,
+                    // WHIT-994: a sign-in never creates a workspace any more;
+                    // the "Create your workspace" step does, afterwards.
+                    'provisioned_tenant_id' => null,
                 ]);
             } catch (\Throwable $e) {
                 error_log('[sso] ' . self::SIGNED_IN_EVENT . ' listener failed for profile ' . $profileId . ': ' . $e->getMessage());
@@ -538,7 +527,7 @@ final class SsoAuthHandler
             $request,
             $ctx->isGlobalTrust() ? null : $tenantId,
         );
-        return $this->redirectForLoginResult($result);
+        return $this->redirectForLoginResult($result, $profileId, $email, $ctx);
     }
 
     /**
@@ -729,7 +718,7 @@ final class SsoAuthHandler
      * cookies were already emitted as a side effect of the login; here we only
      * choose the destination.
      */
-    private function redirectForLoginResult(Response $result): Response
+    private function redirectForLoginResult(Response $result, int $profileId, string $email, FederatedProviderContext $ctx): Response
     {
         $body = json_decode($result->getBody(), true);
         $data = is_array($body) ? $body : [];
@@ -741,8 +730,43 @@ final class SsoAuthHandler
             // The tenant-selection cookie is set; the login UI completes the choice.
             return new Response(302, '', ['Location' => $this->frontendLink(\Whity\Core\Http\FrontendUrls::SSO_LOGIN) . '?sso=select']);
         }
+        if ($result->getStatusCode() === 403 && $ctx->isGlobalTrust()) {
+            return $this->noWorkspace($profileId, $email, $ctx);
+        }
         // No active membership, or anything unexpected.
         return $this->fail('no_membership');
+    }
+
+    /**
+     * Somebody the operator's own provider signed in who has no active
+     * membership (WHIT-994). Rather than a `no_membership` error code, they
+     * land on a page that either invites them to create a workspace, tells
+     * them a place is waiting for them, or says plainly that they need an
+     * invitation, naming the address they signed in with.
+     *
+     * What they hold there is NOT a session: a short-lived signed cookie
+     * naming the profile, the address and the provider, good only for
+     * GET/POST /api/auth/sso/workspace, which re-checks every gate.
+     *
+     * A deactivated account, a tenant's own provider, or a composition with
+     * no provisioner keeps the old generic bounce: nothing is offered.
+     */
+    private function noWorkspace(int $profileId, string $email, FederatedProviderContext $ctx): Response
+    {
+        if ($this->workspaces === null
+            || $this->workspaces->stateFor($profileId, $ctx) === \Whity\Core\Tenant\FederatedWorkspaceProvisioner::STATE_REFUSED
+        ) {
+            return $this->fail('no_membership');
+        }
+
+        $token = $this->jwtParser->create([
+            'profile_id'  => $profileId,
+            'email'       => $email,
+            'provider_id' => $ctx->providerId,
+        ], SsoWorkspaceSetupHandler::TOKEN_TTL, SsoWorkspaceSetupHandler::TOKEN_TYPE);
+        CookieManager::setWorkspaceSetupToken($token, SsoWorkspaceSetupHandler::TOKEN_TTL);
+
+        return new Response(302, '', ['Location' => $this->frontendLink(\Whity\Core\Http\FrontendUrls::SSO_NO_WORKSPACE)]);
     }
 
     /** Bounce to the login page with a generic, non-enumerating SSO marker. */
