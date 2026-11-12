@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import type { Editor } from "@tiptap/core"
+import type { Editor, JSONContent } from "@tiptap/core"
 import { NodeSelection } from "@tiptap/pm/state"
 
 import {
@@ -20,7 +20,11 @@ import { cn } from "../utils"
 import { deleteBlock, duplicateBlock, moveBlockTo, turnInto } from "./behaviour"
 import { BlockList } from "./block-list"
 import { CATALOGUE, applyItem, filterCatalogue, type CatalogueItem } from "./catalogue"
+import type { SavedBlock } from "./contract"
+import { fromEditorContent } from "./convert"
 import { EDITOR_LABELS, type EditorLabels } from "./labels"
+import { SaveBlockDialog, type SaveBlockChoice } from "./save-block-dialog"
+import type { NewSavedBlock } from "./services"
 
 /** Top padding of a block before its first line, so the gutter sits on that line. */
 function firstLineOffset(el: HTMLElement): number {
@@ -47,6 +51,9 @@ function BlockGutter({
   menuAt,
   onMenuAtChange,
   blockUrl,
+  savedItems = [],
+  saveBlock,
+  canShareSavedBlocks = false,
 }: {
   editor: Editor
   labels: EditorLabels
@@ -57,8 +64,15 @@ function BlockGutter({
   onMenuAtChange: (pos: number | null) => void
   /** The address "Copy link to block" copies. */
   blockUrl: (blockId: string) => string
+  /** The Saved blocks group for the + inserter (E.21). */
+  savedItems?: CatalogueItem[]
+  /** Save as block; without it the block menu doesn't offer it. */
+  saveBlock?: (block: NewSavedBlock) => Promise<SavedBlock>
+  canShareSavedBlocks?: boolean
 }) {
   const [hovered, setHovered] = React.useState<Hovered | null>(null)
+  // Save as block: the first and last top-level block ids, found again by id when saving.
+  const [saving, setSaving] = React.useState<{ first: string; last: string; count: number } | null>(null)
   const [inserter, setInserter] = React.useState<{ pos: number; query: string; active: number } | null>(null)
   const [drag, setDrag] = React.useState<{ from: number; x: number; y: number; dropIndex: number; dropTop: number; text: string } | null>(null)
   const pointerDown = React.useRef<{ x: number; y: number; pos: number } | null>(null)
@@ -176,7 +190,53 @@ function BlockGutter({
 
   const menuOpen = menuAt !== null
   const menuBlock = menuOpen ? blockAt(menuAt) : null
-  const inserterItems: CatalogueItem[] = inserter ? filterCatalogue(inserter.query, labels, EDITOR_LABELS) : []
+  const inserterItems: CatalogueItem[] = inserter ? filterCatalogue(inserter.query, labels, EDITOR_LABELS, savedItems) : []
+
+  /**
+   * The top-level blocks Save as block takes: those the selection spans when
+   * it covers this block and others (E.21: select several, then save), else
+   * this block alone.
+   */
+  const blocksToSave = (pos: number) => {
+    const { doc, selection } = editor.state
+    const at = doc.resolve(pos).index(0)
+    const from = doc.resolve(selection.from).index(0)
+    const to = doc.resolve(Math.max(selection.from, selection.to - 1)).index(0)
+    const [a, b] = to > from && at >= from && at <= to ? [from, to] : [at, at]
+    return { first: String(doc.child(a).attrs.id ?? ""), last: String(doc.child(b).attrs.id ?? ""), count: b - a + 1 }
+  }
+
+  /** Where the blocks being saved are now, by their ids: the document may have changed meanwhile. */
+  const savingRange = () => {
+    if (!saving) return null
+    let from = -1
+    let to = -1
+    editor.state.doc.forEach((node, offset) => {
+      if (node.attrs.id === saving.first) from = offset
+      if (node.attrs.id === saving.last) to = offset + node.nodeSize
+    })
+    return from >= 0 && to > from ? { from, to } : null
+  }
+
+  const saveSelection = async (choice: SaveBlockChoice) => {
+    const range = savingRange()
+    if (!range || !saveBlock) throw new Error("The blocks have changed")
+    const nodes: JSONContent[] = []
+    editor.state.doc.nodesBetween(range.from, range.to, (node, pos) => {
+      if (pos >= range.from && pos < range.to) nodes.push(node.toJSON() as JSONContent)
+      return false
+    })
+    const saved = await saveBlock({ ...choice, blocks: fromEditorContent({ type: "doc", content: nodes }), perDocumentKeys: [] })
+    if (choice.mode !== "synced") return
+    // Synced: the blocks become the saved block, drawn from the library from now on.
+    const now = savingRange()
+    if (!now) return
+    editor
+      .chain()
+      .focus()
+      .insertContentAt(now, { type: "savedBlock", attrs: { savedBlockId: saved.id, version: saved.version, overrides: {} } })
+      .run()
+  }
 
   return (
     <>
@@ -266,6 +326,11 @@ function BlockGutter({
                 >
                   <Icon name="link" /> {labels.copyLinkToBlock}
                 </DropdownMenuItem>
+                {saveBlock && menuBlock.type.name !== "savedBlock" && (
+                  <DropdownMenuItem onSelect={() => setSaving(blocksToSave(menuAt))}>
+                    <Icon name="template" /> {labels.saveAsBlock}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   disabled={editor.state.doc.resolve(menuAt).index(0) === 0}
@@ -346,6 +411,17 @@ function BlockGutter({
             }
           />
         </div>
+      )}
+
+      {saveBlock && (
+        <SaveBlockDialog
+          open={saving !== null}
+          onOpenChange={(open) => !open && setSaving(null)}
+          blockCount={saving?.count ?? 1}
+          canShare={canShareSavedBlocks}
+          onSave={saveSelection}
+          labels={labels}
+        />
       )}
 
       {drag && (

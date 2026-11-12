@@ -20,7 +20,7 @@ import { BlockList } from "./block-list"
 import { AgentPanel, type AgentAskStart } from "./agent-panel"
 import type { EditorAgents } from "./agents"
 import { SelectionBubble } from "./bubble"
-import { applyItem, filterCatalogue } from "./catalogue"
+import { applyItem, filterCatalogue, savedBlockItems } from "./catalogue"
 import type { Actor, DocumentKind, EditorMode, PublishBlocker, ResolvedThemeTokens, WhityDocument } from "./contract"
 import { fromEditorContent, toEditorContent } from "./convert"
 import { DocumentBehaviour } from "./behaviour"
@@ -692,7 +692,8 @@ function DocEditor({
     }
   }, [editor, relative])
 
-  const slashItems = React.useMemo(() => filterCatalogue(slash.query, labels, EDITOR_LABELS), [slash.query, labels])
+  const savedItems = React.useMemo(() => savedBlockItems(services.savedBlocks), [services.savedBlocks])
+  const slashItems = React.useMemo(() => filterCatalogue(slash.query, labels, EDITOR_LABELS, savedItems), [slash.query, labels, savedItems])
   React.useEffect(() => setSlashActive(0), [slash.query, slash.open])
   const pickSlash = React.useCallback(
     (index: number) => {
@@ -1095,7 +1096,17 @@ function DocEditor({
                   <>
                     <BlockToolbar editor={editor} labels={labels} container={contentRef} />
                     <FieldBar editor={editor} labels={labels} groups={allFields} container={contentRef} />
-                    <BlockGutter editor={editor} labels={labels} container={contentRef} menuAt={menuAt} onMenuAtChange={setMenuAt} blockUrl={blockUrl} />
+                    <BlockGutter
+                      editor={editor}
+                      labels={labels}
+                      container={contentRef}
+                      menuAt={menuAt}
+                      onMenuAtChange={setMenuAt}
+                      blockUrl={blockUrl}
+                      savedItems={savedItems}
+                      saveBlock={services.saveBlock}
+                      canShareSavedBlocks={services.canShareSavedBlocks ?? false}
+                    />
                     <SelectionBubble
                       editor={editor}
                       labels={labels}

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 
-import type { Inline, RecordRef } from "./contract"
+import type { Inline, RecordRef, SavedBlock } from "./contract"
 import { EDITOR_LABELS, type EditorLabels } from "./labels"
 
 /** What a Record block shows (E.16): the record as the reader may see it. */
@@ -53,7 +53,19 @@ export interface EditorServices {
   chartSources?: { key: string; label: string }[]
   /** What a Record block can point at, for its record picker. */
   recordTypes?: { key: string; label: string }[]
+  /**
+   * Saved blocks (E.21–E.24): this person's own and the workspace library's.
+   * Synced ones are drawn from here wherever a document uses them.
+   */
+  savedBlocks?: SavedBlock[]
+  /** Saves a selection as a block; without it the editor offers no Save as block. */
+  saveBlock?: (block: NewSavedBlock) => Promise<SavedBlock>
+  /** E.22: whether "Everyone in the workspace" is offered (people who manage the library). */
+  canShareSavedBlocks?: boolean
 }
+
+/** What Save as block sends: the contract's SavedBlock without what the library assigns. */
+export type NewSavedBlock = Pick<SavedBlock, "name" | "mode" | "sharing" | "blocks" | "perDocumentKeys">
 
 /**
  * Preview with a record (E.12): each field's value for that record, by path.

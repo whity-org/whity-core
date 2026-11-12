@@ -11,6 +11,7 @@ use Whity\Core\Document\DocumentPeople;
 use Whity\Core\Document\DocumentSourceFileStore;
 use Whity\Core\Document\DocumentSourceRepository;
 use Whity\Core\Document\DocumentSourceVersionRepository;
+use Whity\Core\Document\SavedBlock\SavedBlockRepository;
 use Whity\Core\Document\Suggestion\SuggestionPatch;
 use Whity\Core\Document\Theme\DocumentThemeRef;
 use Whity\Core\Document\Theme\DocumentThemeResolver;
@@ -91,6 +92,9 @@ final class DocumentSourcesApiHandler
         private readonly ?DocumentCollab $collab = null,
         // S5: names for "Written by", from the rows being served.
         private readonly ?DocumentPeople $people = null,
+        // Editor M7: which saved blocks each document uses (E.21), recorded on
+        // every save, for "used in 12 documents" and the 409 on delete.
+        private readonly ?SavedBlockRepository $savedBlocks = null,
     ) {
         $this->repo = $repo;
         $this->policy = $policy;
@@ -252,6 +256,7 @@ final class DocumentSourcesApiHandler
             'created_by'          => $callerId,
             'owner_ou_id'         => $ownerOuId,
         ]);
+        $this->savedBlocks?->recordUses($tenantId, $id, SavedBlockRepository::usesIn($fields['blocks'] ?? []));
         $row = $this->repo->findById($id, $tenantId);
 
         return Response::json(['data' => $row], 201)->withHeaders(['ETag' => self::etag(1)]);
@@ -308,6 +313,9 @@ final class DocumentSourcesApiHandler
         // now, so it no longer blocks publishing (E.37).
         if ($this->collab !== null && array_key_exists('blocks', $fields)) {
             $this->collab->markStaleAgainst($tenantId, $id, $fields['blocks']);
+        }
+        if (array_key_exists('blocks', $fields)) {
+            $this->savedBlocks?->recordUses($tenantId, $id, SavedBlockRepository::usesIn($fields['blocks']));
         }
 
         $saved = $this->repo->findById($id, $tenantId);

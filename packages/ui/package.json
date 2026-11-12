@@ -80,6 +80,7 @@
     "./editor/page-view": "./src/editor/page-view.tsx",
     "./editor/publish-check": "./src/editor/publish-check.tsx",
     "./editor/sample": "./src/editor/sample.ts",
+    "./editor/save-block-dialog": "./src/editor/save-block-dialog.tsx",
     "./editor/schema": "./src/editor/schema.ts",
     "./editor/schema-rich": "./src/editor/schema-rich.ts",
     "./editor/services": "./src/editor/services.tsx",
