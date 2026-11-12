@@ -70,6 +70,10 @@ final class TeamInvitationsRealEngineTest extends TestCase
 
     protected function setUp(): void
     {
+        // Another suite in the same process may leave an actor set (an agent,
+        // say); each request starts with none, and so does each test here.
+        AuditContext::reset();
+        AfterResponse::reset();
         RoleChecker::clearCache();
         TenantContext::reset();
         $this->pdo = $this->makeSchema();
