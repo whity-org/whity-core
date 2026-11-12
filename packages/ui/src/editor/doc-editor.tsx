@@ -867,8 +867,9 @@ function DocEditor({
       lang={doc.lang}
       className={cn("grid h-full min-h-0 grid-rows-[auto_auto_1fr_auto] overflow-hidden bg-background text-sm text-foreground", className)}
     >
-      {/* Header (56px) */}
-      <header className="flex h-14 min-w-0 items-center gap-3 border-b border-border bg-card ps-2 pe-4">
+      {/* Header (56px). On a phone the actions take a second line under the
+          title, wrapping, so the title stays readable and Publish stays on screen. */}
+      <header className="flex h-14 min-w-0 items-center gap-3 border-b border-border bg-card ps-2 pe-4 max-sm:h-auto max-sm:flex-wrap max-sm:gap-y-2 max-sm:py-2">
         {back && <IconButton icon="chevron-left" label={back.label} tooltip="bottom" onClick={back.onClick} />}
         <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-[8px] bg-primary-tint text-primary-tint-foreground">
           <Icon name={KIND_ICON[doc.kind]} />
@@ -905,7 +906,7 @@ function DocEditor({
             )}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 max-sm:basis-full max-sm:flex-wrap max-sm:ps-1">
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button

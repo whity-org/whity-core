@@ -12,7 +12,7 @@ import { labelRequestKey, resolveLabels } from '@/lib/api/resolve-labels';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
-import { IconFilePlus } from '@tabler/icons-react';
+import { IconChevronDown, IconFilePlus } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
 import { formNameFrom } from '@/lib/documents/template-name';
@@ -179,6 +179,9 @@ export default function DocumentLibraryPage() {
   const { has: hasCapability } = useCapabilities();
 
   const [viewKey, setViewKey] = useState(DEFAULT_VIEW);
+  // On a phone the folder rail folds behind a "Folders" button above the list,
+  // so the documents come first; choosing a folder folds it again.
+  const [railOpen, setRailOpen] = useState(false);
   const [collectionId, setCollectionId] = useState<number | null>(null);
   const [anchorOuId, setAnchorOuId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -367,12 +370,14 @@ export default function DocumentLibraryPage() {
     setViewKey(key);
     setCollectionId(null);
     setPage(1);
+    setRailOpen(false);
   }, []);
 
   const selectCollection = useCallback((id: number) => {
     setViewKey('collection');
     setCollectionId(id);
     setPage(1);
+    setRailOpen(false);
   }, []);
 
   const selectAnchor = useCallback((ouId: number | null) => {
@@ -711,7 +716,27 @@ export default function DocumentLibraryPage() {
       )}
 
       {!(views.forbidden || documents.forbidden) && (
-      <div className="flex gap-8">
+      <div className="flex flex-col gap-4 md:flex-row md:gap-8">
+        <Button
+          type="button"
+          variant="outline"
+          className="justify-between md:hidden"
+          aria-expanded={railOpen}
+          aria-controls="document-rail-phone"
+          onClick={() => setRailOpen((open) => !open)}
+        >
+          <span className="min-w-0 truncate">
+            {t('organizer.rail.folders', 'Folders')}
+            {selectedView && (
+              <span className="text-muted-foreground">
+                {' · '}
+                {openCollection !== null ? openCollection.name : viewLabel(t, selectedView)}
+              </span>
+            )}
+          </span>
+          <IconChevronDown size={16} aria-hidden className={railOpen ? 'rotate-180' : undefined} />
+        </Button>
+        <div id="document-rail-phone" className={railOpen ? 'block' : 'hidden md:block'}>
         <ViewRail
           views={views.data?.data ?? []}
           groups={views.data?.groups ?? []}
@@ -724,6 +749,7 @@ export default function DocumentLibraryPage() {
           onCreateCollection={() => setCreatingCollection(true)}
           createDisabledReason={filingDisabledReason}
         />
+        </div>
 
         <div className="min-w-0 flex-1">
           {/* The browser's chrome is offered only when there ARE folders.
