@@ -1129,6 +1129,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'visibleIf' => 'messages-for-customer',
     ];
     $items[] = [
+        'id' => 'chat',
+        'label' => 'Chat',
+        'href' => '/chat',
+        'icon' => 'comment',
+        'group' => 'overview',
+        'order' => 9,
+        // Team chat (CH.1): the team's own chats, people and agents together.
+        // Ungated like its routes; shown to the people who work here, never to
+        // customers.
+        'visibleIf' => 'chat-for-staff',
+    ];
+    $items[] = [
         'id' => 'document-library',
         'label' => 'Documents',
         'href' => '/admin/document-library',
@@ -2087,6 +2099,8 @@ $navigationHandler = new NavigationApiHandler($hookManager, $roleChecker, [
     'forms-own-submissions' => [$formsNavConditions, 'hasOwnSubmissionsToSee'],
     // ADR 0016: a customer's own conversations with the workspace.
     'messages-for-customer' => [new \Whity\Core\Messaging\MessagesNavConditions($db->getPdo()), 'isCustomerWithMessages'],
+    // Team chat (CH.1): the people who work here.
+    'chat-for-staff' => [new \Whity\Core\Chat\ChatNavConditions(new \Whity\Core\Chat\ChatRepository($db->getPdo())), 'isStaff'],
 ]);
 $router->register('GET', '/api/navigation', [$navigationHandler, 'list']);
 
@@ -5422,6 +5436,27 @@ $router->register('GET',   '/api/messages/settings',                      [$mess
 $router->register('PUT',   '/api/messages/settings',                      [$messagesHandler, 'putSettings'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
 $router->register('POST',  '/api/messages/settings/inbound-secret',       [$messagesHandler, 'rotateInboundSecret'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
 // A signed-in customer's own conversations: ownership is the check, like /api/me/forms.
+// Team chat (CH.1, CH.2; migration 253): the team's own chats on the Messages
+// tables. DELIBERATELY UNGATED at the router, like the Inbox: the handler lets
+// in only staff of the workspace, and only members see a chat, so a chat the
+// caller (or the calling agent) is not in answers 404. What an agent may do in
+// a chat is set per chat, by the person who added it.
+$chatRepository = new \Whity\Core\Chat\ChatRepository($db->getPdo());
+$chatHandler = new \Whity\Api\ChatApiHandler(new \Whity\Core\Chat\ChatService($chatRepository));
+$router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null);
+$router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null);
+$router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null);
+$router->register('PATCH',  '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'update'],        null);
+$router->register('GET',    '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'messages'],      null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'post'],          null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/proposals',               [$chatHandler, 'shareProposal'], null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/read',                    [$chatHandler, 'markRead'],      null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/members',                 [$chatHandler, 'addMember'],     null);
+$router->register('DELETE', '/api/chat/chats/{id:\d+}/members/{member:\d+}',    [$chatHandler, 'removeMember'],  null);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/approve',              [$chatHandler, 'approve'],       null);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/decline',              [$chatHandler, 'decline'],       null);
+$router->register('GET',    '/api/chat/directory',                              [$chatHandler, 'directory'],     null);
+
 $meMessagesHandler = new \Whity\Api\MeMessagesApiHandler($messagingService);
 $router->register('GET',  '/api/me/messages',            [$meMessagesHandler, 'list'],  null);
 $router->register('POST', '/api/me/messages',            [$meMessagesHandler, 'start'], null);

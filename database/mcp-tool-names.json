@@ -331,6 +331,22 @@
     "en": "List time off and extra hours",
     "ar": "عرض الإجازات والساعات الإضافية"
   },
+  "get_api_chat_chats": {
+    "en": "List the team chats you are in",
+    "ar": "عرض محادثات الفريق التي أنت فيها"
+  },
+  "get_api_chat_chats_id": {
+    "en": "Read a team chat and who is in it",
+    "ar": "قراءة محادثة فريق ومن فيها"
+  },
+  "get_api_chat_chats_id_messages": {
+    "en": "Read a team chat's messages",
+    "ar": "قراءة رسائل محادثة فريق"
+  },
+  "get_api_chat_directory": {
+    "en": "Find people and agents to mention",
+    "ar": "البحث عن أشخاص ووكلاء للإشارة إليهم"
+  },
   "get_api_convening_bodies": {
     "en": "List the bodies that hold meetings",
     "ar": "عرض الهيئات"
@@ -1140,6 +1156,18 @@
   "post_api_calendar_time_off": {
     "en": "Add time off or extra hours",
     "ar": "إضافة إجازة أو ساعات إضافية"
+  },
+  "post_api_chat_chats_id_messages": {
+    "en": "Write in a team chat",
+    "ar": "الكتابة في محادثة فريق"
+  },
+  "post_api_chat_chats_id_proposals": {
+    "en": "Put your proposal in a team chat",
+    "ar": "وضع اقتراحك في محادثة فريق"
+  },
+  "post_api_chat_chats_id_read": {
+    "en": "Mark a team chat read",
+    "ar": "تعليم محادثة فريق كمقروءة"
   },
   "post_api_convening_bodies": {
     "en": "Set up a body that holds meetings",

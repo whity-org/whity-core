@@ -15,6 +15,12 @@ final class ConversationRepository
 {
     public const STATUSES = ['open', 'pending', 'closed'];
 
+    /**
+     * Team chats (migration 253) share the table; Messages only ever reads
+     * conversations with customers.
+     */
+    private const CUSTOMER_ONLY = "c.kind = 'customer'";
+
     private const COLUMNS = 'c.id, c.tenant_id, c.channel, c.subject, c.status, c.assigned_profile_id,
         c.customer_profile_id, c.contact_name, c.contact_address, c.last_message_at, c.last_inbound_at,
         c.created_at, c.updated_at, c.closed_at,
@@ -57,7 +63,7 @@ final class ConversationRepository
     public function find(int $tenantId, int $id): ?array
     {
         $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM conversations c ' . self::JOINS
-            . ' WHERE c.tenant_id = :tid AND c.id = :id');
+            . ' WHERE c.tenant_id = :tid AND c.id = :id AND ' . self::CUSTOMER_ONLY);
         $stmt->execute([':tid' => $tenantId, ':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -169,7 +175,7 @@ final class ConversationRepository
     /** @return array<string, int> status => count, for the inbox tabs */
     public function countsByStatus(int $tenantId): array
     {
-        $stmt = $this->db->prepare('SELECT status, COUNT(*) AS n FROM conversations WHERE tenant_id = :tid GROUP BY status');
+        $stmt = $this->db->prepare('SELECT c.status, COUNT(*) AS n FROM conversations c WHERE c.tenant_id = :tid AND ' . self::CUSTOMER_ONLY . ' GROUP BY c.status');
         $stmt->execute([':tid' => $tenantId]);
         $counts = array_fill_keys(self::STATUSES, 0);
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -288,7 +294,7 @@ final class ConversationRepository
      */
     private static function filters(int $tenantId, array $filters): array
     {
-        $where = '';
+        $where = ' AND ' . self::CUSTOMER_ONLY;
         $params = [':tid' => $tenantId];
 
         $status = $filters['status'] ?? null;

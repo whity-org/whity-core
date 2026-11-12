@@ -136,6 +136,9 @@ final class TenantOwnedTables
         'messages' => '243_create_conversations_and_messages.php',
         'webchat_visitors' => '245_create_webchat_and_messaging_settings.php',
         'messaging_settings' => '245_create_webchat_and_messaging_settings.php',
+        // Team chat (CH.1, CH.2): a team chat and its people and agents.
+        'chats' => '253_create_team_chat.php',
+        'chat_members' => '253_create_team_chat.php',
 
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says
