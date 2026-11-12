@@ -2578,6 +2578,50 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         self::assertCount(1, $repo->commentsFor(self::TENANT_A, [$threadId])[$threadId] ?? []);
     }
 
+    // ============ saved blocks (editor M7) ============
+    //
+    // saved_blocks, saved_block_versions and saved_block_uses (migrations
+    // 260 and 265). Every read and write binds tenant_id, so another workspace's
+    // ids reach nothing, and recording a use of another workspace's block
+    // records nothing.
+
+    public function testSavedBlocksAreTenantScoped(): void
+    {
+        $repo = new \Whity\Core\Document\SavedBlock\SavedBlockRepository($this->pdo);
+        $blocks = [['id' => 's1', 'type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Example Bakery, IBAN']]]];
+        $id = $repo->create(self::TENANT_A, [
+            'name' => 'Bank details', 'description' => null, 'mode' => 'synced', 'sharing' => 'workspace',
+            'owner_profile_id' => 101, 'blocks' => $blocks, 'per_document_keys' => [],
+        ]);
+        $docA = $this->documentSourceIn(self::TENANT_A);
+        $docB = $this->documentSourceIn(self::TENANT_B);
+        self::assertSame(1, $repo->recordUses(self::TENANT_A, $docA, [[$id, 1]]));
+
+        self::assertNull($repo->find($id, self::TENANT_B), "Tenant A's saved block must be absent to Tenant B");
+        self::assertSame([], $repo->listVisible(self::TENANT_B, 101));
+        self::assertNull($repo->findVersion($id, self::TENANT_B, 1));
+        self::assertSame(0, $repo->countUses($id, self::TENANT_B));
+        self::assertSame([], $repo->uses($id, self::TENANT_B));
+        self::assertSame([], $repo->usesForSource(self::TENANT_B, $docA));
+
+        self::assertFalse($repo->updateDetails($id, self::TENANT_B, ['name' => 'X', 'description' => null, 'sharing' => 'me']), 'a cross-tenant rename touches zero rows');
+        self::assertNull($repo->replaceBlocks($id, self::TENANT_B, 1, $blocks, []), 'a cross-tenant blocks change touches zero rows');
+        self::assertFalse($repo->updatePerDocumentKeys($id, self::TENANT_B, ['signer']));
+        self::assertFalse($repo->archive($id, self::TENANT_B), 'a cross-tenant delete touches zero rows');
+        self::assertSame(0, $repo->recordUses(self::TENANT_B, $docB, [[$id, 1]]), "Tenant B can't record a use of Tenant A's block");
+        self::assertSame(0, $repo->recordUses(self::TENANT_B, $docA, []), "Tenant B's replace leaves Tenant A's uses alone");
+
+        $a = $repo->find($id, self::TENANT_A);
+        self::assertNotNull($a);
+        self::assertSame('Bank details', $a['name']);
+        self::assertSame('workspace', $a['sharing']);
+        self::assertSame(1, $a['version']);
+        self::assertSame([], $a['per_document_keys']);
+        self::assertNull($a['archived_at'], "Tenant A's block is untouched");
+        self::assertSame(1, $repo->countUses($id, self::TENANT_A));
+        self::assertSame([$id => 1], $repo->usesForSource(self::TENANT_A, $docA));
+    }
+
     // ============ document agent requests (editor M6, migration 252) ============
     //
     // A person's Ask an agent. Every read, claim, report and stop binds
@@ -2735,6 +2779,46 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         self::assertSame('imported', $ran['status']);
         self::assertSame(1, $repo->count(self::TENANT_A, []));
         self::assertSame(0, $repo->count(self::TENANT_B, []));
+    }
+
+    // ==================== custom fields (WHIT-954, migration 263) ====================
+
+    public function testCustomFieldsAndTheirValuesAreTenantScoped(): void
+    {
+        $fieldRepo = new \Whity\Core\CustomFields\CustomFieldRepository($this->pdo);
+        $contactRepo = new \Whity\Core\Contacts\ContactRepository($this->pdo);
+        $types = new \Whity\Core\CustomFields\CustomFieldRecordTypes();
+        $types->register(new \Whity\Core\CustomFields\CustomFieldRecordType(
+            'contact', 'Contacts', 'جهات الاتصال', 'contacts:read', 'contacts:write',
+            static fn (int $tenant, int $id): bool => $contactRepo->find($tenant, $id) !== null,
+        ));
+        $fields = new \Whity\Core\CustomFields\CustomFieldService($this->pdo, $fieldRepo, $types);
+        $contacts = new \Whity\Core\Contacts\ContactService($contactRepo, new \Whity\Core\Contacts\ContactTags($this->pdo), $fields);
+
+        $branch = $fields->create(self::TENANT_A, ['record_type' => 'contact', 'label' => 'Preferred branch', 'kind' => 'text'], null);
+        $a = $contacts->create(self::TENANT_A, ['name' => 'Example Café', 'fields' => ['preferred_branch' => 'Abdoun']], null);
+
+        self::assertSame([], $fields->definitions(self::TENANT_B, 'contact'), "Tenant A's field must be invisible to Tenant B");
+        foreach ([
+            'read' => fn () => $fields->show(self::TENANT_B, $branch['id']),
+            'change' => fn () => $fields->update(self::TENANT_B, $branch['id'], ['label' => 'Taken']),
+            'archive' => fn () => $fields->archive(self::TENANT_B, $branch['id'], true),
+            'use' => fn () => $contacts->create(self::TENANT_B, ['name' => 'Other Café', 'fields' => ['preferred_branch' => 'Abdoun']], null),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} Tenant A's field");
+            } catch (\Whity\Core\Contacts\ContactRejectedException $e) {
+                self::assertContains($e->status, [404, 422], "a foreign field is not there for Tenant B ({$what})");
+            }
+        }
+        self::assertSame([], $fields->values(self::TENANT_B, 'contact', [$a['id']]), "Tenant A's values must be invisible to Tenant B");
+        self::assertSame(0, $contacts->list(self::TENANT_B, [], 50, 0)['total'], 'the refused Tenant B contact was rolled back');
+
+        $after = $fields->show(self::TENANT_A, $branch['id']);
+        self::assertSame('Preferred branch', $after['label']['en']);
+        self::assertFalse($after['archived']);
+        self::assertSame(['preferred_branch' => 'Abdoun'], $contacts->show(self::TENANT_A, $a['id'])['fields']);
     }
 
     private function contactService(): \Whity\Core\Contacts\ContactService

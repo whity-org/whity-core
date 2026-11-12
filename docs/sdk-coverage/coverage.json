@@ -1176,6 +1176,10 @@
                 {
                     "what": "flow block",
                     "since": "1.35"
+                },
+                {
+                    "what": "Labels and other visible text in English and Arabic ({en, ar}), served in the reader's language",
+                    "since": "1.101"
                 }
             ],
             "missing": [

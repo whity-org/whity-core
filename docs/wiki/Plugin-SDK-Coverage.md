@@ -782,6 +782,7 @@ Planned: 0.2.28.
 - dataRecord and recordFields blocks (SDK 1.33)
 - visibleWhen and accessGate (SDK 1.34)
 - flow block (SDK 1.35)
+- Labels and other visible text in English and Arabic ({en, ar}), served in the reader's language (SDK 1.101)
 
 **Missing**
 

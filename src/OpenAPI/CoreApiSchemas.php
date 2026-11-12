@@ -146,6 +146,7 @@ final class CoreApiSchemas
             self::documentSourceRoutes(),
             self::documentCollabRoutes(),
             self::documentAgentRoutes(),
+            self::savedBlockRoutes(),
             self::documentThemeRoutes(),
             self::documentTemplateSlotRoutes(),
             self::workspacePluginRoutes(),
@@ -175,7 +176,8 @@ final class CoreApiSchemas
             self::resourceRoleGrantRoutes(),
             self::licensingRoutes(),
             self::externalBillingRoutes(),
-            ContactsApiSchemas::routes()
+            ContactsApiSchemas::routes(),
+            ContactsApiSchemas::customFieldRoutes()
         ));
     }
 
@@ -8059,6 +8061,66 @@ final class CoreApiSchemas
                 'suggestions' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentSuggestion'), 'description' => 'Suggestions made or decided since the cursor, any status'],
                 'comments' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentCommentThread'), 'description' => 'Threads started, replied to, resolved or reopened since the cursor, with all their messages'],
             ], ['cursor', 'draft_version', 'suggestions', 'comments'])),
+
+            // ── Saved blocks (editor M7; E.21-E.24, E.38) ───────────────────
+            // As the editor contract's SavedBlock (camelCase), with its dates.
+            'SavedBlock' => self::object([
+                'id' => self::int(),
+                'name' => self::str() + ['description' => 'At most 120 characters'],
+                'description' => self::str(true),
+                'mode' => ['type' => 'string', 'enum' => ['synced', 'copy'], 'description' => 'synced: editing it once updates every document that uses it; copy: inserts ordinary blocks'],
+                'sharing' => ['type' => 'string', 'enum' => ['me', 'workspace'], 'description' => 'Only me, or everyone in the workspace'],
+                'owner' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('DocumentActor')], 'description' => 'Who saved it; null when that person was removed'],
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The contract Block[] at the current version'],
+                'perDocumentKeys' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Keys of the parts each document fills itself (E.23)'],
+                'version' => self::int() + ['description' => 'Starts at 1; goes up by one on every change of blocks'],
+                'usedIn' => self::int() + ['description' => 'How many documents use it'],
+                'archivedAt' => self::str(true) + ['description' => 'When it was deleted, ISO 8601 UTC; null while it is live'],
+                'createdAt' => self::str() + ['description' => 'ISO 8601 UTC'],
+                'updatedAt' => self::str() + ['description' => 'ISO 8601 UTC'],
+            ], ['id', 'name', 'description', 'mode', 'sharing', 'owner', 'blocks', 'perDocumentKeys', 'version', 'usedIn', 'archivedAt', 'createdAt', 'updatedAt']),
+            'SavedBlockResponse' => self::dataEnvelope(SchemaBuilder::ref('SavedBlock')),
+            'SavedBlockListResponse' => self::listEnvelope('SavedBlock'),
+            'SavedBlockCreateRequest' => self::object([
+                'name' => self::str() + ['description' => 'At most 120 characters, for example Bank details'],
+                'description' => self::str(true) + ['description' => 'At most 1000 characters'],
+                'mode' => ['type' => 'string', 'enum' => ['synced', 'copy'], 'description' => 'synced: editing it once updates every document that uses it; copy: inserts ordinary blocks'],
+                'sharing' => ['type' => 'string', 'enum' => ['me', 'workspace'], 'description' => 'Left out, me. workspace needs documents:publish'],
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The contract Block[]: 1 to 200 objects, each with a string id and type, at most 256 KiB'],
+                'per_document_keys' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Keys used by perDocument marks in the blocks; at most 200'],
+            ], ['name', 'mode', 'blocks']),
+            'SavedBlockUpdateRequest' => self::object([
+                'name' => self::str() + ['description' => 'At most 120 characters'],
+                'description' => self::str(true) + ['description' => 'At most 1000 characters; null clears it'],
+                'sharing' => ['type' => 'string', 'enum' => ['me', 'workspace'], 'description' => 'Sharing with the workspace needs documents:publish'],
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The new contract Block[]; a change bumps the version'],
+                'per_document_keys' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Keys used by perDocument marks in the blocks'],
+                'version' => self::int() + ['description' => 'The version the change was made against; a different current version is 409 changed'],
+            ], []),
+            'SavedBlockArchiveResponse' => self::dataEnvelope(self::object([
+                'id' => self::int(),
+                'archived' => self::bool(),
+                'usedIn' => self::int() + ['description' => 'How many documents still use it'],
+            ], ['id', 'archived', 'usedIn'])),
+            'SavedBlockVersionResponse' => self::dataEnvelope(self::object([
+                'savedBlockId' => self::int(),
+                'version' => self::int(),
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The contract Block[] of that version'],
+                'createdAt' => self::str() + ['description' => 'ISO 8601 UTC'],
+            ], ['savedBlockId', 'version', 'blocks', 'createdAt'])),
+            'SavedBlockUsage' => self::object([
+                'id' => self::int() + ['description' => 'The document id'],
+                'title' => self::str(),
+                'kind' => self::str() + ['description' => 'template, letter, report, note, wiki or label'],
+                'version' => self::int() + ['description' => 'The saved block version the document shows'],
+            ], ['id', 'title', 'kind', 'version']),
+            'SavedBlockUsageResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('SavedBlockUsage')],
+                'meta' => self::object([
+                    'total' => self::int() + ['description' => 'Every document using it'],
+                    'hidden' => self::int() + ['description' => 'Documents using it that the caller can\'t see'],
+                ], ['total', 'hidden']),
+            ], ['data', 'meta']),
 
             // ── Document themes (editor M4d; E.44, DOCUMENT-THEMES.md 3, 5) ──
             // A theme is data, never CSS: a closed token set of enums and
@@ -16896,6 +16958,116 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The people', 'DocumentMentionableListResponse'),
                     404 => $hidden,
                     422 => self::errorResponse('q is empty or longer than 100 characters'),
+                ] + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
+     * Saved blocks (editor M7; E.21-E.24, E.38). Reading needs documents:read,
+     * changing documents:write. Managing the workspace library (the register's
+     * documents:library:manage, not minted yet) uses documents:publish for now.
+     * Deleting is `refuse` for agents: a person deletes a saved block.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function savedBlockRoutes(): array
+    {
+        $hidden = self::errorResponse('Saved block not found, or someone else\'s Only me block');
+        $library = 'Managing the workspace library needs documents:publish for now (the register\'s documents:library:manage is not minted yet).';
+
+        return [
+            self::permissionRoute('GET', '/api/saved-blocks', 'documents:read', [
+                'summary' => 'List the saved blocks the caller can insert',
+                'description' =>
+                    'The caller\'s own Only me blocks and every block shared with the workspace, not deleted, '
+                    . 'by name. Each says in usedIn how many documents use it.',
+                'tags' => ['documents'],
+                'responses' => [
+                    200 => self::jsonResponse('The saved blocks', 'SavedBlockListResponse'),
+                    400 => self::errorResponse('Tenant context is required'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/saved-blocks', 'documents:write', [
+                'summary' => 'Save blocks as one saved block',
+                'description' =>
+                    'Synced (editing it once updates every document using it) or Copy (inserts ordinary '
+                    . 'blocks), shared with Only me or Everyone in the workspace (E.21, E.22). It starts at '
+                    . 'version 1. Sharing with the workspace needs documents:publish. ' . $library,
+                'tags' => ['documents'],
+                'request' => 'SavedBlockCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The saved block', 'SavedBlockResponse'),
+                    400 => self::errorResponse('Tenant context is required'),
+                    422 => self::errorResponse('Invalid name, description, mode, sharing, blocks or per_document_keys'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/saved-blocks/{id:\d+}', 'documents:read', [
+                'summary' => 'Get one saved block',
+                'description' =>
+                    'Its blocks at the current version. A deleted block still answers, with archivedAt set, '
+                    . 'so documents using it keep rendering.',
+                'tags' => ['documents'],
+                'responses' => [
+                    200 => self::jsonResponse('The saved block', 'SavedBlockResponse'),
+                    404 => $hidden,
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/saved-blocks/{id:\d+}', 'documents:write', [
+                'summary' => 'Change a saved block',
+                'description' =>
+                    'Rename it, change its description or sharing, or its blocks and per-document keys. Only '
+                    . 'the fields sent change. A change of blocks bumps the version and keeps the old one, so '
+                    . 'a published template keeps printing what it was published with until it is published '
+                    . 'again (E.38). The owner changes their own blocks; changing someone else\'s workspace '
+                    . 'block, or sharing one with the workspace, needs documents:publish. ' . $library . ' '
+                    . 'Send version to refuse a change made in between (409 changed). mode can\'t change.',
+                'tags' => ['documents'],
+                'request' => 'SavedBlockUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The saved block', 'SavedBlockResponse'),
+                    404 => $hidden,
+                    409 => self::errorResponse('details.code: changed (someone changed it in between) or archived'),
+                    422 => self::errorResponse('Invalid name, description, sharing, blocks or per_document_keys, or a different mode'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/saved-blocks/{id:\d+}', 'documents:write', [
+                'summary' => 'Delete a saved block',
+                'description' =>
+                    'Archives it: it leaves the / menu and the library, while documents and published '
+                    . 'templates that use it keep their version. A synced block still used by documents '
+                    . 'answers 409 with details.code in_use and details.used_in, unless a documents:publish '
+                    . 'holder sends force=1. The owner deletes their own blocks; someone else\'s workspace '
+                    . 'block needs documents:publish. ' . $library . ' People only.',
+                'tags' => ['documents'],
+                'mcp' => ['agentPolicy' => 'refuse'],
+                'parameters' => [
+                    self::queryParam('force', 'string', '`1` deletes a synced block that documents still use; needs documents:publish.'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The deleted block', 'SavedBlockArchiveResponse'),
+                    404 => $hidden,
+                    409 => self::errorResponse('details.code in_use: a synced block still used; details.used_in is how many documents use it'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/saved-blocks/{id:\d+}/versions/{version:\d+}', 'documents:read', [
+                'summary' => 'Get one version of a saved block',
+                'description' => 'The blocks a version had; a published template prints the version it was published with (E.38).',
+                'tags' => ['documents'],
+                'responses' => [
+                    200 => self::jsonResponse('The version', 'SavedBlockVersionResponse'),
+                    404 => self::errorResponse('Saved block or version not found, or not visible to the caller'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/saved-blocks/{id:\d+}/usage', 'documents:read', [
+                'summary' => 'List the documents that use a saved block',
+                'description' =>
+                    'The documents the caller can see that use it, with the version each shows. meta.total '
+                    . 'counts every document using it, meta.hidden those the caller can\'t see.',
+                'tags' => ['documents'],
+                'responses' => [
+                    200 => self::jsonResponse('The documents', 'SavedBlockUsageResponse'),
+                    404 => $hidden,
                 ] + self::authErrors(),
             ]),
         ];

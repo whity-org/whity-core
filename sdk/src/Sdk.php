@@ -1238,6 +1238,15 @@ namespace Whity\Sdk;
  *
  * Purely additive.)
  *
+ * 1.101 (LOCALIZED TEXT IN BLOCK SCREENS: any text a person reads in a `screen: 'blocks'`
+ * descriptor (its label, and label, title, placeholder, emptyText, description, confirm,
+ * trigger and itemLabel anywhere in the tree, `value` on `text`, `text` on `heading`, `body` on `alert`) may be an
+ * {@see I18n\LocalizedText} value `{en, ar}`. The host serves it in the reader's language;
+ * renderers still receive strings. {@see Frontend\Blocks\BlockText} lists the fields and
+ * resolves a tree, and {@see Frontend\Blocks\BlockValidator} accepts the objects (WHIT-984).
+ *
+ * Purely additive.)
+ *
  * 1.102 (WHITY'S OWN BILLING EMAILS: the host service {@see Mail\BillingEmails} sends a
  * {@see Mail\WorkspaceEmail} in the INSTANCE's brand to a workspace's members who hold
  * `billing:pay`, in the workspace's language (EM.1 `payment-failed`, `whity-receipt`). Only a

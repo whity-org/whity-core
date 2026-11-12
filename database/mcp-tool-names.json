@@ -161,6 +161,10 @@
     "en": "Remove permissions from a role",
     "ar": "سحب صلاحيات من دور"
   },
+  "delete_api_saved_blocks_id": {
+    "en": "Delete a saved block",
+    "ar": "حذف كتلة محفوظة"
+  },
   "delete_api_storage_config": {
     "en": "Remove your storage setup and use the default",
     "ar": "إزالة إعداد التخزين والعودة للافتراضي"
@@ -834,6 +838,22 @@
     "en": "List the kinds of rule a route step can use",
     "ar": "عرض أنواع قواعد مسار المستندات"
   },
+  "get_api_saved_blocks": {
+    "en": "List the saved blocks you can insert",
+    "ar": "عرض الكتل المحفوظة التي يمكنك إدراجها"
+  },
+  "get_api_saved_blocks_id": {
+    "en": "Show a saved block",
+    "ar": "عرض كتلة محفوظة"
+  },
+  "get_api_saved_blocks_id_usage": {
+    "en": "List the documents that use a saved block",
+    "ar": "عرض المستندات التي تستخدم كتلة محفوظة"
+  },
+  "get_api_saved_blocks_id_versions_version": {
+    "en": "Show an earlier version of a saved block",
+    "ar": "عرض إصدار سابق من كتلة محفوظة"
+  },
   "get_api_search": {
     "en": "Search documents, forms, people and units you can see",
     "ar": "البحث في المستندات والنماذج والأشخاص"
@@ -1002,6 +1022,10 @@
     "en": "Rename a body, move it, retire it or bring it back",
     "ar": "تعديل هيئة أو إيقافها أو إعادتها"
   },
+  "patch_api_custom_fields_id": {
+    "en": "Change a field",
+    "ar": "تعديل حقل"
+  },
   "patch_api_document_collections_id": {
     "en": "Rename one of your document collections",
     "ar": "تغيير اسم مجموعة مستندات"
@@ -1057,6 +1081,10 @@
   "patch_api_roles_id": {
     "en": "Update a role and, if given, replace its permissions",
     "ar": "تعديل دور وصلاحياته"
+  },
+  "patch_api_saved_blocks_id": {
+    "en": "Change a saved block",
+    "ar": "تعديل كتلة محفوظة"
   },
   "patch_api_settings": {
     "en": "Change your workspace settings",
@@ -1260,6 +1288,18 @@
   "post_api_convening_bodies_id_members": {
     "en": "Add a member to a body, or change their seat",
     "ar": "تعيين عضو في هيئة أو نقله"
+  },
+  "post_api_custom_fields": {
+    "en": "Add a field to a record type",
+    "ar": "إضافة حقل إلى نوع سجل"
+  },
+  "post_api_custom_fields_id_archive": {
+    "en": "Archive a field",
+    "ar": "أرشفة حقل"
+  },
+  "post_api_custom_fields_id_restore": {
+    "en": "Restore an archived field",
+    "ar": "استعادة حقل مؤرشف"
   },
   "post_api_data_types_type_bulk": {
     "en": "Trash, restore, retire or delete many records at once",
@@ -1627,6 +1667,10 @@
   "post_api_routes_routeid_actions": {
     "en": "Act on your item on a route",
     "ar": "اتخاذ إجراء على عنصرك في مسار"
+  },
+  "post_api_saved_blocks": {
+    "en": "Save blocks as one saved block",
+    "ar": "حفظ كتل ككتلة محفوظة واحدة"
   },
   "post_api_signup_requests_id_approve": {
     "en": "Let a waiting person join as a customer",

@@ -36,6 +36,7 @@ final class ContactsApiSchemas
                     self::param('tag_id', 'integer', 'Only contacts with this tag.'),
                     self::param('q', 'string', 'Search text.'),
                     self::param('archived', 'string', '`true` for archived contacts instead.'),
+                    ['name' => 'field', 'in' => 'query', 'required' => false, 'style' => 'deepObject', 'explode' => true, 'description' => 'Filter on your own fields: `field[preferred_branch]=Abdoun`. For a choose-several field, contacts with that choice; for yes or no, `true` or `false`.', 'schema' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']]],
                     self::param('page', 'integer', 'Page, from 1.'),
                     self::param('per_page', 'integer', 'Rows per page, at most 200. Default 50.'),
                 ],
@@ -139,6 +140,75 @@ final class ContactsApiSchemas
         ];
     }
 
+    /**
+     * The workspace's own fields on its records (WHIT-954, design 3.3 A9).
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    public static function customFieldRoutes(): array
+    {
+        $tags = ['custom-fields'];
+        $one = self::data(SchemaBuilder::ref('CustomField'));
+        $notFound = [404 => self::error('Not found')];
+
+        return [
+            [
+                'method' => 'GET', 'path' => '/api/custom-fields/record-types', 'requiredRole' => null, 'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The kinds of record you can add your own fields to, and how many each has',
+                    'description' => 'Only the types you can read.',
+                    'tags' => $tags,
+                    'responses' => [200 => self::json('Record types', self::object([
+                        'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('CustomFieldRecordType')],
+                    ], ['data']))] + self::auth(),
+                ],
+            ],
+            [
+                'method' => 'GET', 'path' => '/api/custom-fields', 'requiredRole' => null, 'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'List the fields on a record type',
+                    'description' => 'Needs the record type\'s own read permission, such as `contacts:read`.',
+                    'tags' => $tags,
+                    'parameters' => [
+                        self::param('record_type', 'string', 'The record type, such as `contact`.') + ['required' => true],
+                        self::param('archived', 'string', '`true` to include archived fields.'),
+                    ],
+                    'responses' => [200 => self::json('Fields', self::object([
+                        'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('CustomField')],
+                    ], ['data']))] + $notFound + self::auth(),
+                ],
+            ],
+            self::route('POST', '/api/custom-fields', 'fields:manage', [
+                'mcp' => ['undo' => ['windowSeconds' => self::UNDO_WINDOW_SECONDS, 'operation' => 'post_api_custom_fields_id_archive', 'arguments' => ['id' => '/result/data/id']]],
+                'summary' => 'Add a field to a record type',
+                'description' => 'Usable at once: on the record under `fields`, in list filters, as a document merge field (`{{contact.<key>}}`) and in imports. '
+                    . 'The key is made from the English name unless given, and never changes.',
+                'tags' => $tags,
+                'request' => 'CustomFieldRequest',
+                'responses' => [201 => self::json('The field', $one), 409 => self::error('That key is taken'), 422 => self::error('A value that doesn\'t look right')] + $notFound + self::auth(),
+            ]),
+            self::route('PATCH', '/api/custom-fields/{id:\d+}', 'fields:manage', [
+                'summary' => 'Change a field\'s name, choices, list column, whether it\'s required, or who can change it',
+                'description' => 'The key, kind and record type never change.',
+                'tags' => $tags,
+                'request' => 'CustomFieldRequest',
+                'responses' => [200 => self::json('The field', $one), 422 => self::error('A value that doesn\'t look right')] + $notFound + self::auth(),
+            ]),
+            self::route('POST', '/api/custom-fields/{id:\d+}/archive', 'fields:manage', [
+                'mcp' => ['undo' => ['windowSeconds' => self::UNDO_WINDOW_SECONDS, 'operation' => 'post_api_custom_fields_id_restore', 'arguments' => ['id' => '/arguments/id']]],
+                'summary' => 'Archive a field',
+                'description' => 'It leaves records, lists and documents; its values are kept and come back if it is restored.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The field', $one)] + $notFound + self::auth(),
+            ]),
+            self::route('POST', '/api/custom-fields/{id:\d+}/restore', 'fields:manage', [
+                'summary' => 'Bring an archived field back',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The field', $one)] + $notFound + self::auth(),
+            ]),
+        ];
+    }
+
     /** @return array<string, array<string, mixed>> */
     public static function components(): array
     {
@@ -162,10 +232,45 @@ final class ContactsApiSchemas
                 'profile_id' => self::int(true) + ['description' => 'The person in Whity this contact is, when known.'],
                 'profile' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'display_name' => self::str()], 'description' => 'Only on a single contact.'],
                 'tags' => ['type' => 'array', 'items' => $tag],
+                'fields' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The workspace\'s own fields (WHIT-954), by key.'],
                 'archived' => self::bool(),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
             ], ['id', 'name', 'contact_person', 'email', 'mobile', 'phone', 'tax_number', 'payment_terms', 'address', 'notes', 'is_customer', 'is_supplier', 'profile_id', 'tags', 'archived', 'created_at', 'updated_at']),
+            'CustomFieldRecordType' => self::object([
+                'key' => self::str(),
+                'label' => self::str(),
+                'label_ar' => self::str(),
+                'count' => self::int(),
+            ], ['key', 'label', 'label_ar', 'count']),
+            'CustomField' => self::object([
+                'id' => self::int(),
+                'record_type' => self::str(),
+                'key' => self::str(),
+                'label' => self::object(['en' => self::str(), 'ar' => self::str()], ['en', 'ar']),
+                'kind' => self::str() + ['enum' => ['text', 'textarea', 'select', 'multiselect', 'number', 'date', 'checkbox', 'profile_ref']],
+                'options' => ['type' => 'array', 'items' => self::str()],
+                'show_in_list' => self::bool(),
+                'required' => self::bool(),
+                'edit_permission' => self::str(true),
+                'sort_order' => self::int(),
+                'created_by_profile_id' => self::int(true),
+                'archived' => self::bool(),
+                'merge_field' => self::str() + ['description' => 'How a document template uses it, such as `{{contact.preferred_branch}}`.'],
+                'used_by' => self::int() + ['description' => 'How many records have a value.'],
+                'created_at' => self::str(),
+            ], ['id', 'record_type', 'key', 'label', 'kind', 'options', 'show_in_list', 'required', 'edit_permission', 'sort_order', 'archived', 'merge_field', 'used_by', 'created_at']),
+            'CustomFieldRequest' => self::object([
+                'record_type' => self::str() + ['description' => 'The record type, such as `contact`. Only when adding.'],
+                'key' => self::str() + ['pattern' => '^[a-z][a-z0-9_]{0,63}$', 'description' => 'What documents and filters use. Made from the name when left out. Only when adding.'],
+                'label' => ['oneOf' => [self::str(), self::object(['en' => self::str(), 'ar' => self::str()], [])], 'description' => 'The name, as text or `{en, ar}`.'],
+                'kind' => self::str() + ['enum' => ['text', 'textarea', 'select', 'multiselect', 'number', 'date', 'checkbox', 'profile_ref'], 'description' => 'Short text, long text, choose one, choose several, amount, date, yes or no, or a person. Only when adding.'],
+                'options' => ['type' => 'array', 'maxItems' => 100, 'items' => self::str(), 'description' => 'The choices, for choose one or choose several.'],
+                'show_in_list' => self::bool() + ['description' => 'Show it as a column in the record list.'],
+                'required' => self::bool() + ['description' => 'New records can\'t be saved without it.'],
+                'edit_permission' => self::str(true) + ['description' => 'A permission needed to change it, besides the record\'s own; null for everyone who can edit the record.'],
+                'sort_order' => self::int() + ['description' => 'Position among the fields; lower comes first.'],
+            ], []),
             'ContactRequest' => self::object([
                 'name' => self::str() + ['maxLength' => 200, 'description' => 'The name of the customer or supplier, such as a company.'],
                 'contact_person' => self::str() + ['maxLength' => 200, 'description' => 'Who to talk to there.'],
@@ -180,6 +285,7 @@ final class ContactsApiSchemas
                 'is_supplier' => self::bool() + ['description' => 'The workspace buys from them. A contact can be both.'],
                 'profile_id' => self::int(true) + ['description' => 'Link to a person in the workspace; null unlinks.'],
                 'tags' => ['type' => 'array', 'maxItems' => 20, 'items' => self::str() + ['maxLength' => 128], 'description' => 'Tag names; the list replaces the contact\'s tags.'],
+                'fields' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The workspace\'s own fields, by key (see GET /api/v1/custom-fields?record_type=contact); null clears one. Only the keys sent change.'],
             ], []),
             'ContactImportUploadRequest' => self::object([
                 'file_name' => self::str() + ['description' => 'The file\'s name, such as `customers.xlsx`.'],

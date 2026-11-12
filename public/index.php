@@ -753,6 +753,17 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CALENDAR_READ,
     ];
     $items[] = [
+        'id' => 'contacts',
+        'label' => 'Contacts',
+        'href' => '/contacts',
+        'icon' => 'customer',
+        'group' => 'people',
+        // Customers and suppliers (WHIT-955, design 3.3 A8), after the team's own pages.
+        'order' => 8,
+        // Mirrors GET /api/contacts.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CONTACTS_READ,
+    ];
+    $items[] = [
         'id' => 'users',
         'label' => 'Users',
         'href' => '/admin/users',
@@ -3591,6 +3602,8 @@ $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentFieldP
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\CompanyFieldProvider($settingsService, $documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\TodayFieldProvider($documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentNumberFieldProvider($documentFieldLabels));
+// WHIT-954: contacts as a record type, with the workspace's own fields (`{{contact.<key>}}`).
+$documentFieldRegistry->add(new \Whity\Core\Contacts\ContactFieldProvider($db->getPdo(), $documentFieldLabels));
 // WHIT-742: each workspace plugin's record types, in the workspaces where
 // the plugin is published and on (`CakeOrders.order`), so a template can be
 // written for them and a slot can be issued from them.
@@ -4947,6 +4960,25 @@ $router->register('GET',  '/api/document-sources/{id:\d+}/changes',             
 // The people a comment may @mention: members who can read the document.
 $router->register('GET',  '/api/document-sources/{id:\d+}/mentionable',                     [$documentCollabHandler, 'mentionable'],      null, null, CorePermissions::DOCUMENTS_COMMENT);
 
+// Saved blocks (editor M7; E.21-E.24, E.38). Reading needs documents:read and
+// changing documents:write; managing the workspace library uses
+// documents:publish until the register's documents:library:manage is minted.
+// The usage list shows only documents the caller can see (visibleRow).
+// Deleting is agentPolicy refuse.
+$savedBlocksHandler = new \Whity\Api\SavedBlocksApiHandler(
+    new \Whity\Core\Document\SavedBlock\SavedBlockRepository($db->getPdo()),
+    $documentSourcesHandler,
+    $roleChecker,
+    $auditLogger,
+);
+$router->register('GET',    '/api/saved-blocks',                                    [$savedBlocksHandler, 'list'],    null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST',   '/api/saved-blocks',                                    [$savedBlocksHandler, 'create'],  null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('GET',    '/api/saved-blocks/{id:\d+}',                           [$savedBlocksHandler, 'show'],    null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('PATCH',  '/api/saved-blocks/{id:\d+}',                           [$savedBlocksHandler, 'update'],  null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('DELETE', '/api/saved-blocks/{id:\d+}',                           [$savedBlocksHandler, 'delete'],  null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('GET',    '/api/saved-blocks/{id:\d+}/versions/{version:\d+}',    [$savedBlocksHandler, 'version'], null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('GET',    '/api/saved-blocks/{id:\d+}/usage',                     [$savedBlocksHandler, 'usage'],   null, null, CorePermissions::DOCUMENTS_READ);
+
 // Agents in the editor (editor M6; E.30, E.31; owner's answers Q3, Q4, Q9).
 // Whity hosts no model: a person's request waits until their own agent picks
 // it up over MCP (document_agent_requests_next). The agent's tools are named by
@@ -5170,14 +5202,39 @@ $router->register('DELETE', '/api/calendar/events/{id:\d+}',                [$ca
 // can be undone for 24 hours.
 $contactRepository = new \Whity\Core\Contacts\ContactRepository($db->getPdo());
 $contactTags = new \Whity\Core\Contacts\ContactTags($db->getPdo());
-$contactService = new \Whity\Core\Contacts\ContactService($contactRepository, $contactTags);
+// WHIT-954: the workspace's own fields on core's records. Core registers
+// `contact`; a plugin registers its own type on $customFieldRecordTypes with
+// registerOwned() (its key starts with its name and a dot).
+$customFieldRecordTypes = new \Whity\Core\CustomFields\CustomFieldRecordTypes();
+$customFieldRecordTypes->register(new \Whity\Core\CustomFields\CustomFieldRecordType(
+    'contact',
+    'Contacts',
+    'جهات الاتصال',
+    CorePermissions::CONTACTS_READ,
+    CorePermissions::CONTACTS_WRITE,
+    static fn (int $tenantId, int $id): bool => $contactRepository->find($tenantId, $id) !== null,
+    \Whity\Core\Contacts\ContactFieldProvider::reservedKeys(),
+));
+\Whity\register_service(\Whity\Core\CustomFields\CustomFieldRecordTypes::class, $customFieldRecordTypes);
+$customFieldRepository = new \Whity\Core\CustomFields\CustomFieldRepository($db->getPdo());
+$customFieldService = new \Whity\Core\CustomFields\CustomFieldService($db->getPdo(), $customFieldRepository, $customFieldRecordTypes);
+$contactService = new \Whity\Core\Contacts\ContactService($contactRepository, $contactTags, $customFieldService);
 $contactImportService = new \Whity\Core\Contacts\Import\ContactImportService(
     $db->getPdo(),
     $contactRepository,
     $contactTags,
     new \Whity\Core\Contacts\Import\ContactImportRepository($db->getPdo()),
 );
-$contactsHandler = new \Whity\Api\ContactsApiHandler($contactService, $contactTags, $contactImportService);
+$contactImportService->addTargets(new \Whity\Core\CustomFields\CustomFieldImportTargets($customFieldService, $customFieldRepository, 'contact'));
+$contactsHandler = new \Whity\Api\ContactsApiHandler($contactService, $contactTags, $contactImportService, $roleChecker);
+$customFieldsHandler = new \Whity\Api\CustomFieldsApiHandler($customFieldService, $roleChecker);
+// Listing a type's fields checks that type's read permission in the handler.
+$router->register('GET',    '/api/custom-fields/record-types',             [$customFieldsHandler, 'recordTypes'], null);
+$router->register('GET',    '/api/custom-fields',                          [$customFieldsHandler, 'list'],        null);
+$router->register('POST',   '/api/custom-fields',                          [$customFieldsHandler, 'create'],      null, null, CorePermissions::FIELDS_MANAGE);
+$router->register('PATCH',  '/api/custom-fields/{id:\d+}',                 [$customFieldsHandler, 'update'],      null, null, CorePermissions::FIELDS_MANAGE);
+$router->register('POST',   '/api/custom-fields/{id:\d+}/archive',         [$customFieldsHandler, 'archive'],     null, null, CorePermissions::FIELDS_MANAGE);
+$router->register('POST',   '/api/custom-fields/{id:\d+}/restore',         [$customFieldsHandler, 'restore'],     null, null, CorePermissions::FIELDS_MANAGE);
 $router->register('GET',    '/api/contacts',                               [$contactsHandler, 'list'],        null, null, CorePermissions::CONTACTS_READ);
 $router->register('POST',   '/api/contacts',                               [$contactsHandler, 'create'],      null, null, CorePermissions::CONTACTS_WRITE);
 $router->register('GET',    '/api/contacts/tags',                          [$contactsHandler, 'listTags'],    null, null, CorePermissions::CONTACTS_READ);
@@ -6397,7 +6454,7 @@ $pluginLoader->collectJobs($jobsRegistry);
 // Descriptor-derived navigation (WC-169): every validated plugin frontend
 // feature gets a menu entry pointing at the dynamic screen route /admin/x/{id}.
 // Features are read at dispatch time, so runtime disable drops the entry.
-\Whity\Core\PluginNavigationBridge::subscribe($hookManager, $pluginLoader);
+\Whity\Core\PluginNavigationBridge::subscribe($hookManager, $pluginLoader, static fn (): string => $languageRegistry->getCurrentLanguageCode());
 \Whity\Core\Plugin\Tenant\TenantPluginNavigation::subscribe($hookManager, $tenantManifestHost);
 
 // Handle requests (persistent worker mode or fallback single-request mode)

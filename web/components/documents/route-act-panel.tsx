@@ -130,6 +130,7 @@ import {
   type RouteVerdictName,
 } from './routing-wire';
 import { SignPanel } from './sign-panel';
+import { Lottie } from '@whity/ui/lottie';
 
 /**
  * The server's own ceiling on a note, from `DocumentRoutingApiHandler`.
@@ -224,6 +225,8 @@ export function RouteActPanel({
    * A toast says it for four seconds; this says it until they navigate away.
    */
   const [outcome, setOutcome] = useState<DecisionOutcome | null>(null);
+  /** The viewer has just signed: the panel says so, with the signing moment (LT.4). */
+  const [justSigned, setJustSigned] = useState(false);
 
   /** The viewer's own OPEN item on this route, if they have one. */
   const myOpenItem = useMemo<RouteRecipient | null>(() => {
@@ -536,7 +539,7 @@ export function RouteActPanel({
   // WHIT-922: a signing step is answered by signing or declining, with its own
   // panel. Nothing on this panel would be accepted there.
   if (myStep?.kind === 'sign') {
-    return <SignPanel documentId={documentId} route={route} onActed={onActed} />;
+    return <SignPanel documentId={documentId} route={route} onActed={onActed} onSigned={() => setJustSigned(true)} />;
   }
 
   return (
@@ -613,6 +616,14 @@ export function RouteActPanel({
         Ordering it above the controls is not cosmetics. What you just did, and
         what it concluded, outrank a list of things you may no longer do.
       */}
+      {justSigned && (
+        <div data-slot="route-act-signed" className="flex flex-col items-center gap-1 text-center">
+          <Lottie name="documents-sign" className="h-[100px] w-[150px]" />
+          <p className="text-sm text-foreground" role="status">
+            {t('signing.done', 'Signed. Your electronic signature is recorded with the audit trail.')}
+          </p>
+        </div>
+      )}
       {outcome !== null && (
         <Alert
           variant={

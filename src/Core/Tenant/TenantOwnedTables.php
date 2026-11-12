@@ -136,6 +136,10 @@ final class TenantOwnedTables
         'contacts' => '261_create_contacts.php',
         'contact_imports' => '261_create_contacts.php',
         'contact_import_changes' => '261_create_contacts.php',
+
+        // WHIT-954 — the workspace's own fields and their values (A9).
+        'custom_field_definitions' => '263_create_custom_fields.php',
+        'custom_field_values' => '263_create_custom_fields.php',
         // Messages (ADR 0016, WHIT-938): conversations with customers, their
         // messages, web chat visitors and the per-workspace settings. Every
         // query binds tenant_id. The public chat and inbound webhook routes find
@@ -222,6 +226,11 @@ final class TenantOwnedTables
         'document_comment_threads' => '184_create_document_comment_threads.php',
         'document_comments' => '185_create_document_comments.php',
         'document_agent_requests' => '252_create_document_agent_requests.php',
+        // Editor M7: saved blocks, their insert-only versions, and which
+        // documents use them (migrations 260 and 265, E.21-E.24, E.38).
+        'saved_blocks' => '260_create_saved_blocks.php',
+        'saved_block_versions' => '260_create_saved_blocks.php',
+        'saved_block_uses' => '265_create_saved_block_uses.php',
         // Whity Builder (WHIT-760): a workspace's own plugins as published
         // manifest versions, the live pointer, and the permission slugs they
         // declare (migration 164).

@@ -60,6 +60,7 @@ function EmptyBox({
   action,
   moment,
   once,
+  onceEver,
   className,
 }: {
   icon: IconName
@@ -68,6 +69,7 @@ function EmptyBox({
   action?: React.ReactNode
   moment?: MomentName
   once?: string
+  onceEver?: string
   className?: string
 }) {
   const tile = (
@@ -82,7 +84,7 @@ function EmptyBox({
         className
       )}
     >
-      {moment ? <Lottie name={moment} once={once} className="h-[120px] w-[160px]" fallback={tile} /> : tile}
+      {moment ? <Lottie name={moment} once={once} onceEver={onceEver} className="h-[120px] w-[160px]" fallback={tile} /> : tile}
       <p className="mt-1 text-base font-semibold text-foreground">{title}</p>
       {description && <p className="max-w-prose text-sm text-muted-foreground">{description}</p>}
       {action && <div className="mt-1">{action}</div>}
@@ -98,6 +100,7 @@ function EmptyFirstTime({
   action,
   moment,
   once,
+  onceEver,
   className,
 }: {
   icon?: IconName
@@ -105,10 +108,12 @@ function EmptyFirstTime({
   description?: string
   /** The page's main button. */
   action?: React.ReactNode
-  /** `empty-documents`, `empty-people`, `empty-invoices`, `empty-stock` or `all-caught-up` (LT.4). */
+  /** `empty-documents`, `empty-people`, `empty-invoices`, `empty-stock`, `all-caught-up`, or a first-run scene (LT.4). */
   moment?: MomentName
   /** Plays once a session under this key; defaults to the moment's name. */
   once?: string
+  /** Plays once ever on this device under this key instead (first-run scenes). */
+  onceEver?: string
   className?: string
 }) {
   return (
@@ -118,7 +123,8 @@ function EmptyFirstTime({
       description={description}
       action={action}
       moment={moment}
-      once={moment ? (once ?? moment) : undefined}
+      once={moment && !onceEver ? (once ?? moment) : undefined}
+      onceEver={onceEver}
       className={className}
     />
   )

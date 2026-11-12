@@ -60,6 +60,7 @@ function ApprovalQueue({ items, currentId, onCurrentChange, label = "Approvals",
     <section data-slot="approval-queue" aria-label={label} className={cn("grid max-w-[560px] gap-2", className)}>
       {!current ? (
         <EmptyState
+          moment="all-caught-up"
           icon={<Icon name="success" size={24} />}
           title={L.doneTitle}
           description={L.doneDescription}
