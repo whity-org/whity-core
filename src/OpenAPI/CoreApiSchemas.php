@@ -10136,13 +10136,15 @@ final class CoreApiSchemas
             'DisplayPreferences' => self::object([
                 'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
                 'showTechnicalDetails' => self::bool(),
-            ], ['textSize', 'showTechnicalDetails']),
+                'animations' => ['type' => 'string', 'enum' => ['full', 'calm', 'off']],
+            ], ['textSize', 'showTechnicalDetails', 'animations']),
             'DisplayPreferencesResponse' => self::object([
                 'data' => SchemaBuilder::ref('DisplayPreferences'),
             ], ['data']),
             'DisplayPreferencesUpdateRequest' => self::object([
                 'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
                 'showTechnicalDetails' => self::bool(),
+                'animations' => ['type' => 'string', 'enum' => ['full', 'calm', 'off']],
             ], []),
             'NotificationPreferencesUpdateRequest' => self::object([
                 'preferences' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationPreferenceEntry'), 'description' => 'Entries of `{type, channel, enabled}` to set for the signed-in user. Transactional notification types cannot be turned off.'],

@@ -10135,6 +10135,8 @@ export interface components {
             /** @enum {string} */
             textSize: "standard" | "larger";
             showTechnicalDetails: boolean;
+            /** @enum {string} */
+            animations: "full" | "calm" | "off";
         };
         DisplayPreferencesResponse: {
             data: components["schemas"]["DisplayPreferences"];
@@ -10143,6 +10145,8 @@ export interface components {
             /** @enum {string} */
             textSize?: "standard" | "larger";
             showTechnicalDetails?: boolean;
+            /** @enum {string} */
+            animations?: "full" | "calm" | "off";
         };
         Document: {
             id: number;
