@@ -5881,6 +5881,19 @@ $agentProposals = new \Whity\Core\Agent\AgentProposalRepository(
     // WHIT-991: created, decided and undone, for plugins.
     new \Whity\Core\Agent\AgentProposalEvents($hookManager),
 );
+// A12 / EM.1 `needs-approval`: the person an agent acts for hears by email that
+// something waits for them (only opens the app; one an hour per agent; the
+// agent's page and Preferences turn it off).
+(new \Whity\Core\Notification\AgentEmailNotifier(
+    $db->getPdo(),
+    $agentProposals,
+    new \Whity\Core\Notification\NotificationPreferenceRepository($db->getPdo()),
+    $profileEmailRepository,
+    new DatabaseSharedStore($db->getPdo()),
+    $brandedEmailSender,
+    $frontendUrls->base() . '/admin/approvals',
+    $logger,
+))->subscribe($hookManager);
 // WHIT-833: previews of what a proposed call would change. Register one with
 // $proposalDiffs->register('<tool name>', fn (array $arguments, int $tenantId): ?array => ...).
 $proposalDiffs = new \Whity\Mcp\Tools\ProposalDiffRegistry();

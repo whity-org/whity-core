@@ -78,8 +78,20 @@ final class BrandedEmailSender
         }
 
         try {
-            $rendered = $this->layout->render($content, $this->branding($tenantId));
-            $this->mailer->send($to, $subject, $rendered->text, $rendered->html);
+            $branding = $this->branding($tenantId);
+            $rendered = $this->layout->render($content, $branding);
+            if ($tenantId > 0 && $this->mailer instanceof ThreadedMailer) {
+                // EM.1: from "the workspace, via Whity"; a white-label plan drops "via Whity".
+                $this->mailer->sendThreaded(new OutgoingEmail(
+                    to: $to,
+                    subject: $subject,
+                    textBody: $rendered->text,
+                    htmlBody: $rendered->html,
+                    fromName: self::fromName($branding, $content->language),
+                ));
+            } else {
+                $this->mailer->send($to, $subject, $rendered->text, $rendered->html);
+            }
 
             return true;
         } catch (\Throwable $e) {
@@ -87,5 +99,19 @@ final class BrandedEmailSender
 
             return false;
         }
+    }
+
+    /**
+     * "Example Bakery via Whity" ("Example Bakery عبر Whity" in Arabic), or the
+     * workspace's name alone on a white-label plan.
+     */
+    public static function fromName(EmailBranding $branding, string $language = 'en'): string
+    {
+        $name = trim(str_replace(["\r", "\n"], ' ', $branding->siteName));
+        if ($branding->whiteLabel || $name === 'Whity') {
+            return $name;
+        }
+
+        return $name . ($language === 'ar' ? ' عبر Whity' : ' via Whity');
     }
 }

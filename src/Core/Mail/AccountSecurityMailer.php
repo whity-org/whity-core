@@ -110,6 +110,7 @@ final class AccountSecurityMailer
             ctaTone: 'danger',
             notice: sprintf($w['notice'], $email),
             language: $lang,
+            rowsFirst: true,
         ));
     }
 

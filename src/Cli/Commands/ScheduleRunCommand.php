@@ -193,6 +193,15 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // EM.1: the agents' daily summary, once an hour; the job sends only
+        // where it is 18:00, and at most once a day per person.
+        if ((int) $now->format('i') === 0) {
+            $this->queue->dispatch(\Whity\Core\Notification\Jobs\AgentDailySummaryJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'agents-daily-summary-' . $bucket,
+            ]);
+        }
+
         $this->logger->info('[schedule:run] tick complete', [
             'bucket'     => $bucket,
             'dispatched' => $dispatched,

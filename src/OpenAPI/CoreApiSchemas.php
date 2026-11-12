@@ -7169,7 +7169,8 @@ final class CoreApiSchemas
                     'kind' => self::str(true),
                     'readable' => ['type' => 'boolean', 'description' => 'False when you cannot read this document yourself, so its name is withheld'],
                 ], ['id', 'title', 'kind', 'readable'])],
-            ], ['id', 'slug', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant', 'preset', 'status', 'createdAt', 'updatedAt', 'paused', 'pausedAt', 'pausedBy', 'updatedBy', 'worksFor', 'actionsToday', 'proposalsToday', 'waiting', 'lastActiveAt', 'onItsOwn', 'mayRead']),
+                'notifyByEmail' => ['type' => 'boolean', 'description' => 'Whether the person it acts for hears by email when something waits for them (A12)'],
+            ], ['id', 'slug', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant', 'preset', 'status', 'createdAt', 'updatedAt', 'paused', 'pausedAt', 'pausedBy', 'updatedBy', 'worksFor', 'actionsToday', 'proposalsToday', 'waiting', 'lastActiveAt', 'onItsOwn', 'mayRead', 'notifyByEmail']),
             'AgentOnItsOwn' => self::object([
                 'allowed' => self::int(),
                 'askFirst' => self::int(),
@@ -15239,6 +15240,7 @@ final class CoreApiSchemas
             'toolsets' => ['type' => 'array', 'items' => self::str(), 'description' => 'Toolset ids or prefix.*; empty means every toolset'],
             'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']], 'description' => 'Where a new assignment starts, per permission'],
             'mayRead' => ['type' => 'array', 'maxItems' => 20, 'items' => self::int(), 'description' => 'Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person\'s own access.'],
+            'notifyByEmail' => ['type' => 'boolean', 'description' => 'Email the person it acts for when something waits for them: at most one an hour, and the email only opens Whity'],
         ];
     }
 

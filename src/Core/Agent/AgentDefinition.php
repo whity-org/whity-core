@@ -122,6 +122,15 @@ final class AgentDefinition
             }
         }
 
+        // A12: whether the person it acts for hears by email when it needs them.
+        if (array_key_exists('notify_by_email', $input)) {
+            if (!is_bool($input['notify_by_email'])) {
+                $errors[] = 'notifyByEmail must be true or false';
+            } else {
+                $out['notify_by_email'] = $input['notify_by_email'];
+            }
+        }
+
         if (array_key_exists('grant', $input)) {
             $grant = $input['grant'];
             if (!is_array($grant) || ($grant !== [] && array_is_list($grant))) {

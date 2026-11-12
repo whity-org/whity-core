@@ -59,8 +59,12 @@ final class EmailLayout
         $heading = self::esc($c->heading);
 
         $body = '';
+        $paragraphs = '';
         foreach ($c->paragraphs as $p) {
-            $body .= self::para($p, self::TEXT);
+            $paragraphs .= self::para($p, self::TEXT);
+        }
+        if (!$c->rowsFirst) {
+            $body .= $paragraphs;
         }
 
         if ($c->code !== null && $c->code !== '') {
@@ -80,6 +84,9 @@ final class EmailLayout
             }
             $body .= '<table role="presentation" class="rows" width="100%" cellpadding="0" cellspacing="0" border="0" '
                 . 'style="margin:4px 0 22px;background:' . self::PANEL . ';border-radius:12px">' . $rows . '</table>';
+        }
+        if ($c->rowsFirst) {
+            $body .= $paragraphs;
         }
 
         if ($c->checklist !== []) {
