@@ -16,7 +16,7 @@ final class ConversationRepository
     public const STATUSES = ['open', 'pending', 'closed'];
 
     /**
-     * Team chats (migration 259) share the table; Messages only ever reads
+     * Team chats (migration 250) share the table; Messages only ever reads
      * conversations with customers.
      */
     private const CUSTOMER_ONLY = "c.kind = 'customer'";

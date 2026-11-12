@@ -16,7 +16,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Mcp\Auth\McpPrincipal;
 
 /**
- * Team chat on the real schema (CH.1, CH.2; migration 259): only members see a
+ * Team chat on the real schema (CH.1, CH.2; migration 250): only members see a
  * chat, an agent reads only from when it joined and never another chat, its
  * joining line says who added it and what it may do, a held agent line waits
  * for the person it works for, a shared proposal is decided only by its person,

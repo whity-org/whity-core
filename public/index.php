@@ -5393,7 +5393,7 @@ $router->register('GET',   '/api/messages/settings',                      [$mess
 $router->register('PUT',   '/api/messages/settings',                      [$messagesHandler, 'putSettings'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
 $router->register('POST',  '/api/messages/settings/inbound-secret',       [$messagesHandler, 'rotateInboundSecret'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
 // A signed-in customer's own conversations: ownership is the check, like /api/me/forms.
-// Team chat (CH.1, CH.2; migration 259): the team's own chats on the Messages
+// Team chat (CH.1, CH.2; migration 250): the team's own chats on the Messages
 // tables. DELIBERATELY UNGATED at the router, like the Inbox: the handler lets
 // in only staff of the workspace, and only members see a chat, so a chat the
 // caller (or the calling agent) is not in answers 404. What an agent may do in

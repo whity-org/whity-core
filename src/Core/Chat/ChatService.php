@@ -636,7 +636,15 @@ final class ChatService
                 'kind' => $kind,
                 'body' => (string) $r['body_text'],
                 'author' => $author,
-                'mentions' => is_array($meta['mentions'] ?? null) ? array_values($meta['mentions']) : [],
+                // Rebuilt in a fixed shape: jsonb does not keep key order.
+                'mentions' => array_values(array_map(
+                    static fn (mixed $m): array => [
+                        'type' => (string) (is_array($m) ? ($m['type'] ?? '') : ''),
+                        'id' => (int) (is_array($m) ? ($m['id'] ?? 0) : 0),
+                        'name' => (string) (is_array($m) ? ($m['name'] ?? '') : ''),
+                    ],
+                    is_array($meta['mentions'] ?? null) ? $meta['mentions'] : [],
+                )),
                 'status' => $held !== null ? 'held' : ((string) $r['status'] === 'cancelled' ? 'declined' : 'posted'),
                 'waiting_for' => $held !== null ? $held['by'] : null,
                 'can_decide' => $held !== null && !$viewer->isAgent() && (int) ($held['by']['id'] ?? 0) === $viewer->profileId,

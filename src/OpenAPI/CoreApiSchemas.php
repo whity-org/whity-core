@@ -6622,7 +6622,7 @@ final class CoreApiSchemas
                 'source' => self::str(),
             ], ['data', 'pagination', 'source']),
 
-            // -- Team chat (CH.1, CH.2; migration 259) ----------------------------
+            // -- Team chat (CH.1, CH.2; migration 250) ----------------------------
             // People and agents in one chat. An agent is always marked: who it is,
             // who it works for, and what it may do in that chat.
             'ChatPerson' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']),
@@ -17038,6 +17038,17 @@ final class CoreApiSchemas
      * @param array<string, mixed> $schema
      * @return array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}
      */
+    private static function permissionRoute(string $method, string $path, string $permission, array $schema): array
+    {
+        return [
+            'method' => $method,
+            'path' => $path,
+            'requiredRole' => null,
+            'requiredPermission' => $permission,
+            'schema' => $schema,
+        ];
+    }
+
     /**
      * A route with no permission gate: the handler decides who may use it.
      *
@@ -17051,17 +17062,6 @@ final class CoreApiSchemas
             'path' => $path,
             'requiredRole' => null,
             'requiredPermission' => null,
-            'schema' => $schema,
-        ];
-    }
-
-    private static function permissionRoute(string $method, string $path, string $permission, array $schema): array
-    {
-        return [
-            'method' => $method,
-            'path' => $path,
-            'requiredRole' => null,
-            'requiredPermission' => $permission,
             'schema' => $schema,
         ];
     }
