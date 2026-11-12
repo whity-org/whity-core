@@ -90,7 +90,7 @@ function SaveBlockDialog({
         >
           <DialogHeader>
             <DialogTitle>{labels.saveBlockTitle}</DialogTitle>
-            <DialogDescription>{fill(labels.saveBlockExplain, { n: blockCount })}</DialogDescription>
+            <DialogDescription>{blockCount === 1 ? labels.saveBlockExplainOne : fill(labels.saveBlockExplain, { n: blockCount })}</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-1.5">

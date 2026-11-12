@@ -287,6 +287,42 @@ final class SavedBlocksApiRealEngineTest extends TestCase
         self::assertSame([], $this->blocks->usesForSource(self::TENANT, $doc));
     }
 
+    public function testSavingADraftRecordsTheSyncedBlocksItUses(): void
+    {
+        $a = $this->make(self::OWNER, ['sharing' => 'workspace']);
+        $b = $this->make(self::OWNER, ['sharing' => 'workspace']);
+        $doc = $this->document(self::OWNER);
+        $roleChecker = new RoleChecker($this->wrap($this->pdo), new PermissionRegistry());
+        $documents = new DocumentSourcesApiHandler(
+            $this->sources,
+            new DocumentAccessPolicy(),
+            $roleChecker,
+            new OuReachResolver($this->pdo, new ResourceRoleAssignmentRepository($this->pdo, new ResourceTypeRegistry())),
+            savedBlocks: $this->blocks,
+        );
+        $ref = static fn (string $id, int $saved): array => ['id' => $id, 'type' => 'savedBlock', 'savedBlockId' => (string) $saved, 'version' => 1, 'overrides' => []];
+        $save = function (string $etag, array $blocks) use ($documents, $doc): Response {
+            $req = new Request('PUT', "/api/document-sources/{$doc}/draft", ['If-Match' => $etag], (string) json_encode(['blocks' => $blocks]));
+            TenantContext::reset();
+            TenantContext::setTenantId(self::TENANT);
+            $req->user = (object) ['profile_id' => self::OWNER, 'active_tenant_id' => self::TENANT];
+
+            return $documents->saveDraft($req, ['id' => (string) $doc]);
+        };
+
+        // One at the top, one inside a toggle: both count.
+        $res = $save('"1"', [$ref('r1', $a), ['id' => 't1', 'type' => 'toggle', 'open' => true, 'summary' => [], 'children' => [$ref('r2', $b)]]]);
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        self::assertSame([$a => 1, $b => 1], $this->blocks->usesForSource(self::TENANT, $doc));
+        self::assertSame(1, $this->data($this->call('show', self::OWNER, $a))['usedIn']);
+
+        // Detached (now ordinary blocks): it no longer uses the block.
+        $res = $save('"2"', [$ref('r1', $a), ['id' => 'p1', 'type' => 'paragraph', 'content' => []]]);
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        self::assertSame([$a => 1], $this->blocks->usesForSource(self::TENANT, $doc));
+        self::assertSame(0, $this->data($this->call('show', self::OWNER, $b))['usedIn']);
+    }
+
     public function testUsageListsOnlyDocumentsTheCallerCanSee(): void
     {
         $id = $this->make(self::OWNER, ['sharing' => 'workspace']);

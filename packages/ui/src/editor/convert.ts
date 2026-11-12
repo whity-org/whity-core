@@ -203,6 +203,11 @@ export function blockToPm(block: Block): JSONContent {
       return { type: "qr", attrs: { ...common(block), value: block.value, caption: block.caption ?? null, sizeMm: block.sizeMm ?? null } }
     case "math":
       return { type: "math", attrs: { ...common(block), tex: block.tex } }
+    case "savedBlock":
+      return {
+        type: "savedBlock",
+        attrs: { ...common(block), savedBlockId: block.savedBlockId, version: block.version, overrides: block.overrides },
+      }
     default:
       return { type: "unknownBlock", attrs: { ...common(block), data: block } }
   }
@@ -321,6 +326,17 @@ export function blockFromPm(node: JSONContent): Block | null {
     }
     case "math":
       return withCommon({ id, type: "math", tex: String(a.tex ?? "") }, a)
+    case "savedBlock":
+      return withCommon(
+        {
+          id,
+          type: "savedBlock",
+          savedBlockId: String(a.savedBlockId ?? ""),
+          version: Number(a.version ?? 1),
+          overrides: (a.overrides ?? {}) as Of<"savedBlock">["overrides"],
+        },
+        a
+      )
     case "unknownBlock":
       return a.data ? { ...(a.data as Block), id } : null
     default:
@@ -330,6 +346,19 @@ export function blockFromPm(node: JSONContent): Block | null {
 
 function blocksFromPm(nodes: JSONContent[] | undefined): Block[] {
   return (nodes ?? []).map(blockFromPm).filter((b): b is Block => b !== null)
+}
+
+/**
+ * Blocks as fresh editor content: the same blocks with no ids, so the editor
+ * gives each a new one (a saved block's copy, or a detached synced block).
+ */
+export function freshEditorBlocks(blocks: Block[]): JSONContent[] {
+  const strip = (node: JSONContent): JSONContent => ({
+    ...node,
+    ...(node.attrs && "id" in node.attrs ? { attrs: { ...node.attrs, id: null } } : {}),
+    ...(node.content ? { content: node.content.map(strip) } : {}),
+  })
+  return blocks.map((b) => strip(blockToPm(b)))
 }
 
 /** The editor's content for a document's blocks. An empty document gets one empty paragraph. */

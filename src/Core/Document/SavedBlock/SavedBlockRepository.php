@@ -281,6 +281,45 @@ final class SavedBlockRepository
     }
 
     /**
+     * The saved blocks a document's blocks use, as [savedBlockId, version]
+     * for {@see self::recordUses()}: every `savedBlock`, nested ones in
+     * toggles and columns included. Copies are ordinary blocks and use none.
+     *
+     * @param array<mixed> $blocks
+     * @return list<array{0: int, 1: int}>
+     */
+    public static function usesIn(array $blocks): array
+    {
+        $uses = [];
+        foreach ($blocks as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+            $type = $block['type'] ?? null;
+            if ($type === 'savedBlock') {
+                $id = $block['savedBlockId'] ?? null;
+                $version = $block['version'] ?? null;
+                if ((is_int($id) || (is_string($id) && ctype_digit($id))) && is_int($version)) {
+                    $uses[] = [(int) $id, $version];
+                }
+                continue;
+            }
+            if ($type === 'toggle' && is_array($block['children'] ?? null)) {
+                array_push($uses, ...self::usesIn($block['children']));
+            }
+            if ($type === 'columns' && is_array($block['columns'] ?? null)) {
+                foreach ($block['columns'] as $column) {
+                    if (is_array($column)) {
+                        array_push($uses, ...self::usesIn($column));
+                    }
+                }
+            }
+        }
+
+        return $uses;
+    }
+
+    /**
      * Replaces the saved blocks a document uses, for the editor's draft save
      * to call. Each entry is [savedBlockId, version]; a saved block named
      * twice keeps the last version given. Ids that aren't a saved block of

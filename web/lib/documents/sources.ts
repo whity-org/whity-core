@@ -13,6 +13,7 @@ import type {
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { agentsAdapter } from './agents';
+import { savedBlocksAdapter } from './saved-blocks';
 import { collabAdapter } from './collab';
 
 /**
@@ -192,6 +193,8 @@ export const documentSourcesAdapter: DocumentEditorAdapter = {
   ...collabAdapter,
   // M6: Ask an agent.
   ...agentsAdapter,
+  // M7: saved blocks.
+  ...savedBlocksAdapter,
 
   async loadTemplate(recordType): Promise<TemplateSetup> {
     const [{ data, response }, logos] = await Promise.all([

@@ -6,7 +6,7 @@ import { DocumentEditorScreen } from '@whity/features/document-editor';
 import { useTranslation } from '@whity/features/i18n';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useAuth } from '@/lib/auth-context';
-import { DOCUMENTS_COMMENT, DOCUMENTS_ISSUE, DOCUMENTS_SUGGEST, DOCUMENTS_WRITE } from '@/lib/capabilities';
+import { DOCUMENTS_COMMENT, DOCUMENTS_ISSUE, DOCUMENTS_PUBLISH, DOCUMENTS_SUGGEST, DOCUMENTS_WRITE } from '@/lib/capabilities';
 import { issueHref } from '@/lib/documents/issue';
 import { documentSourcesAdapter } from '@/lib/documents/sources';
 
@@ -70,6 +70,8 @@ export default function DocumentSourcePage({
       canEdit={hasPermission(DOCUMENTS_WRITE)}
       canSuggest={hasPermission(DOCUMENTS_SUGGEST)}
       canComment={hasPermission(DOCUMENTS_COMMENT)}
+      // E.22: the workspace library is managed with documents:publish until documents:library:manage exists.
+      canManageLibrary={hasPermission(DOCUMENTS_PUBLISH)}
       me={me}
       onBack={() => (issuing ? router.push('/admin/document-library') : router.push(isTemplate ? '/admin/document-templates' : '/admin/document-sources'))}
       path={

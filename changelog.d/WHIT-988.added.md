@@ -1,0 +1,1 @@
+Saved blocks in the document editor: select blocks and Save as block (Synced or Copy, Only me or the workspace library); insert them from the Saved blocks group of the / menu; a synced block shows its name, "used in N documents" and Detach, and each save records which saved blocks a document uses.

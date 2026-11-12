@@ -128,6 +128,8 @@ export const BarcodeBlock = atom("barcode", {
 export const QrBlock = atom("qr", { value: json([]), caption: json(null), sizeMm: { default: null } })
 /** E.42 */
 export const MathBlock = atom("math", { tex: { default: "" } })
+/** E.21: a synced saved block, drawn from the library; copies are ordinary blocks. */
+export const SavedBlockNode = atom("savedBlock", { savedBlockId: { default: "" }, version: { default: 1 }, overrides: json({}) })
 
 export const richSchemaExtensions = [
   Callout,
@@ -147,4 +149,5 @@ export const richSchemaExtensions = [
   BarcodeBlock,
   QrBlock,
   MathBlock,
+  SavedBlockNode,
 ]

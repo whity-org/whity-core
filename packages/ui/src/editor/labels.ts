@@ -71,6 +71,7 @@ export const EDITOR_LABELS = {
   groupStructure: "Structure",
   groupMedia: "Media",
   groupWhity: "Whity",
+  groupSaved: "Saved blocks",
   blockCallout: "Callout",
   blockCalloutHint: "A note or something important",
   blockToggle: "Toggle",
@@ -352,6 +353,17 @@ export const EDITOR_LABELS = {
   saveBlockEveryoneHint: "It joins the workspace library.",
   saveBlockSave: "Save block",
   saveBlockCancel: "Cancel",
+  saveBlockExplainOne: "Saves this block so you can insert it from the / menu.",
+  saveAsBlock: "Save as block",
+  savedBlockLabel: "Saved block: {name}",
+  savedBlockSynced: "Synced",
+  savedBlockUsedIn: "used in {n} documents",
+  savedBlockUsedInOne: "used in 1 document",
+  savedBlockDetach: "Detach",
+  savedBlockDetachHint: "Turn it into ordinary blocks you change here only",
+  savedBlockMissing: "This saved block was deleted or isn't shared with you.",
+  savedBlockSyncedHint: "Synced: changes reach every document",
+  savedBlockCopyHint: "Inserts a copy you change freely",
 }
 
 export type EditorLabels = typeof EDITOR_LABELS
