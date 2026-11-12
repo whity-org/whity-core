@@ -200,14 +200,6 @@ final class SavedBlocksApiHandler
 
         $id = (int) $row['id'];
         $changed = [];
-        if ($name !== $row['name'] || $description !== $row['description'] || $sharing !== $row['sharing']) {
-            $this->repo->updateDetails($id, $tenantId, ['name' => $name, 'description' => $description, 'sharing' => $sharing]);
-            foreach (['name' => $name, 'description' => $description, 'sharing' => $sharing] as $field => $value) {
-                if ($value !== $row[$field]) {
-                    $changed[] = $field;
-                }
-            }
-        }
         $version = (int) $row['version'];
         if ($blocks !== null && $blocks !== $row['blocks']) {
             $next = $this->repo->replaceBlocks($id, $tenantId, $version, $blocks, $keys);
@@ -222,6 +214,15 @@ final class SavedBlocksApiHandler
         } elseif ($keys !== $row['per_document_keys']) {
             $this->repo->updatePerDocumentKeys($id, $tenantId, $keys);
             $changed[] = 'per_document_keys';
+        }
+        // After the blocks, so a lost race (409 above) changes nothing at all.
+        if ($name !== $row['name'] || $description !== $row['description'] || $sharing !== $row['sharing']) {
+            $this->repo->updateDetails($id, $tenantId, ['name' => $name, 'description' => $description, 'sharing' => $sharing]);
+            foreach (['name' => $name, 'description' => $description, 'sharing' => $sharing] as $field => $value) {
+                if ($value !== $row[$field]) {
+                    $changed[] = $field;
+                }
+            }
         }
 
         if ($changed !== []) {
