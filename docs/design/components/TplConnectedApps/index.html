@@ -22,14 +22,14 @@
       var has = g[1].some(function (x) { return x[1] === active; });
       return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
   function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
   function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
   function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
       h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
       h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
   function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
-  var rows = [{ id: 1, n: 'Claude', w: 'Rana Haddad', m: 'Everything Rana can do, asking first for changes', u: 'Today, 10:20', e: '2 Feb 2027' }, { id: 2, n: 'Cursor', w: 'Karim Aziz', m: 'Read only', u: '3 days ago', e: '14 Jan 2027' }, { id: 3, n: 'n8n', w: 'Lina Saad', m: 'Invoices and payments', u: 'Every hour', e: 'Never' }];
+  var rows = [{ id: 1, n: 'Claude', w: 'Amro Saleh', m: 'Everything Amro can do, asking first for changes', u: 'Today, 10:20', e: '2 Feb 2027' }, { id: 2, n: 'Cursor', w: 'Ibrahim Mansour', m: 'Read only', u: '3 days ago', e: '14 Jan 2027' }, { id: 3, n: 'n8n', w: 'Awss Haddad', m: 'Invoices and payments', u: 'Every hour', e: 'Never' }];
   ReactDOM.createRoot(document.getElementById('root')).render(shell('Connected AI apps', h(F, null,
     h(W.PageHeader, { title: 'Connected AI apps', description: 'AI apps outside Whity that people have signed in. Each acts for one person and can do no more than they can.', actions: h(W.Button, { icon: 'plus' }, 'Connect an AI app') }),
     h('div', { className: 'wy-listbar' }, h('span', { className: 'wy-listbar__end' }, h(W.Switch, { label: 'Show technical details' }))),

@@ -176,6 +176,12 @@ export interface DataTableSelection<TData> {
   actions?: React.ReactNode
   /** The money total of the selected rows, shown beside the count. */
   summary?: (rows: TData[]) => React.ReactNode
+  /**
+   * Which rows may be ticked (AQ.1: only Ordinary approvals go together). A row
+   * this refuses shows a disabled checkbox and is skipped by Select all.
+   * Omitted, every row may be ticked.
+   */
+  canSelect?: (row: TData) => boolean
   labels?: {
     /** "{count} selected" */
     count?: (count: number) => string
@@ -396,8 +402,18 @@ type SelectionRef<TData> = React.RefObject<{
 }>
 
 function pageRowIds<TData>(latest: SelectionRef<TData>): string[] {
+  const { data, getRowId, selection } = latest.current
+  const ids: string[] = []
+  data.forEach((row, index) => {
+    if (selection?.canSelect && !selection.canSelect(row)) return
+    ids.push(getRowId ? getRowId(row, index) : String(index))
+  })
+  return ids
+}
+
+function rowById<TData>(latest: SelectionRef<TData>, rowId: string): TData | undefined {
   const { data, getRowId } = latest.current
-  return data.map((row, index) => (getRowId ? getRowId(row, index) : String(index)))
+  return data.find((row, index) => (getRowId ? getRowId(row, index) : String(index)) === rowId)
 }
 
 function SelectAllCell<TData>({ latest }: { latest: SelectionRef<TData> }) {
@@ -408,6 +424,7 @@ function SelectAllCell<TData>({ latest }: { latest: SelectionRef<TData> }) {
   return (
     <Checkbox
       aria-label={selection.labels?.selectAll ?? "Select all"}
+      disabled={ids.length === 0}
       checked={chosen === 0 ? false : chosen === ids.length ? true : "indeterminate"}
       onCheckedChange={(checked) => {
         const next = new Set(selection.selected)
@@ -424,10 +441,13 @@ function SelectAllCell<TData>({ latest }: { latest: SelectionRef<TData> }) {
 function SelectRowCell<TData>({ latest, rowId }: { latest: SelectionRef<TData>; rowId: string }) {
   const { selection } = latest.current
   if (!selection) return null
+  const row = selection.canSelect ? rowById(latest, rowId) : undefined
+  const selectable = !selection.canSelect || (row !== undefined && selection.canSelect(row))
   return (
     <Checkbox
       aria-label={selection.labels?.selectRow ?? "Select row"}
-      checked={selection.selected.has(rowId)}
+      disabled={!selectable}
+      checked={selectable && selection.selected.has(rowId)}
       onCheckedChange={(checked) => {
         const next = new Set(selection.selected)
         if (checked === true) next.add(rowId)

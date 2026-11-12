@@ -15,7 +15,7 @@
   var topBar = h(React.Fragment, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
   ReactDOM.createRoot(document.getElementById('root')).render((function () { function Page() { var st = React.useState('#b74c05'); var c = st[0];
     var sw = ['#0961bb', '#b74c05', 'oklch(0.5 0.15 150)', 'oklch(0.55 0.18 30)', 'oklch(0.45 0.15 300)', 'oklch(0.8 0.16 85)'];
-    return h(W.AppShell, { tenant: 'Example Bakery', user: 'Rana Haddad', role: 'Owner', nav: nav('Branding'), topActions: topBar },
+    return h(W.AppShell, { tenant: 'Example Bakery', user: 'Amro Saleh', role: 'Owner', nav: nav('Branding'), topActions: topBar },
       h(W.PageHeader, { breadcrumb: [{ label: 'Settings' }, { label: 'Branding' }], title: 'Branding', description: 'Your name, logo and colour, on every screen, email and document your team and customers see.', actions: h(W.Button, { icon: 'check' }, 'Save branding') }),
       h('div', { className: 'wy-split' },
         h(W.Card, { title: 'Your brand' }, h('div', { className: 'wy-grid' },

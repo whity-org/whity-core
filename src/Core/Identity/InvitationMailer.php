@@ -67,19 +67,20 @@ final class InvitationMailer
         $link = $this->buildLink($rawToken);
         $expiry = $ttlDays === 1 ? '1 day' : $ttlDays . ' days';
 
+        // EM.1 `invitation`: sent by the workspace, so its name heads the email.
         $rendered = $this->layout->render(
             new EmailContent(
-                heading: 'You have been invited to ' . $workspace,
+                heading: 'You are invited to ' . $workspace,
                 paragraphs: [
-                    'An administrator has invited you to join ' . $workspace . ' on ' . $branding->siteName . '.',
-                    'Use the link below to accept. It expires in ' . $expiry . ' and can only be used once.',
+                    "Set your password and you're in; it takes a minute.",
                 ],
-                ctaLabel: 'Accept invitation',
+                ctaLabel: 'Accept the invitation',
                 ctaUrl: $link,
-                callout: 'Workspace: ' . $workspace,
-                footnote: 'If you were not expecting this invitation you can ignore this message — nothing is created until you accept.',
+                footnote: 'The link works for ' . $expiry . " and only once. If you weren't expecting this, you can ignore it: nothing is created until you accept.",
+                preheader: 'Join the team in ' . $workspace . '. The link works for ' . $expiry . '.',
+                notice: 'Sent by ' . $workspace . ' because someone invited this address.',
             ),
-            $branding,
+            new EmailBranding($workspace, $branding->brandColor, $branding->supportEmail, $branding->footerText, $branding->whiteLabel),
         );
 
         $this->mailer->send($email, 'You have been invited to ' . $workspace, $rendered->text, $rendered->html);

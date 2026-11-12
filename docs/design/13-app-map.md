@@ -1,4 +1,4 @@
-# App map (v2.9)
+# App map
 
 The screens of whity-core's web app as they exist in `web/app`, grouped as the sidebar groups them, with IDs for design work. **Template** names the template in this system; **Needs** marks server work for the agent features.
 
@@ -66,7 +66,7 @@ Sidebar groups: (top) Dashboard · Inbox · Approvals — People — AI — Docu
 | U03b | Join a workspace as a customer | `/join/[workspace]`, `/join/confirm` | none yet (ask WHIT-915) | built on `TplAuthInvite` and the `/f/[slug]` frame |
 | U04 | Settings · licensing | `/settings`, `/licensing` | `TplAccountPrefs`, `TplAccountSecurity`, `TplLicensing` | section 25; text size preference |
 | U05 | Status | `/status` | `TplSystemStates` | |
-| U06 | 404 · 403 · 500 · offline · maintenance · rate limit | `not-found`, `error`, middleware | `TplSystemStates` | |
+| U06 | 404 · 403 · 500 · offline · maintenance · rate limit | `not-found`, `error`, middleware | `TplSystemStates`; Lottie moments in `TplMoments` | LT.4 |
 | **Partner apps (built on Whity)** | | | | |
 | P01 | Front Office: invoices | plugin route | `TplPartnerInvoices`, `DataTableSelect` | Front Office app, JoFotara integration |
 | **Documents (Whity Render)** | | | | |
@@ -84,4 +84,77 @@ Sidebar groups: (top) Dashboard · Inbox · Approvals — People — AI — Docu
 | R12 | Letter | Whity Render | `TplDocLetter` | |
 | R13 | Purchase order | Whity Render | `TplDocPurchaseOrder` | |
 
-Every screen in the built app (inventory of 1 November 2026) now has a design. Still to draw: agent notifications (email, push, WhatsApp), the mobile approval screen, the 80 mm thermal receipt, the publisher's page and the public marketplace.
+**Mobile (Whity app, 3.0):** screens MB01–MB62 are listed in section 26 with their cards; the mobile approval screen is `TmHome` and `TmDecisionVariants`.
+
+Every screen in the built app (inventory of 1 November 2026) now has a design. Agent notifications by email and WhatsApp (`TplAgentNotify`) and the 80 mm receipt (`TplReceipt80`) are drawn in 3.2. Still to draw: the publisher's page and the public marketplace.
+
+## Work and operations (3.1)
+
+New areas; routes are for the Whity team to settle. Section 27 has the full coverage table.
+
+| ID | Screen | Template | Phone |
+| --- | --- | --- | --- |
+| W01 | Tasks (on Taskaat) | `TplTasks` | `TmTasks` |
+| W02 | Boards | `TplBoard` | `TmBoards` |
+| W03 | Meetings · a meeting · meeting bodies | `TplMeetings`, `TplMeeting` | `TmMeetingsMobile` |
+| W04 | Appointments · public booking page | `TplAppointments`, `TplBookingPage` | `TmAppointmentsMobile` |
+| W05 | Applications · an application | `TplApplications`, `TplApplication` | `TmApplicationsMobile` |
+| W06 | Flows · flow builder (route templates move here) | `TplFlows`, `TplFlowBuilder` | `TmFlowsMobile` |
+| W07 | Chat, with people and agents | `TplChat`, `TplChatAddAgent` | `TmChat` |
+| O01 | Inventory · a recipe | `TplInventory`, `TplRecipe` | `TmInventoryMobile` |
+| O02 | Money · accounts and sales tax | `TplMoney`, `TplLedger` | `TmMoneyMobile` |
+| O03 | Subscriptions a tenant sells | `TplSubscriptions` | `TmSubscriptionsMobile` |
+
+Additions to existing screens: A03 Approvals list view (`TplApprovalsList`); A48 two-step resets with two admins (`TplGatingTwoStep`); A14 Delegations with I'm away (`TplAway`); on the phone, agent setup (`TmAgentSetup`), the organisation (`TmOrgMobile`), document editing (`TmDocEditMobile`) and the form builder (`TmFormBuilderMobile`).
+
+## Near term (3.2)
+
+The roadmap's near-term pages (section 28, N1–N9). Routes are for the Whity team to settle.
+
+| ID | Screen | Template | Phone |
+| --- | --- | --- | --- |
+| N1 | Contacts · a contact | `TplContacts` | `TmOpsMobile` |
+| N2 | Custom fields (Settings › Fields) | `TplCustomFields` | `TmFinanceMobile` |
+| N3 | Import from a spreadsheet | `TplImport` | `TmFinanceMobile` |
+| N4 | Receiving goods · supplier bill | `TplReceiving` | `TmOpsMobile` |
+| N5 | Waste and stock adjustments | `TplAdjustments` | `TmOpsMobile` |
+| N6 | Bank reconciliation | `TplBankRec` | `TmFinanceMobile` |
+| N7 | Reports | `TplReports` | `TmFinanceMobile` |
+| N8 | 80 mm receipt (Whity Render) | `TplReceipt80` | |
+| N9 | Agent notifications by email and WhatsApp | `TplAgentNotify` | |
+
+## Websites (3.2)
+
+Public sites, outside the app (section 29). Build-ready pages are in `sites/`.
+
+| Site | Pages | Card |
+| --- | --- | --- |
+| whity.dev | Home (companies first, a door for builders) | `SiteHome`, `SiteHomeAr` |
+| whity.dev | Module pages: money, stock, approvals, documents | `SiteModMoney`, `SiteModMoneyAr`, `SiteModStock`, `SiteModApprovals`, `SiteModDocuments` |
+| brand.whity.dev | Brand guide | `SiteBrand` |
+| health.whity.dev | Status | `SiteStatus` |
+| id.whity.dev | Sign in · approve on the phone · account | `SiteId` |
+| docs.whity.dev | Docs home · an article | `SiteDocs` |
+| whity.dev | Security (WS.13, WS.18) | `SiteSecurity` |
+| whity.dev | Partners (WS.15) | `SitePartners`, `SitePartnersAr` |
+| whity.dev | About (WS.16) | `SiteAbout`, `SiteAboutAr` |
+| whity.dev | Contact (WS.19) | `SiteContact`, `SiteContactAr` |
+| whity.dev | Install · privacy · licence · 404 (WS.20–WS.23) | `SiteInstall`, `SitePrivacy`, `SiteLicence`, `Site404` |
+
+## Motion in the app (LT.4)
+
+| Moments | Web | Phone |
+| --- | --- | --- |
+| Empty states, done, first run, waiting, errors, and the Animations setting | `TplMoments` | `TmMoments` |
+
+## Emails (EM.1)
+
+Build-ready in `handoff/emails/` (English and Arabic, with placeholders).
+
+| Group | Emails | Card |
+| --- | --- | --- |
+| Account | Invitation, verify email, reset password, new sign-in, two-step turned off | `EmailAccount` |
+| Money (to a workspace's customers) | Invoice, quote, payment reminder, receipt | `EmailMoney` |
+| Agents | Needs your approval, daily summary | `EmailAgents` (with `TplAgentNotify`) |
+| Workspace and billing | Workspace ready, plan limit, payment failed, Whity receipt | `EmailWorkspace` |
+| Arabic and dark mode | | `EmailArabic`, `EmailDark` |

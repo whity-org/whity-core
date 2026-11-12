@@ -1,0 +1,69 @@
+<!-- @dsCard group="Templates · Work" height=976 width=1440 subtitle="IN.1: stock in every place, batches with expiry, and the Stock assistant proposing what to reorder" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1440px;min-height:976px}</style><meta charset="utf-8"><title>Inventory</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function kpi(l, v, s, cls) { return h('div', { className: 'wk-kpi' }, h('span', null, l), h('b', null, v), s ? h('small', { className: cls || '' }, s) : null); }
+  function num(v, cls) { return h('span', { className: 'wk-num' + (cls ? ' ' + cls : '') }, v); }
+  function prop(agent, forWho, title, lines, why, btns) { return h('div', { className: 'wk-minutes', style: { gap: 10 } }, h(W.ActorChip, { kind: 'agent', name: agent, onBehalfOf: forWho }), h('b', { style: { fontSize: 16 } }, title), h('ul', { className: 'wk-ev' }, lines.map(function (l, i) { return h('li', { key: i, className: 'is-ok' }, I(l[0], 16), h('div', null, l[1], h('small', null, l[2]))); })), why ? h('small', { style: { color: 'var(--muted-foreground)', fontSize: 13 } }, why) : null, h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end' } }, btns)); }
+
+  var rows = [
+    { id: 1, n: 'Flour, 25 kg bag', s: 'FLR-25 · ingredient', c: '18', a: '4', w: '2', r: '6 bags', st: ['destructive', 'Low at Sweifieh'] },
+    { id: 2, n: 'Butter, 10 kg', s: 'BTR-10 · ingredient', c: '6', a: '1', w: '1', r: '2', st: ['warning', 'Expires 15 Nov'] },
+    { id: 3, n: 'Sugar, 50 kg', s: 'SGR-50 · ingredient', c: '5', a: '–', w: '–', r: '2', st: null },
+    { id: 4, n: 'Medjool dates, kg', s: 'DAT-MJ · ingredient', c: '40', a: '6', w: '4', r: '10 kg', st: null },
+    { id: 5, n: 'Maamoul, box of 12', s: 'MML-12 · made here', c: '0', a: '34', w: '22', r: '20', st: null },
+    { id: 6, n: 'Ramadan box', s: 'RMD-BOX · made here', c: '0', a: '12', w: '8', r: '10', st: ['warning', 'Low at Sweifieh'] },
+    { id: 7, n: 'Gift boxes', s: 'PKG-GFT · packaging', c: '120', a: '0', w: '0', r: '200', st: ['destructive', 'Below reorder'] }];
+  var cols = [{ key: 'n', label: 'Item', render: function (r) { return h('div', { className: 'wy-person' }, h('span', { className: 'wk-chip', style: { width: 28, height: 28, padding: 0, justifyContent: 'center' } }, I(r.s.indexOf('made') > -1 ? 'recipe' : 'package', 14)), h('div', null, h('b', null, r.n), h('small', null, r.s))); } },
+    { key: 'c', label: 'Central kitchen', align: 'end', render: function (r) { return num(r.c); } }, { key: 'a', label: 'Abdoun', align: 'end', render: function (r) { return num(r.a); } }, { key: 'w', label: 'Sweifieh', align: 'end', render: function (r) { return num(r.w, r.id === 1 || r.id === 6 ? 'wk-low' : ''); } },
+    { key: 'r', label: 'Reorder at', align: 'end', render: function (r) { return num(r.r); } }, { key: 'st', label: '', render: function (r) { return r.st ? h(W.Badge, { variant: r.st[0] }, r.st[1]) : null; } }];
+  var side = h('div', { style: { display: 'grid', gap: 16 } }, prop('Stock assistant', 'Ahmad Khalil', 'Reorder flour, butter and gift boxes', [['package', '24 bags of flour from Jordan Flour Mills', 'JOD 384.000 · delivery Thursday'], ['package', '6 × 10 kg butter from Example Dairy', 'JOD 312.000'], ['package', '300 gift boxes from Amman Print', 'JOD 285.000 · for Ramadan']], 'At this week’s pace, Sweifieh runs out of flour on Wednesday.', [h(W.Button, { key: 1, variant: 'ghost', size: 'sm' }, 'Decline'), h(W.Button, { key: 2, variant: 'outline', size: 'sm' }, 'Edit'), h(W.Button, { key: 3, size: 'sm', icon: 'check' }, 'Approve 3 orders')]),
+    h(W.Card, { title: 'Expiring soon', description: 'Sell or use these first' }, h('div', { className: 'wk-docs' }, h('div', { className: 'wk-doc is-miss' }, I('batch', 16), h('span', null, 'Maamoul batch B-1102 · Sweifieh, 8 boxes'), h('b', null, '10 Nov')), h('div', { className: 'wk-doc' }, I('batch', 16), h('span', null, 'Butter lot L-2210 · Abdoun, 1 × 10 kg'), h('b', null, '15 Nov')))));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Inventory', h(F, null, h(W.PageHeader, { title: 'Inventory', description: 'Stock in 3 places, with recipes for what you make and batches with expiry dates', actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'barcode' }, 'Count stock'), h(W.Button, { variant: 'outline', icon: 'transfer' }, 'Transfer'), h(W.Button, { icon: 'recipe' }, 'Make a batch')) }),
+    h('div', { className: 'wk-bar' }, h(W.Tabs, { items: [{ value: 's', label: 'Stock' }, { value: 'b', label: 'Batches', count: 2 }, { value: 'r', label: 'Recipes' }, { value: 'c', label: 'Counts' }, { value: 't', label: 'Transfers' }], defaultValue: 's' })),
+    h('div', { className: 'wk-kpis' }, kpi('Items', '48'), kpi('Below reorder', '3', 'Flour, Ramadan box, gift boxes', 'is-bad'), kpi('Expiring in 7 days', '2 batches', 'Maamoul, butter'), kpi('Stock value', 'JOD 6,420.500', 'At cost')),
+    h('div', { className: 'wk-split', style: { gridTemplateColumns: 'minmax(0,1fr) 400px' } }, h(W.Card, { style: { padding: 0 } }, h(W.DataTable, { label: 'Stock', columns: cols, rows: rows, rowMenu: true })), side))));
+</script>
+</body>
+</html>

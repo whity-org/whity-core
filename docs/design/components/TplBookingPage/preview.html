@@ -1,0 +1,47 @@
+<!-- @dsCard group="Templates · Work" height=760 width=1280 subtitle="AP.1: the public page a tenant’s customers book from, in the tenant’s brand" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Booking page</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  var TH = W.tenantTheme('#b74c05', dark ? 'dark' : 'light');
+  function svc(t, sub, on) { return h('div', { className: 'wk-svc' + (on ? ' is-on' : '') }, h('b', null, t), h('small', null, sub)); }
+  var days = []; ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(function (d) { days.push(h('b', { key: d }, d)); });
+  for (var d = 1; d <= 30; d++) { var wd = (d - 1) % 7, open = d >= 8 && wd < 5; days.push(h('span', { key: 'd' + d, className: d === 10 ? 'is-on' : open ? 'is-open' : '' }, d)); }
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: Object.assign({ minHeight: '100%', background: 'var(--background)', color: 'var(--foreground)', display: 'flex', flexDirection: 'column' }, TH) },
+    h('div', { className: 'wk-pubhead' }, h(W.TenantLogo, { name: 'Example Bakery', color: '#b74c05', size: 32 }), h('span', { style: { color: 'var(--muted-foreground)' } }, '· Book a visit'), h('span', { style: { marginInlineStart: 'auto' } }, h(W.Button, { variant: 'ghost' }, 'Sign in'))),
+    h('div', { className: 'wk-pubbody', style: { flex: 1 } }, h('h1', null, 'Book a cake consultation'), h('div', { className: 'wk-book' },
+      h('div', { style: { display: 'grid', gap: 10 } }, svc('Wedding cake consultation', '45 min · free · with Ibrahim', true), svc('Catering tasting', '60 min · JOD 10.000, taken off your order', false), svc('Birthday cake consultation', '30 min · free', false)),
+      h('div', { style: { display: 'grid', gap: 10 } }, h('b', null, 'November 2026'), h('div', { className: 'wk-month' }, days)),
+      h('div', { style: { display: 'grid', gap: 10 } }, h('b', null, 'Tuesday 10 November'), h('div', { className: 'wk-slots' }, ['09:30', '10:15', '11:00', '12:30', '13:15'].map(function (t) { return h('span', { key: t, className: t === '10:15' ? 'is-on' : '' }, t); }))))),
+    h('div', { className: 'wk-summary' }, h('span', null, h('b', null, 'Wedding cake consultation'), ' · Tuesday 10 November at 10:15 · 45 min · with Ibrahim Mansour · Abdoun branch'), h('span', { style: { flex: 'none', color: 'var(--muted-foreground)', fontSize: 13 } }, 'Reminder by WhatsApp'), h(W.Button, { iconEnd: 'chevron-right' }, 'Book it')),
+    h('div', { style: { textAlign: 'center', padding: '10px', fontSize: 12, color: 'var(--muted-foreground)' } }, 'Built on Whity')));
+</script>
+</body>
+</html>

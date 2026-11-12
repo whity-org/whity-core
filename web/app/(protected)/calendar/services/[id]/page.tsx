@@ -31,6 +31,7 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { BilingualInput, type BilingualValue } from '@whity/ui/bilingual-input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Checkbox } from '@whity/ui/checkbox';
+import { FieldSelect } from '@/components/field-select';
 import { MoneyInput } from '@whity/ui/money/money-input';
 import { parseMoney, toDecimalString } from '@whity/ui/money/currency';
 import { ReadOnlyNotice } from '@whity/ui/page-states';
@@ -50,9 +51,14 @@ interface Draft {
   price: string;
   currency: string;
   bookableOnline: boolean;
+  needsApproval: boolean;
+  /** The room it needs, as the select's value: a room id, or NO_ROOM. */
+  room: string;
   active: boolean;
   staff: number[];
 }
+
+const NO_ROOM = 'none';
 
 function draftOf(service: CalendarService): Draft {
   return {
@@ -64,6 +70,8 @@ function draftOf(service: CalendarService): Draft {
     price: service.price_minor === null ? '' : safeDecimal(service.price_minor, service.currency),
     currency: service.currency,
     bookableOnline: service.bookable_online,
+    needsApproval: service.needs_approval ?? false,
+    room: service.room_id === null || service.room_id === undefined ? NO_ROOM : String(service.room_id),
     active: service.active,
     staff: [...service.staff_profile_ids].sort((a, b) => a - b),
   };
@@ -86,8 +94,8 @@ export default function CalendarServicePage() {
   const { addToast } = useToast();
 
   const { data, error, forbidden, refetch } = useFetch(async () => {
-    const [service, staff] = await Promise.all([calendarApi.service(id), calendarApi.staff()]);
-    return { service, staff };
+    const [service, staff, rooms] = await Promise.all([calendarApi.service(id), calendarApi.staff(), calendarApi.rooms()]);
+    return { service, staff, rooms };
   }, [id]);
 
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -109,8 +117,9 @@ export default function CalendarServicePage() {
     if (current.duration !== saved.duration || current.before !== saved.before || current.after !== saved.after)
       changes.push(t('services.field.time', 'Time'));
     if (current.price !== saved.price || current.currency !== saved.currency) changes.push(t('services.field.price', 'Price'));
-    if (current.bookableOnline !== saved.bookableOnline || current.active !== saved.active)
+    if (current.bookableOnline !== saved.bookableOnline || current.active !== saved.active || current.needsApproval !== saved.needsApproval)
       changes.push(t('services.field.offered', 'Where it is offered'));
+    if (current.room !== saved.room) changes.push(t('services.field.room', 'Room it needs'));
     if (current.staff.join(',') !== saved.staff.join(',')) changes.push(t('services.field.staff', 'Who provides it'));
   }
 
@@ -166,6 +175,8 @@ export default function CalendarServicePage() {
       price_minor: priceMinor,
       currency,
       bookable_online: current.bookableOnline,
+      needs_approval: current.needsApproval,
+      room_id: current.room === NO_ROOM ? null : Number(current.room),
       active: current.active,
       staff_profile_ids: current.staff,
     };
@@ -358,6 +369,52 @@ export default function CalendarServicePage() {
                     aria-label={t('services.field.online', 'Customers can book it online')}
                   />
                 </label>
+                <label className="flex min-h-10 items-start justify-between gap-3">
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium text-foreground">{t('services.field.approval', 'Needs your OK')}</span>
+                    <span className="block text-sm text-muted-foreground">
+                      {t('services.field.approvalHint', 'Customers send a request instead of booking. The time is held until someone accepts it or suggests another time.')}
+                    </span>
+                  </span>
+                  <Switch
+                    checked={current.needsApproval}
+                    onCheckedChange={(needsApproval) => update({ needsApproval })}
+                    aria-label={t('services.field.approval', 'Needs your OK')}
+                    data-testid="service-needs-approval"
+                  />
+                </label>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('services.field.room', 'Room it needs')}</CardTitle>
+                <CardDescription>
+                  {t('services.card.roomHint', 'Booking this service also books the room, so two people can’t use it at the same time.')}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChangedField changed={current.room !== saved.room}>
+                  <label htmlFor="service-room" className="sr-only">
+                    {t('services.field.room', 'Room it needs')}
+                  </label>
+                  <FieldSelect
+                    id="service-room"
+                    value={current.room}
+                    onChange={(room) => update({ room })}
+                    options={[
+                      { value: NO_ROOM, label: t('services.room.none', 'No room') },
+                      ...data.rooms
+                        .filter((room) => room.active || String(room.id) === current.room)
+                        .map((room) => ({ value: String(room.id), label: words.label(room.name) })),
+                    ]}
+                  />
+                </ChangedField>
+                {data.rooms.length === 0 && (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {t('services.room.noRooms', 'No rooms yet. Add them under Rooms.')}
+                  </p>
+                )}
               </CardContent>
             </Card>
 

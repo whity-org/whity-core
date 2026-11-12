@@ -63,6 +63,8 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
   const [cancelling, setCancelling] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [taking, setTaking] = useState(false);
+  const [takeProblem, setTakeProblem] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isManageToken(initialToken)) return;
@@ -143,7 +145,28 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
 
   const timeZone = safeTimeZone(booking.time_zone);
   const workspaceName = booking.workspace?.name ?? '';
-  const open = booking.status === 'confirmed' || booking.status === 'pending_payment';
+  const open = booking.status === 'confirmed' || booking.status === 'pending_payment' || booking.status === 'requested';
+  const requested = booking.status === 'requested';
+  const suggested = requested && booking.suggested === true;
+
+  // Design 3.3: take the time the business suggested. The link changes, like a move.
+  const takeSuggestion = async () => {
+    setTaking(true);
+    setTakeProblem(null);
+    try {
+      const taken = await publicBookingApi.acceptSuggestion(token);
+      setBooking((current) => ({ ...taken, workspace: taken.workspace ?? current?.workspace, time_zone: taken.time_zone ?? current?.time_zone }));
+      if (taken.manage_token) {
+        setToken(taken.manage_token);
+        replaceManageUrl(taken.manage_token);
+      }
+      setNotice(t('manage.taken', 'Booked. We’ve emailed you the details and a new link; this page now uses it.'));
+    } catch (error) {
+      setTakeProblem(words.errorText(error, t('manage.takeError', 'The time could not be taken. Try again, or pick another time.')));
+    } finally {
+      setTaking(false);
+    }
+  };
 
   return (
     <PublicShell wide>
@@ -159,6 +182,10 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
               ? t('manage.cancelled', 'This booking is cancelled. There is nothing more to do here.')
               : booking.status === 'expired'
               ? t('manage.expired', 'This booking wasn’t paid in time, so the time was given back. There is nothing more to do here.')
+              : suggested
+              ? t('manage.suggestedDescription', '{workspace} can’t do the time you asked for and suggests this one. Take it, pick another time, or cancel.', { workspace: workspaceName })
+              : requested
+              ? t('manage.requestedDescription', 'Your request is waiting for an answer. The time is held for you; you’ll get an email when it is accepted.')
               : t('manage.description', 'You can add it to your calendar, move it to another time, or cancel it.')}
           </CardDescription>
         </CardHeader>
@@ -172,8 +199,18 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
           {mode === 'view' ? (
             <>
               <BookingFacts booking={booking} timeZone={timeZone} />
+              {takeProblem && (
+                <Alert variant="destructive" data-testid="manage-take-problem">
+                  <AlertDescription className="text-sm">{takeProblem}</AlertDescription>
+                </Alert>
+              )}
               {open && (
                 <div className="flex flex-wrap gap-2">
+                  {suggested && (
+                    <Button onClick={() => void takeSuggestion()} loading={taking} data-testid="manage-take">
+                      {t('manage.take', 'Take this time')}
+                    </Button>
+                  )}
                   <Button asChild variant="outline" data-testid="manage-ics">
                     <a href={icsUrl(token)} download="booking.ics">
                       <Icon name="calendar" />

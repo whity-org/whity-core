@@ -128,6 +128,18 @@ final class TenantOwnedTables
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_service_staff' => '248_create_calendar_bookings.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
+        // Design 3.3: rooms a service needs, filtered by branch.
+        'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
+
+        // WHIT-953 — contacts and their spreadsheet imports (design 3.3 A8).
+        // Every query binds tenant_id.
+        'contacts' => '261_create_contacts.php',
+        'contact_imports' => '261_create_contacts.php',
+        'contact_import_changes' => '261_create_contacts.php',
+
+        // WHIT-954 — the workspace's own fields and their values (A9).
+        'custom_field_definitions' => '263_create_custom_fields.php',
+        'custom_field_values' => '263_create_custom_fields.php',
         // Messages (ADR 0016, WHIT-938): conversations with customers, their
         // messages, web chat visitors and the per-workspace settings. Every
         // query binds tenant_id. The public chat and inbound webhook routes find
@@ -136,6 +148,9 @@ final class TenantOwnedTables
         'messages' => '243_create_conversations_and_messages.php',
         'webchat_visitors' => '245_create_webchat_and_messaging_settings.php',
         'messaging_settings' => '245_create_webchat_and_messaging_settings.php',
+        // Team chat (CH.1, CH.2): a team chat and its people and agents.
+        'chats' => '253_create_team_chat.php',
+        'chat_members' => '253_create_team_chat.php',
 
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says

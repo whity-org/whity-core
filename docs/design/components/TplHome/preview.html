@@ -1,4 +1,4 @@
-<!-- @dsCard group="Templates · Home" height=1312 width=1280 subtitle="H.1–H.4: an owner’s home, led by what waits for her, then what agents did today and the cards her apps add" -->
+<!-- @dsCard group="Templates · Home" height=1312 width=1280 subtitle="H.1–H.4: an owner’s home, led by what waits for him, then what agents did today and the cards his apps add" -->
 <!doctype html>
 <html>
 <head><meta charset="utf-8"><title>Home</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
@@ -14,7 +14,7 @@
       { label: L.Documents || 'Documents', items: [it('document', 'Library'), it('routing', 'Routing')] },
       { label: L.Platform || 'Platform', items: [it('tenant', 'Tenants'), it('plugin', 'Plugins'), it('branding', 'Branding'), it('audit', 'Audit log')] }]; }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: 'Rana Haddad', role: 'Owner', nav: nav('Plugins', o.L), topActions: topBar, labels: o.shellLabels }, kids); }
+  function shell(kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: 'Amro Saleh', role: 'Owner', nav: nav('Plugins', o.L), topActions: topBar, labels: o.shellLabels }, kids); }
   function logo(p, size) { return h('span', { className: size === 'lg' ? 'wy-pdetail__ic' : 'wy-ptile__ic', style: { background: p.color }, 'aria-hidden': 'true' }, p.whity ? h(W.Mark, { size: size === 'lg' ? 34 : 22, tone: 'onbrand', label: '' }) : p.initial || p.name.charAt(0)); }
   function trust(p, L) { L = L || {}; return p.whity ? h('span', { className: 'wy-trust wy-trust--whity' }, I('success', 12), L.byWhity || 'By Whity') : p.verified ? h('span', { className: 'wy-trust wy-trust--verified' }, I('success', 12), L.verified || 'Verified') : h('span', { className: 'wy-trust wy-trust--sandbox' }, I('lock', 12), L.sandboxed || 'Sandboxed'); }
   function adds(p, L) { L = L || {}; return h('div', { className: 'wy-adds' }, (p.adds || []).map(function (a) { var m = { screens: ['dashboard', L.screens || 'Screens'], blocks: ['page', L.blocks || 'Document blocks'], agent: ['robot', L.agent || 'Agent tools'], fields: ['field', L.fields || 'Fields'], connect: ['link', L.connect || 'Connects out'] }[a];
@@ -49,16 +49,16 @@
   var groups = [[null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox'], ['approval', 'Approvals']]], ['People', [['users', 'Users'], ['role', 'Roles']]], ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps']]], ['Documents', [['document', 'Library'], ['template', 'Templates']]], ['Apps', [['invoice', 'Front Office'], ['table', 'Stock'], ['routing', 'Deliveries']]], ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['settings', 'Settings']]]];
   var wait = [
     { agent: 'Billing assistant', title: 'Send a payment reminder to Example Café', amt: 'JOD 312.000', what: 'overdue 12 days', age: '2 days ago', actions: [['Decline', 'ghost'], ['Approve']] },
-    { from: 'Omar Khalil', icon: 'document', title: 'Purchase order PO-0142 · Example Mills', amt: 'JOD 1,240.000', what: 'sent for your decision', age: 'yesterday', actions: [['Open']] },
+    { from: 'Ahmad Khalil', icon: 'document', title: 'Purchase order PO-0142 · Example Mills', amt: 'JOD 1,240.000', what: 'sent for your decision', age: 'yesterday', actions: [['Open']] },
     { agent: 'Stock assistant', title: 'Reorder flour and butter from Example Mills', amt: 'JOD 412.500', what: 'orders from your usual supplier', age: '5 h ago', actions: [['Decline', 'ghost'], ['Approve']] },
     { agent: 'Billing assistant', title: 'Issue credit note CN-0031 to Example Hotel', amt: 'JOD 48.000', what: 'for a returned order', age: '3 h ago', actions: [['Decline', 'ghost'], ['Approve']] },
-    { from: 'Lina Saad', icon: 'calendar', title: 'Leave request · 3–5 November', what: 'asks for 3 days', age: '2 h ago', actions: [['Reject', 'ghost'], ['Approve']] }];
+    { from: 'Awss Haddad', icon: 'calendar', title: 'Leave request · 3–5 November', what: 'asks for 3 days', age: '2 h ago', actions: [['Reject', 'ghost'], ['Approve']] }];
   var today = [
-    { actor: 'Billing assistant', onBehalfOf: 'Rana', text: 'sent 4 receipts by WhatsApp', time: '09:12', kind: 'act' },
-    { actor: 'Stock assistant', onBehalfOf: 'Rana', text: 'proposed a reorder from Example Mills', time: '08:40', kind: 'propose' },
-    { actor: 'Rana Haddad', actorKind: 'person', text: 'undid a price change on Croissant, box of 6', time: '08:31', kind: 'undo' }];
-  ReactDOM.createRoot(document.getElementById('root')).render(h(W.AppShell, { tenant: 'Example Bakery', user: 'Rana Haddad', role: 'Owner', nav: navH(groups, { Inbox: 2, Approvals: 3 }), topActions: topBar },
-    h(W.PageHeader, { title: 'Good morning, Rana', description: 'Monday 2 November · Example Bakery' }),
+    { actor: 'Billing assistant', onBehalfOf: 'Amro', text: 'sent 4 receipts by WhatsApp', time: '09:12', kind: 'act' },
+    { actor: 'Stock assistant', onBehalfOf: 'Amro', text: 'proposed a reorder from Example Mills', time: '08:40', kind: 'propose' },
+    { actor: 'Amro Saleh', actorKind: 'person', text: 'undid a price change on Croissant, box of 6', time: '08:31', kind: 'undo' }];
+  ReactDOM.createRoot(document.getElementById('root')).render(h(W.AppShell, { tenant: 'Example Bakery', user: 'Amro Saleh', role: 'Owner', nav: navH(groups, { Inbox: 2, Approvals: 3 }), topActions: topBar },
+    h(W.PageHeader, { title: 'Good morning, Amro', description: 'Monday 2 November · Example Bakery' }),
     h('div', { className: 'wy-home' },
       h(W.Card, { title: h('span', null, 'Waiting for you ', h(W.Badge, { variant: 'secondary' }, '5')), description: 'Oldest first. Agent proposals are dashed until you decide.' },
         h('div', { style: { display: 'grid', gap: 12 } }, h('ul', { className: 'wy-wait' }, wait.map(waitRow)),

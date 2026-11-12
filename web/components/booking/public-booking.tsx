@@ -406,6 +406,11 @@ function BookingForm({
                       <span className="mt-0.5 block text-sm text-muted-foreground">
                         {words.duration(s.duration_minutes)}
                       </span>
+                      {s.sends_request && (
+                        <span className="mt-0.5 block text-sm text-muted-foreground" data-testid="book-service-request">
+                          {t('service.request', 'You send a request; the business confirms the time.')}
+                        </span>
+                      )}
                     </span>
                     {price !== null && (
                       <span className="shrink-0 text-sm font-medium text-foreground tabular-nums" dir="ltr">
@@ -600,7 +605,7 @@ function BookingForm({
               )}
 
               <Button type="submit" size="lg" className="w-full sm:w-auto" loading={submitting} data-testid="book-submit">
-                {t('submit', 'Book this time')}
+                {service?.sends_request ? t('submitRequest', 'Send request') : t('submit', 'Book this time')}
               </Button>
             </section>
           )}
@@ -680,18 +685,28 @@ function BookedView({ page, result }: { page: PublicBookingPage; result: BookedR
   const holdUntil = useDateDisplay({ timeZone }).time(result.payment?.hold_expires_at ?? null);
   const { booking, manageToken, payment } = result;
   const owes = payment !== null;
+  const requested = booking.status === 'requested';
 
   return (
     <Card className="border-t-4 border-t-primary text-sm" data-testid="book-done">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-xl font-semibold">
-          <Icon name={owes ? 'clock' : 'success'} className="size-6 text-primary" />
-          {owes ? t('done.payTitle', 'One more step: pay to confirm') : t('done.title', 'You’re booked')}
+          <Icon name={owes || requested ? 'clock' : 'success'} className="size-6 text-primary" />
+          {owes
+            ? t('done.payTitle', 'One more step: pay to confirm')
+            : requested
+              ? t('done.requestTitle', 'Request sent')
+              : t('done.title', 'You’re booked')}
         </CardTitle>
         <CardDescription className="text-sm">
           {owes
             ? t('done.payDescription', 'We’re holding this time for you. It’s confirmed once you pay.')
-            : t('done.description', 'We’ve sent the details to {email}.', { email: booking.customer.email })}
+            : requested
+              ? t('done.requestDescription', 'We’re holding this time while {workspace} looks at your request. We’ll email {email} when they accept it or suggest another time.', {
+                  workspace: page.workspace.name,
+                  email: booking.customer.email,
+                })
+              : t('done.description', 'We’ve sent the details to {email}.', { email: booking.customer.email })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">

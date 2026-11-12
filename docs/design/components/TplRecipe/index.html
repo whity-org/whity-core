@@ -1,0 +1,62 @@
+<!-- @dsCard group="Templates · Work" height=902 width=1440 subtitle="IN.1: an item you make: what goes into a batch, what it costs, and its batches with expiry dates" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1440px;min-height:902px}</style><meta charset="utf-8"><title>Recipe</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function kpi(l, v, s, cls) { return h('div', { className: 'wk-kpi' }, h('span', null, l), h('b', null, v), s ? h('small', { className: cls || '' }, s) : null); }
+  function num(v, cls) { return h('span', { className: 'wk-num' + (cls ? ' ' + cls : '') }, v); }
+  function prop(agent, forWho, title, lines, why, btns) { return h('div', { className: 'wk-minutes', style: { gap: 10 } }, h(W.ActorChip, { kind: 'agent', name: agent, onBehalfOf: forWho }), h('b', { style: { fontSize: 16 } }, title), h('ul', { className: 'wk-ev' }, lines.map(function (l, i) { return h('li', { key: i, className: 'is-ok' }, I(l[0], 16), h('div', null, l[1], h('small', null, l[2]))); })), why ? h('small', { style: { color: 'var(--muted-foreground)', fontSize: 13 } }, why) : null, h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end' } }, btns)); }
+
+  var ing = [['Semolina', '6 kg', '0.950', '5.700'], ['Butter', '3 kg', '4.200', '12.600'], ['Date paste', '4.5 kg', '3.100', '13.950'], ['Sugar', '1 kg', '0.800', '0.800'], ['Rose water', '0.2 L', '6.000', '1.200'], ['Boxes, 12 pieces', '20', '0.950', '19.000']];
+  var recipe = h(W.Card, { title: 'A batch of 20 boxes', description: 'Made at the Central kitchen · takes about 3 hours', action: h(W.Button, { variant: 'ghost', size: 'sm', icon: 'edit' }, 'Edit') }, h('table', { className: 'wk-je' }, h('thead', null, h('tr', null, h('th', null, 'Ingredient'), h('th', { className: 'n' }, 'Quantity'), h('th', { className: 'n' }, 'Cost per unit'), h('th', { className: 'n' }, 'Cost'))),
+    h('tbody', null, ing.map(function (r) { return h('tr', { key: r[0] }, h('td', null, r[0]), h('td', { className: 'n' }, r[1]), h('td', { className: 'n' }, r[2]), h('td', { className: 'n' }, r[3])); })), h('tfoot', null, h('tr', null, h('td', null, 'Batch cost'), h('td'), h('td'), h('td', { className: 'n' }, 'JOD 53.250')), h('tr', null, h('td', null, 'Cost per box'), h('td'), h('td'), h('td', { className: 'n' }, 'JOD 2.663')))));
+  var price = h('div', { className: 'wk-kpis', style: { gridTemplateColumns: 'repeat(3,1fr)', marginTop: 16 } }, kpi('Sells for', 'JOD 6.500'), kpi('Margin', '59%', 'After ingredients and box', 'is-good'), kpi('Made this month', '6 batches', '120 boxes'));
+  function batch(id, made, n, exp, where, warn) { return h('div', { className: 'wk-doc' + (warn ? ' is-miss' : '') }, I('batch', 16), h('span', null, h('b', null, id), ' · made ' + made + ' · ' + n, h('br'), h('small', { style: { color: 'var(--muted-foreground)' } }, where)), h('b', { className: warn ? 'wk-low' : '' }, exp)); }
+  var side = h('div', { style: { display: 'grid', gap: 16 } }, h(W.Card, { title: 'Batches', description: 'Each batch gets a number and an expiry date, printed on its labels', action: h(W.Button, { size: 'sm', icon: 'recipe' }, 'Make a batch') }, h('div', { className: 'wk-docs' }, batch('B-1108', '8 Nov', '20 boxes', '22 Nov', 'Abdoun 12 · Sweifieh 8'), batch('B-1105', '3 Nov', '20 boxes', '17 Nov', 'Abdoun 14 · Sweifieh 6'), batch('B-1102', '27 Oct', '20 boxes', '10 Nov', 'Sweifieh 8 left · sell first', 1))),
+    h(W.Card, { title: 'Where it is now' }, h(W.DescriptionList, { items: [{ label: 'Abdoun', value: '34 boxes' }, { label: 'Sweifieh', value: '22 boxes' }, { label: 'Reorder level', value: 'Make a batch below 20' }] })));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Inventory', h(F, null, recHead({ icon: 'recipe', title: 'Maamoul, box of 12', badges: h(W.Badge, { variant: 'outline' }, 'Made here'), facts: [['tenant', 'Central kitchen'], ['batch', 'Batches of 20 boxes'], ['clock', 'Keeps 14 days'], ['money', 'Costs JOD 2.663 a box']], actions: h(W.IconButton, { icon: 'more', label: 'More' }) }),
+    h('div', { className: 'wk-bar', style: { marginTop: 8 } }, h(W.Tabs, { items: [{ value: 'r', label: 'Recipe' }, { value: 'b', label: 'Batches', count: 3 }, { value: 's', label: 'Stock' }, { value: 'h', label: 'History' }], defaultValue: 'r' })),
+    h('div', { className: 'wk-split', style: { gridTemplateColumns: 'minmax(0,1fr) 420px' } }, h('div', null, recipe, price), side))));
+</script>
+</body>
+</html>

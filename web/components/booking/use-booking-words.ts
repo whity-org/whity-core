@@ -62,6 +62,8 @@ export function useBookingWords(): BookingWords {
           return t('status.confirmed', 'Booked');
         case 'pending_payment':
           return t('status.pendingPayment', 'Waiting for payment');
+        case 'requested':
+          return t('status.requested', 'Request sent: waiting for an answer');
         case 'cancelled':
           return t('status.cancelled', 'Cancelled');
         default:

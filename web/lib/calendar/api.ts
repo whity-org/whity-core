@@ -28,6 +28,9 @@ export type CalendarBooking = Schemas['CalendarBooking'];
 export type CalendarBookingCreateRequest = Schemas['CalendarBookingCreateRequest'];
 export type CalendarEvent = Schemas['CalendarEvent'];
 export type CalendarEventRequest = Schemas['CalendarEventRequest'];
+export type CalendarRoom = Schemas['CalendarRoom'];
+export type CalendarRoomRequest = Schemas['CalendarRoomRequest'];
+export type CalendarToday = Schemas['CalendarToday'];
 
 export const CALENDAR_READ = 'calendar:read';
 export const CALENDAR_WRITE = 'calendar:write';
@@ -100,6 +103,10 @@ export interface RangeParams {
   from: string;
   to: string;
   profileId?: number | null;
+  /** Only this branch (an organisational unit): bookings whose person or room is in it. */
+  unitId?: number | null;
+  /** Comma-separated statuses; the server's default is the live ones. */
+  status?: string | null;
 }
 
 export const calendarApi = {
@@ -108,7 +115,7 @@ export const calendarApi = {
     send<CalendarSettings>('/settings', 'PUT', body, 'The calendar settings could not be saved'),
 
   staff: async () => read<CalendarStaff[]>(await apiClient(`${BASE}/staff`), 'The team could not be loaded'),
-  saveStaff: (profileId: number, body: { bookable?: boolean; sort_order?: number }) =>
+  saveStaff: (profileId: number, body: { bookable?: boolean; sort_order?: number; unit_id?: number | null }) =>
     send<CalendarStaff[]>(`/staff/${profileId}`, 'PUT', body, 'That person could not be updated'),
 
   hours: async (profileId: number) =>
@@ -138,9 +145,9 @@ export const calendarApi = {
       'Free times could not be loaded'
     ),
 
-  bookings: async ({ from, to, profileId }: RangeParams) =>
+  bookings: async ({ from, to, profileId, unitId, status }: RangeParams) =>
     read<CalendarBooking[]>(
-      await apiClient(`${BASE}/bookings${query({ from, to, profile_id: profileId })}`),
+      await apiClient(`${BASE}/bookings${query({ from, to, profile_id: profileId, unit_id: unitId, status })}`),
       'The bookings could not be loaded'
     ),
   booking: async (id: number) => read<CalendarBooking>(await apiClient(`${BASE}/bookings/${id}`), 'The booking could not be loaded'),
@@ -150,6 +157,21 @@ export const calendarApi = {
     send<CalendarBooking>(`/bookings/${id}/move`, 'POST', body, 'The booking could not be moved'),
   cancelBooking: (id: number, reason: string) =>
     send<CalendarBooking>(`/bookings/${id}/cancel`, 'POST', reason === '' ? {} : { reason }, 'The booking could not be cancelled'),
+
+  /** Accept a customer's request: it becomes a booking (design 3.3). */
+  acceptBooking: (id: number) => send<CalendarBooking>(`/bookings/${id}/accept`, 'POST', {}, 'The request could not be accepted'),
+  /** Suggest another time for a request; the customer takes it from their link. */
+  suggestBooking: (id: number, body: { starts_at: string; profile_id?: number }) =>
+    send<CalendarBooking>(`/bookings/${id}/suggest`, 'POST', body, 'The other time could not be suggested'),
+  /** The customer arrived (true), or did not after all (false). */
+  checkIn: (id: number, arrived: boolean) =>
+    send<CalendarBooking>(`/bookings/${id}/check-in`, arrived ? 'POST' : 'DELETE', undefined, 'The check-in could not be saved'),
+  today: async ({ date, unitId }: { date?: string | null; unitId?: number | null }) =>
+    read<CalendarToday>(await apiClient(`${BASE}/today${query({ date, unit_id: unitId })}`), 'Today could not be loaded'),
+
+  rooms: async () => read<CalendarRoom[]>(await apiClient(`${BASE}/rooms`), 'The rooms could not be loaded'),
+  createRoom: (body: CalendarRoomRequest) => send<CalendarRoom>('/rooms', 'POST', body, 'The room could not be added'),
+  updateRoom: (id: number, body: CalendarRoomRequest) => send<CalendarRoom>(`/rooms/${id}`, 'PATCH', body, 'The room could not be saved'),
 
   events: async ({ from, to, profileId }: RangeParams) =>
     read<CalendarEvent[]>(

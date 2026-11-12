@@ -56,13 +56,15 @@ final class TokenEmailVerificationProvider implements EmailVerificationProvider
         if ($this->layout !== null && $this->settings !== null) {
             $rendered = $this->layout->render(
                 new EmailContent(
-                    heading: 'Confirm your email address',
+                    heading: 'Confirm your email',
                     paragraphs: [
-                        'Thanks for signing up. Confirm this address to activate your account and secure it to you.',
+                        'Confirm this address to finish signing up and keep your account yours.',
                     ],
-                    ctaLabel: 'Verify email address',
+                    ctaLabel: 'Confirm my email',
                     ctaUrl: $link,
-                    footnote: "If you didn't request this, you can safely ignore this message.",
+                    footnote: 'Never share this link: we will never ask you for it.',
+                    preheader: 'One step to finish signing up.',
+                    notice: "Sent to {$email} because someone signed up with it. If it wasn't you, ignore this email.",
                 ),
                 EmailBranding::fromSettings($this->settings),
             );

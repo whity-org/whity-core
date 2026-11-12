@@ -16,7 +16,7 @@ Simple Modern Standard Arabic in short sentences, written and reviewed by a nati
 
 ## Agents
 
-- **Describe the action, not the agent**: the agent named by role, then who it acts for, then what it did or proposes. "Billing assistant for Rana · Sent 12 payment reminders."
+- **Describe the action, not the agent**: the agent named by role, then who it acts for, then what it did or proposes. "Billing assistant for Amro · Sent 12 payment reminders."
 - **Names by role**: Billing assistant, HR assistant, Front desk. No human first names, no "Whity AI".
 - **No "I", no feelings, no apologies.** A proposal title is an imperative with a count: "Send payment reminders to 12 customers".
 - **Documents an agent sent say so** in their footer, with the person it acted for.

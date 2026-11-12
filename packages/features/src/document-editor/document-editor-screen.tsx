@@ -4,6 +4,7 @@ import * as React from 'react';
 
 import { Button } from '@whity/ui/button';
 import { DocEditor, type SaveState } from '@whity/ui/editor/doc-editor';
+import { isActive, type EditorAgentChoice, type EditorAgentRequest, type EditorAgents } from '@whity/ui/editor/agents';
 import type { EditorCollab, RailSuggestion, RailThread } from '@whity/ui/editor/collab';
 import type { Actor, DocumentKind, EditorMode, ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
 import type { FieldDef } from '@whity/ui/editor/fields';
@@ -43,6 +44,8 @@ const RETRY_FIRST_MS = 2000;
 const RETRY_MAX_MS = 60000;
 /** Comments and suggestions are polled this often while the editor is open (M5). */
 const COLLAB_POLL_MS = 10000;
+/** M6: while a request waits or runs, its status is polled this often (the run "streams" in place). */
+const AGENT_POLL_MS = 2000;
 
 /** Open suggestions in the server's id order. */
 function byId<T extends { id: string }>(list: T[]): T[] {
@@ -410,6 +413,60 @@ export function DocumentEditorScreen({
   }, [collabOn, issuingMode, suggestions, threads, revision, canSuggest, canComment, me, adapter, id, reloadDraft, loadCollab, flushNow]);
 
 
+  // M6: Ask an agent. The person's own agent works over MCP; its suggestions
+  // arrive through the collab feed, fetched again whenever a request finishes.
+  const agentsOn = collabOn && !!adapter.agentRequests && !!adapter.askAgent && !issuingMode;
+  const [agentChoices, setAgentChoices] = React.useState<EditorAgentChoice[]>([]);
+  const [agentRequests, setAgentRequests] = React.useState<EditorAgentRequest[]>([]);
+  React.useEffect(() => {
+    if (!agentsOn) return;
+    let live = true;
+    adapter.agentChoices?.(labels.agentAny).then((c) => live && setAgentChoices(c)).catch(() => undefined);
+    adapter.agentRequests!(id).then((r) => live && setAgentRequests(r)).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [agentsOn, adapter, id, labels.agentAny]);
+  const anyActive = agentRequests.some((r) => isActive(r.status));
+  React.useEffect(() => {
+    if (!agentsOn || !anyActive) return;
+    let live = true;
+    const timer = setInterval(() => {
+      adapter.agentRequests!(id)
+        .then(async (next) => {
+          if (!live) return;
+          setAgentRequests((prev) => {
+            const finished = next.some((r) => !isActive(r.status) && prev.find((p) => p.id === r.id && isActive(p.status)));
+            if (finished) void loadCollab().catch(() => undefined);
+            return next;
+          });
+        })
+        .catch(() => undefined);
+    }, AGENT_POLL_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [agentsOn, anyActive, adapter, id, loadCollab]);
+  const agents = React.useMemo<EditorAgents | undefined>(() => {
+    if (!agentsOn) return undefined;
+    // Only "any of my agents" means none of the workspace's agents is in use; it may still be connected over MCP.
+    return {
+      choices: agentChoices,
+      requests: agentRequests,
+      connectHref: '/admin/my-agents',
+      onAsk: async (request) => {
+        const made = await adapter.askAgent!(id, request);
+        setAgentRequests((prev) => [made, ...prev.filter((r) => r.id !== made.id)]);
+      },
+      onStop: async (requestId) => {
+        if (!adapter.stopAgentRequest) return;
+        const now = await adapter.stopAgentRequest(requestId);
+        setAgentRequests((prev) => prev.map((r) => (r.id === now.id ? now : r)));
+      },
+    };
+  }, [agentsOn, agentChoices, agentRequests, adapter, id]);
+
   const showPreview = React.useCallback(
     async (record: string | null) => {
       if (!adapter.preview) return;
@@ -613,6 +670,7 @@ export function DocumentEditorScreen({
           onCommandPalette={onCommandPalette}
           labels={labels}
           collab={collab}
+          agents={agents}
           services={services}
           theme={theme?.tokens ?? null}
           {...(printed && template

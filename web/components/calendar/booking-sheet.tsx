@@ -11,6 +11,12 @@
  * CANCEL cannot be undone through the API, so it is a dialog that names the
  * consequence (section 21: confirm by how undoable an action is), with an
  * optional reason that the customer will see.
+ *
+ * DESIGN 3.3. A customer's request has Accept (its one filled button) and
+ * Suggest another time, which uses the Move picker and leaves the request
+ * waiting for the customer. A confirmed booking has Check in, and Undo
+ * check-in once the customer has arrived; both undo each other, so neither
+ * asks first.
  */
 
 import { useState } from 'react';
@@ -64,26 +70,61 @@ export function bookingMoney(minor: number, currency: string): string {
 
 export function statusVariant(status: CalendarBooking['status']): 'success' | 'warning' | 'outline' {
   if (status === 'confirmed') return 'success';
-  if (status === 'pending_payment') return 'warning';
+  if (status === 'pending_payment' || status === 'requested') return 'warning';
   return 'outline';
 }
 
+/** What just happened to a booking, so the screen can say it. */
+export type BookingChange = 'moved' | 'cancelled' | 'accepted' | 'suggested' | 'checkedIn' | 'notCheckedIn';
+
 export interface BookingSheetProps {
   booking: CalendarBooking | null;
+  /** Open straight on Suggest another time (from the Requests card). */
+  suggest?: boolean;
   onClose: () => void;
   services: CalendarService[];
   staff: CalendarStaff[];
   timeZone: string;
   canChange: boolean;
-  onChanged: (booking: CalendarBooking) => void;
+  onChanged: (booking: CalendarBooking, what: BookingChange) => void;
 }
 
-export function BookingSheet({ booking, onClose, services, staff, timeZone, canChange, onChanged }: BookingSheetProps) {
+export function BookingSheet({ booking, suggest = false, onClose, services, staff, timeZone, canChange, onChanged }: BookingSheetProps) {
   const t = useTranslation('calendar');
   const words = useCalendarWords();
   const dates = useDateDisplay({ timeZone });
-  const [mode, setMode] = useState<'view' | 'move'>('view');
+  const [mode, setMode] = useState<'view' | 'move' | 'suggest'>('view');
   const [cancelling, setCancelling] = useState(false);
+  const [acting, setActing] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const bookingId = booking?.id ?? null;
+
+  // A different booking, or the Requests card's Suggest, starts the sheet
+  // afresh (adjusting state while rendering, not in an effect).
+  const opening = `${bookingId ?? ''}:${suggest ? 'suggest' : 'view'}`;
+  const [opened, setOpened] = useState(opening);
+  if (opened !== opening) {
+    setOpened(opening);
+    setMode(suggest && bookingId !== null ? 'suggest' : 'view');
+    setProblem(null);
+  }
+
+  const act = async (what: 'accepted' | 'checkedIn' | 'notCheckedIn') => {
+    if (booking === null) return;
+    setActing(true);
+    setProblem(null);
+    try {
+      const changed =
+        what === 'accepted'
+          ? await calendarApi.acceptBooking(booking.id)
+          : await calendarApi.checkIn(booking.id, what === 'checkedIn');
+      onChanged(changed, what);
+    } catch (error) {
+      setProblem(words.errorText(error, t('booking.actError', 'That didn’t work. Try again.')));
+    } finally {
+      setActing(false);
+    }
+  };
 
   const close = () => {
     setMode('view');
@@ -121,22 +162,53 @@ export function BookingSheet({ booking, onClose, services, staff, timeZone, canC
                 service={service}
                 staff={staff}
                 timeZone={timeZone}
+                suggest={mode === 'suggest'}
                 onCancel={() => setMode('view')}
                 onMoved={(moved) => {
+                  const what = mode === 'suggest' ? 'suggested' : 'moved';
                   setMode('view');
-                  onChanged(moved);
+                  onChanged(moved, what);
                 }}
               />
             )}
 
+            {problem && mode === 'view' && (
+              <Alert variant="destructive" data-testid="booking-problem">
+                <AlertDescription>{problem}</AlertDescription>
+              </Alert>
+            )}
+
             {mode === 'view' && canChange && open && (
-              <SheetFooter className="gap-2">
+              <SheetFooter className="flex-wrap gap-2">
                 <Button variant="outline" onClick={() => setCancelling(true)} data-testid="booking-cancel">
-                  {t('booking.cancel.action', 'Cancel booking')}
+                  {booking.status === 'requested' ? t('booking.decline', 'Decline') : t('booking.cancel.action', 'Cancel booking')}
                 </Button>
-                <Button variant="outline" onClick={() => setMode('move')} data-testid="booking-move">
-                  {t('booking.move.action', 'Move')}
-                </Button>
+                {booking.status === 'requested' ? (
+                  <>
+                    <Button variant="outline" onClick={() => setMode('suggest')} data-testid="booking-suggest">
+                      {t('request.suggest', 'Suggest another time')}
+                    </Button>
+                    <Button onClick={() => void act('accepted')} loading={acting} data-testid="booking-accept">
+                      {t('request.accept', 'Accept')}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" onClick={() => setMode('move')} data-testid="booking-move">
+                      {t('booking.move.action', 'Move')}
+                    </Button>
+                    {booking.status === 'confirmed' &&
+                      (booking.checked_in_at ? (
+                        <Button variant="outline" onClick={() => void act('notCheckedIn')} loading={acting} data-testid="booking-undo-check-in">
+                          {t('booking.undoCheckIn', 'Undo check-in')}
+                        </Button>
+                      ) : (
+                        <Button onClick={() => void act('checkedIn')} loading={acting} data-testid="booking-check-in">
+                          {t('booking.checkIn', 'Check in')}
+                        </Button>
+                      ))}
+                  </>
+                )}
               </SheetFooter>
             )}
 
@@ -148,7 +220,7 @@ export function BookingSheet({ booking, onClose, services, staff, timeZone, canC
               onOpenChange={setCancelling}
               onCancelled={(cancelled) => {
                 setCancelling(false);
-                onChanged(cancelled);
+                onChanged(cancelled, 'cancelled');
               }}
             />
           </>
@@ -194,6 +266,19 @@ function BookingFacts({
     value: person ? <ActorChip name={person.display_name} /> : t('booking.fact.removedPerson', 'Someone no longer on the calendar'),
   });
   rows.push({ label: t('booking.fact.service', 'Service'), value: words.serviceName(service) });
+  if (booking.room_name) {
+    rows.push({ label: t('booking.fact.room', 'Room'), value: words.label(booking.room_name), testId: 'booking-room' });
+  }
+  if (booking.checked_in_at) {
+    rows.push({
+      label: t('booking.fact.checkedIn', 'Checked in'),
+      value: <span dir="ltr" className="tabular-nums">{dates.time(booking.checked_in_at) ?? '—'}</span>,
+      testId: 'booking-checked-in',
+    });
+  }
+  if (booking.status === 'requested' && booking.suggested_at) {
+    rows.push({ label: t('booking.fact.suggested', 'Suggested'), value: t('request.suggested', 'You suggested this time. Waiting for the customer.') });
+  }
   if (booking.price_minor !== null && booking.price_minor !== undefined && booking.currency) {
     rows.push({
       label: t('booking.fact.price', 'Price'),
@@ -235,6 +320,7 @@ function MovePanel({
   service,
   staff,
   timeZone,
+  suggest,
   onCancel,
   onMoved,
 }: {
@@ -242,6 +328,8 @@ function MovePanel({
   service: CalendarService | null;
   staff: CalendarStaff[];
   timeZone: string;
+  /** Suggest the time to the customer instead of moving the booking. */
+  suggest: boolean;
   onCancel: () => void;
   onMoved: (booking: CalendarBooking) => void;
 }) {
@@ -271,10 +359,11 @@ function MovePanel({
     try {
       // With Anyone, take the first person free then; the server re-checks.
       const target = profileId ?? slot.profile_ids[0];
-      const moved = await calendarApi.moveBooking(booking.id, {
+      const body = {
         starts_at: toZonedIso(new Date(slot.starts_at), timeZone),
         ...(target !== undefined && target !== booking.profile_id ? { profile_id: target } : {}),
-      });
+      };
+      const moved = suggest ? await calendarApi.suggestBooking(booking.id, body) : await calendarApi.moveBooking(booking.id, body);
       onMoved(moved);
     } catch (error) {
       if (isTaken(error)) {
@@ -289,7 +378,14 @@ function MovePanel({
 
   return (
     <div className="space-y-4" data-testid="booking-move-panel">
-      <h3 className="text-base font-semibold text-foreground">{t('booking.move.title', 'Move to another time')}</h3>
+      <h3 className="text-base font-semibold text-foreground">
+        {suggest ? t('request.suggestTitle', 'Suggest another time') : t('booking.move.title', 'Move to another time')}
+      </h3>
+      {suggest && (
+        <p className="text-sm text-muted-foreground">
+          {t('request.suggestHint', 'The customer gets an email with the new time and takes it, or picks another, from their link.')}
+        </p>
+      )}
       <div className="space-y-1">
         <label htmlFor="move-person" className="text-sm font-medium text-foreground">
           {t('booking.field.person', 'With')}
@@ -329,7 +425,7 @@ function MovePanel({
           {t('action.back', 'Back')}
         </Button>
         <Button onClick={() => void save()} loading={saving} data-testid="move-submit">
-          {t('booking.move.submit', 'Move booking')}
+          {suggest ? t('request.suggestSubmit', 'Suggest this time') : t('booking.move.submit', 'Move booking')}
         </Button>
       </div>
     </div>

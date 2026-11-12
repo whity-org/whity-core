@@ -22,7 +22,7 @@
       var has = g[1].some(function (x) { return x[1] === active; });
       return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
   function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
   function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
   function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
@@ -33,7 +33,7 @@
   function setPage(active, title, desc, kids, actions) { return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: 'Settings' }, { label: active }], title: title, description: desc, actions: actions }),
     h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, g[0]), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '' }, x); })); })), h('div', { className: 'wy-set__main' }, kids)))); }
 
-  var rows = [{ id: 1, p: 'Omar Khalil', u: 'Sweifieh', s: ['warning', 'Not set up'], d: '9 Nov 2026' }, { id: 2, p: 'Sami Nasser', u: 'Abdoun', s: ['warning', 'Not set up'], d: '9 Nov 2026' }, { id: 3, p: 'Karim Aziz', u: 'Sweifieh', s: ['outline', 'Deactivated'], d: '—' }, { id: 4, p: 'Dana Yousef', u: 'Abdoun', s: ['success', 'Set up'], d: '—' }];
+  var rows = [{ id: 1, p: 'Ahmad Khalil', u: 'Sweifieh', s: ['warning', 'Not set up'], d: '9 Nov 2026' }, { id: 2, p: 'Emad Nasser', u: 'Abdoun', s: ['warning', 'Not set up'], d: '9 Nov 2026' }, { id: 3, p: 'Ibrahim Mansour', u: 'Sweifieh', s: ['outline', 'Deactivated'], d: '—' }, { id: 4, p: 'Awss Haddad', u: 'Abdoun', s: ['success', 'Set up'], d: '—' }];
   ReactDOM.createRoot(document.getElementById('root')).render(setPage('Security', 'Security', 'Two-step sign-in protects accounts if a password leaks.', h(F, null,
     h(W.Card, { title: 'Who must use two-step sign-in' }, h('div', { style: { display: 'grid', gap: 12 } },
       h('div', { className: 'wy-flag' }, h('div', null, h('b', null, 'Everyone in Example Bakery'), h('span', null, 'Required from 9 November 2026. Until then they’re reminded each time they sign in.')), h(W.Button, { variant: 'outline' }, 'Change')),

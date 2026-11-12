@@ -15,6 +15,10 @@
     "en": "Remove the default logo or brand image for all workspaces",
     "ar": "إزالة شعار أو صورة افتراضية لكل المساحات"
   },
+  "delete_api_calendar_bookings_id_check_in": {
+    "en": "Undo a check-in",
+    "ar": "إلغاء تسجيل الوصول"
+  },
   "delete_api_calendar_events_id": {
     "en": "Remove a calendar event",
     "ar": "حذف حدث من التقويم"
@@ -307,6 +311,10 @@
     "en": "List calendar events",
     "ar": "عرض أحداث التقويم"
   },
+  "get_api_calendar_rooms": {
+    "en": "List rooms",
+    "ar": "عرض الغرف"
+  },
   "get_api_calendar_services": {
     "en": "List services",
     "ar": "عرض الخدمات"
@@ -330,6 +338,46 @@
   "get_api_calendar_time_off": {
     "en": "List time off and extra hours",
     "ar": "عرض الإجازات والساعات الإضافية"
+  },
+  "get_api_calendar_today": {
+    "en": "Today at a glance",
+    "ar": "نظرة على اليوم"
+  },
+  "get_api_chat_chats": {
+    "en": "List the team chats you are in",
+    "ar": "عرض محادثات الفريق التي أنت فيها"
+  },
+  "get_api_chat_chats_id": {
+    "en": "Read a team chat and who is in it",
+    "ar": "قراءة محادثة فريق ومن فيها"
+  },
+  "get_api_chat_chats_id_messages": {
+    "en": "Read a team chat's messages",
+    "ar": "قراءة رسائل محادثة فريق"
+  },
+  "get_api_chat_directory": {
+    "en": "Find people and agents to mention",
+    "ar": "البحث عن أشخاص ووكلاء للإشارة إليهم"
+  },
+  "get_api_contacts": {
+    "en": "List customers and suppliers",
+    "ar": "عرض العملاء والموردين"
+  },
+  "get_api_contacts_id": {
+    "en": "Get a customer or supplier",
+    "ar": "عرض عميل أو مورد"
+  },
+  "get_api_contacts_imports": {
+    "en": "List contact imports",
+    "ar": "عرض عمليات استيراد جهات الاتصال"
+  },
+  "get_api_contacts_imports_id": {
+    "en": "Get a contact import",
+    "ar": "عرض عملية استيراد"
+  },
+  "get_api_contacts_tags": {
+    "en": "List the tags on contacts",
+    "ar": "عرض وسوم جهات الاتصال"
   },
   "get_api_convening_bodies": {
     "en": "List the bodies that hold meetings",
@@ -938,13 +986,25 @@
     "en": "Change a calendar event",
     "ar": "تعديل حدث في التقويم"
   },
+  "patch_api_calendar_rooms_id": {
+    "en": "Change a room",
+    "ar": "تعديل غرفة"
+  },
   "patch_api_calendar_services_id": {
     "en": "Change a service",
     "ar": "تعديل خدمة"
   },
+  "patch_api_contacts_id": {
+    "en": "Change a customer or supplier",
+    "ar": "تعديل عميل أو مورد"
+  },
   "patch_api_convening_bodies_id": {
     "en": "Rename a body, move it, retire it or bring it back",
     "ar": "تعديل هيئة أو إيقافها أو إعادتها"
+  },
+  "patch_api_custom_fields_id": {
+    "en": "Change a field",
+    "ar": "تعديل حقل"
   },
   "patch_api_document_collections_id": {
     "en": "Rename one of your document collections",
@@ -1117,17 +1177,33 @@
     "en": "Book a service for a customer",
     "ar": "حجز خدمة لعميل"
   },
+  "post_api_calendar_bookings_id_accept": {
+    "en": "Accept a booking request",
+    "ar": "قبول طلب حجز"
+  },
   "post_api_calendar_bookings_id_cancel": {
     "en": "Cancel a booking",
     "ar": "إلغاء حجز"
+  },
+  "post_api_calendar_bookings_id_check_in": {
+    "en": "Check a customer in",
+    "ar": "تسجيل وصول عميل"
   },
   "post_api_calendar_bookings_id_move": {
     "en": "Move a booking",
     "ar": "تغيير موعد حجز"
   },
+  "post_api_calendar_bookings_id_suggest": {
+    "en": "Suggest another time for a request",
+    "ar": "اقتراح موعد آخر لطلب"
+  },
   "post_api_calendar_events": {
     "en": "Add a calendar event",
     "ar": "إضافة حدث إلى التقويم"
+  },
+  "post_api_calendar_rooms": {
+    "en": "Add a room",
+    "ar": "إضافة غرفة"
   },
   "post_api_calendar_services": {
     "en": "Add a service",
@@ -1141,6 +1217,46 @@
     "en": "Add time off or extra hours",
     "ar": "إضافة إجازة أو ساعات إضافية"
   },
+  "post_api_chat_chats_id_messages": {
+    "en": "Write in a team chat",
+    "ar": "الكتابة في محادثة فريق"
+  },
+  "post_api_chat_chats_id_proposals": {
+    "en": "Put your proposal in a team chat",
+    "ar": "وضع اقتراحك في محادثة فريق"
+  },
+  "post_api_chat_chats_id_read": {
+    "en": "Mark a team chat read",
+    "ar": "تعليم محادثة فريق كمقروءة"
+  },
+  "post_api_contacts": {
+    "en": "Add a customer or supplier",
+    "ar": "إضافة عميل أو مورد"
+  },
+  "post_api_contacts_id_archive": {
+    "en": "Archive a customer or supplier",
+    "ar": "أرشفة عميل أو مورد"
+  },
+  "post_api_contacts_id_restore": {
+    "en": "Restore an archived contact",
+    "ar": "استعادة جهة اتصال مؤرشفة"
+  },
+  "post_api_contacts_imports": {
+    "en": "Upload a spreadsheet of contacts",
+    "ar": "رفع جدول جهات اتصال"
+  },
+  "post_api_contacts_imports_id_check": {
+    "en": "Check what an import will do",
+    "ar": "التحقق مما سيفعله الاستيراد"
+  },
+  "post_api_contacts_imports_id_run": {
+    "en": "Run a contact import",
+    "ar": "تنفيذ استيراد جهات الاتصال"
+  },
+  "post_api_contacts_imports_id_undo": {
+    "en": "Undo a contact import",
+    "ar": "التراجع عن استيراد جهات الاتصال"
+  },
   "post_api_convening_bodies": {
     "en": "Set up a body that holds meetings",
     "ar": "تأسيس هيئة"
@@ -1148,6 +1264,18 @@
   "post_api_convening_bodies_id_members": {
     "en": "Add a member to a body, or change their seat",
     "ar": "تعيين عضو في هيئة أو نقله"
+  },
+  "post_api_custom_fields": {
+    "en": "Add a field to a record type",
+    "ar": "إضافة حقل إلى نوع سجل"
+  },
+  "post_api_custom_fields_id_archive": {
+    "en": "Archive a field",
+    "ar": "أرشفة حقل"
+  },
+  "post_api_custom_fields_id_restore": {
+    "en": "Restore an archived field",
+    "ar": "استعادة حقل مؤرشف"
   },
   "post_api_data_types_type_bulk": {
     "en": "Trash, restore, retire or delete many records at once",

@@ -14,7 +14,7 @@ import { tabsListVariants } from '@whity/ui/tabs';
 import { useTranslation } from '@whity/features/i18n';
 import { useCalendarAccess } from './use-calendar-basics';
 
-export type CalendarSection = 'calendar' | 'services' | 'hours' | 'settings';
+export type CalendarSection = 'calendar' | 'services' | 'rooms' | 'hours' | 'settings';
 
 export function CalendarNav({ active }: { active: CalendarSection }) {
   const t = useTranslation('calendar');
@@ -23,6 +23,7 @@ export function CalendarNav({ active }: { active: CalendarSection }) {
   const tabs: { id: CalendarSection; label: string; href: string; show: boolean }[] = [
     { id: 'calendar', label: t('nav.calendar', 'Calendar'), href: '/calendar', show: true },
     { id: 'services', label: t('nav.services', 'Services'), href: '/calendar/services', show: access.canRead },
+    { id: 'rooms', label: t('nav.rooms', 'Rooms and branches'), href: '/calendar/rooms', show: access.canRead },
     { id: 'hours', label: t('nav.hours', 'Hours and time off'), href: '/calendar/hours', show: access.canRead },
     { id: 'settings', label: t('nav.settings', 'Settings'), href: '/calendar/settings', show: access.canManage },
   ];
