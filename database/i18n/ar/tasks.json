@@ -1,0 +1,32 @@
+{
+    "domain": "tasks",
+    "language": "ar",
+    "notice": "Hand-written translations. Unlike the English catalogue one directory up, this file is NOT generated — it is the source of truth for this language and is edited by hand. Every key must also exist in the English catalogue (CI fails on one that does not); a key absent from here falls back to English at runtime. Seed it with `whity-cli i18n:sync --language=<code>`.",
+    "keys": {
+        "action.cancel": "إلغاء",
+        "connect.action": "ربط Taskaat",
+        "connect.ask": "اطلب من شخص يدير المهام أن يربط Taskaat.",
+        "connect.body": "سجّل الدخول إلى Taskaat واسمح لـ Whity. بعدها يستطيع وكلاؤك قراءة مهام مساحة العمل وشروط إنجازها وأدلتها وقراراتها وتحديثها، وتنتظر تغييراتهم أن يقبلها شخص.",
+        "connect.title": "اربط مساحة عملك بـ Taskaat",
+        "connected.body": "يصل وكلاؤك إلى Taskaat الخاص بمساحة العمل عبر Whity، وتنتظر تغييراتهم أن يقبلها شخص.",
+        "connected.open": "فتح في Taskaat",
+        "connected.since": "مربوط منذ {date}. يصل وكلاؤك إلى Taskaat الخاص بمساحة العمل عبر Whity، وتنتظر تغييراتهم أن يقبلها شخص.",
+        "connected.soon": "ستظهر مهامك ولوحاتك هنا قريبًا. حتى ذلك الحين افتحها في Taskaat.",
+        "connected.title": "مربوط بـ Taskaat",
+        "description": "المهام واللوحات موجودة في Taskaat، ويعمل Whity معها عبر Taskaat الخاص بمساحة عملك.",
+        "disconnect.action": "فصل",
+        "disconnect.body": "لن يصل الوكلاء بعد الآن إلى Taskaat الخاص بمساحة العمل. تبقى مهامك في Taskaat. لإلغاء صلاحية Whity هناك أيضًا، أزله من التطبيقات المتصلة في Taskaat.",
+        "disconnect.confirm": "فصل Taskaat",
+        "disconnect.title": "فصل Taskaat؟",
+        "error.connect": "لم يستجب Taskaat. حاول مرة أخرى بعد دقيقة.",
+        "error.disconnect": "تعذّر فصل Taskaat. حاول مرة أخرى.",
+        "error.load": "تعذّر التحقق من الربط بـ Taskaat. حاول مرة أخرى.",
+        "lapsed.body": "لم يعد Taskaat يقبل ربط مساحة العمل هذه. على شخص يدير المهام أن يربطها مرة أخرى.",
+        "lapsed.title": "اربط Taskaat مرة أخرى",
+        "return.back": "العودة إلى المهام",
+        "return.denied": "أُلغي الربط في Taskaat.",
+        "return.failed": "لم يربط Taskaat مساحة العمل هذه.",
+        "return.finishing": "جارٍ ربط مساحة العمل هذه بـ Taskaat…",
+        "title": "المهام"
+    }
+}
