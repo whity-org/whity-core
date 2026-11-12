@@ -71124,7 +71124,8 @@
                     },
                     "reason": {
                         "type": "string",
-                        "nullable": true
+                        "nullable": true,
+                        "description": "Why the reset is needed, shown to the second admin"
                     }
                 },
                 "required": [
@@ -73696,10 +73697,12 @@
                 "type": "object",
                 "properties": {
                     "request_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "The two-step reset request about to be approved"
                     },
                     "profile_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "The person a reset is about to be started for, when there is no request"
                     }
                 }
             },

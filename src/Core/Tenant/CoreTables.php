@@ -57,6 +57,7 @@ final class CoreTables
         'affiliates' => '154_create_affiliates.php',
         'app_settings' => '024_create_app_settings.php',
         'audit_log' => '016_create_audit_log.php',
+        'away_periods' => '251_add_two_admin_resets_and_away.php',
         'backup_codes' => '007_add_two_factor_support.php',
         'calendar_availability_exceptions' => '247_create_calendar.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',

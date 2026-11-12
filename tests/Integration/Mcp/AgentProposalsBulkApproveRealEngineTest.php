@@ -125,8 +125,8 @@ final class AgentProposalsBulkApproveRealEngineTest extends TestCase
             ['id' => $checkFirst, 'reason' => 'open_on_its_own'],
             ['id' => $verifying, 'reason' => 'open_on_its_own'],
         ], $data['refused']);
-        self::assertSame('waiting', $this->proposals->find($checkFirst, self::TENANT)['status']);
-        self::assertSame('waiting', $this->proposals->find($verifying, self::TENANT)['status']);
+        self::assertSame('waiting', $this->status($checkFirst));
+        self::assertSame('waiting', $this->status($verifying));
         self::assertCount(1, $this->created);
     }
 
@@ -158,6 +158,13 @@ final class AgentProposalsBulkApproveRealEngineTest extends TestCase
     {
         self::assertSame(422, $this->inbox->bulkApprove($this->as(self::RANA, ['ids' => []]))->getStatusCode());
         self::assertSame(422, $this->inbox->bulkApprove($this->as(self::RANA, ['ids' => range(1, 51)]))->getStatusCode());
+    }
+
+    private function status(int $id): ?string
+    {
+        $proposal = $this->proposals->find($id, self::TENANT);
+
+        return $proposal === null ? null : (string) $proposal['status'];
     }
 
     /** @param list<string> $permissions */

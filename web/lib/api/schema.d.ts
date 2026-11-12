@@ -11646,6 +11646,7 @@ export interface components {
             profile_id: number;
             /** @description The admin's authenticator code, or the code emailed to them */
             code: string;
+            /** @description Why the reset is needed, shown to the second admin */
             reason?: string | null;
         };
         ForceResetResponse: {
@@ -12351,7 +12352,9 @@ export interface components {
             data: components["schemas"]["HomeCard"][];
         };
         IdentityCheckRequest: {
+            /** @description The two-step reset request about to be approved */
             request_id?: number;
+            /** @description The person a reset is about to be started for, when there is no request */
             profile_id?: number;
         };
         IdentityCheckResponse: {
