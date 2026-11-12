@@ -106,6 +106,7 @@ function formatDate(date: Date, locale?: string): string {
     const m = MONTH_NAMES[date.getMonth()].slice(0, 3)
     return `${m} ${date.getDate()}, ${date.getFullYear()}`
   }
+  // @date-display-ignore: the picker's own field and calendar in the interface language (Western digits); the chosen day is handed back as a Date, not displayed as a record timestamp.
   return new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "short",
@@ -116,6 +117,7 @@ function formatDate(date: Date, locale?: string): string {
 
 function formatMonthYear(year: number, month: number, locale?: string): string {
   if (!locale || locale.startsWith("en")) return `${MONTH_NAMES[month]} ${year}`
+  // @date-display-ignore: the picker's own field and calendar in the interface language (Western digits); the chosen day is handed back as a Date, not displayed as a record timestamp.
   return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", numberingSystem: "latn" }).format(
     new Date(year, month, 1)
   )
@@ -124,6 +126,7 @@ function formatMonthYear(year: number, month: number, locale?: string): string {
 /** Sunday first, as the grid is laid out. 1 January 2023 was a Sunday. */
 function dayNames(locale?: string): string[] {
   if (!locale || locale.startsWith("en")) return DAY_NAMES
+  // @date-display-ignore: the picker's own field and calendar in the interface language (Western digits); the chosen day is handed back as a Date, not displayed as a record timestamp.
   const format = new Intl.DateTimeFormat(locale, { weekday: "narrow" })
   return Array.from({ length: 7 }, (_, i) => format.format(new Date(2023, 0, 1 + i)))
 }

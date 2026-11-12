@@ -93,13 +93,13 @@ class SeedAuthTranslations
         // --- Two-factor challenge ---------------------------------------------
         'twoFactor.instructions'        => [
             'Enter the 6-digit code from your authenticator app or a backup code',
-            'أدخل الرمز المكوّن من ٦ أرقام من تطبيق المصادقة أو أحد رموز الاسترداد',
+            'أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة أو أحد رموز الاسترداد',
         ],
         'twoFactor.code.label'          => ['Authenticator Code', 'رمز تطبيق المصادقة'],
         'twoFactor.submit'              => ['Verify', 'تحقّق'],
         'twoFactor.submit.pending'      => ['Verifying...', 'جارٍ التحقّق...'],
         'twoFactor.back'                => ['Back to Login', 'العودة إلى تسجيل الدخول'],
-        'twoFactor.error.length'        => ['Code must be exactly 6 digits', 'يجب أن يتكوّن الرمز من ٦ أرقام بالضبط'],
+        'twoFactor.error.length'        => ['Code must be exactly 6 digits', 'يجب أن يتكوّن الرمز من 6 أرقام بالضبط'],
         'twoFactor.error.invalid'       => ['Invalid authenticator code. Please try again.', 'رمز المصادقة غير صحيح. حاول مرة أخرى.'],
         'twoFactor.error.generic'       => ['Verification failed. Please try again.', 'فشل التحقّق. حاول مرة أخرى.'],
         'twoFactor.error.transport'     => ['An error occurred. Please try again.', 'حدث خطأ. حاول مرة أخرى.'],
