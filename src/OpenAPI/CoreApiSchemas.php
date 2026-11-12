@@ -10146,13 +10146,15 @@ final class CoreApiSchemas
             'DisplayPreferences' => self::object([
                 'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
                 'showTechnicalDetails' => self::bool(),
-            ], ['textSize', 'showTechnicalDetails']),
+                'animations' => ['type' => 'string', 'enum' => ['full', 'calm', 'off']],
+            ], ['textSize', 'showTechnicalDetails', 'animations']),
             'DisplayPreferencesResponse' => self::object([
                 'data' => SchemaBuilder::ref('DisplayPreferences'),
             ], ['data']),
             'DisplayPreferencesUpdateRequest' => self::object([
                 'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
                 'showTechnicalDetails' => self::bool(),
+                'animations' => ['type' => 'string', 'enum' => ['full', 'calm', 'off']],
             ], []),
             'NotificationPreferencesUpdateRequest' => self::object([
                 'preferences' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationPreferenceEntry'), 'description' => 'Entries of `{type, channel, enabled}` to set for the signed-in user. Transactional notification types cannot be turned off.'],
@@ -16328,6 +16330,11 @@ final class CoreApiSchemas
             $properties['accentUse'] = ['type' => 'string', 'enum' => ['title', 'title-and-headings'], 'description' => 'Where the print colour is used: `title` only, or `title-and-headings` (H1 to H3 too).'];
         }
         $properties['letterhead'] = $letterhead;
+        if (!$overridesOnly) {
+            // E.46 and E.47 (editor M8).
+            $properties['titleFace'] = ['type' => 'string', 'enum' => ['readex', 'noto'], 'description' => 'The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).'];
+            $properties['largePrint'] = ['type' => 'boolean', 'description' => 'Large print: an 11pt body in print, with headings scaled by the same steps.'];
+        }
 
         $schema = ['type' => 'object', 'additionalProperties' => false, 'properties' => $properties];
         if ($complete) {

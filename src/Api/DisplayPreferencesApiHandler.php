@@ -12,8 +12,11 @@ use Whity\Core\Response;
 /**
  * A person's display preferences (design decisions W.3, A.1, A.3).
  *
- *   GET /api/v1/me/display-preferences  — text size and Show technical details
- *   PUT /api/v1/me/display-preferences  — change either
+ *   GET /api/v1/me/display-preferences  — text size, Show technical details, Animations
+ *   PUT /api/v1/me/display-preferences  — change any of them
+ *
+ * Animations (LT.4): full (default), calm (scenes fade in at their end) or off
+ * (still). The device's reduce-motion setting means off on top of this.
  *
  * Session-gated and strictly self-scoped: the profile comes from the validated
  * token, never the body. No RBAC permission (self-service, like language).
@@ -21,6 +24,8 @@ use Whity\Core\Response;
 final class DisplayPreferencesApiHandler
 {
     private const TEXT_SIZES = ['standard', 'larger'];
+
+    private const ANIMATIONS = ['full', 'calm', 'off'];
 
     public function __construct(
         private readonly TokenValidator $tokenValidator,
@@ -62,7 +67,8 @@ final class DisplayPreferencesApiHandler
 
         $textSize = $body['textSize'] ?? null;
         $technical = $body['showTechnicalDetails'] ?? null;
-        if ($textSize === null && $technical === null) {
+        $animations = $body['animations'] ?? null;
+        if ($textSize === null && $technical === null && $animations === null) {
             return Response::error('Nothing to change', 422);
         }
         if ($textSize !== null && !in_array($textSize, self::TEXT_SIZES, true)) {
@@ -70,6 +76,9 @@ final class DisplayPreferencesApiHandler
         }
         if ($technical !== null && !is_bool($technical)) {
             return Response::error('showTechnicalDetails must be true or false', 422);
+        }
+        if ($animations !== null && !in_array($animations, self::ANIMATIONS, true)) {
+            return Response::error('animations must be full, calm or off', 422);
         }
 
         // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
@@ -84,17 +93,22 @@ final class DisplayPreferencesApiHandler
             $stmt->bindValue(2, $profileId, PDO::PARAM_INT);
             $stmt->execute();
         }
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        if ($animations !== null) {
+            $stmt = $this->db->prepare('UPDATE profiles SET animations = ? WHERE id = ?');
+            $stmt->execute([$animations, $profileId]);
+        }
 
         return Response::json(['data' => $this->read($profileId)], 200);
     }
 
     /**
-     * @return array{textSize: string, showTechnicalDetails: bool}|null
+     * @return array{textSize: string, showTechnicalDetails: bool, animations: string}|null
      */
     private function read(int $profileId): ?array
     {
         // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
-        $stmt = $this->db->prepare('SELECT text_size, show_technical_details FROM profiles WHERE id = ? LIMIT 1');
+        $stmt = $this->db->prepare('SELECT text_size, show_technical_details, animations FROM profiles WHERE id = ? LIMIT 1');
         $stmt->execute([$profileId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!is_array($row)) {
@@ -104,6 +118,7 @@ final class DisplayPreferencesApiHandler
         return [
             'textSize'             => in_array($row['text_size'], self::TEXT_SIZES, true) ? (string) $row['text_size'] : 'standard',
             'showTechnicalDetails' => filter_var($row['show_technical_details'], FILTER_VALIDATE_BOOLEAN),
+            'animations'           => in_array($row['animations'], self::ANIMATIONS, true) ? (string) $row['animations'] : 'full',
         ];
     }
 

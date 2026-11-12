@@ -97,6 +97,7 @@
     "./icon-map": "./src/icon-map.ts",
     "./input": "./src/input.tsx",
     "./locked-screen": "./src/locked-screen.tsx",
+    "./lottie": "./src/lottie.tsx",
     "./mark": "./src/mark.tsx",
     "./math-text": "./src/math-text.tsx",
     "./menu-bar": "./src/menu-bar.tsx",

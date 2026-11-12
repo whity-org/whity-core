@@ -26,3 +26,14 @@ final color = AppTokens.colors(isDarkMode)['primary'];
 `lib/src/generated/tokens.dart` is generated — do not hand-edit it. It's
 regenerated (along with every other token target) by running
 `npm run tokens:generate` from `web/` in the whity-core repo.
+
+## The brand extension
+
+`lib/src/whity_brand.dart` is the `WhityBrand` theme extension from the design
+hand-off (`docs/design/handoff/flutter/lib/whity_brand.dart`): the plane, the
+blueprint, the mark sheet and the logo sizes, which `AppTokens` does not carry.
+It is copied, not generated; update it from the hand-off when the design changes.
+
+```dart
+ThemeData(extensions: const [WhityBrand.light]);
+```
