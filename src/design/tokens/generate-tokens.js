@@ -348,6 +348,7 @@ function generateTokensJson(base) {
     shadow: { light: base.shadow.light, dark: base.shadow.dark },
     plane: base.plane,
     size: base.size,
+    logo: Object.fromEntries(Object.entries(base.logo).filter(([k]) => k !== 'description')),
     motion: base.motion,
     document: { fontSize: base.document.fontSize, lineHeight: base.document.lineHeight },
   };
@@ -543,7 +544,11 @@ function generateThemeInlineBlock(base) {
 function pushScalarProperties(lines, base) {
   lines.push(`  --radius: ${base.borderRadius.base};`);
   for (const [name, value] of Object.entries(base.plane)) lines.push(`  --${name}: ${value};`);
+  for (const [step, value] of Object.entries(base.spacing.scale)) lines.push(`  --space-${step}: ${value};`);
   for (const [name, value] of Object.entries(base.size)) lines.push(`  --${name}: ${value};`);
+  for (const [name, value] of Object.entries(base.logo)) {
+    if (name !== 'description') lines.push(`  --${name}: ${value};`);
+  }
   for (const [name, value] of Object.entries(base.motion)) lines.push(`  --${name}: ${value};`);
 }
 

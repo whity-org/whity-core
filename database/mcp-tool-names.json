@@ -190,6 +190,30 @@
   "delete_api_users_id_memberships_membershipid": {
     "ar": "سحب دور إضافي من مستخدم"
   },
+  "document_agent_request_update": {
+    "en": "Report how a document request is going",
+    "ar": "الإبلاغ عن سير طلب مستند"
+  },
+  "document_agent_requests_next": {
+    "en": "Pick up the next document request your person asked of you",
+    "ar": "استلام طلب المستند التالي الذي طلبه منك صاحبك"
+  },
+  "document_comment_reply": {
+    "en": "Reply in a comment thread on a document",
+    "ar": "الرد في سلسلة تعليقات على مستند"
+  },
+  "document_read": {
+    "en": "Read a document as blocks, with its open comments and suggestions",
+    "ar": "قراءة مستند كتلًا مع تعليقاته واقتراحاته المفتوحة"
+  },
+  "document_suggest_blocks": {
+    "en": "Suggest new blocks in a document",
+    "ar": "اقتراح كتل جديدة في مستند"
+  },
+  "document_suggest_rewrite": {
+    "en": "Suggest replacing text in a document",
+    "ar": "اقتراح استبدال نص في مستند"
+  },
   "get_api_2fa_policies": {
     "en": "List your workspace's two-step sign-in rules",
     "ar": "عرض قواعد التحقق بخطوتين"
@@ -373,6 +397,10 @@
   "get_api_document_sources_id": {
     "en": "Open a document in the editor",
     "ar": "فتح مستند في المحرر"
+  },
+  "get_api_document_sources_id_agent_requests": {
+    "en": "Your agent requests on a document",
+    "ar": "طلباتك من الوكلاء على مستند"
   },
   "get_api_document_sources_id_changes": {
     "en": "See what changed in a document",
@@ -1141,6 +1169,10 @@
     "en": "Delegate some of your permissions to someone",
     "ar": "تفويض بعض صلاحياتك لشخص آخر"
   },
+  "post_api_document_agent_requests_rid_stop": {
+    "en": "Stop an agent request",
+    "ar": "إيقاف طلب من وكيل"
+  },
   "post_api_document_collections": {
     "en": "Create a document collection of your own",
     "ar": "إنشاء مجموعة مستندات خاصة بك"
@@ -1151,6 +1183,10 @@
   "post_api_document_sources": {
     "en": "Create a document in the editor",
     "ar": "إنشاء مستند في المحرر"
+  },
+  "post_api_document_sources_id_agent_requests": {
+    "en": "Ask an agent to work on a document",
+    "ar": "طلب العمل على مستند من وكيل"
   },
   "post_api_document_sources_id_comments": {
     "en": "Start a comment on a document",

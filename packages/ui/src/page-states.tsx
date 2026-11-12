@@ -3,6 +3,7 @@ import * as React from "react"
 import { Alert, AlertDescription, AlertTitle } from "./alert"
 import { Button } from "./button"
 import { Icon, type IconName } from "./icon"
+import { Lottie, type MomentName } from "./lottie"
 import { Skeleton } from "./skeleton"
 import { cn } from "./utils"
 
@@ -48,20 +49,32 @@ function LoadingRows({
   )
 }
 
-/** The dashed box with a tinted icon tile shared by the two empty states. */
+/**
+ * The dashed box shared by the two empty states: a tinted icon tile, or a Lottie
+ * moment (LT.4) with the tile as its fallback.
+ */
 function EmptyBox({
   icon,
   title,
   description,
   action,
+  moment,
+  once,
   className,
 }: {
   icon: IconName
   title: string
   description?: string
   action?: React.ReactNode
+  moment?: MomentName
+  once?: string
   className?: string
 }) {
+  const tile = (
+    <span className="grid size-12 place-items-center rounded-card bg-muted text-muted-foreground">
+      <Icon name={icon} size={24} />
+    </span>
+  )
   return (
     <div
       className={cn(
@@ -69,9 +82,7 @@ function EmptyBox({
         className
       )}
     >
-      <span className="grid size-12 place-items-center rounded-card bg-muted text-muted-foreground">
-        <Icon name={icon} size={24} />
-      </span>
+      {moment ? <Lottie name={moment} once={once} className="h-[120px] w-[160px]" fallback={tile} /> : tile}
       <p className="mt-1 text-base font-semibold text-foreground">{title}</p>
       {description && <p className="max-w-prose text-sm text-muted-foreground">{description}</p>}
       {action && <div className="mt-1">{action}</div>}
@@ -85,6 +96,8 @@ function EmptyFirstTime({
   title,
   description,
   action,
+  moment,
+  once,
   className,
 }: {
   icon?: IconName
@@ -92,9 +105,23 @@ function EmptyFirstTime({
   description?: string
   /** The page's main button. */
   action?: React.ReactNode
+  /** `empty-documents`, `empty-people`, `empty-invoices`, `empty-stock` or `all-caught-up` (LT.4). */
+  moment?: MomentName
+  /** Plays once a session under this key; defaults to the moment's name. */
+  once?: string
   className?: string
 }) {
-  return <EmptyBox icon={icon} title={title} description={description} action={action} className={className} />
+  return (
+    <EmptyBox
+      icon={icon}
+      title={title}
+      description={description}
+      action={action}
+      moment={moment}
+      once={moment ? (once ?? moment) : undefined}
+      className={className}
+    />
+  )
 }
 
 /** Empty after a filter: names the search or filter and offers Clear filters. */
@@ -115,6 +142,7 @@ function EmptyFiltered({
   return (
     <EmptyBox
       icon="search"
+      moment="no-results"
       title={title}
       description={description}
       className={className}
@@ -146,6 +174,44 @@ function AreaError({
       <Button type="button" variant="outline" size="sm" onClick={onRetry}>
         {retryLabel}
       </Button>
+    </div>
+  )
+}
+
+/**
+ * Waiting on something real (an upload, an import, an outside system): a looping
+ * moment while `active`, then still on its last frame. The words say what is
+ * happening and that the person can keep working; nothing waits for the picture.
+ */
+function WaitingState({
+  moment = "updating",
+  active = true,
+  title,
+  description,
+  action,
+  className,
+}: {
+  /** `uploading`, `waiting-reply`, `updating` (loops) or `offline` (plays once, then still). */
+  moment?: MomentName
+  /** False once the waiting is over. */
+  active?: boolean
+  title: string
+  description?: React.ReactNode
+  action?: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div role="status" aria-busy={active} className={cn("flex flex-col items-center gap-2 px-6 py-8 text-center", className)}>
+      <Lottie
+        name={moment}
+        play={moment === "offline" ? "view" : "loop"}
+        active={active}
+        className="size-[120px]"
+        fallback={<Icon name={moment === "offline" ? "alert" : "clock"} size={24} className="text-muted-foreground" />}
+      />
+      <p className="mt-1 text-base font-semibold text-foreground">{title}</p>
+      {description && <div className="max-w-prose text-sm text-muted-foreground">{description}</div>}
+      {action && <div className="mt-1">{action}</div>}
     </div>
   )
 }
@@ -202,4 +268,4 @@ function AccessDeniedPanel({
   )
 }
 
-export { AccessDeniedPanel, AreaError, EmptyFiltered, EmptyFirstTime, LoadingRows, ReadOnlyNotice }
+export { AccessDeniedPanel, AreaError, EmptyFiltered, EmptyFirstTime, LoadingRows, ReadOnlyNotice, WaitingState }

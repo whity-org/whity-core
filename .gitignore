@@ -89,3 +89,6 @@ ops/watchdog/.wrangler/
 
 # Design-card screenshot check output (scripts/design-cards-compare.mjs)
 /.design-check/
+
+# install.sh logs (whity.dev/install.sh)
+/.whity-install/

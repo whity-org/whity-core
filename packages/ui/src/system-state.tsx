@@ -1,6 +1,7 @@
 import * as React from "react"
 
 import { Icon, type IconName } from "./icon"
+import { Lottie, type MomentName } from "./lottie"
 import { cn } from "./utils"
 
 export interface SystemStateProps {
@@ -11,6 +12,8 @@ export interface SystemStateProps {
   description: string
   /** The one thing to do next, then at most one quieter way out. */
   actions?: React.ReactNode
+  /** `went-wrong`, `not-found` or `offline` (LT.4); the planes art shows until it is ready. */
+  moment?: MomentName
   className?: string
 }
 
@@ -19,16 +22,23 @@ export interface SystemStateProps {
  * happened, that nothing was lost when that is true, and what to do next. The
  * art is the mark's two planes with the sheet dashed, "not set down".
  */
-function SystemState({ icon, code, title, description, actions, className }: SystemStateProps) {
+function SystemState({ icon, code, title, description, actions, moment, className }: SystemStateProps) {
+  const art = (
+    <span aria-hidden="true" className="relative block size-14">
+      <span className="absolute start-0 bottom-0 size-9 rounded-control bg-muted" />
+      <span className="absolute end-0 top-0 grid size-10 place-items-center rounded-control border border-dashed border-border bg-card text-muted-foreground">
+        <Icon name={icon} size={20} />
+      </span>
+    </span>
+  )
   return (
     <main className={cn("grid min-h-screen place-items-center bg-background p-4", className)}>
       <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-card border border-border bg-card px-6 py-10 text-center shadow-sm">
-        <span aria-hidden="true" className="relative mb-2 block size-14">
-          <span className="absolute start-0 bottom-0 size-9 rounded-control bg-muted" />
-          <span className="absolute end-0 top-0 grid size-10 place-items-center rounded-control border border-dashed border-border bg-card text-muted-foreground">
-            <Icon name={icon} size={20} />
-          </span>
-        </span>
+        {moment ? (
+          <Lottie name={moment} className="mb-2 h-[135px] w-[200px]" fallback={art} />
+        ) : (
+          <span className="mb-2">{art}</span>
+        )}
         {code ? (
           <span dir="ltr" className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
             {code}

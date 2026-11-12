@@ -4885,6 +4885,31 @@ $router->register('GET',  '/api/document-sources/{id:\d+}/changes',             
 // The people a comment may @mention: members who can read the document.
 $router->register('GET',  '/api/document-sources/{id:\d+}/mentionable',                     [$documentCollabHandler, 'mentionable'],      null, null, CorePermissions::DOCUMENTS_COMMENT);
 
+// Agents in the editor (editor M6; E.30, E.31; owner's answers Q3, Q4, Q9).
+// Whity hosts no model: a person's request waits until their own agent picks
+// it up over MCP (document_agent_requests_next). The agent's tools are named by
+// their operationId and only ever write suggestions and comments, through the
+// collab handler above, with the agent and the person it acts for.
+$documentAgentHandler = new \Whity\Api\DocumentAgentApiHandler(
+    $documentSourcesHandler,
+    $documentCollabHandler,
+    $documentCollab,
+    new \Whity\Core\Document\Agent\DocumentAgentRequestRepository($db->getPdo()),
+    new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
+    new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo()),
+    $roleChecker,
+    $auditLogger,
+);
+$router->register('POST', '/api/document-sources/{id:\d+}/agent-requests',               [$documentAgentHandler, 'ask'],            null, null, CorePermissions::DOCUMENTS_SUGGEST);
+$router->register('GET',  '/api/document-sources/{id:\d+}/agent-requests',               [$documentAgentHandler, 'listRequests'],   null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-agent-requests/{rid:\d+}/stop',                 [$documentAgentHandler, 'stop'],           null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-agent-requests/next',                           [$documentAgentHandler, 'next'],           null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-agent-requests/{rid:\d+}/progress',             [$documentAgentHandler, 'progress'],       null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('GET',  '/api/document-sources/{id:\d+}/agent-view',                   [$documentAgentHandler, 'read'],           null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-sources/{id:\d+}/agent-suggestions/blocks',     [$documentAgentHandler, 'suggestBlocks'],  null, null, CorePermissions::DOCUMENTS_SUGGEST);
+$router->register('POST', '/api/document-sources/{id:\d+}/agent-suggestions/rewrite',    [$documentAgentHandler, 'suggestRewrite'], null, null, CorePermissions::DOCUMENTS_SUGGEST);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/reply',     [$documentAgentHandler, 'reply'],          null, null, CorePermissions::DOCUMENTS_COMMENT);
+
 // 13b-quinquies-bis. ROUTING NOTIFICATIONS (#1054) — the subscriber that turns a
 // routing broadcast into notifications.
 //

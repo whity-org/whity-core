@@ -1,6 +1,36 @@
+import { avatarPatternShapes } from "./avatar-pattern"
 import { Icon } from "./icon"
 import { Mark } from "./mark"
 import { cn } from "./utils"
+
+/** The seeded pattern (M.34) as SVG elements: no markup is ever injected. */
+function AvatarPattern({ seed, hue }: { seed: string; hue?: number }) {
+  const { background, rotate, shapes } = avatarPatternShapes(seed, hue)
+  return (
+    <svg data-slot="avatar-pattern" viewBox="0 0 40 40" aria-hidden="true" className="block size-full rounded-full">
+      <rect width="40" height="40" fill={background} />
+      <g transform={`rotate(${rotate} 20 20)`}>
+        {shapes.map((shape, index) =>
+          shape.kind === "circle" ? (
+            <circle key={index} cx={shape.cx} cy={shape.cy} r={shape.r} fill={shape.fill} />
+          ) : (
+            <rect
+              key={index}
+              x={shape.x}
+              y={shape.y}
+              width={shape.width}
+              height={shape.height}
+              rx={shape.rx}
+              fill={shape.fill}
+              {...(shape.dash ? { stroke: shape.stroke, strokeWidth: 2.6, strokeDasharray: "4.5 3" } : {})}
+              {...(shape.rotate != null ? { transform: `rotate(${shape.rotate} 20 24)` } : {})}
+            />
+          )
+        )}
+      </g>
+    </svg>
+  )
+}
 
 export type ActorKind = "person" | "agent" | "system"
 
@@ -19,7 +49,8 @@ function initials(name: string): string {
 
 /**
  * Who did something, at a glance: people get their initials on grey (or a
- * photo), agents the robot face on the tint, and the system the Whity mark.
+ * photo, or a seeded Whity pattern, M.34), agents the robot face on the tint,
+ * and the system the Whity mark.
  * Agents never get a human face or a photo (stage 8). An optional dot shows
  * presence. The reference is docs/design/components/Avatar (`.wy-avatar`).
  */
@@ -27,6 +58,8 @@ function Avatar({
   name,
   kind = "person",
   src,
+  pattern,
+  hue,
   size = 32,
   status,
   labels,
@@ -36,6 +69,13 @@ function Avatar({
   kind?: ActorKind
   /** A photo, for people only. */
   src?: string
+  /**
+   * A stable seed (the Whity ID, or the person id): people without a photo get
+   * the seeded pattern instead of initials (M.34).
+   */
+  pattern?: string
+  /** The hue of the installation colour where the account was made (`brandHue`); Whity Blue by default. */
+  hue?: number
   size?: number
   status?: "online" | "busy" | "offline"
   /** Overrides for the accessible name suffixes, e.g. Arabic. */
@@ -64,6 +104,8 @@ function Avatar({
         <Mark size={Math.round(size * 0.62)} label="" />
       ) : src ? (
         <img src={src} alt="" className="size-full rounded-full object-cover" />
+      ) : pattern != null ? (
+        <AvatarPattern seed={pattern} hue={hue} />
       ) : (
         initials(name)
       )}
