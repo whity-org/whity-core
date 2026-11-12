@@ -336,6 +336,22 @@ export const EDITOR_LABELS = {
   agentRetry: "Try again",
   agentRewrite: "Rewrite with an agent",
   agentRewriteRequest: "Rewrite this, keeping the meaning",
+  saveBlockTitle: "Save as block",
+  saveBlockExplain: "Saves the {n} selected blocks as one block you can insert from the / menu.",
+  saveBlockName: "Name",
+  saveBlockNamePlaceholder: "Bank details",
+  saveBlockHow: "When it's inserted",
+  saveBlockSynced: "Synced",
+  saveBlockSyncedHint: "Editing it once updates every document that uses it. Published templates pick up the change when they're published again.",
+  saveBlockCopy: "Copy",
+  saveBlockCopyHint: "Inserts a copy people change freely.",
+  saveBlockWho: "Who can use it",
+  saveBlockOnlyMe: "Only me",
+  saveBlockOnlyMeHint: "It's in your / menu only.",
+  saveBlockEveryone: "Everyone in the workspace",
+  saveBlockEveryoneHint: "It joins the workspace library.",
+  saveBlockSave: "Save block",
+  saveBlockCancel: "Cancel",
 }
 
 export type EditorLabels = typeof EDITOR_LABELS
