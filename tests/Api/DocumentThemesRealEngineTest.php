@@ -176,6 +176,28 @@ final class DocumentThemesRealEngineTest extends TestCase
         self::assertSame('document', $theme['sources']['letterhead.lines']);
     }
 
+    public function testTheTitleFaceAndLargePrintAreThemeOptions(): void
+    {
+        $standard = $this->resolver->resolve(self::TENANT);
+        self::assertSame('readex', $standard['tokens']['titleFace'], 'E.46: Readex Pro by default');
+        self::assertFalse($standard['tokens']['largePrint'], 'E.47: off by default');
+        self::assertSame('whity.standard', $standard['sources']['titleFace']);
+
+        $this->themes->create(self::TENANT, 'plain', 'Plain', 'بسيط', 'whity.standard', [
+            'titleFace' => 'noto',
+            'largePrint' => true,
+        ], self::OWNER);
+        $theme = $this->resolver->resolve(self::TENANT, ['ref' => 'tenant.plain']);
+        self::assertSame('noto', $theme['tokens']['titleFace']);
+        self::assertTrue($theme['tokens']['largePrint']);
+        self::assertSame('tenant.plain', $theme['sources']['largePrint']);
+        self::assertNotSame($standard['hash'], $theme['hash']);
+
+        self::assertSame(['titleFace' => 'titleFace must be one of readex, noto.'], \Whity\Core\Document\Theme\DocumentThemeTokens::errors(['titleFace' => 'comic']));
+        self::assertSame(['largePrint' => 'largePrint must be true or false.'], \Whity\Core\Document\Theme\DocumentThemeTokens::errors(['largePrint' => 'yes']));
+        self::assertArrayHasKey('largePrint', \Whity\Core\Document\Theme\DocumentThemeTokens::errors(['largePrint' => true], overridesOnly: true), 'a theme option, not a document override');
+    }
+
     public function testADocumentsOwnPrintColourGetsAMatchingTitleOnDark(): void
     {
         $this->themes->create(self::TENANT, 'house', 'House', 'الدار', null, [

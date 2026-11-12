@@ -89,6 +89,8 @@ final class DocumentThemeResolver
             'accentUse' => DocumentThemeRef::STANDARD,
             'letterhead.logo' => DocumentThemeRef::STANDARD,
             'letterhead.lines' => DocumentThemeRef::STANDARD,
+            'titleFace' => DocumentThemeRef::STANDARD,
+            'largePrint' => DocumentThemeRef::STANDARD,
         ];
 
         if ($row !== null) {
@@ -187,6 +189,8 @@ final class DocumentThemeResolver
                 'logo' => $letterhead['logo'] ?? 'wide',
                 'lines' => array_values((array) ($letterhead['lines'] ?? [])),
             ],
+            'titleFace' => in_array($tokens['titleFace'] ?? null, DocumentThemeTokens::TITLE_FACES, true) ? $tokens['titleFace'] : 'readex',
+            'largePrint' => ($tokens['largePrint'] ?? false) === true,
         ];
     }
 }

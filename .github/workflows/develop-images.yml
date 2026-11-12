@@ -1,0 +1,128 @@
+# Develop images (WHIT-951): every green push to develop publishes the app,
+# web and render images, so app.whity.dev can run develop instead of waiting
+# for a release.
+#
+# Trigger: Automated Tests finishing on a push to develop (a merge through the
+# queue). Only a successful run builds, so a develop image has passed the same
+# suite as the commit it carries. Runs cancelled by a newer push (that
+# workflow's concurrency group) never build; the newer one does.
+#
+# Tags, on all three images:
+#   develop-<7-char sha>  immutable; what a deployment pins, so a rollback is exact
+#   develop               floating; moved by the `promote` job only after the
+#                         smoke test passed, and only while the commit is still
+#                         develop's tip, so a deployment polling it never gets an
+#                         image that failed smoke or an older build than it has
+#
+# The build itself is images.yml, the same jobs release.yml uses: identical
+# Dockerfile stages, build identity (/api/build reports the commit), Trivy
+# scan and smoke test, including the upgrade from the latest release.
+#
+# The deployer for app.whity.dev runs on its own host and polls the `develop`
+# tag; nothing here reaches into a deployment.
+name: Develop images
+
+on:
+  workflow_run:
+    workflows: ['Automated Tests']
+    types: [completed]
+    branches: [develop]
+  # Rebuild develop's current tip by hand (e.g. after a failed build).
+  workflow_dispatch: {}
+
+# One build at a time. A newer pending run replaces an older pending one,
+# which is what we want: only the newest develop is worth publishing.
+concurrency:
+  group: develop-images
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve the develop commit
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'develop')
+
+    permissions:
+      contents: read
+
+    outputs:
+      commit: ${{ steps.r.outputs.commit }}
+      tag: ${{ steps.r.outputs.tag }}
+      version: ${{ steps.r.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # workflow_run's github.sha is the default branch's head at the time
+          # this run starts, not the commit that was tested. Build what passed.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Decide tags
+        id: r
+        run: |
+          COMMIT=$(git rev-parse HEAD)
+          SHORT=$(git rev-parse --short=7 HEAD)
+          VERSION=$(grep -oE "VERSION = '[^']+'" src/Core/CoreVersion.php | grep -oE "[0-9]+\.[0-9]+\.[0-9]+")
+          TIP=$(git ls-remote origin refs/heads/develop | cut -f1)
+
+          if [ "${COMMIT}" != "${TIP}" ]; then
+            echo "::notice::${SHORT} is no longer develop's tip (${TIP:0:7}); publishing develop-${SHORT}, the develop tag waits for the newer build."
+          fi
+
+          {
+            echo "commit=${COMMIT}"
+            echo "tag=develop-${SHORT}"
+            echo "version=${VERSION}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Building ${COMMIT} (CoreVersion ${VERSION}) as develop-${SHORT}"
+
+  images:
+    name: Images
+    needs: [resolve]
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    uses: ./.github/workflows/images.yml
+    with:
+      commit: ${{ needs.resolve.outputs.commit }}
+      tag: ${{ needs.resolve.outputs.tag }}
+      version: ${{ needs.resolve.outputs.version }}
+
+  promote:
+    name: Move the develop tag
+    runs-on: ubuntu-latest
+    needs: [resolve, images]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Point develop at the smoke-tested images
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
+          COMMIT: ${{ needs.resolve.outputs.commit }}
+        run: |
+          # Checked again here: the build took long enough for develop to move.
+          TIP=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}" refs/heads/develop | cut -f1)
+          if [ "${COMMIT}" != "${TIP}" ]; then
+            echo "::notice::develop moved to ${TIP:0:7} during the build; ${TAG} stays published, the develop tag is left for the newer build."
+            exit 0
+          fi
+          BASE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          # Copies the manifest in the registry; nothing is rebuilt or pulled.
+          for name in "${BASE}" "${BASE}/web" "${BASE}/render"; do
+            docker buildx imagetools create --tag "${name}:develop" "${name}:${TAG}"
+          done
+          echo "develop -> ${TAG} (${COMMIT})" >> "$GITHUB_STEP_SUMMARY"

@@ -11,6 +11,7 @@ export default function NotFound() {
   return (
     <SystemState
       icon="search"
+      moment="not-found"
       code="404"
       title={t('system.notFound.title', 'We can’t find that page')}
       description={t(

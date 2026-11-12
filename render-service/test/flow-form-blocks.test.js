@@ -70,6 +70,19 @@ describe('theme', () => {
     expect(buildFlowHtml(normaliseFlowDocument(titleOnly))).toContain('<body class="flow-themed">');
   });
 
+  test('the title face and large print hold without a print colour (E.46, E.47)', () => {
+    const payload = doc([{ type: 'heading', level: 1, text: 'Terms' }], { theme: { titleFace: 'noto', largePrint: true } });
+    expect(validateFlowPayload(payload)).toBeNull();
+    expect(buildFlowHtml(normaliseFlowDocument(payload))).toContain('<body class="flow-title-body-face flow-large-print">');
+
+    const both = doc([{ type: 'paragraph', text: 'x' }], { theme: { accent: '#b74c05', titleFace: 'readex', largePrint: false } });
+    expect(validateFlowPayload(both)).toBeNull();
+    expect(buildFlowHtml(normaliseFlowDocument(both))).toContain('<body class="flow-themed">');
+
+    expect(validateFlowPayload(doc([{ type: 'paragraph', text: 'x' }], { theme: { titleFace: 'comic' } }))).toMatch(/titleFace/);
+    expect(validateFlowPayload(doc([{ type: 'paragraph', text: 'x' }], { theme: { largePrint: 'yes' } }))).toMatch(/largePrint/);
+  });
+
   test('takes only the print colour and where it goes, never the greys and rules', () => {
     for (const key of ['ink', 'muted', 'line', 'tint']) {
       expect(validateFlowPayload(doc([{ type: 'paragraph', text: 'x' }], { theme: { [key]: '#032230' } }))).toMatch(new RegExp(`theme\\.${key}`));

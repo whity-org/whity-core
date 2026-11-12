@@ -521,8 +521,11 @@ function buildFlowHtml(doc) {
     : '';
   // E.45: a theme may put the print colour on the headings as well.
   const bodyClasses = [
-    doc.theme ? 'flow-themed' : '',
+    doc.theme && doc.theme.accent ? 'flow-themed' : '',
     doc.theme && doc.theme.accentUse === 'title-and-headings' ? 'flow-accent-headings' : '',
+    // E.46: the title in the body face; E.47: an 11pt body.
+    doc.theme && doc.theme.titleFace === 'noto' ? 'flow-title-body-face' : '',
+    doc.theme && doc.theme.largePrint === true ? 'flow-large-print' : '',
   ].filter(Boolean).join(' ');
 
   // Everything the browser-side paginator needs: geometry, the running
