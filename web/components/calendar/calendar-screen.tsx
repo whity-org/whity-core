@@ -8,7 +8,8 @@
  * existing pieces: the toggle group for the view, the select for the person,
  * the dialog and sheet patterns, and the six states.
  *
- * DESIGN 3.3 (`TplAppointments`): a branch filter when the workspace puts
+ * DESIGN 3.3 (`TplAppointments`): Day for everyone has a column for each
+ * person and each room (the kit's time grid); a branch filter when the workspace puts
  * staff or rooms in branches; customers' requests dashed amber and checked-in
  * bookings green; a column beside the calendar with the Requests waiting for
  * an OK and Today at a glance (below the calendar on a narrow screen).
@@ -48,6 +49,7 @@ import { AgendaList, MonthGrid, TimeGrid, type GridItem } from './calendar-grid'
 import { BookingDialog } from './booking-dialog';
 import { BookingSheet } from './booking-sheet';
 import { RequestsCard, TodayCard } from './appointments-side';
+import { DayColumns, wantsColumns } from './day-columns';
 import { CalendarNav } from './calendar-nav';
 import { EventDialog } from './event-dialog';
 import { useCalendarAccess, useCalendarBasics } from './use-calendar-basics';
@@ -375,6 +377,18 @@ function CalendarBody({
             <AgendaList {...gridProps} days={range.days} />
           </div>
         </>
+      ) : person === EVERYONE && wantsColumns(staff, rooms) ? (
+        <DayColumns
+          day={anchor}
+          today={today}
+          timeZone={timeZone}
+          items={items}
+          staff={staff}
+          rooms={rooms}
+          unitId={unitId}
+          label={[title ?? '', usedUnits.find((u) => u.id === unitId)?.name ?? ''].filter((part) => part !== '').join(', ')}
+          onOpen={gridProps.onOpen}
+        />
       ) : (
         <TimeGrid {...gridProps} days={range.days} />
       )}

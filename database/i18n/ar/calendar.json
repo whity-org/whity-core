@@ -73,6 +73,8 @@
         "booking.status.requested": "طلب: بانتظار موافقتك",
         "booking.suggested": "اقتُرح موعد آخر على {name}",
         "booking.undoCheckIn": "إلغاء تسجيل الوصول",
+        "columns.none": "لا أحد ولا غرفة في هذا الفرع.",
+        "columns.room": "(غرفة)",
         "description": "الحجوزات ووقت الفريق، بتوقيت مساحة العمل.",
         "empty.action": "أضف خدمة",
         "empty.ask": "لم يُجهَّز شيء بعد. يضيف مَن يدير التقويم الخدمات وساعات عمل الفريق.",

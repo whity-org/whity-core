@@ -72,6 +72,8 @@
         "booking.status.requested": "Request: needs your OK",
         "booking.suggested": "Another time suggested to {name}",
         "booking.undoCheckIn": "Undo check-in",
+        "columns.none": "Nobody and no room in this branch.",
+        "columns.room": "(room)",
         "description": "Bookings and the team’s time, in the workspace’s time zone.",
         "empty.action": "Add a service",
         "empty.ask": "Nothing is set up yet. Someone who manages the calendar adds the services and the team’s hours.",
