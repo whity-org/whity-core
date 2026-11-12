@@ -46,6 +46,7 @@ const GROUP_OF: Readonly<Record<string, GroupId>> = {
   email: 'email',
   'email-domains': 'email',
   storage: 'data',
+  fields: 'data',
   tags: 'data',
   'tag-groups': 'data',
   languages: 'data',
@@ -106,6 +107,8 @@ export function SettingsArea({ children }: { children: ReactNode }) {
   const { items: navItems } = useNavigation();
   const { has } = useCapabilities();
   const canSeeDevices = has(LICENSING_VIEW);
+  // WHIT-955: the workspace's own fields on its records (A9).
+  const canManageFields = has('fields:manage');
   const language = useLanguageCode();
 
   // The server words the tabs in the caller's language, so a switch needs them again.
@@ -142,6 +145,9 @@ export function SettingsArea({ children }: { children: ReactNode }) {
       const item = navItems.find((nav) => nav.id === id);
       if (item) links.push({ id, href: item.href, label: dataLabels[id] ?? item.label, group: 'data' });
     }
+    if (canManageFields) {
+      links.push({ id: 'fields', href: '/admin/settings/fields', label: t('settingsArea.fields', 'Fields'), group: 'data' });
+    }
     if (canSeeDevices) {
       links.push({ id: 'devices', href: DEVICES_HREF, label: t('settingsArea.devices', 'Licensed devices'), group: 'devices' });
     }
@@ -155,7 +161,7 @@ export function SettingsArea({ children }: { children: ReactNode }) {
       label: groupLabels[group],
       links: links.filter((link) => link.group === group).sort((a, b) => rank(a.id) - rank(b.id)),
     })).filter((group) => group.links.length > 0);
-  }, [tabs, navItems, canSeeDevices, t, tc]);
+  }, [tabs, navItems, canSeeDevices, canManageFields, t, tc]);
 
   return (
     <div className="grid gap-6 md:grid-cols-[200px_minmax(0,1fr)] md:gap-8">
