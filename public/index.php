@@ -3422,6 +3422,8 @@ $documentSourcesHandler = new \Whity\Api\DocumentSourcesApiHandler(
     $documentThemeResolver,
     $documentCollab,
     new \Whity\Core\Document\DocumentPeople($db->getPdo()),
+    // Editor M7: records which saved blocks each document uses on every save.
+    new \Whity\Core\Document\SavedBlock\SavedBlockRepository($db->getPdo()),
 );
 $router->register('GET',    '/api/document-sources',                [$documentSourcesHandler, 'list'],      null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('POST',   '/api/document-sources',                [$documentSourcesHandler, 'create'],    null, null, CorePermissions::DOCUMENTS_WRITE);

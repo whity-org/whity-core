@@ -6,7 +6,7 @@ import { Button } from '@whity/ui/button';
 import { DocEditor, type SaveState } from '@whity/ui/editor/doc-editor';
 import { isActive, type EditorAgentChoice, type EditorAgentRequest, type EditorAgents } from '@whity/ui/editor/agents';
 import type { EditorCollab, RailSuggestion, RailThread } from '@whity/ui/editor/collab';
-import type { Actor, DocumentKind, EditorMode, ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
+import type { Actor, DocumentKind, EditorMode, ResolvedDocumentTheme, SavedBlock, WhityDocument } from '@whity/ui/editor/contract';
 import type { FieldDef } from '@whity/ui/editor/fields';
 import { themedLetterhead } from '@whity/ui/editor/page-view';
 import type { EditorServices, FieldPreview } from '@whity/ui/editor/services';
@@ -85,6 +85,7 @@ export function DocumentEditorScreen({
   issue,
   canSuggest = false,
   canComment = false,
+  canManageLibrary = false,
   me,
 }: {
   id: string;
@@ -94,6 +95,8 @@ export function DocumentEditorScreen({
   canSuggest?: boolean;
   /** documents:comment: start threads, reply, resolve and reopen. */
   canComment?: boolean;
+  /** E.22: manages the workspace library of saved blocks (offers "Everyone in the workspace"). */
+  canManageLibrary?: boolean;
   /** The person at the keyboard, for their own cards. */
   me?: Actor & { kind: 'person' };
   onBack?: () => void;
@@ -467,6 +470,35 @@ export function DocumentEditorScreen({
     };
   }, [agentsOn, agentChoices, agentRequests, adapter, id]);
 
+  // M7: saved blocks. The library loads once; a block saved here joins it at once.
+  const savedOn = !!adapter.savedBlocks && !issuingMode;
+  const [savedBlocks, setSavedBlocks] = React.useState<SavedBlock[] | undefined>(undefined);
+  React.useEffect(() => {
+    if (!savedOn) return;
+    let live = true;
+    adapter.savedBlocks!().then((list) => live && setSavedBlocks(list)).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [savedOn, adapter]);
+  const editorServices = React.useMemo<EditorServices | undefined>(() => {
+    if (!savedOn) return services;
+    return {
+      ...services,
+      savedBlocks: savedBlocks ?? [],
+      canShareSavedBlocks: canManageLibrary,
+      ...(adapter.saveBlock
+        ? {
+            saveBlock: async (block) => {
+              const saved = await adapter.saveBlock!(block);
+              setSavedBlocks((prev) => [...(prev ?? []).filter((b) => b.id !== saved.id), saved]);
+              return saved;
+            },
+          }
+        : {}),
+    };
+  }, [savedOn, services, savedBlocks, canManageLibrary, adapter]);
+
   const showPreview = React.useCallback(
     async (record: string | null) => {
       if (!adapter.preview) return;
@@ -671,7 +703,7 @@ export function DocumentEditorScreen({
           labels={labels}
           collab={collab}
           agents={agents}
-          services={services}
+          services={editorServices}
           theme={theme?.tokens ?? null}
           {...(printed && template
             ? {

@@ -221,6 +221,44 @@
 .wy-doc [data-kind="important"] .wy-callout-icon { color: var(--warning-text); }
 .wy-doc .wy-callout-text { flex: 1; min-width: 0; unicode-bidi: plaintext; }
 
+/* A synced saved block (E.21, EditorCustomBlocks): a light outline in the main
+   colour, its source label above it when selected or hovered. */
+.wy-doc .wy-saved { outline: 1.5px solid color-mix(in oklab, var(--primary) 55%, transparent); outline-offset: 6px; border-radius: 4px; margin-block: 8px; }
+/* Selected, the block's ring is the one every selected block has. */
+.wy-doc .wy-saved.is-selected,
+.wy-doc .ProseMirror-selectednode > .wy-saved { outline: none; }
+.wy-doc .wy-saved-body > * { margin: 0; padding-block: 3px; }
+.wy-doc .wy-saved-callout { display: flex; gap: 10px; padding: 12px 14px; border-radius: var(--radius-control-lg); background: var(--muted); }
+.wy-doc .wy-saved-callout p { flex: 1; min-width: 0; margin: 0; unicode-bidi: plaintext; }
+.wy-doc .wy-saved-callout[data-kind="important"] { background: var(--warning-tint); }
+.wy-doc .wy-saved-src {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  inset-inline-start: 0;
+  z-index: 3;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 8px 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--popover);
+  box-shadow: var(--shadow-float);
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.wy-doc .wy-saved.is-selected .wy-saved-src,
+.wy-doc .ProseMirror-selectednode > .wy-saved .wy-saved-src,
+.wy-doc .wy-saved:hover .wy-saved-src,
+.wy-doc .wy-saved:focus-within .wy-saved-src { display: inline-flex; }
+.wy-doc .wy-saved-src b { color: var(--foreground); font-weight: 500; }
+.wy-doc .wy-saved-sep { width: 1px; height: 16px; margin: 0 2px; background: var(--border); }
+.wy-doc .wy-saved-action { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; border-radius: 4px; }
+.wy-doc .wy-saved-action:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
 /* Toggle: the summary line, and the blocks it hides. */
 .wy-doc [data-type="toggle"] { display: flex; gap: 4px; align-items: flex-start; }
 .wy-doc .wy-toggle-button {

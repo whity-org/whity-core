@@ -80,7 +80,9 @@ function BlockList({
                   <Icon name={item.icon} />
                 </span>
                 <span className="grid min-w-0 flex-1 leading-[1.3]">
-                  {labels[item.label]}
+                  <span className="truncate" dir="auto">
+                    {item.title ?? labels[item.label]}
+                  </span>
                   <span className={cn("truncate text-xs text-muted-foreground", on && "text-current opacity-80")}>
                     {labels[item.hint]}
                   </span>

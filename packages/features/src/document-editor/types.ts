@@ -8,10 +8,10 @@ import type {
   RailSuggestion,
   RailThread,
 } from '@whity/ui/editor/collab';
-import type { Inline, LabelPrintSource, PublishBlocker, ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
+import type { Inline, LabelPrintSource, PublishBlocker, ResolvedDocumentTheme, SavedBlock, WhityDocument } from '@whity/ui/editor/contract';
 import type { FieldGroup } from '@whity/ui/editor/fields';
 import type { BrandLogos, Letterhead, LetterheadParts } from '@whity/ui/editor/page-view';
-import type { EditorServices, FieldPreview } from '@whity/ui/editor/services';
+import type { EditorServices, FieldPreview, NewSavedBlock } from '@whity/ui/editor/services';
 
 /** A document as the server keeps it: the contract's document plus its draft version. */
 export interface LoadedDocument {
@@ -107,6 +107,13 @@ export interface DocumentEditorAdapter {
   agentRequests?(id: string): Promise<EditorAgentRequest[]>;
   askAgent?(id: string, request: NewAgentRequest): Promise<EditorAgentRequest>;
   stopAgentRequest?(requestId: string): Promise<EditorAgentRequest>;
+
+  /* M7: saved blocks (EditorCustomBlocks, E.21–E.24). Without them the editor offers none. */
+
+  /** This person's own saved blocks and the workspace library's. */
+  savedBlocks?(): Promise<SavedBlock[]>;
+  /** Saves blocks to the library; resolves to the saved block. Throws when refused. */
+  saveBlock?(block: NewSavedBlock): Promise<SavedBlock>;
 }
 
 export interface CollabSnapshot {

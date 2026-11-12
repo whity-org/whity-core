@@ -2,6 +2,8 @@ import type { Editor, JSONContent } from "@tiptap/core"
 
 import type { IconName } from "../icon"
 import { currentBlock } from "./behaviour"
+import type { SavedBlock } from "./contract"
+import { freshEditorBlocks } from "./convert"
 import type { EditorLabels } from "./labels"
 
 /**
@@ -11,9 +13,13 @@ import type { EditorLabels } from "./labels"
  */
 export interface CatalogueItem {
   id: string
-  group: "groupBasic" | "groupLists" | "groupStructure" | "groupMedia" | "groupWhity"
+  group: "groupBasic" | "groupLists" | "groupStructure" | "groupMedia" | "groupWhity" | "groupSaved"
   label: keyof EditorLabels
   hint: keyof EditorLabels
+  /** A name of its own (a saved block's), shown instead of `label`. */
+  title?: string
+  /** Several blocks at once (a saved block's copy), inserted instead of `node`. */
+  nodes?: JSONContent[]
   icon: IconName
   /** The Markdown shortcut, shown beside the item. */
   markdown?: string
@@ -52,12 +58,32 @@ export const CATALOGUE: CatalogueItem[] = [
   { id: "qr", group: "groupWhity", label: "blockQr", hint: "blockQrHint", icon: "qr", keywords: ["qrcode", "scan", "link"], textBlock: false, node: { type: "qr", attrs: { value: [] } } },
 ]
 
+/**
+ * The / menu's Saved blocks group (E.21): a synced block goes in as one
+ * savedBlock drawn from the library; a copy goes in as its ordinary blocks.
+ */
+export function savedBlockItems(saved: SavedBlock[] | undefined): CatalogueItem[] {
+  return (saved ?? []).map((b) => ({
+    id: `saved:${b.id}`,
+    group: "groupSaved",
+    label: "groupSaved",
+    hint: b.mode === "synced" ? "savedBlockSyncedHint" : "savedBlockCopyHint",
+    title: b.name,
+    icon: b.mode === "synced" ? "sync" : "copy",
+    keywords: ["saved", b.name],
+    textBlock: false,
+    node: { type: "savedBlock", attrs: { savedBlockId: b.id, version: b.version, overrides: {} } },
+    ...(b.mode === "copy" ? { nodes: freshEditorBlocks(b.blocks) } : {}),
+  }))
+}
+
 /** Filter by the item's name, hint and keywords, in the current language and in English. */
-export function filterCatalogue(query: string, labels: EditorLabels, english: EditorLabels): CatalogueItem[] {
+export function filterCatalogue(query: string, labels: EditorLabels, english: EditorLabels, extra: CatalogueItem[] = []): CatalogueItem[] {
+  const all = extra.length ? [...CATALOGUE, ...extra] : CATALOGUE
   const q = query.trim().toLowerCase()
-  if (!q) return CATALOGUE
-  return CATALOGUE.filter((item) =>
-    [labels[item.label], labels[item.hint], english[item.label], english[item.hint], item.id, ...item.keywords]
+  if (!q) return all
+  return all.filter((item) =>
+    [item.title ?? labels[item.label], labels[item.hint], english[item.label], english[item.hint], item.id, ...item.keywords]
       .some((word) => String(word).toLowerCase().includes(q))
   )
 }
@@ -89,6 +115,12 @@ export function applyItem(editor: Editor, item: CatalogueItem, { after }: { afte
     return
   }
   const node: JSONContent = { type: item.node.type, attrs: item.node.attrs, ...(item.node.content ? { content: item.node.content } : {}) }
+  if (item.nodes) {
+    // A saved block's copy: its blocks, then a fresh line; an empty line gives way to them.
+    const range = empty && block ? { from: block.pos, to: block.pos + block.node.nodeSize } : atPos
+    chain.insertContentAt(range, [...item.nodes, { type: "paragraph" }]).run()
+    return
+  }
   if (empty && block) {
     // A block on an empty line takes its place, with a fresh line after it.
     chain.insertContentAt({ from: block.pos, to: block.pos + block.node.nodeSize }, [node, { type: "paragraph" }]).run()
