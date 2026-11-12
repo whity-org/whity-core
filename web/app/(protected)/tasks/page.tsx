@@ -1,9 +1,9 @@
 'use client';
 
-/** /tasks — tasks and boards on Taskaat (A10, WHIT-962). The screen is `TaskaatConnection` until the list and board land. */
+/** /tasks — Work › Tasks, read and written through the workspace's Taskaat (A10, TplTasks). */
 
-import { TaskaatConnection } from '@/components/tasks/taskaat-connection';
+import { TasksScreen } from '@/components/tasks/tasks-screen';
 
 export default function TasksPage() {
-  return <TaskaatConnection />;
+  return <TasksScreen />;
 }
