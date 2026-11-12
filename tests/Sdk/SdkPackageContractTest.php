@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.98.0',
+            '1.99.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.98 ADDS PluginBookingPaymentInterface with Calendar\\BookingPaymentStep and the Calendar\\Bookings host service, PluginCalendarBusyInterface, the Calendar\\CalendarEvents host service, and calendar and booking events (ADR 0017, WHIT-943). '
+            'SDK 1.99 ADDS the Mail\WorkspaceEmails host service and the Mail\WorkspaceEmail value object: plugins email as the workspace (WHIT-978). '
+            . 'SDK 1.98 ADDS PluginBookingPaymentInterface with Calendar\\BookingPaymentStep and the Calendar\\Bookings host service, PluginCalendarBusyInterface, the Calendar\\CalendarEvents host service, and calendar and booking events (ADR 0017, WHIT-943). '
             . 'SDK 1.97 ADDS Messaging\MessageChannel and PluginMessageChannelsInterface (channels such as WhatsApp or SMS), and Inbox\InboxSource with PluginInboxSourcesInterface, ordered by InboxOrder and paged by InboxCursor (#881, WHIT-937). '
             . 'SDK 1.94 ADDS route and form events: constants for document.routed and document.route_acted, and route.*, document.finalised, form.submitted and submission.* with ids only. '
             . 'SDK 1.93 ADDS I18n\LocalizedText, the translatable-field marker and value contract (#521). '

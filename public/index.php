@@ -1731,6 +1731,8 @@ $emailNotifications->subscribe($hookManager);
 // and the two security emails that can't be turned off. The workspace branding
 // source is handed over once the entitlement service exists (below).
 $brandedEmailSender = new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService, $logger);
+// SDK 1.99 (WHIT-978): plugins send as the workspace through the same sender.
+\Whityegister_service(\Whity\Sdk\Mail\WorkspaceEmails::class, new \Whity\Core\Mail\SdkWorkspaceEmails($brandedEmailSender)); // @phpstan-ignore-line
 $accountSecurityMailer = new \Whity\Core\Mail\AccountSecurityMailer(
     $brandedEmailSender,
     $profileEmailRepository,

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.98).
+ * SDK identity (v1.99).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1222,12 +1222,20 @@ namespace Whity\Sdk;
  * events carry ids only (WHIT-943).
  *
  * Purely additive.)
+ *
+ * 1.99 (EMAIL AS THE WORKSPACE: the host service {@see Mail\WorkspaceEmails} sends a
+ * {@see Mail\WorkspaceEmail} as a workspace, in its brand and language and the EM.1 layout:
+ * heading, paragraphs, label-value rows, one button, a note and the footer notice, plain text
+ * only. Best effort: false, never an exception. For what a business sends its customers,
+ * such as Front Office's invoices and receipts (WHIT-978).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.98.0';
+    public const VERSION = '1.99.0';
 
     /**
      * Static identity only — never instantiated.
