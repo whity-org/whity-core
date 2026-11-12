@@ -127,6 +127,12 @@ final class TenantOwnedTables
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_service_staff' => '248_create_calendar_bookings.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
+
+        // WHIT-953 — contacts and their spreadsheet imports (design 3.3 A8).
+        // Every query binds tenant_id.
+        'contacts' => '261_create_contacts.php',
+        'contact_imports' => '261_create_contacts.php',
+        'contact_import_changes' => '261_create_contacts.php',
         // Messages (ADR 0016, WHIT-938): conversations with customers, their
         // messages, web chat visitors and the per-workspace settings. Every
         // query binds tenant_id. The public chat and inbound webhook routes find

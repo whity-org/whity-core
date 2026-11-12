@@ -171,7 +171,8 @@ final class CoreApiSchemas
             self::reportRoutes(),
             self::resourceRoleGrantRoutes(),
             self::licensingRoutes(),
-            self::externalBillingRoutes()
+            self::externalBillingRoutes(),
+            ContactsApiSchemas::routes()
         ));
     }
 
@@ -11142,7 +11143,7 @@ final class CoreApiSchemas
                 'counts' => SchemaBuilder::ref('DataTypeBulkCounts'),
                 'results' => ['type' => 'array', 'items' => SchemaBuilder::ref('DataTypeBulkResult')],
             ], ['key', 'action', 'counts', 'results'])),
-        ] + self::workspacePluginComponents();
+        ] + self::workspacePluginComponents() + ContactsApiSchemas::components();
     }
 
     /**
