@@ -165,6 +165,7 @@ final class CoreToolsets
         'convening'                => 'core.convening',
         'calendar'                 => 'core.calendar',
         'contacts'                 => 'core.contacts',
+        'custom-fields'            => 'core.contacts',
         'taxonomy'                 => 'core.taxonomy',
         'data-types'               => 'core.taxonomy',
         'time-windows'             => 'core.time',

@@ -172,7 +172,8 @@ final class CoreApiSchemas
             self::resourceRoleGrantRoutes(),
             self::licensingRoutes(),
             self::externalBillingRoutes(),
-            ContactsApiSchemas::routes()
+            ContactsApiSchemas::routes(),
+            ContactsApiSchemas::customFieldRoutes()
         ));
     }
 

@@ -158,6 +158,7 @@ final class CorePermissionDescriptions
         CorePermissions::CONTACTS_READ                => 'See customers and suppliers, their tags and details',
         CorePermissions::CONTACTS_WRITE               => 'Add and change customers and suppliers, and their tags',
         CorePermissions::CONTACTS_IMPORT              => 'Import customers and suppliers from a spreadsheet, and undo an import',
+        CorePermissions::FIELDS_MANAGE                => 'Add, change and archive the workspace\'s own fields on its records',
         CorePermissions::CONVENING_DECIDE             => 'Record a body\'s decision on an agenda item — the act that can approve or reject a ',
         ];
     }

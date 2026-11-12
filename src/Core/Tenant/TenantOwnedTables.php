@@ -133,6 +133,10 @@ final class TenantOwnedTables
         'contacts' => '261_create_contacts.php',
         'contact_imports' => '261_create_contacts.php',
         'contact_import_changes' => '261_create_contacts.php',
+
+        // WHIT-954 — the workspace's own fields and their values (A9).
+        'custom_field_definitions' => '263_create_custom_fields.php',
+        'custom_field_values' => '263_create_custom_fields.php',
         // Messages (ADR 0016, WHIT-938): conversations with customers, their
         // messages, web chat visitors and the per-workspace settings. Every
         // query binds tenant_id. The public chat and inbound webhook routes find

@@ -938,6 +938,10 @@
     "en": "Rename a body, move it, retire it or bring it back",
     "ar": "تعديل هيئة أو إيقافها أو إعادتها"
   },
+  "patch_api_custom_fields_id": {
+    "en": "Change a field",
+    "ar": "تعديل حقل"
+  },
   "patch_api_document_collections_id": {
     "en": "Rename one of your document collections",
     "ar": "تغيير اسم مجموعة مستندات"
@@ -1160,6 +1164,18 @@
   "post_api_convening_bodies_id_members": {
     "en": "Add a member to a body, or change their seat",
     "ar": "تعيين عضو في هيئة أو نقله"
+  },
+  "post_api_custom_fields": {
+    "en": "Add a field to a record type",
+    "ar": "إضافة حقل إلى نوع سجل"
+  },
+  "post_api_custom_fields_id_archive": {
+    "en": "Archive a field",
+    "ar": "أرشفة حقل"
+  },
+  "post_api_custom_fields_id_restore": {
+    "en": "Restore an archived field",
+    "ar": "استعادة حقل مؤرشف"
   },
   "post_api_data_types_type_bulk": {
     "en": "Trash, restore, retire or delete many records at once",
