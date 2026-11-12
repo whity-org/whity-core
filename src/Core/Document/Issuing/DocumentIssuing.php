@@ -166,6 +166,49 @@ final class DocumentIssuing
     }
 
     /**
+     * The ids of plugin blocks in these blocks, nested ones included: blocks
+     * Whity can't print as they are (editor M7, E.18-E.19).
+     *
+     * @param array<mixed> $blocks
+     * @return list<string>
+     */
+    public static function unprintableBlocks(array $blocks): array
+    {
+        $ids = [];
+        foreach ($blocks as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+            $type = $block['type'] ?? null;
+            if ($type === 'plugin') {
+                $ids[] = (string) ($block['id'] ?? '');
+            }
+            if ($type === 'toggle' && is_array($block['children'] ?? null)) {
+                array_push($ids, ...self::unprintableBlocks($block['children']));
+            }
+            if ($type === 'columns' && is_array($block['columns'] ?? null)) {
+                foreach ($block['columns'] as $column) {
+                    if (is_array($column)) {
+                        array_push($ids, ...self::unprintableBlocks($column));
+                    }
+                }
+            }
+        }
+
+        return $ids;
+    }
+
+    public static function unprintable(): DocumentIssueRefused
+    {
+        return new DocumentIssueRefused(
+            'unprintable_block',
+            "This template has a plugin block that can't print here; turn its plugin on and publish the template again",
+            422,
+            ['code' => 'unprintable_block'],
+        );
+    }
+
+    /**
      * The required fields a version uses that these values don't have
      * (E.27); empty when it can be issued.
      *
@@ -190,6 +233,13 @@ final class DocumentIssuing
     {
         [$tenantId, $callerId] = [$actor->tenantId, $actor->issuerId()];
         [$source, $version, $values, $originKey] = [$request->source, $request->version, $request->values, $request->originKey];
+        // Editor M7 (E.18, E.19): a plugin block left in a version has no print
+        // here, so the document would print without it. Refuse before anything is
+        // written. Publishing turns plugin blocks into Whity's own, so a version
+        // only keeps one when it was published past that (a plugin's starter).
+        if (self::unprintableBlocks(is_array($version['blocks'] ?? null) ? $version['blocks'] : []) !== []) {
+            throw self::unprintable();
+        }
         if ($originKey !== null) {
             $existing = $this->documents?->findByOriginKey($originKey, $tenantId);
             if ($existing !== null) {

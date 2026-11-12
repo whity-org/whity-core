@@ -1322,6 +1322,37 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         self::assertSame('PAY-1', $this->storedValues((int) $done->items[0]->documentId)['template.reference']);
     }
 
+    /**
+     * Editor M7 (E.18, E.19): a version that still holds a plugin block (a
+     * plugin's starter, published with no check) can't print it, so a bulk
+     * issue refuses every item by name rather than issue documents without
+     * the block. Publishing through the editor turns plugin blocks into
+     * Whity's own, so its versions never hold one.
+     */
+    public function testABatchFromATemplateWithAPluginBlockItCantPrintRefusesEveryItem(): void
+    {
+        [$documents, $bulk] = $this->bulkFacade();
+        $template = $this->editor->published(self::TENANT, self::RAISER, 'Delivery note', [
+            $this->editor->para('Ref: ', $this->editor->field('template.reference')),
+            ['id' => 't1', 'type' => 'toggle', 'open' => true, 'summary' => [], 'children' => [
+                ['id' => 'd1', 'type' => 'plugin', 'plugin' => 'DeliveryTracker', 'blockType' => 'status', 'schemaVersion' => 1, 'data' => ['order' => 'SO-2207']],
+            ]],
+        ], ['own_fields' => self::OWN_FIELDS]);
+        $request = new BulkIssueRequest(TemplateRef::source($template), [
+            new BulkIssueItem(values: ['template.reference' => 'DN-1']),
+            new BulkIssueItem(values: ['template.reference' => 'DN-2']),
+        ], 'delivery:2026-11');
+
+        $status = $this->asPerson(self::RAISER, fn () => $documents->issueMany($request));
+        self::assertSame(['done' => true, 'remaining' => 0, 'delay' => 0], $bulk->run(self::TENANT, $status->batchId));
+
+        $done = $this->asPerson(self::RAISER, fn () => $documents->batch($status->batchId));
+        self::assertNotNull($done);
+        self::assertSame([0, 0, 2, 0], [$done->issued, $done->replayed, $done->refused, $done->failed]);
+        self::assertSame(['unprintable_block', 'unprintable_block'], array_map(static fn ($i) => $i->reason, $done->items));
+        self::assertSame(0, $this->countDocuments(), 'no document is issued without the block');
+    }
+
     /** The batch key makes a resend safe, and refuses a different batch under it. */
     public function testTheBatchKeyMakesAResendReturnTheSameBatch(): void
     {
