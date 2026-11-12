@@ -1129,6 +1129,17 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'visibleIf' => 'messages-for-customer',
     ];
     $items[] = [
+        'id' => 'chat',
+        'label' => 'Chat',
+        'href' => '/chat',
+        'icon' => 'comment',
+        'group' => 'overview',
+        'order' => 9,
+        // Team chat (CH.1): the team's own chats, people and agents together.
+        // Mirrors GET /api/chat/chats; what each person sees is their own chats.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CHAT_READ,
+    ];
+    $items[] = [
         'id' => 'document-library',
         'label' => 'Documents',
         'href' => '/admin/document-library',
@@ -5379,6 +5390,24 @@ $router->register('GET',   '/api/messages/settings',                      [$mess
 $router->register('PUT',   '/api/messages/settings',                      [$messagesHandler, 'putSettings'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
 $router->register('POST',  '/api/messages/settings/inbound-secret',       [$messagesHandler, 'rotateInboundSecret'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
 // A signed-in customer's own conversations: ownership is the check, like /api/me/forms.
+// Team chat (CH.1, CH.2; migration 259): the team's own chats on the Messages
+// tables. chat:read / chat:write at the router; membership in the handler, so a
+// chat the caller (or the calling agent) is not in answers 404.
+$chatHandler = new \Whity\Api\ChatApiHandler(new \Whity\Core\Chat\ChatService(new \Whity\Core\Chat\ChatRepository($db->getPdo())));
+$router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null, null, \Whity\Core\RBAC\CorePermissions::CHAT_READ);
+$router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null, null, \Whity\Core\RBAC\CorePermissions::CHAT_WRITE);
+$router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null, null, \Whity\Core\RBAC\CorePermissions::CHAT_READ);
+$router->register('PATCH',  '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'update'],        null, null, \Whity\Core\RBAC\CorePermissions::CHAT_WRITE);
+$router->register('GET',    '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'messages'],      null, null, \Whity\Core\RBAC\CorePermissions::CHAT_READ);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'post'],          null, null, \Whity\Core\RBAC\CorePermissions::CHAT_WRITE);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/proposals',               [$chatHandler, 'shareProposal'], null, null, \Whity\Core\RBAC\CorePermissions::CHAT_WRITE);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/read',                    [$chatHandler, 'markRead'],      null, null, \Whity\Core\RBAC\CorePermissions::CHAT_READ);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/members',                 [$chatHandler, 'addMember'],     null, null, \Whity\Core\RBAC\CorePermissions::CHAT_WRITE);
+$router->register('DELETE', '/api/chat/chats/{id:\d+}/members/{member:\d+}',    [$chatHandler, 'removeMember'],  null, null, \Whity\Core\RBAC\CorePermissions::CHAT_WRITE);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/approve',              [$chatHandler, 'approve'],       null, null, \Whity\Core\RBAC\CorePermissions::CHAT_WRITE);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/decline',              [$chatHandler, 'decline'],       null, null, \Whity\Core\RBAC\CorePermissions::CHAT_WRITE);
+$router->register('GET',    '/api/chat/directory',                              [$chatHandler, 'directory'],     null, null, \Whity\Core\RBAC\CorePermissions::CHAT_READ);
+
 $meMessagesHandler = new \Whity\Api\MeMessagesApiHandler($messagingService);
 $router->register('GET',  '/api/me/messages',            [$meMessagesHandler, 'list'],  null);
 $router->register('POST', '/api/me/messages',            [$meMessagesHandler, 'start'], null);

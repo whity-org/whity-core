@@ -155,6 +155,8 @@ final class CorePermissionDescriptions
         CorePermissions::CALENDAR_READ                => 'See the team\'s calendars, bookings and services',
         CorePermissions::CALENDAR_WRITE               => 'Keep your own calendar events, and book, move and cancel customer bookings',
         CorePermissions::CALENDAR_MANAGE              => 'Set up services, everyone\'s working hours and time off, and the public booking page',
+        CorePermissions::CHAT_READ                    => 'Read the team chats you are in',
+        CorePermissions::CHAT_WRITE                   => 'Start team chats, write in them and add people and agents',
         CorePermissions::CONVENING_DECIDE             => 'Record a body\'s decision on an agenda item — the act that can approve or reject a ',
         ];
     }
