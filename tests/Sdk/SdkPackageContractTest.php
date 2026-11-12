@@ -244,7 +244,7 @@ final class SdkPackageContractTest extends TestCase
         $this->assertSame(
             '1.103.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.103 ADDS PluginDocumentBlocksInterface, Documents\DocumentBlock and documents.blocks: blocks a plugin adds to the document editor, declarations drawn by Whity's own renderer (WHIT-993). '
+            'SDK 1.103 ADDS PluginDocumentBlocksInterface, Documents\DocumentBlock and documents.blocks: blocks a plugin adds to the document editor, declarations drawn by Whity\'s own renderer (WHIT-993). '
             . 'SDK 1.101 ADDS Frontend\Blocks\BlockText: block screens take {en, ar} text, served in the language of the reader (WHIT-984). '
             . 'SDK 1.100 ADDS the Mail\WorkspaceEmails host service and the Mail\WorkspaceEmail value object: plugins email as the workspace (WHIT-978). '
             . 'SDK 1.99 ADDS the Messaging\\CustomerMessages host service: a plugin tells a workspace\'s customer something through Messages, WhatsApp first then email (WHIT-967). SDK 1.98 ADDS PluginBookingPaymentInterface with Calendar\\BookingPaymentStep and the Calendar\\Bookings host service, PluginCalendarBusyInterface, the Calendar\\CalendarEvents host service, and calendar and booking events (ADR 0017, WHIT-943). '

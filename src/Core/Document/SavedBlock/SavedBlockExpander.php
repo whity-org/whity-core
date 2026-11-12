@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Document\SavedBlock;
 
+use Whity\Core\Document\Blocks\PluginBlockPrinter;
+
 /**
  * Synced saved blocks as what they print (editor M7; E.21, E.38).
  *
@@ -29,19 +31,38 @@ namespace Whity\Core\Document\SavedBlock;
  */
 final class SavedBlockExpander
 {
-    public function __construct(private readonly SavedBlockRepository $repo)
-    {
+    /**
+     * @param PluginBlockPrinter|null $plugins Plugin blocks (editor M7, E.17–E.18): turned into
+     *        Whity's own blocks from their print views, after saved blocks are expanded, so a
+     *        plugin block inside a saved block prints too.
+     */
+    public function __construct(
+        private readonly SavedBlockRepository $repo,
+        private readonly ?PluginBlockPrinter $plugins = null,
+    ) {
     }
 
     /**
      * @param array<mixed> $blocks
      * @return list<mixed>
      */
-    public function expand(int $tenantId, array $blocks): array
+    public function expand(int $tenantId, array $blocks, string $lang = 'en'): array
     {
         $cache = [];
+        $expanded = $this->walk($tenantId, array_values($blocks), $cache, true);
 
-        return $this->walk($tenantId, array_values($blocks), $cache, true);
+        return $this->plugins?->lower($tenantId, $expanded, $lang) ?? $expanded;
+    }
+
+    /**
+     * Plugin blocks in these (expanded) blocks whose plugin is off or gone, by block id.
+     *
+     * @param list<mixed> $blocks
+     * @return array<string, string>
+     */
+    public function missingPlugins(int $tenantId, array $blocks): array
+    {
+        return $this->plugins?->missing($tenantId, $blocks) ?? [];
     }
 
     /**

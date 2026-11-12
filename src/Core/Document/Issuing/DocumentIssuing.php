@@ -134,7 +134,8 @@ final class DocumentIssuing
         $last = $this->published($tenantId, $source);
         $theme = $this->print->theme($tenantId, $source['theme'] ?? null, (string) $source['kind']);
         $blocks = is_array($source['blocks'] ?? null) ? array_values($source['blocks']) : [];
-        $blocks = $this->savedBlocks?->expand($tenantId, $blocks) ?? $blocks;
+        $lang = (string) ($source['lang'] ?? 'en');
+        $blocks = $this->savedBlocks?->expand($tenantId, $blocks, $lang) ?? $blocks;
         // Compared without key order: PostgreSQL's JSONB stores object keys in its own order.
         if ($last !== null
             && $last['title'] === (string) $source['title']
@@ -145,7 +146,7 @@ final class DocumentIssuing
             return $last;
         }
         $expander = $this->savedBlocks;
-        $freeze = $expander !== null ? static fn (array $b): array => $expander->expand($tenantId, $b) : null;
+        $freeze = $expander !== null ? static fn (array $b): array => $expander->expand($tenantId, $b, $lang) : null;
         $version = $this->versions->publish((int) $source['id'], $tenantId, (int) $source['draft_version'], $callerId, $theme, $freeze);
 
         return $version === null ? null : $this->versions->find((int) $source['id'], $tenantId, $version);
