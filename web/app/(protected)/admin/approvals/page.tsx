@@ -13,14 +13,14 @@
  * operation as their delegate after the server checks everything again.
  * Nothing moves on until the server has answered, so a card never claims a
  * decision that did not land.
+ *
+ * AQ.1 (`TplApprovalsList`): a List view beside One at a time lets Ordinary
+ * (tier-1) proposals be approved together; the rest open on their own.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@whity/ui/tabs';
-import { Button } from '@whity/ui/button';
 import { Card } from '@whity/ui/card';
-import { Icon } from '@whity/ui/icon';
 import { ActionProposal, type ActionProposalLabels } from '@whity/ui/action-proposal';
 import { ApprovalQueue, type ApprovalQueueItem } from '@whity/ui/approval-queue';
 import { AgentActivity } from '@whity/ui/agent-activity';
@@ -48,7 +48,9 @@ import {
   type AgentProposal,
   type ProposalWords,
 } from '@/components/agents/proposals';
+import { ViewToggle } from '@whity/ui/view-toggle';
 import { EditProposalDialog } from './edit-proposal-dialog';
+import { ApprovalsList } from './approvals-list';
 
 export default function ApprovalsPage() {
   const t = useTranslation('admin');
@@ -64,6 +66,9 @@ export default function ApprovalsPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [editing, setEditing] = useState<AgentProposal | null>(null);
   const [undoingId, setUndoingId] = useState<number | null>(null);
+  // One at a time stays the default (AQ.1).
+  const [view, setView] = useState<'one' | 'list'>('one');
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // The undo meters count down without a request: the window's end is known.
   const [now, setNow] = useState(() => Date.now());
@@ -248,6 +253,82 @@ export default function ApprovalsPage() {
     }
   };
 
+  /** AQ.1: Ordinary proposals together; the server approves only tier 1 and says what it refused. */
+  const approveTogether = async (chosen: AgentProposal[]) => {
+    setBulkBusy(true);
+    try {
+      const response = await apiClient('/api/v1/me/agent-proposals/bulk-approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: chosen.map((p) => p.id) }),
+      });
+      const body = (await response.json().catch(() => null)) as
+        | { data?: { approved: AgentProposal[]; refused: { id: number; reason: string }[] }; error?: string }
+        | null;
+      if (!response.ok || !body?.data) {
+        addToast(body?.error ?? t('approvals.error.decide', 'That decision could not be saved. Try again.'), 'error', 6000);
+        return;
+      }
+      const { approved, refused } = body.data;
+      const failed = approved.filter((p) => (p.result as { isError?: boolean } | null)?.isError);
+      addToast(
+        t('approvals.toast.approvedN', 'Approved {count}. Each can be undone on its own in Decided.').replace(
+          '{count}',
+          String(approved.length - failed.length),
+        ),
+        'success',
+        10000,
+        approved.length > 0 ? { label: t('approvals.toast.seeDecided', 'See them'), onClick: () => setTab('decided') } : undefined,
+      );
+      if (failed.length > 0 || refused.length > 0) {
+        addToast(
+          t('approvals.toast.someLeft', '{count} did not go through and are still here to open one by one.').replace(
+            '{count}',
+            String(failed.length + refused.length),
+          ),
+          'error',
+          8000,
+        );
+      }
+      proposals.refetch();
+      actions.refetch();
+      window.dispatchEvent(new Event(WAITING_CHANGED_EVENT));
+    } catch {
+      addToast(t('approvals.error.decide', 'That decision could not be saved. Try again.'), 'error', 6000);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const declineTogether = async (chosen: AgentProposal[]) => {
+    setBulkBusy(true);
+    let declined = 0;
+    try {
+      for (const proposal of chosen) {
+        const response = await apiClient(`/api/v1/me/agent-proposals/${proposal.id}/decline`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+        if (response.ok) declined += 1;
+      }
+      addToast(t('approvals.toast.declinedN', 'Declined {count}.').replace('{count}', String(declined)), 'info');
+      if (declined < chosen.length) {
+        addToast(t('approvals.error.decide', 'That decision could not be saved. Try again.'), 'error', 6000);
+      }
+    } finally {
+      proposals.refetch();
+      actions.refetch();
+      window.dispatchEvent(new Event(WAITING_CHANGED_EVENT));
+      setBulkBusy(false);
+    }
+  };
+
+  const openOnItsOwn = (proposal: AgentProposal) => {
+    setCurrentId(String(proposal.id));
+    setView('one');
+  };
+
   const queueItems: ApprovalQueueItem[] = waiting.map((proposal) => ({
     id: String(proposal.id),
     ...cardProps(proposal),
@@ -284,14 +365,18 @@ export default function ApprovalsPage() {
     <div>
       <AdminHeader
         title={t('approvals.title', 'Approvals')}
-        description={t('approvals.description', 'Agents ask here before they do anything you set to “Ask first”.')}
+        description={t('approvals.description.agents', 'What agents propose to do for you')}
         action={
-          <Button variant="outline" asChild>
-            <Link href="/admin/ai-principals">
-              <Icon name="scope" size={16} />
-              {t('approvals.scopes', 'Agent scopes')}
-            </Link>
-          </Button>
+          <ViewToggle<'one' | 'list'>
+            label={t('approvals.view', 'How to review')}
+            value={view}
+            onChange={setView}
+            showLabels
+            options={[
+              { value: 'one', label: t('approvals.view.one', 'One at a time') },
+              { value: 'list', label: t('approvals.view.list', 'List') },
+            ]}
+          />
         }
       />
 
@@ -320,6 +405,16 @@ export default function ApprovalsPage() {
                 label={t('approvals.loading', 'Loading…')}
                 headers={[t('approvals.loading.agent', 'Agent'), t('approvals.loading.request', 'Request')]}
                 rows={3}
+              />
+            ) : view === 'list' ? (
+              <ApprovalsList
+                proposals={waiting}
+                words={words}
+                onOpen={openOnItsOwn}
+                onApproveTogether={approveTogether}
+                onDeclineTogether={declineTogether}
+                busy={bulkBusy}
+                now={now}
               />
             ) : (
               <div className="grid gap-6 lg:grid-cols-[minmax(0,560px)_minmax(0,1fr)]">

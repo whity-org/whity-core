@@ -1,69 +1,103 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '@/lib/toast-context';
+import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { ApprovalGatingTabs } from '@/components/admin/approval-gating-tabs';
 import { Button } from '@whity/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { Card } from '@whity/ui/card';
+import { Badge } from '@whity/ui/badge';
+import { Avatar } from '@whity/ui/avatar';
+import { Icon } from '@whity/ui/icon';
+import { Input } from '@whity/ui/input';
 import { AccessDenied } from '@whity/ui/access-denied';
-import { Pagination } from '@whity/ui/pagination';
-import { Alert, AlertDescription } from '@whity/ui/alert';
-import { ConfirmAction } from '@whity/ui/confirm-action';
+import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
+import { OtpInput } from '@whity/ui/otp-input';
+import { EmptyState } from '@whity/ui/empty-state';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@whity/ui/dialog';
 import { useDateDisplay } from '@whity/features/datetime';
-import { IconCheck, IconInbox, IconX } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import { cn } from '@whity/ui/utils';
 
 /**
- * Pending "lost my 2FA device" recovery requests
- * (WC-password-reset-2fa-recovery) — the "2FA auth reset" tab of the unified
- * Approval Gating admin surface.
+ * Two-step resets (AG.1, `TplGatingTwoStep`): the "Two-step resets" tab of
+ * Approval gating.
  *
- * This is the highest-stakes queue of the three: approving CLEARS the target
- * user's two-factor authentication entirely and issues them a fresh
- * password-reset link — a genuinely account-takeover-adjacent action, gated on
- * the narrow `two_factor_recovery:approve` permission (distinct from
- * `password_resets:approve`). Scoped to the CALLER'S OWN tenant, like the
- * Password reset tab (not system-tenant-restricted).
+ * Clearing someone's two-step needs TWO admins. Each one confirms it's them
+ * first (their authenticator code, or a code emailed to them; the platform has
+ * no passkeys yet). The first approval is recorded and changes nothing; the
+ * second, by a different admin, clears the two-step and emails a reset link.
+ * The person asking can never approve their own. The server enforces all of
+ * it; this screen says it in plain words and shows who has approved.
+ *
+ * Layout: the requests on the start side; the chosen one on the end side, with
+ * what approving does, where the request came from, the checks admins made,
+ * the two approval slots and the one warning that there is no Undo.
  */
 const TWO_FACTOR_RECOVERY_APPROVE = 'two_factor_recovery:approve';
 
-const PER_PAGE = 25;
+interface Check {
+  text: string;
+  by_profile_id: number;
+  by_name: string;
+  at: string;
+}
 
 interface PendingTwoFactorRecovery {
   id: number;
   profile_id: number;
   email: string;
   display_name: string;
-  /** Why they asked, in their own words. Optional, so often null. */
   reason: string | null;
   created_at: string;
+  requested_from: string | null;
+  last_signed_in_at: string | null;
+  checks: Check[];
+  first_approval: { profile_id: number; display_name: string; at: string; method: string } | null;
 }
+
+interface IdentityCheck {
+  method: 'totp' | 'email_code';
+  email_hint: string | null;
+}
+
+const JSON_HEADERS = { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json' };
 
 export default function TwoFactorRecoveryApprovalsPage() {
   const { addToast } = useToast();
+  const { user } = useAuth();
   const { hasPermission, loading: isCapabilitiesLoading } = useCapabilities();
   const t = useTranslation('admin');
+  const dates = useDateDisplay();
 
   const canApprove = hasPermission(TWO_FACTOR_RECOVERY_APPROVE);
 
   const [items, setItems] = useState<PendingTwoFactorRecovery[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  // Approving is security-sensitive: type the email to confirm (tier 3).
-  const [approving, setApproving] = useState<typeof items[number] | null>(null);
-  const dates = useDateDisplay();
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [checkText, setCheckText] = useState('');
+  // The "confirm it's you" step before an approval.
+  const [confirming, setConfirming] = useState<IdentityCheck | null>(null);
+  const [code, setCode] = useState('');
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await fetch(`/api/v1/2fa-recovery/pending?page=${page}&per_page=${PER_PAGE}`, {
+      const res = await fetch('/api/v1/2fa-recovery/pending?page=1&per_page=100', {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
       });
@@ -75,14 +109,14 @@ export default function TwoFactorRecoveryApprovalsPage() {
       const body = await res.json().catch(() => ({}));
       const rows = Array.isArray(body?.data) ? (body.data as PendingTwoFactorRecovery[]) : [];
       setItems(rows);
-      setTotal(typeof body?.pagination?.total === 'number' ? body.pagination.total : rows.length);
+      setSelectedId((current) => (current !== null && rows.some((r) => r.id === current) ? current : rows[0]?.id ?? null));
     } catch {
       setLoadError(true);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, []);
 
   useEffect(() => {
     if (!isCapabilitiesLoading && canApprove) {
@@ -90,80 +124,106 @@ export default function TwoFactorRecoveryApprovalsPage() {
     }
   }, [isCapabilitiesLoading, canApprove, load]);
 
-  const act = async (item: PendingTwoFactorRecovery, action: 'approve' | 'reject') => {
-    setBusyId(item.id);
+  const selected = useMemo(() => items.find((i) => i.id === selectedId) ?? null, [items, selectedId]);
+  const me = user?.id ?? null;
+  const isRequester = selected !== null && selected.profile_id === me;
+  const gaveFirst = selected?.first_approval?.profile_id === me && me !== null;
+
+  const post = async (path: string, body: unknown) =>
+    fetch(path, { method: 'POST', headers: JSON_HEADERS, credentials: 'include', body: JSON.stringify(body) });
+
+  /** Step 1: find out the check, and have the code emailed when that is the check. */
+  const startApproval = async () => {
+    if (selected === null) return;
+    setBusy(true);
     try {
-      const res = await fetch(`/api/v1/2fa-recovery/${item.id}/${action}`, {
-        method: 'POST',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'include',
-      });
+      const res = await post('/api/v1/2fa-recovery/identity-check', { request_id: selected.id });
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        addToast(
-          action === 'approve'
-            ? t(
-                'twoFactorRecovery.approve.failedStatus',
-                'Failed to approve the request for {email} ({status}).',
-                { email: item.email, status: res.status }
-              )
-            : t(
-                'twoFactorRecovery.reject.failedStatus',
-                'Failed to reject the request for {email} ({status}).',
-                { email: item.email, status: res.status }
-              ),
-          'error'
-        );
+        addToast(body?.error ?? t('twoStep.identity.failed', 'We could not start the check. Try again in a few minutes.'), 'error');
+        return;
+      }
+      setCode('');
+      setCodeError(null);
+      setConfirming(body.data as IdentityCheck);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Step 2: approve with the code. */
+  const approve = async (value: string) => {
+    if (selected === null) return;
+    setBusy(true);
+    try {
+      const res = await post(`/api/v1/2fa-recovery/${selected.id}/approve`, { code: value });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (body?.reason === 'identity_check_failed') {
+          setCodeError(t('twoStep.identity.wrong', 'That code is not right or has expired.'));
+          return;
+        }
+        setConfirming(null);
+        addToast(body?.error ?? t('twoStep.approve.failed', 'The approval could not be saved.'), 'error', 8000);
         void load();
         return;
       }
+      setConfirming(null);
       addToast(
-        action === 'approve'
-          ? t(
-              'twoFactorRecovery.approve.success',
-              "Approved — {email}'s two-factor authentication has been cleared and a " +
-                "password-reset link was sent.",
-              { email: item.email }
-            )
-          : t('twoFactorRecovery.reject.success', 'Rejected the recovery request for {email}.', {
-              email: item.email,
-            }),
-        'success'
+        body?.data?.status === 'approved'
+          ? t('twoStep.approve.cleared', "{name}'s two-step is cleared and a reset link is on its way.", { name: selected.display_name })
+          : t('twoStep.approve.first', 'Approved. It now needs a second admin.'),
+        'success',
       );
-      setItems((prev) => prev.filter((i) => i.id !== item.id));
-    } catch {
-      addToast(
-        action === 'approve'
-          ? t('twoFactorRecovery.approve.failed', 'Failed to approve the request for {email}.', {
-              email: item.email,
-            })
-          : t('twoFactorRecovery.reject.failed', 'Failed to reject the request for {email}.', {
-              email: item.email,
-            }),
-        'error'
-      );
+      void load();
     } finally {
-      setBusyId(null);
+      setBusy(false);
+    }
+  };
+
+  const reject = async () => {
+    if (selected === null) return;
+    setBusy(true);
+    try {
+      const res = await post(`/api/v1/2fa-recovery/${selected.id}/reject`, {});
+      if (!res.ok) {
+        addToast(t('twoStep.reject.failed', 'The request could not be rejected.'), 'error');
+      } else {
+        addToast(t('twoStep.reject.done', 'Rejected. Their account is unchanged.'), 'success');
+      }
+      void load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addCheck = async () => {
+    if (selected === null || checkText.trim() === '') return;
+    setBusy(true);
+    try {
+      const res = await post(`/api/v1/2fa-recovery/${selected.id}/checks`, { text: checkText.trim() });
+      if (!res.ok) {
+        addToast(t('twoStep.check.failed', 'The check could not be saved.'), 'error');
+        return;
+      }
+      setCheckText('');
+      void load();
+    } finally {
+      setBusy(false);
     }
   };
 
   if (isCapabilitiesLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-100">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <LoadingRows label={t('twoStep.loading', 'Loading requests')} headers={[t('twoStep.person', 'Person')]} rows={2} />;
   }
 
   if (!canApprove) {
     return (
-      <div className="space-y-6 max-w-4xl mx-auto px-4 md:px-0 pb-16">
+      <div className="space-y-6">
         <ApprovalGatingTabs active="two-factor-recovery" />
         <AccessDenied
           data-testid="two-factor-recovery-access-denied"
-          description={t(
-            'twoFactorRecovery.accessDenied',
-            "You don't have permission to review pending 2FA-recovery requests."
-          )}
+          description={t('twoFactorRecovery.accessDenied', "You don't have permission to review pending 2FA-recovery requests.")}
           action={
             <Button onClick={() => window.history.back()} variant="outline">
               {t('twoFactorRecovery.goBack', 'Go Back')}
@@ -174,144 +234,248 @@ export default function TwoFactorRecoveryApprovalsPage() {
     );
   }
 
+  const time = (value: string | null) => (value ? (dates.dateTime(value) ?? '') : '');
+
   return (
-    <div className="space-y-8 max-w-4xl mx-auto px-4 md:px-0 pb-16">
-      <ApprovalGatingTabs active="two-factor-recovery" />
+    <div className="space-y-6 pb-16">
       <AdminHeader
-        title={t('twoFactorRecovery.title', '2FA Auth Reset Approvals')}
-        description={t(
-          'twoFactorRecovery.description',
-          'Review requests from users locked out because they lost both their password and ' +
-            'their 2FA device.'
-        )}
+        title={t('approvalGating.title', 'Approval gating')}
+        description={t('approvalGating.description', 'Sign-ups, password resets and two-step resets that need an admin')}
       />
+      <ApprovalGatingTabs active="two-factor-recovery" />
 
-      <Alert variant="warning" data-testid="two-factor-identity-warning">
-        <AlertDescription>
-          {t(
-            'twoFactorRecovery.identityWarning',
-            'Check who is asking before you approve. Approving switches off their two-step sign-in.'
-          )}
-        </AlertDescription>
-      </Alert>
-
-      <Card className="border border-border bg-card shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold font-heading">
-            <h2>{t('twoFactorRecovery.list.title', 'Awaiting approval')}</h2>
-          </CardTitle>
-          <CardDescription className="text-sm">
-            {t(
-              'twoFactorRecovery.list.description',
-              'Approving clears the user’s two-factor authentication entirely and emails them a ' +
-                'fresh password-reset link. Rejecting leaves their account completely untouched.'
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <LoadingRows
-              label={t('twoFactorRecovery.loading', 'Loading requests')}
-              headers={[t('twoFactorRecovery.column.person', 'Person'), t('twoFactorRecovery.column.asked', 'Asked')]}
-              rows={3}
-            />
-          ) : loadError ? (
-            <div data-testid="two-factor-recovery-load-error">
-              <AreaError
-                message={t('twoFactorRecovery.loadError', 'Failed to load the requests.')}
-                retryLabel={t('twoFactorRecovery.retry', 'Try again')}
-                onRetry={() => void load()}
-              />
-            </div>
-          ) : items.length === 0 ? (
-            <div
-              className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground"
-              data-testid="two-factor-recovery-empty"
-            >
-              <IconInbox size={40} className="mb-3 opacity-60" />
-              <p className="text-sm">
-                {t('twoFactorRecovery.empty', 'No pending 2FA-recovery requests.')}
-              </p>
-            </div>
-          ) : (
-            <ul className="divide-y divide-border" data-testid="two-factor-recovery-list">
-              {items.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex flex-col gap-3 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
+      {loading && items.length === 0 ? (
+        <LoadingRows label={t('twoStep.loading', 'Loading requests')} headers={[t('twoStep.person', 'Person')]} rows={2} />
+      ) : loadError ? (
+        <div data-testid="two-factor-recovery-load-error">
+          <AreaError
+            message={t('twoFactorRecovery.loadError', 'Failed to load the requests.')}
+            retryLabel={t('twoFactorRecovery.retry', 'Try again')}
+            onRetry={() => void load()}
+          />
+        </div>
+      ) : items.length === 0 ? (
+        <div data-testid="two-factor-recovery-empty">
+          <EmptyState
+            title={t('twoStep.empty.title', 'No two-step resets waiting')}
+            description={t('twoStep.empty.description', 'When someone loses their phone and codes, their request comes here for two admins.')}
+          />
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+          <ul className="grid h-fit gap-2" data-testid="two-factor-recovery-list" aria-label={t('twoStep.list', 'Two-step resets')}>
+            {items.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(item.id)}
+                  aria-current={item.id === selectedId}
                   data-testid={`two-factor-recovery-row-${item.id}`}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-control-lg border border-border bg-card p-3 text-start',
+                    item.id === selectedId && 'border-primary/40 bg-info-tint',
+                  )}
                 >
-                  <div className="min-w-0">
-                    <p className="font-medium text-foreground truncate">{item.email}</p>
-                    <p className="text-sm text-foreground" data-testid={`twoFactorRecovery-reason-${item.id}`}>
-                      {item.reason ?? t('twoFactorRecovery.reason.default', 'Lost access to their second step')}
-                    </p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {[
-                        item.display_name,
-                        dates.dateTime(item.created_at) !== null
-                          ? t('twoFactorRecovery.asked', 'Asked on {date}', { date: dates.dateTime(item.created_at) ?? '' })
-                          : null,
-                      ]
-                        .filter((part) => part)
+                  <Avatar name={item.display_name || item.email} size={32} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{item.display_name || item.email}</span>
+                    <span className="block truncate text-sm text-muted-foreground" data-testid={`twoFactorRecovery-reason-${item.id}`}>
+                      {[item.reason ?? t('twoFactorRecovery.reason.default', 'Lost access to their second step'), dates.time(item.created_at)]
+                        .filter(Boolean)
                         .join(' · ')}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={busyId === item.id}
-                      onClick={() => setApproving(item)}
-                      className="gap-1"
-                      data-testid={`two-factor-recovery-approve-${item.id}`}
-                    >
-                      <IconCheck className="w-4 h-4" />
-                      {t('twoFactorRecovery.action.approve', 'Approve…')}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={busyId === item.id}
-                      onClick={() => void act(item, 'reject')}
-                      className="gap-1"
-                      data-testid={`two-factor-recovery-reject-${item.id}`}
-                    >
-                      <IconX className="w-4 h-4" />
-                      {t('twoFactorRecovery.action.reject', 'Reject')}
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                    </span>
+                  </span>
+                  <Icon name="chevron-right" size={16} className="rtl:rotate-180" aria-hidden />
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {selected !== null && (
+            <Card className="gap-0 p-0" data-testid={`two-factor-recovery-detail-${selected.id}`}>
+              <section className="space-y-2 p-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="destructive">
+                    <Icon name="lock" size={12} aria-hidden />
+                    {t('approvals.kind.verify', 'Needs verifying')}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {t('twoStep.asked', 'Asked {when}', { when: time(selected.created_at) })}
+                  </span>
+                </div>
+                <h2 className="text-lg font-semibold">
+                  {t('twoStep.title', "Clear {name}'s two-step sign-in", { name: selected.display_name || selected.email })}
+                </h2>
+                <p className="text-muted-foreground">
+                  {t(
+                    'twoStep.what',
+                    'They lost their phone and their recovery codes. Approving lets their password alone sign them in, until they set two-step up again.',
+                  )}
+                </p>
+              </section>
+
+              <section className="border-t border-border p-5">
+                <h3 className="mb-2 text-sm font-semibold">{t('twoStep.request', 'Request')}</h3>
+                <dl className="divide-y divide-border">
+                  {[
+                    [t('twoStep.from', 'From'), selected.requested_from === 'admin'
+                      ? t('twoStep.fromAdmin', 'Started by an admin')
+                      : (selected.requested_from ?? t('twoStep.unknown', 'Not known'))],
+                    [t('twoStep.account', 'Their account'), selected.email],
+                    [t('twoStep.lastSignedIn', 'Last signed in'), selected.last_signed_in_at ? time(selected.last_signed_in_at) : t('twoStep.never', 'Not yet in this workspace')],
+                  ].map(([term, value]) => (
+                    <div key={term} className="grid grid-cols-[minmax(0,200px)_minmax(0,1fr)] gap-4 py-2.5">
+                      <dt className="text-muted-foreground">{term}</dt>
+                      <dd className="min-w-0 break-words">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+
+              <section className="border-t border-border p-5">
+                <h3 className="mb-2 text-sm font-semibold">{t('twoStep.checks', 'Checks')}</h3>
+                {selected.checks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t('twoStep.checks.none', 'No checks yet. Say what you did to make sure it is really them.')}
+                  </p>
+                ) : (
+                  <ul className="grid gap-3">
+                    {selected.checks.map((check, index) => (
+                      <li key={index} className="flex gap-3">
+                        <Icon name="success" size={16} className="mt-1 text-success-text" aria-hidden />
+                        <div>
+                          <div>{check.text}</div>
+                          <div className="text-sm text-muted-foreground">{[check.by_name, time(check.at)].filter(Boolean).join(', ')}</div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <form
+                  className="mt-3 flex gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void addCheck();
+                  }}
+                >
+                  <Input
+                    value={checkText}
+                    maxLength={300}
+                    onChange={(e) => setCheckText(e.target.value)}
+                    placeholder={t('twoStep.check.placeholder', 'Called them on the number on file')}
+                    aria-label={t('twoStep.check.label', 'A check you made')}
+                  />
+                  <Button type="submit" variant="outline" disabled={busy || checkText.trim() === ''}>
+                    {t('twoStep.check.add', 'Add check')}
+                  </Button>
+                </form>
+              </section>
+
+              <section className="space-y-4 border-t border-border p-5">
+                <h3 className="text-sm font-semibold">{t('twoStep.twoAdmins', 'Two admins approve')}</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {selected.first_approval !== null ? (
+                    <ApproverSlot
+                      done
+                      name={selected.first_approval.display_name}
+                      line={t('twoStep.slot.approved', 'Approved {when} with {how}', {
+                        when: time(selected.first_approval.at),
+                        how: selected.first_approval.method === 'totp' ? t('twoStep.how.totp', 'their authenticator') : t('twoStep.how.email', 'an emailed code'),
+                      })}
+                    />
+                  ) : (
+                    <ApproverSlot name={t('twoStep.slot.first', 'First admin')} line={t('twoStep.slot.waiting', 'Waiting')} />
+                  )}
+                  <ApproverSlot
+                    name={gaveFirst ? t('twoStep.slot.another', 'Another admin') : t('twoStep.slot.you', 'You')}
+                    line={
+                      isRequester
+                        ? t('twoStep.slot.ownRequest', 'This is your own request, so another admin decides')
+                        : gaveFirst
+                          ? t('twoStep.slot.needsSomeoneElse', 'A different admin has to give the second approval')
+                          : t('twoStep.slot.waitingForYou', 'Waiting for you')
+                    }
+                  />
+                </div>
+                <Alert variant="warning">
+                  <Icon name="alert" size={16} aria-hidden />
+                  <AlertTitle>{t('twoStep.noUndo.title', "There's no Undo for this")}</AlertTitle>
+                  <AlertDescription>
+                    {t(
+                      'twoStep.noUndo.description',
+                      "If it wasn't really {name}, someone could sign in with their password. They'll be asked to set up two-step at their next sign-in.",
+                      { name: selected.display_name || selected.email },
+                    )}
+                  </AlertDescription>
+                </Alert>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button variant="outline" disabled={busy} onClick={() => void reject()} data-testid={`two-factor-recovery-reject-${selected.id}`}>
+                    {t('twoFactorRecovery.action.reject', 'Reject')}
+                  </Button>
+                  <Button
+                    disabled={busy || isRequester || gaveFirst}
+                    onClick={() => void startApproval()}
+                    data-testid={`two-factor-recovery-approve-${selected.id}`}
+                  >
+                    <Icon name="two-step" size={16} aria-hidden />
+                    {t('twoStep.approve', 'Confirm it’s you and approve')}
+                  </Button>
+                </div>
+              </section>
+            </Card>
           )}
-          {!loading && !loadError && total > PER_PAGE && (
-            <Pagination className="mt-4" page={page} perPage={PER_PAGE} total={total} onPageChange={setPage} />
-          )}
-        </CardContent>
-      </Card>
-      <ConfirmAction
-        open={approving !== null}
-        onOpenChange={(open) => {
-          if (!open) setApproving(null);
-        }}
-        title={t('twoFactorRecovery.approve.title', 'Approve the two-step reset for {email}?', { email: approving?.email ?? '' })}
-        description={t(
-          'twoFactorRecovery.approve.description',
-          'Their two-step sign-in is switched off, so anyone with their password can sign in. Check their identity first.'
-        )}
-        confirmLabel={t('twoFactorRecovery.approve.confirm', 'Approve request')}
-        cancelLabel={t('twoFactorRecovery.approve.cancel', 'Cancel')}
-        typeToConfirm={{
-          value: approving?.email ?? '',
-          label: t('twoFactorRecovery.approve.typeLabel', 'Type their email to confirm'),
-        }}
-        variant="default"
-        onConfirm={async () => {
-          if (approving !== null) await act(approving, 'approve');
-        }}
-      />
+        </div>
+      )}
+
+      <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('twoStep.identity.title', 'Confirm it’s you')}</DialogTitle>
+            <DialogDescription>
+              {confirming?.method === 'totp'
+                ? t('twoStep.identity.totp', 'Enter the code from your authenticator app.')
+                : t('twoStep.identity.email', 'We sent a code to {email}. Enter it here.', { email: confirming?.email_hint ?? '' })}
+            </DialogDescription>
+          </DialogHeader>
+          <OtpInput
+            label={t('twoStep.identity.code', 'Code')}
+            value={code}
+            onChange={(value) => {
+              setCode(value);
+              setCodeError(null);
+            }}
+            onComplete={(value) => void approve(value)}
+            errorText={codeError ?? undefined}
+            disabled={busy}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirming(null)}>
+              {t('twoStep.identity.cancel', 'Cancel')}
+            </Button>
+            <Button disabled={busy || code.length < 6} onClick={() => void approve(code)}>
+              {t('twoStep.identity.approve', 'Approve')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function ApproverSlot({ name, line, done = false }: { name: string; line: string; done?: boolean }) {
+  return (
+    <div
+      className={cn(
+        'rounded-control-lg border p-3',
+        done ? 'border-success-text/40 bg-success-tint' : 'border-dashed border-border',
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <Avatar name={name} size={28} />
+        <span>{name}</span>
+      </div>
+      <div className="mt-2 text-sm">{line}</div>
     </div>
   );
 }
