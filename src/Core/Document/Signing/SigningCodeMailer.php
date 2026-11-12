@@ -36,8 +36,9 @@ final class SigningCodeMailer
                     'Use this code to confirm your electronic signature on "' . $documentTitle . '".',
                     'It expires in ' . $minutes . ' minutes and can be used once.',
                 ],
-                callout: $code,
                 footnote: 'If you are not signing anything right now, ignore this message. Nothing is signed without the code.',
+                code: $code,
+                notice: 'Sent to ' . $email . '.',
             ),
             $branding,
         );

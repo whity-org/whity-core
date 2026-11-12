@@ -54,6 +54,8 @@
     "./documents/barcode-svg": "./src/documents/barcode-svg.tsx",
     "./dropdown-menu": "./src/dropdown-menu.tsx",
     "./editor": "./src/editor/index.ts",
+    "./editor/agent-panel": "./src/editor/agent-panel.tsx",
+    "./editor/agents": "./src/editor/agents.ts",
     "./editor/behaviour": "./src/editor/behaviour.ts",
     "./editor/block-ids": "./src/editor/block-ids.ts",
     "./editor/block-list": "./src/editor/block-list.tsx",

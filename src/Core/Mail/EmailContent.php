@@ -6,22 +6,36 @@ namespace Whity\Core\Mail;
 
 /**
  * The per-message content an {@see EmailLayout} renders into the branded shell
- * (WC-email). Structured (not raw HTML) so the layout controls escaping — a
- * caller passes plain strings and cannot inject markup.
+ * (EM.1, `docs/design/handoff/emails/`). Structured (not raw HTML) so the layout
+ * controls escaping: a caller passes plain strings and cannot inject markup.
  *
- * Covers the transactional messages: a heading, one or more body paragraphs, an
- * optional call-to-action button, an optional highlighted callout (e.g. "X
- * invited you to Y"), and an optional small-print footnote (e.g. link expiry).
+ * The blocks, in the order they are drawn: heading, paragraphs, a one-time code,
+ * detail rows (When / Device / Near), a checklist, an agent's proposal (the dashed
+ * box: not happened yet), a grey note, the one main button, a soft line under it,
+ * and the footer notice ("Security emails can't be turned off. Sent to …").
+ *
+ * Every field after `$footnote` is optional and new in 0.2.29; the first six keep
+ * their old meaning so existing senders render unchanged.
  */
 final class EmailContent
 {
     /**
-     * @param string      $heading    The message headline.
-     * @param list<string> $paragraphs Body paragraphs, in order (plain text).
-     * @param string|null $ctaLabel   Button label, or null for no button.
-     * @param string|null $ctaUrl     Button URL (required when $ctaLabel is set).
-     * @param string|null $callout    Highlighted callout line, or null.
-     * @param string|null $footnote   Small-print line under the CTA, or null.
+     * @param string                    $heading    The message headline.
+     * @param list<string>              $paragraphs Body paragraphs, in order (plain text).
+     * @param string|null               $ctaLabel   Button label, or null for no button.
+     * @param string|null               $ctaUrl     Button URL (required when $ctaLabel is set).
+     * @param string|null               $callout    The grey note, or null.
+     * @param string|null               $footnote   Soft line under the button, or null.
+     * @param string|null               $preheader  The inbox preview line.
+     * @param string|null               $code       A one-time code, drawn large and left to right.
+     * @param list<array{0: string, 1: string}> $rows Label and value pairs.
+     * @param list<string>              $checklist  Ticked lines (what agents did, first steps).
+     * @param array{meta: string, title: string, detail: string}|null $proposal
+     *                                              An agent's proposal: who for whom, what, the detail.
+     * @param string|null               $calloutLead Bold start of the grey note ("Wasn't you?").
+     * @param string                    $ctaTone    'brand' or 'danger' ("It wasn't me").
+     * @param string|null               $notice     The footer line: why this was sent.
+     * @param string                    $language   'en' or 'ar': direction, font and the layout's own words.
      */
     public function __construct(
         public readonly string $heading,
@@ -30,6 +44,15 @@ final class EmailContent
         public readonly ?string $ctaUrl = null,
         public readonly ?string $callout = null,
         public readonly ?string $footnote = null,
+        public readonly ?string $preheader = null,
+        public readonly ?string $code = null,
+        public readonly array $rows = [],
+        public readonly array $checklist = [],
+        public readonly ?array $proposal = null,
+        public readonly ?string $calloutLead = null,
+        public readonly string $ctaTone = 'brand',
+        public readonly ?string $notice = null,
+        public readonly string $language = 'en',
     ) {
     }
 
@@ -38,5 +61,10 @@ final class EmailContent
     {
         return $this->ctaLabel !== null && $this->ctaLabel !== ''
             && $this->ctaUrl !== null && $this->ctaUrl !== '';
+    }
+
+    public function isArabic(): bool
+    {
+        return $this->language === 'ar';
     }
 }

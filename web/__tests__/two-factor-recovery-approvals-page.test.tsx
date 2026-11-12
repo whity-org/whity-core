@@ -1,16 +1,15 @@
 /**
- * WC-password-reset-2fa-recovery — 2FA Auth Reset Approvals admin page tests.
- *
- * Mirrors password-reset-approvals-page.test.tsx; gated on
- * two_factor_recovery:approve, tenant-scoped (not system-tenant-restricted).
+ * Two-step resets (AG.1, TplGatingTwoStep): two admins, each confirming it's
+ * them with a code; the requester and the first admin can't give the second.
  */
 
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 const hasPermission = jest.fn<boolean, [string]>();
+let currentUserId = 10;
 jest.mock('@/lib/auth-context', () => ({
-  useAuth: () => ({ user: { tenant_id: 3 } }),
+  useAuth: () => ({ user: { id: currentUserId, tenant_id: 3 } }),
 }));
 
 jest.mock('@/hooks/useCapabilities', () => ({
@@ -24,125 +23,109 @@ jest.mock('@/lib/toast-context', () => ({
 
 import TwoFactorRecoveryApprovalsPage from '@/app/(protected)/admin/approval-gating/two-factor-recovery/page';
 
-const PENDING = [
-  {
-    id: 701,
-    profile_id: 22,
-    email: 'lockedout@acme.test',
-    display_name: 'Locked Out User',
-    created_at: '2026-08-01T00:00:00Z',
-  },
-];
+const REQUEST = {
+  id: 701,
+  profile_id: 22,
+  email: 'ibrahim@examplebakery.test',
+  display_name: 'Ibrahim Mansour',
+  reason: 'Lost his phone and codes',
+  created_at: '2026-11-12T08:12:00Z',
+  requested_from: 'Chrome on Windows',
+  last_signed_in_at: '2026-11-11T09:00:00Z',
+  checks: [{ text: 'Called him on the number on file', by_profile_id: 11, by_name: 'Emad Nasser', at: '2026-11-12T08:30:00Z' }],
+  first_approval: null as null | { profile_id: number; display_name: string; at: string; method: string },
+};
 
 function grant(...perms: string[]) {
   hasPermission.mockImplementation((slug: string) => perms.includes(slug));
 }
 
-function mockFetchOnceJson(data: unknown, ok = true, status = 200) {
+function respond(data: unknown, ok = true, status = 200) {
   (global.fetch as jest.Mock).mockResolvedValueOnce({ ok, status, json: async () => data });
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
+  currentUserId = 10;
   grant('two_factor_recovery:approve');
   global.fetch = jest.fn();
 });
 
-describe('TwoFactorRecoveryApprovalsPage — access gate', () => {
-  it('shows Access Denied for a caller lacking the permission', async () => {
-    grant();
-    render(<TwoFactorRecoveryApprovalsPage />);
+it('shows Access Denied for a caller lacking the permission', async () => {
+  grant();
+  render(<TwoFactorRecoveryApprovalsPage />);
 
-    await waitFor(() =>
-      expect(screen.getByTestId('two-factor-recovery-access-denied')).toBeInTheDocument()
-    );
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
+  await waitFor(() => expect(screen.getByTestId('two-factor-recovery-access-denied')).toBeInTheDocument());
+  expect(global.fetch).not.toHaveBeenCalled();
 });
 
-describe('TwoFactorRecoveryApprovalsPage — list and actions', () => {
-  it('lists pending requests for an eligible caller', async () => {
-    mockFetchOnceJson({ data: PENDING });
-    render(<TwoFactorRecoveryApprovalsPage />);
+it('shows the request, where it came from and the checks made', async () => {
+  respond({ data: [REQUEST] });
+  render(<TwoFactorRecoveryApprovalsPage />);
 
-    await waitFor(() =>
-      expect(screen.getByTestId('two-factor-recovery-row-701')).toBeInTheDocument()
-    );
-    expect(screen.getByText('lockedout@acme.test')).toBeInTheDocument();
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/v1/2fa-recovery/pending?page=1&per_page=25',
-      expect.objectContaining({ credentials: 'include' })
-    );
-  });
-
-  it('renders the empty state when there are no pending requests', async () => {
-    mockFetchOnceJson({ data: [] });
-    render(<TwoFactorRecoveryApprovalsPage />);
-
-    await waitFor(() => expect(screen.getByTestId('two-factor-recovery-empty')).toBeInTheDocument());
-  });
-
-  it('POSTs approve and removes the row on success', async () => {
-    mockFetchOnceJson({ data: PENDING });
-    mockFetchOnceJson({ data: { id: 701, status: 'approved' } });
-    render(<TwoFactorRecoveryApprovalsPage />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('two-factor-recovery-approve-701')).toBeInTheDocument()
-    );
-    fireEvent.click(screen.getByTestId('two-factor-recovery-approve-701'));
-    // Approving is tier 3: the dialog asks for the email to be typed.
-    fireEvent.change(await screen.findByLabelText('Type their email to confirm'), { target: { value: 'lockedout@acme.test' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Approve request' }));
-
-    await waitFor(() =>
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/v1/2fa-recovery/701/approve',
-        expect.objectContaining({ method: 'POST' })
-      )
-    );
-    await waitFor(() =>
-      expect(screen.queryByTestId('two-factor-recovery-row-701')).not.toBeInTheDocument()
-    );
-  });
-
-  it('POSTs reject to the reject endpoint', async () => {
-    mockFetchOnceJson({ data: PENDING });
-    mockFetchOnceJson({ data: { id: 701, status: 'rejected' } });
-    render(<TwoFactorRecoveryApprovalsPage />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('two-factor-recovery-reject-701')).toBeInTheDocument()
-    );
-    fireEvent.click(screen.getByTestId('two-factor-recovery-reject-701'));
-
-    await waitFor(() =>
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/v1/2fa-recovery/701/reject',
-        expect.objectContaining({ method: 'POST' })
-      )
-    );
-  });
-
-  it('surfaces a load error with a retry affordance', async () => {
-    mockFetchOnceJson({ error: 'nope' }, false, 403);
-    render(<TwoFactorRecoveryApprovalsPage />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('two-factor-recovery-load-error')).toBeInTheDocument()
-    );
-  });
+  await waitFor(() => expect(screen.getByTestId('two-factor-recovery-detail-701')).toBeInTheDocument());
+  expect(screen.getByText('Chrome on Windows')).toBeInTheDocument();
+  expect(screen.getByText('ibrahim@examplebakery.test')).toBeInTheDocument();
+  expect(screen.getByText('Called him on the number on file')).toBeInTheDocument();
+  expect(screen.getByText("There's no Undo for this")).toBeInTheDocument();
 });
 
-describe('TwoFactorRecoveryApprovalsPage — approval-gating tab bar', () => {
-  it('renders the shared tab bar with the 2FA tab active', async () => {
-    mockFetchOnceJson({ data: [] });
-    render(<TwoFactorRecoveryApprovalsPage />);
+it('renders the empty state when there are no pending requests', async () => {
+  respond({ data: [] });
+  render(<TwoFactorRecoveryApprovalsPage />);
 
-    await waitFor(() => expect(screen.getByTestId('approval-gating-tabs')).toBeInTheDocument());
-    expect(screen.getByTestId('approval-gating-tab-two-factor-recovery')).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
-  });
+  await waitFor(() => expect(screen.getByTestId('two-factor-recovery-empty')).toBeInTheDocument());
+});
+
+it('asks for a code before approving, then sends it', async () => {
+  respond({ data: [REQUEST] });
+  render(<TwoFactorRecoveryApprovalsPage />);
+  await waitFor(() => expect(screen.getByTestId('two-factor-recovery-approve-701')).toBeInTheDocument());
+
+  respond({ data: { method: 'email_code', email_hint: 'a•••@examplebakery.test' } });
+  fireEvent.click(screen.getByTestId('two-factor-recovery-approve-701'));
+  await waitFor(() => expect(screen.getByText(/We sent a code to a•••@examplebakery.test/)).toBeInTheDocument());
+  expect(global.fetch).toHaveBeenLastCalledWith(
+    '/api/v1/2fa-recovery/identity-check',
+    expect.objectContaining({ method: 'POST', body: JSON.stringify({ request_id: 701 }) }),
+  );
+
+  respond({ data: { id: 701, status: 'waiting_for_second_admin' } });
+  respond({ data: [{ ...REQUEST, first_approval: { profile_id: 10, display_name: 'Amro Saleh', at: '2026-11-12T08:34:00Z', method: 'email_code' } }] });
+  const boxes = screen.getAllByRole('textbox');
+  fireEvent.change(boxes[boxes.length - 1], { target: { value: '123456' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+
+  await waitFor(() => expect(addToast).toHaveBeenCalledWith('Approved. It now needs a second admin.', 'success'));
+  expect((global.fetch as jest.Mock).mock.calls.some(
+    ([url, init]) => url === '/api/v1/2fa-recovery/701/approve' && init.body === JSON.stringify({ code: '123456' }),
+  )).toBe(true);
+});
+
+it('does not let the first admin give the second approval', async () => {
+  respond({ data: [{ ...REQUEST, first_approval: { profile_id: 10, display_name: 'Amro Saleh', at: '2026-11-12T08:34:00Z', method: 'totp' } }] });
+  render(<TwoFactorRecoveryApprovalsPage />);
+
+  await waitFor(() => expect(screen.getByTestId('two-factor-recovery-approve-701')).toBeDisabled());
+  expect(screen.getByText('A different admin has to give the second approval')).toBeInTheDocument();
+});
+
+it('does not let the requester approve their own', async () => {
+  currentUserId = 22;
+  respond({ data: [REQUEST] });
+  render(<TwoFactorRecoveryApprovalsPage />);
+
+  await waitFor(() => expect(screen.getByTestId('two-factor-recovery-approve-701')).toBeDisabled());
+});
+
+it('rejects, leaving the account unchanged', async () => {
+  respond({ data: [REQUEST] });
+  render(<TwoFactorRecoveryApprovalsPage />);
+  await waitFor(() => expect(screen.getByTestId('two-factor-recovery-reject-701')).toBeInTheDocument());
+
+  respond({ data: { id: 701, status: 'rejected' } });
+  respond({ data: [] });
+  fireEvent.click(screen.getByTestId('two-factor-recovery-reject-701'));
+
+  await waitFor(() => expect(addToast).toHaveBeenCalledWith('Rejected. Their account is unchanged.', 'success'));
 });
