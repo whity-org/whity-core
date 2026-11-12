@@ -5249,6 +5249,15 @@ $brandingService = new \Whity\Core\Branding\BrandingService(
     new \Whity\Core\Branding\BrandingAssetValidator(new \Whity\Core\Branding\SvgSanitizer()),
     $entitlementService
 );
+// WHIT-959: plugins send their own emails (invoices, receipts) through the same
+// branded layout as core's, in the sending workspace's brand.
+\Whity\Core\Mail\HostPluginEmailSender::register(
+    $mailer,
+    $settingsService,
+    (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+    static fn (int $tenantId): bool => $brandingService->showsBuiltOnWhity($tenantId),
+    $logger,
+);
 $brandingHostRepo = new \Whity\Core\Branding\TenantHostRepository($db->getPdo());
 $hostResolver = new \Whity\Core\Branding\HostResolver(
     $brandingHostRepo,

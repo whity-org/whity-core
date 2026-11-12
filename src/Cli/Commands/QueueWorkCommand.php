@@ -150,15 +150,31 @@ final class QueueWorkCommand implements CliCommand
                 new \Whity\Core\Settings\TenantSettingsRepository($pdo)
             );
             $workerLogger = $this->logger;
+            $workerMailer = new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
+                $workerSettings,
+                new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                $workerSecrets,
+                $workerLogger
+            ));
+            // WHIT-959: a plugin's job sends its emails (an invoice, a receipt)
+            // through the same service and branded layout as its routes.
+            $workerBranding = new \Whity\Core\Branding\BrandingService(
+                $workerSettings,
+                null,
+                null,
+                new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo)),
+            );
+            \Whity\Core\Mail\HostPluginEmailSender::register(
+                $workerMailer,
+                $workerSettings,
+                (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+                static fn (int $tenantId): bool => $workerBranding->showsBuiltOnWhity($tenantId),
+                $this->logger,
+            );
             $messaging = \Whity\Core\Messaging\CoreMessaging::build(
                 $pdo,
                 $messageChannels,
-                new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
-                    $workerSettings,
-                    new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
-                    $workerSecrets,
-                    $workerLogger
-                )),
+                $workerMailer,
                 $workerSecrets,
                 static fn (string $name, array $payload, array $opts): ?int => (new \Whity\Core\Queue\QueueService($repo))->dispatch($name, $payload, $opts),
                 null,
