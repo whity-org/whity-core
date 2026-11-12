@@ -49,6 +49,8 @@ export interface EmptyStateProps
   moment?: MomentName
   /** Play the moment once a session under this key (empty lists), then show it still. */
   once?: string
+  /** Play the moment once ever on this device (first-run scenes such as `agents-propose`). */
+  onceEver?: string
 }
 
 function EmptyState({
@@ -60,6 +62,7 @@ function EmptyState({
   action,
   moment,
   once,
+  onceEver,
   ...props
 }: EmptyStateProps) {
   const resolvedVariant = variant ?? "empty"
@@ -80,6 +83,7 @@ function EmptyState({
         <Lottie
           name={moment}
           once={once}
+          onceEver={onceEver}
           className="h-[120px] w-[160px]"
           fallback={
             <span className="text-muted-foreground [&>svg]:size-8 [&>svg]:stroke-1">{icon ?? defaultIcon}</span>
