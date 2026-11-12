@@ -109,6 +109,29 @@ Every other lane starts after this merges. It is the only lane that changes the 
 
 Estimate: 4 PRs (F1+F2, F4, F5, F6), run as one lane in that order; F6 can run beside F4.
 
+### Core or paid plugin
+
+**The rule (owner, 12 Nov 2026):** what any team can use goes in core, free; what a business needs to trade goes in a paid plugin. Each lane below follows it.
+
+| In core (free) | In a paid plugin |
+| --- | --- |
+| The editor M6-M8, including the plugin block registry and saved blocks | |
+| Bulk approval, two-step reset with a second admin, I'm away (A7) | The 80 mm receipt (`TplReceipt80`, A7), with the JoFotara QR: **Front Office** |
+| Contacts (customers and suppliers), tags, the import engine for contacts (A8) | Importing items, opening stock and opening balances (A8): **Front Office** |
+| Custom fields on core's records, usable in lists, filters, documents and flows (A9) | Custom fields on items and stock: Front Office uses core's mechanism |
+| Tasks and boards through Taskaat (A10) | |
+| | Receiving, three-way match, waste and adjustments, bank reconciliation (A11): **Front Office** |
+| | Profit and loss, balance sheet, ageing, stock value, sales tax (A12 reports): **Front Office** |
+| Agent notifications by email (A12) | Agent notifications by WhatsApp (and SMS): the WhatsApp plugin |
+| The motion player, the Animations setting and the app's moments (A13) | Business moments (`money-invoice`, `payment-received`, `stock-*`, `spot-jofotara`, `spot-cliq`, `spot-jod`) ship with the plugin whose screen shows them |
+| Team chat with agents (`TplChat`) | |
+| Calendar rooms, branches, check-in and requests (`TplAppointments`); reminders by email | Reminders and confirmations by WhatsApp; deposits; calendar sync |
+| | Plans a workspace sells, subscribers, renewals (`TplSubscriptions`): **Whity Pay** |
+| Emails for accounts, security and the workspace: verify email, reset password, invitation, new sign-in, two-step off, workspace ready, needs approval, daily summary, plan limit (E1) | Emails for trading: invoice, quote, receipt, payment reminder: **Front Office**; payment failed, and Whity's own receipt for a plan: **Whity Pay** |
+| The public plans and contact endpoints, health, the installer (W1, W2, W6, W7) | |
+
+Core keeps an extension point wherever a paid plugin adds to a core screen (an email sender, a moment, a contact tab, a custom-field record type, a calendar reminder channel), so the plugin never patches core.
+
 ### Lanes after the foundation
 
 Each lane owns its files. The columns say what each one may touch, so lanes that don't share a row can run side by side.
@@ -116,23 +139,23 @@ Each lane owns its files. The columns say what each one may touch, so lanes that
 | Lane | Milestones | Owns | Server work | PRs |
 | --- | --- | --- | --- | --- |
 | **Editor** | M6, M7, M8 | `packages/ui/src/editor/`, `packages/features/src/document-editor/`, `src/Core/Document/`, `web/app/(protected)/admin/document-sources/` | **Yes.** M6: MCP tools (`documents.read`, `suggest_blocks`, `suggest_rewrite`, `reply_comment`), streamed runs. M7: block registry, `saved_blocks` tables (migrations), **SDK minor**. M8: theme options E.46, E.47 | 6 |
-| **People and approvals** | A7 | `admin/approvals`, `admin/approval-gating`, `admin/registrations`, `admin/delegations`, `src/Core/Delegation`, `src/Core/Security`, the receipt in `src/Core/Document/Print` (ask the Editor lane first: same tree) | **Yes.** Bulk approve, two-step reset with a second admin (table), passkey identity check, "I'm away", the 80 mm page | 3 |
+| **People and approvals** | A7 (core part) | `admin/approvals`, `admin/approval-gating`, `admin/registrations`, `admin/delegations`, `src/Core/Delegation`, `src/Core/Security` | **Yes.** Bulk approve, two-step reset with a second admin (table), passkey identity check, "I'm away" | 2 |
 | **Contacts** | A8 then A9 | new `web/app/(protected)/contacts`, `packages/features/src/contacts`, `src/Core/Contacts`, `src/Core/CustomFields`, settings page for fields | **Yes.** `contacts` table, import engine (preview, 24-hour undo, Excel reader), field definitions and values, MCP tools for contacts | 6 |
 | **Taskaat** | A10 | new `web/app/(protected)/tasks`, `boards`, `src/Core/Taskaat` | **Yes. The Taskaat link**: per-workspace connection (OAuth), a proxy to Taskaat's API, "Open in Taskaat", Taskaat tools in the workspace MCP. Needs Taskaat's team | 3 |
-| **Operations** | A11, A12 reports | A Front Office code plugin in whity-org/whity-plugins (Q6): its own `src/`, migrations and screens; in core only the extension points it asks for | **Yes, the largest.** Purchase orders, receipts, supplier bills, three-way match, stock items and movements, adjustments with approval, bank accounts and lines, a ledger to report from; the Bookkeeping assistant's suggestions as MCP tools | 8+ |
+| **Operations** (paid) | A11, A12 reports, the 80 mm receipt, item and stock imports, trading emails | A Front Office code plugin in whity-org/whity-plugins (Q6): its own `src/`, migrations and screens; in core only the extension points it asks for | **Yes, the largest.** Purchase orders, receipts, supplier bills, three-way match, stock items and movements, adjustments with approval, bank accounts and lines, a ledger to report from; the Bookkeeping assistant's suggestions as MCP tools | 8+ |
 | **Team chat** (owner, 12 Nov) | `TplChat`, `TplChatAddAgent` | new `web/app/(protected)/chat`, `src/Core/Chat` beside `src/Core/Messaging` (reads its tables, doesn't change its channels) | **Yes.** Team conversations on the Messages tables (kind: team), members that can be agents, read-from-join scope, proposals in the thread, links to a board, meeting or record, MCP tools to read and post | 3 |
 | **Calendar extras** (owner, 12 Nov) | `TplAppointments` gaps | `web/app/(protected)/calendar`, `src/Core/Calendar` | **Yes.** Rooms as resources, branches, checked-in state, requests needing approval with Suggest another time | 2 |
-| **Subscriptions** (whity-plugins, owner, 12 Nov) | `TplSubscriptions` | whity-org/whity-plugins `whity-pay/` | **Yes, in the plugin.** Customer plans, subscribers, renewals, retries then pause, CliQ and card; may need an SDK hook from core | 3 |
+| **Subscriptions** (paid; whity-plugins, owner, 12 Nov) | `TplSubscriptions` | whity-org/whity-plugins `whity-pay/` | **Yes, in the plugin.** Customer plans, subscribers, renewals, retries then pause, CliQ and card; may need an SDK hook from core | 3 |
 | **Agent notifications** | A12 notifications | `admin/agents` (its notifications tab), `src/Core/Notification` | **Yes.** Per-agent setting, one an hour, through `MessagingService` | 1 |
 | **Moments** | A13 (screens) | One PR per screen family, after its own lane, or done by that lane | — (F5 did it) | 1-2 |
-| **Emails** | E1 | `src/Core/Mail/` senders, `src/Core/Identity/*Mailer.php` | **Yes.** New senders: new sign-in, two-step off, workspace ready, needs approval, daily summary (scheduler), plan limit (from warn mode), Whity's receipt | 3 |
+| **Emails** | E1 (core emails) | `src/Core/Mail/` senders, `src/Core/Identity/*Mailer.php` | **Yes.** New senders: new sign-in, two-step off, workspace ready, needs approval, daily summary (scheduler), plan limit (from warn mode); an email sender extension point for plugins. Trading emails go with Front Office and Whity Pay | 3 |
 | **Public endpoints and health** | W1, W2, W6, W7 (core side) | new `src/Api/PublicPlansApiHandler.php`, `PublicContactApiHandler.php`, `ops/watchdog/`, the installer script | **Yes.** `GET /api/public/plans` (plan bundles plus a marketing layer, a migration), `POST /api/public/contact` | 4 |
 | **Websites** (whity-web) | W1, W4, W5, W6, W8 | whity-org/whity-web | Calls the two endpoints above | 7 |
 | **Whity ID** (whity-id) | W3 | whity-org/whity-id | Passkeys, Apple, Google | 2 |
 
 **Which lanes can run at once** (after the foundation): all of them, with these limits.
 
-- **Editor** and **People and approvals** share `src/Core/Document/Print` only through the 80 mm receipt: the A7 receipt PR goes after M6 merges, or the Editor lane writes the page size.
+- **Editor** and **Operations** meet at the 80 mm receipt: Front Office draws it, and the Editor lane adds the 80 mm page size to `src/Core/Document/Print` as a core extension point.
 - **Contacts** runs A8 before A9 (fields attach to contacts).
 - **Agent notifications** and **Emails** both send through `src/Core/Messaging`; neither changes it. Emails owns `src/Core/Mail`; agent notifications only calls it.
 - **Moments** follows each screen's own lane, or the lane adds its moments itself.
@@ -172,7 +195,7 @@ Status: **done** (built and merged), **partial** (some of it is built), **missin
 | A4 AI and agents | Done (#1564; S6) | — | — | — |
 | A5 Plugin store | Done (#1562; S7). Store moves to Whity ID | Whity ID | Store module in whity-id | — |
 | A6 Workspace, billing, settings | Done (#1563 and follow-ups; S8) | — | — | — |
-| A7 Quick wins | Missing | People and approvals | **Yes**: two-step reset, away, receipt | 3 |
+| A7 Quick wins | Missing | People and approvals (core); Operations (the receipt, paid) | **Yes**: two-step reset, away; the receipt in Front Office | 2 + 1 |
 | A8 Contacts and import | Missing | Contacts | **Yes**: contacts table, import engine, MCP tools | 3 |
 | A9 Custom fields | Missing | Contacts | **Yes**: field definitions and values | 3 |
 | A10 Tasks on Taskaat | Missing | Taskaat | **Yes**: the Taskaat link | 3, plus Taskaat's side |
