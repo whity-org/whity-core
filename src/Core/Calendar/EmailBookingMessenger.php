@@ -129,6 +129,7 @@ final class EmailBookingMessenger implements BookingMessenger
                 ctaLabel: $link !== null ? $t['cta'] : null,
                 ctaUrl: $link,
                 footnote: $link !== null ? $t['footnote'] : null,
+                language: $arabic ? 'ar' : 'en',
             ),
             EmailBranding::fromSettings($this->settings),
         );
