@@ -35,12 +35,13 @@ final class SdkBillingEmailsTest extends TestCase
     private CapturingMailer $mailer;
     private SettingsService $settings;
     private SdkBillingEmails $emails;
+    private \PDO $pdo;
     /** @var list<array{int, string}> */
     private array $asked = [];
 
     protected function setUp(): void
     {
-        $pdo = SchemaFromMigrations::make(true);
+        $this->pdo = $pdo = SchemaFromMigrations::make(true);
         $this->settings = new SettingsService(new GlobalSettingsRepository($pdo), new TenantSettingsRepository($pdo));
         $this->mailer = new CapturingMailer();
         $who = $this->createStub(WorkspaceRecipients::class);
@@ -216,6 +217,7 @@ final class SdkBillingEmailsTest extends TestCase
     {
         $plugin = self::declaring('billing-test-arabic');
         $this->settings->setGlobal(SettingsRegistry::PLUGINS_BILLING_EMAIL_SENDERS, 'billing-test-arabic');
+        $this->pdo->exec("INSERT INTO tenants (id, name, slug) VALUES (9, 'Example Bakery', 'example-bakery')");
         $this->settings->setTenant(9, SettingsRegistry::LOCALE, 'ar');
 
         self::assertSame('ar', $this->emails->language(9));
