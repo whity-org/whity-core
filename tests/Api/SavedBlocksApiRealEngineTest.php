@@ -94,7 +94,7 @@ final class SavedBlocksApiRealEngineTest extends TestCase
         self::assertSame('synced', $b['mode']);
         self::assertSame('me', $b['sharing'], 'Only me unless asked');
         self::assertSame(['kind' => 'person', 'id' => self::WRITER, 'name' => 'Amro Saleh'], $b['owner']);
-        self::assertSame($this->bank(), $b['blocks']);
+        self::assertEquals($this->bank(), $b['blocks']);
         self::assertSame(['signer'], $b['perDocumentKeys']);
         self::assertSame(1, $b['version']);
         self::assertSame(0, $b['usedIn']);
@@ -102,7 +102,7 @@ final class SavedBlocksApiRealEngineTest extends TestCase
         self::assertMatchesRegularExpression('/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/', $b['createdAt']);
 
         $v1 = $this->data($this->call('version', self::WRITER, (int) $b['id'], ['version' => '1']));
-        self::assertSame(['savedBlockId' => $b['id'], 'version' => 1, 'blocks' => $this->bank()], array_diff_key($v1, ['createdAt' => 1]));
+        self::assertEquals(['savedBlockId' => $b['id'], 'version' => 1, 'blocks' => $this->bank()], array_diff_key($v1, ['createdAt' => 1]));
         self::assertSame(1, (int) $this->q("SELECT COUNT(*) FROM audit_log WHERE action = 'documents.saved_block.created'")->fetchColumn());
     }
 
@@ -195,11 +195,11 @@ final class SavedBlocksApiRealEngineTest extends TestCase
 
         $changed = $this->data($this->patch(self::WRITER, $id, ['blocks' => $next, 'per_document_keys' => ['signer'], 'version' => 1]));
         self::assertSame(2, $changed['version']);
-        self::assertSame($next, $changed['blocks']);
+        self::assertEquals($next, $changed['blocks']);
         self::assertSame(['signer'], $changed['perDocumentKeys']);
 
-        self::assertSame($this->bank(), $this->data($this->call('version', self::WRITER, $id, ['version' => '1']))['blocks'], 'version 1 is kept (E.38)');
-        self::assertSame($next, $this->data($this->call('version', self::WRITER, $id, ['version' => '2']))['blocks']);
+        self::assertEquals($this->bank(), $this->data($this->call('version', self::WRITER, $id, ['version' => '1']))['blocks'], 'version 1 is kept (E.38)');
+        self::assertEquals($next, $this->data($this->call('version', self::WRITER, $id, ['version' => '2']))['blocks']);
         self::assertSame(404, $this->call('version', self::WRITER, $id, ['version' => '3'])->getStatusCode());
 
         $stale = $this->patch(self::WRITER, $id, ['blocks' => $this->bank(), 'version' => 1]);
@@ -255,7 +255,7 @@ final class SavedBlocksApiRealEngineTest extends TestCase
         self::assertNotNull($this->data($this->call('show', self::OWNER, $id))['archivedAt']);
         self::assertSame(409, $this->patch(self::OWNER, $id, ['name' => 'Back'])->getStatusCode(), 'a deleted block does not change');
         self::assertSame(404, $this->call('delete', self::OWNER, $id)->getStatusCode(), 'deleted already');
-        self::assertSame($this->bank(), $this->data($this->call('version', self::OWNER, $id, ['version' => '1']))['blocks'], 'its versions stay for documents that use it');
+        self::assertEquals($this->bank(), $this->data($this->call('version', self::OWNER, $id, ['version' => '1']))['blocks'], 'its versions stay for documents that use it');
         $audit = $this->q("SELECT metadata FROM audit_log WHERE action = 'documents.saved_block.archived'")->fetchColumn();
         self::assertIsString($audit);
         self::assertTrue(json_decode($audit, true)['forced'] ?? null);

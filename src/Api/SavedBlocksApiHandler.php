@@ -201,7 +201,8 @@ final class SavedBlocksApiHandler
         $id = (int) $row['id'];
         $changed = [];
         $version = (int) $row['version'];
-        if ($blocks !== null && $blocks !== $row['blocks']) {
+        // Key order doesn't count: PostgreSQL's JSONB stores objects with its own.
+        if ($blocks !== null && self::canonical($blocks) !== self::canonical($row['blocks'])) {
             $next = $this->repo->replaceBlocks($id, $tenantId, $version, $blocks, $keys);
             if ($next === null) {
                 return Response::error('Someone changed this saved block; reload it', 409, ['code' => 'changed']);
@@ -398,6 +399,20 @@ final class SavedBlocksApiHandler
     private static function mayManage(array $row, int $callerId, callable $can): bool
     {
         return $row['owner_profile_id'] === $callerId || $can(CorePermissions::DOCUMENTS_PUBLISH);
+    }
+
+    /** JSON with every object's keys sorted, so two encodings of the same blocks compare equal. */
+    private static function canonical(mixed $value): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+        $value = array_map(self::canonical(...), $value);
+        if (!array_is_list($value)) {
+            ksort($value);
+        }
+
+        return $value;
     }
 
     private static function libraryRefused(): Response

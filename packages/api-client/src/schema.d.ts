@@ -16302,7 +16302,10 @@ export interface components {
             name: string;
             /** @description At most 1000 characters */
             description?: string | null;
-            /** @enum {string} */
+            /**
+             * @description synced: editing it once updates every document that uses it; copy: inserts ordinary blocks
+             * @enum {string}
+             */
             mode: "synced" | "copy";
             /**
              * @description Left out, me. workspace needs documents:publish

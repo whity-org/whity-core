@@ -8083,7 +8083,7 @@ final class CoreApiSchemas
             'SavedBlockCreateRequest' => self::object([
                 'name' => self::str() + ['description' => 'At most 120 characters, for example Bank details'],
                 'description' => self::str(true) + ['description' => 'At most 1000 characters'],
-                'mode' => ['type' => 'string', 'enum' => ['synced', 'copy']],
+                'mode' => ['type' => 'string', 'enum' => ['synced', 'copy'], 'description' => 'synced: editing it once updates every document that uses it; copy: inserts ordinary blocks'],
                 'sharing' => ['type' => 'string', 'enum' => ['me', 'workspace'], 'description' => 'Left out, me. workspace needs documents:publish'],
                 'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The contract Block[]: 1 to 200 objects, each with a string id and type, at most 256 KiB'],
                 'per_document_keys' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Keys used by perDocument marks in the blocks; at most 200'],

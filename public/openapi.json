@@ -90789,7 +90789,8 @@
                         "enum": [
                             "synced",
                             "copy"
-                        ]
+                        ],
+                        "description": "synced: editing it once updates every document that uses it; copy: inserts ordinary blocks"
                     },
                     "sharing": {
                         "type": "string",
