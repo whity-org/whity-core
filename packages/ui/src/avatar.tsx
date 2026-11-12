@@ -1,3 +1,4 @@
+import { avatarPattern } from "./avatar-pattern"
 import { Icon } from "./icon"
 import { Mark } from "./mark"
 import { cn } from "./utils"
@@ -19,7 +20,8 @@ function initials(name: string): string {
 
 /**
  * Who did something, at a glance: people get their initials on grey (or a
- * photo), agents the robot face on the tint, and the system the Whity mark.
+ * photo, or a seeded Whity pattern, M.34), agents the robot face on the tint,
+ * and the system the Whity mark.
  * Agents never get a human face or a photo (stage 8). An optional dot shows
  * presence. The reference is docs/design/components/Avatar (`.wy-avatar`).
  */
@@ -27,6 +29,8 @@ function Avatar({
   name,
   kind = "person",
   src,
+  pattern,
+  hue,
   size = 32,
   status,
   labels,
@@ -36,6 +40,13 @@ function Avatar({
   kind?: ActorKind
   /** A photo, for people only. */
   src?: string
+  /**
+   * A stable seed (the Whity ID, or the person id): people without a photo get
+   * the seeded pattern instead of initials (M.34).
+   */
+  pattern?: string
+  /** The hue of the installation colour where the account was made (`brandHue`); Whity Blue by default. */
+  hue?: number
   size?: number
   status?: "online" | "busy" | "offline"
   /** Overrides for the accessible name suffixes, e.g. Arabic. */
@@ -64,6 +75,13 @@ function Avatar({
         <Mark size={Math.round(size * 0.62)} label="" />
       ) : src ? (
         <img src={src} alt="" className="size-full rounded-full object-cover" />
+      ) : pattern != null ? (
+        <span
+          data-slot="avatar-pattern"
+          className="block size-full overflow-hidden rounded-full [&>svg]:block [&>svg]:size-full"
+          // Built only from numbers derived from the seed (avatar-pattern.ts), never from text.
+          dangerouslySetInnerHTML={{ __html: avatarPattern(pattern, hue) }}
+        />
       ) : (
         initials(name)
       )}
