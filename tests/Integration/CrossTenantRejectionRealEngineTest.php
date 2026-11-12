@@ -2673,6 +2673,78 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         );
     }
 
+    // ==================== contacts and their imports (WHIT-953, migration 261) ====================
+
+    public function testContactsAreTenantScopedAndAForeignContactCannotBeReadChangedOrArchived(): void
+    {
+        $contacts = $this->contactService();
+        $a = $contacts->create(self::TENANT_A, ['name' => 'Example Café', 'tags' => ['Wholesale']], null);
+        $b = $contacts->create(self::TENANT_B, ['name' => 'Other Café'], null);
+
+        self::assertSame(['Example Café'], array_column($contacts->list(self::TENANT_A, [], 50, 0)['data'], 'name'));
+        self::assertSame(['Other Café'], array_column($contacts->list(self::TENANT_B, [], 50, 0)['data'], 'name'));
+
+        foreach ([
+            'read' => fn () => $contacts->show(self::TENANT_B, $a['id']),
+            'change' => fn () => $contacts->update(self::TENANT_B, $a['id'], ['name' => 'Taken']),
+            'archive' => fn () => $contacts->archive(self::TENANT_B, $a['id'], true),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} Tenant A's contact");
+            } catch (\Whity\Core\Contacts\ContactRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign contact answers 404 on {$what}");
+            }
+        }
+        $after = $contacts->show(self::TENANT_A, $a['id']);
+        self::assertSame('Example Café', $after['name']);
+        self::assertFalse($after['archived']);
+        self::assertSame(['Wholesale'], array_column($after['tags'], 'name'));
+        self::assertSame('Other Café', $contacts->show(self::TENANT_B, $b['id'])['name']);
+    }
+
+    public function testAForeignContactImportCannotBeReadRunOrUndone(): void
+    {
+        $repo = new \Whity\Core\Contacts\ContactRepository($this->pdo);
+        $imports = new \Whity\Core\Contacts\Import\ContactImportService(
+            $this->pdo,
+            $repo,
+            new \Whity\Core\Contacts\ContactTags($this->pdo),
+            new \Whity\Core\Contacts\Import\ContactImportRepository($this->pdo),
+        );
+        $import = $imports->upload(self::TENANT_A, null, 'a.csv', "Name\nExample Café\n");
+        $imports->check(self::TENANT_A, $import['id'], ['mapping' => ['0' => 'name']]);
+
+        foreach ([
+            'read' => fn () => $imports->show(self::TENANT_B, $import['id']),
+            'check' => fn () => $imports->check(self::TENANT_B, $import['id'], ['mapping' => ['0' => 'name']]),
+            'run' => fn () => $imports->run(self::TENANT_B, $import['id'], null),
+            'undo' => fn () => $imports->undo(self::TENANT_B, $import['id']),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} Tenant A's import");
+            } catch (\Whity\Core\Contacts\ContactRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign import answers 404 on {$what}");
+            }
+        }
+        self::assertSame(0, $repo->count(self::TENANT_B, []), 'nothing was imported into Tenant B');
+        self::assertSame(0, $repo->count(self::TENANT_A, []), 'Tenant A\'s import has not run');
+
+        $ran = $imports->run(self::TENANT_A, $import['id'], null);
+        self::assertSame('imported', $ran['status']);
+        self::assertSame(1, $repo->count(self::TENANT_A, []));
+        self::assertSame(0, $repo->count(self::TENANT_B, []));
+    }
+
+    private function contactService(): \Whity\Core\Contacts\ContactService
+    {
+        return new \Whity\Core\Contacts\ContactService(
+            new \Whity\Core\Contacts\ContactRepository($this->pdo),
+            new \Whity\Core\Contacts\ContactTags($this->pdo),
+        );
+    }
+
     private function invitationService(): \Whity\Core\Identity\InvitationService
     {
         return new \Whity\Core\Identity\InvitationService(

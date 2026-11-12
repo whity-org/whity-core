@@ -359,6 +359,26 @@
     "en": "Find people and agents to mention",
     "ar": "البحث عن أشخاص ووكلاء للإشارة إليهم"
   },
+  "get_api_contacts": {
+    "en": "List customers and suppliers",
+    "ar": "عرض العملاء والموردين"
+  },
+  "get_api_contacts_id": {
+    "en": "Get a customer or supplier",
+    "ar": "عرض عميل أو مورد"
+  },
+  "get_api_contacts_imports": {
+    "en": "List contact imports",
+    "ar": "عرض عمليات استيراد جهات الاتصال"
+  },
+  "get_api_contacts_imports_id": {
+    "en": "Get a contact import",
+    "ar": "عرض عملية استيراد"
+  },
+  "get_api_contacts_tags": {
+    "en": "List the tags on contacts",
+    "ar": "عرض وسوم جهات الاتصال"
+  },
   "get_api_convening_bodies": {
     "en": "List the bodies that hold meetings",
     "ar": "عرض الهيئات"
@@ -974,6 +994,10 @@
     "en": "Change a service",
     "ar": "تعديل خدمة"
   },
+  "patch_api_contacts_id": {
+    "en": "Change a customer or supplier",
+    "ar": "تعديل عميل أو مورد"
+  },
   "patch_api_convening_bodies_id": {
     "en": "Rename a body, move it, retire it or bring it back",
     "ar": "تعديل هيئة أو إيقافها أو إعادتها"
@@ -1200,6 +1224,34 @@
   "post_api_chat_chats_id_read": {
     "en": "Mark a team chat read",
     "ar": "تعليم محادثة فريق كمقروءة"
+  },
+  "post_api_contacts": {
+    "en": "Add a customer or supplier",
+    "ar": "إضافة عميل أو مورد"
+  },
+  "post_api_contacts_id_archive": {
+    "en": "Archive a customer or supplier",
+    "ar": "أرشفة عميل أو مورد"
+  },
+  "post_api_contacts_id_restore": {
+    "en": "Restore an archived contact",
+    "ar": "استعادة جهة اتصال مؤرشفة"
+  },
+  "post_api_contacts_imports": {
+    "en": "Upload a spreadsheet of contacts",
+    "ar": "رفع جدول جهات اتصال"
+  },
+  "post_api_contacts_imports_id_check": {
+    "en": "Check what an import will do",
+    "ar": "التحقق مما سيفعله الاستيراد"
+  },
+  "post_api_contacts_imports_id_run": {
+    "en": "Run a contact import",
+    "ar": "تنفيذ استيراد جهات الاتصال"
+  },
+  "post_api_contacts_imports_id_undo": {
+    "en": "Undo a contact import",
+    "ar": "التراجع عن استيراد جهات الاتصال"
   },
   "post_api_convening_bodies": {
     "en": "Set up a body that holds meetings",

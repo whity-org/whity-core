@@ -5154,6 +5154,35 @@ $router->register('POST',   '/api/calendar/events',                         [$ca
 $router->register('PATCH',  '/api/calendar/events/{id:\d+}',                [$calendarHandler, 'updateEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('DELETE', '/api/calendar/events/{id:\d+}',                [$calendarHandler, 'deleteEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
 
+// ── Contacts and import (WHIT-953, design 3.3 A8) ──────────────────────────
+// Customers and suppliers as one record, with tags on core's taxonomy and a
+// spreadsheet import that shows what it will do before anything changes and
+// can be undone for 24 hours.
+$contactRepository = new \Whity\Core\Contacts\ContactRepository($db->getPdo());
+$contactTags = new \Whity\Core\Contacts\ContactTags($db->getPdo());
+$contactService = new \Whity\Core\Contacts\ContactService($contactRepository, $contactTags);
+$contactImportService = new \Whity\Core\Contacts\Import\ContactImportService(
+    $db->getPdo(),
+    $contactRepository,
+    $contactTags,
+    new \Whity\Core\Contacts\Import\ContactImportRepository($db->getPdo()),
+);
+$contactsHandler = new \Whity\Api\ContactsApiHandler($contactService, $contactTags, $contactImportService);
+$router->register('GET',    '/api/contacts',                               [$contactsHandler, 'list'],        null, null, CorePermissions::CONTACTS_READ);
+$router->register('POST',   '/api/contacts',                               [$contactsHandler, 'create'],      null, null, CorePermissions::CONTACTS_WRITE);
+$router->register('GET',    '/api/contacts/tags',                          [$contactsHandler, 'listTags'],    null, null, CorePermissions::CONTACTS_READ);
+$router->register('GET',    '/api/contacts/{id:\d+}',                      [$contactsHandler, 'show'],        null, null, CorePermissions::CONTACTS_READ);
+$router->register('PATCH',  '/api/contacts/{id:\d+}',                      [$contactsHandler, 'update'],      null, null, CorePermissions::CONTACTS_WRITE);
+$router->register('POST',   '/api/contacts/{id:\d+}/archive',              [$contactsHandler, 'archive'],     null, null, CorePermissions::CONTACTS_WRITE);
+$router->register('POST',   '/api/contacts/{id:\d+}/restore',              [$contactsHandler, 'restore'],     null, null, CorePermissions::CONTACTS_WRITE);
+$router->register('GET',    '/api/contacts/imports',                       [$contactsHandler, 'listImports'], null, null, CorePermissions::CONTACTS_IMPORT);
+$router->register('POST',   '/api/contacts/imports',                       [$contactsHandler, 'upload'],      null, null, CorePermissions::CONTACTS_IMPORT);
+$router->register('GET',    '/api/contacts/imports/{id:\d+}',              [$contactsHandler, 'showImport'],  null, null, CorePermissions::CONTACTS_IMPORT);
+$router->register('POST',   '/api/contacts/imports/{id:\d+}/check',        [$contactsHandler, 'checkImport'], null, null, CorePermissions::CONTACTS_IMPORT);
+$router->register('POST',   '/api/contacts/imports/{id:\d+}/run',          [$contactsHandler, 'runImport'],   null, null, CorePermissions::CONTACTS_IMPORT);
+$router->register('POST',   '/api/contacts/imports/{id:\d+}/undo',         [$contactsHandler, 'undoImport'],  null, null, CorePermissions::CONTACTS_IMPORT);
+$router->register('GET',    '/api/contacts/imports/{id:\d+}/skipped.csv',  [$contactsHandler, 'skippedCsv'],  null, null, CorePermissions::CONTACTS_IMPORT);
+
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,
     $meetingRepository,
