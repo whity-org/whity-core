@@ -117,6 +117,7 @@ final class CoreApiSchemas
             self::formRoutes(),
             self::conveningRoutes(),
             self::calendarRoutes(),
+            self::taskaatRoutes(),
             self::publicBookingRoutes(),
             self::delegationRoutes(),
             self::auditRoutes(),
@@ -173,7 +174,8 @@ final class CoreApiSchemas
             self::reportRoutes(),
             self::resourceRoleGrantRoutes(),
             self::licensingRoutes(),
-            self::externalBillingRoutes()
+            self::externalBillingRoutes(),
+            ContactsApiSchemas::routes()
         ));
     }
 
@@ -4749,6 +4751,25 @@ final class CoreApiSchemas
                 ]),
             ], ['code', 'state']),
 
+            // WHIT-962 (A10): the workspace's connection to Taskaat.
+            'TaskaatConnection' => self::object([
+                'connected' => self::bool(),
+                'taskaat_url' => array_merge(self::str(), ['description' => 'Taskaat\'s web address, for "Open in Taskaat" links: /dashboard/{project-slug}?task={task-id}.']),
+                'connected_at' => self::str(),
+                'connected_by' => self::int(true),
+                'needs_reconnect' => self::bool(),
+            ], ['connected', 'taskaat_url']),
+            'TaskaatConnectionResponse' => self::object([
+                'data' => ['$ref' => '#/components/schemas/TaskaatConnection'],
+            ], ['data']),
+            'TaskaatConnectResponse' => self::object([
+                'data' => self::object(['authorize_url' => self::str()], ['authorize_url']),
+            ], ['data']),
+            'TaskaatConnectCompleteRequest' => self::object([
+                'code' => array_merge(self::str(), ['description' => 'The authorization code Taskaat sent back to /tasks/connect.']),
+                'state' => array_merge(self::str(), ['description' => 'The state Taskaat sent back with the code.']),
+            ], ['code', 'state']),
+
             // GET /api/plugins/store/catalog — a store's public catalogue entry.
             'StoreCataloguePlugin' => self::object([
                 'slug' => self::str(),
@@ -6919,6 +6940,46 @@ final class CoreApiSchemas
                     'site_key' => self::str(),
                 ]],
             ], ['workspace_name', 'max_length'])),
+            'PublicPlansResponse' => self::object([
+                'version' => self::int(),
+                'currency' => self::str(),
+                'decimals' => self::int(),
+                'updatedAt' => self::str(),
+                'plans' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::str(),
+                    'highlight' => self::bool(),
+                    'name' => SchemaBuilder::ref('PublicLocalizedText'),
+                    'tagline' => SchemaBuilder::ref('PublicLocalizedText'),
+                    'price' => self::object(['monthly' => self::str(true)], ['monthly']),
+                    'limits' => self::object([
+                        'staff' => self::int(),
+                        'customersPerMonth' => self::int(),
+                    ], []),
+                    'features' => ['type' => 'array', 'items' => SchemaBuilder::ref('PublicLocalizedText')],
+                    'cta' => self::object([
+                        'label' => SchemaBuilder::ref('PublicLocalizedText'),
+                        'href' => self::str(),
+                    ], ['label', 'href']),
+                ], ['id', 'highlight', 'name', 'price', 'limits', 'features'])],
+                'dedicatedHosting' => self::object(['fromMonthly' => self::str(true)], ['fromMonthly']),
+            ], ['version', 'currency', 'decimals', 'updatedAt', 'plans', 'dedicatedHosting']),
+            'PublicLocalizedText' => self::object([
+                'en' => self::str(),
+                'ar' => self::str(),
+            ], ['en']),
+            'PublicContactRequest' => self::object([
+                'topic' => ['type' => 'string', 'enum' => ['question', 'demo', 'partners', 'other']],
+                'name' => self::str(),
+                'company' => self::str(),
+                'contact' => self::str(),
+                'message' => self::str(),
+                'lang' => ['type' => 'string', 'enum' => ['en', 'ar']],
+                // Left empty by people. Anything here is treated as a bot.
+                'website' => self::str(),
+            ], ['name', 'contact', 'message']),
+            'PublicContactResponse' => self::dataEnvelope(self::object([
+                'received' => self::bool(),
+            ], ['received'])),
             'PublicChatStartResponse' => self::dataEnvelope(self::object([
                 'token' => self::str(),
                 'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('CustomerMessage')],
@@ -7037,6 +7098,8 @@ final class CoreApiSchemas
                 // waiting · approved · declined · expired · undone
                 'status' => ['type' => 'string', 'enum' => ['waiting', 'approved', 'declined', 'expired', 'undone']],
                 'tool' => self::str(),
+                // AQ.1: 1 Ordinary, 2 Check first, 3 Needs verifying. Only Ordinary ones can be approved together.
+                'tier' => ['type' => 'integer', 'enum' => [1, 2, 3]],
                 'summary' => self::str(),
                 'arguments' => ['type' => 'object', 'additionalProperties' => true],
                 'diff' => ['nullable' => true, 'description' => 'What would change, when the operation can preview it'],
@@ -7050,7 +7113,7 @@ final class CoreApiSchemas
                 'action' => ['allOf' => [SchemaBuilder::ref('AgentAction')], 'nullable' => true],
                 'agentPaused' => ['type' => 'boolean', 'description' => 'The agent is paused, so this can be declined but not approved until it is resumed'],
                 'toolInfo' => ['allOf' => [SchemaBuilder::ref('AgentToolInfo')], 'nullable' => true, 'description' => 'What it would run, in plain words'],
-            ], ['id', 'agent', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt', 'action']),
+            ], ['id', 'agent', 'status', 'tool', 'tier', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt', 'action']),
             'AgentProposalListResponse' => self::listEnvelope('AgentProposal'),
             // ── Agent actions and undo (WHIT-812) ─────────────────────────────
             'AgentAction' => self::object([
@@ -7101,6 +7164,14 @@ final class CoreApiSchemas
             'AgentActionListResponse' => self::listEnvelope('AgentAction'),
             'AgentActionResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentAction')),
             'AgentProposalResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentProposal')),
+            'AgentProposalBulkApproveResponse' => self::dataEnvelope(self::object([
+                'approved' => ['type' => 'array', 'items' => SchemaBuilder::ref('AgentProposal')],
+                // not_found · open_on_its_own (tier 2 or 3) · not_waiting
+                'refused' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::int(),
+                    'reason' => ['type' => 'string', 'enum' => ['not_found', 'open_on_its_own', 'not_waiting']],
+                ], ['id', 'reason'])],
+            ], ['approved', 'refused'])),
             // ── Workspace agents and presets (WHIT-815) ──────────────────────
             'AgentPersonaFields' => self::object(self::agentPersonaProperties(), []),
             'AgentCreateRequest' => self::object(self::agentPersonaProperties() + [
@@ -7139,7 +7210,8 @@ final class CoreApiSchemas
                     'kind' => self::str(true),
                     'readable' => ['type' => 'boolean', 'description' => 'False when you cannot read this document yourself, so its name is withheld'],
                 ], ['id', 'title', 'kind', 'readable'])],
-            ], ['id', 'slug', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant', 'preset', 'status', 'createdAt', 'updatedAt', 'paused', 'pausedAt', 'pausedBy', 'updatedBy', 'worksFor', 'actionsToday', 'proposalsToday', 'waiting', 'lastActiveAt', 'onItsOwn', 'mayRead']),
+                'notifyByEmail' => ['type' => 'boolean', 'description' => 'Whether the person it acts for hears by email when something waits for them (A12)'],
+            ], ['id', 'slug', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant', 'preset', 'status', 'createdAt', 'updatedAt', 'paused', 'pausedAt', 'pausedBy', 'updatedBy', 'worksFor', 'actionsToday', 'proposalsToday', 'waiting', 'lastActiveAt', 'onItsOwn', 'mayRead', 'notifyByEmail']),
             'AgentOnItsOwn' => self::object([
                 'allowed' => self::int(),
                 'askFirst' => self::int(),
@@ -9862,6 +9934,7 @@ final class CoreApiSchemas
                     'price_minor' => self::int(true),
                     'currency' => self::str(),
                     'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
+                    'sends_request' => self::bool() + ['description' => 'Booking it sends a request the business accepts first.'],
                 ], ['id', 'name', 'duration_minutes', 'price_minor', 'currency', 'staff_profile_ids'])],
                 'staff' => ['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'display_name' => self::str()], ['profile_id', 'display_name'])],
                 'bot_check' => ['type' => 'object', 'nullable' => true, 'properties' => ['provider' => self::str(), 'site_key' => self::str()]],
@@ -9883,7 +9956,8 @@ final class CoreApiSchemas
             ], ['starts_at']),
             'PublicBooking' => self::object([
                 'id' => self::int(),
-                'status' => self::str() + ['enum' => ['pending_payment', 'confirmed', 'cancelled', 'expired']],
+                'status' => self::str() + ['enum' => ['pending_payment', 'requested', 'confirmed', 'cancelled', 'expired'], 'description' => '`requested`: the customer asked for this time and staff accept it first.'],
+                'suggested' => self::bool() + ['description' => 'The business suggested this time for the request; the customer can take it.'],
                 'starts_at' => self::str(),
                 'ends_at' => self::str(),
                 'service' => self::object(['id' => self::int(true), 'name' => SchemaBuilder::ref('LocalizedLabel'), 'duration_minutes' => self::int(true)], ['id', 'name']),
@@ -9913,6 +9987,7 @@ final class CoreApiSchemas
                 'week_start' => self::str(),
                 'weekend_days' => ['type' => 'array', 'items' => self::str()],
                 'currency' => self::str(),
+                'instant_booking' => self::bool() + ['description' => 'Off: every booking from the booking page is a request.'],
             ], ['time_zone', 'booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'payment_hold_minutes', 'week_start', 'weekend_days', 'currency']),
             'CalendarSettingsRequest' => self::object([
                 'booking_page_enabled' => self::bool() + ['description' => 'Turn the public booking page on or off.'],
@@ -9923,6 +9998,7 @@ final class CoreApiSchemas
                 'payment_hold_minutes' => self::int() + ['minimum' => 1, 'maximum' => 1440, 'description' => 'How long a payment step holds a slot.'],
                 'week_start' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], 'description' => 'The first day of the week in calendar views.'],
                 'weekend_days' => ['type' => 'array', 'items' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']], 'description' => 'Days shown as the weekend.'],
+                'instant_booking' => self::bool() + ['description' => 'Off turns every booking from the booking page into a request staff accept.'],
             ], []),
             'CalendarStaff' => self::object([
                 'profile_id' => self::int(),
@@ -9930,8 +10006,34 @@ final class CoreApiSchemas
                 'bookable' => self::bool() + ['description' => 'Offered on the public booking page.'],
                 'sort_order' => self::int(),
                 'feed_enabled' => self::bool(),
+                'unit_id' => self::int(true) + ['description' => 'The branch (organisational unit) they work in.'],
             ], ['profile_id', 'display_name', 'bookable', 'sort_order', 'feed_enabled']),
+            'CalendarRoom' => self::object([
+                'id' => self::int(),
+                'name' => SchemaBuilder::ref('LocalizedLabel'),
+                'unit_id' => self::int(true) + ['description' => 'The branch (organisational unit) it is in.'],
+                'active' => self::bool(),
+                'sort_order' => self::int(),
+            ], ['id', 'name', 'unit_id', 'active', 'sort_order']),
+            'CalendarRoomRequest' => self::object([
+                'name' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],
+                'unit_id' => self::int(true) + ['description' => 'The branch it is in; null for none.'],
+                'active' => self::bool() + ['description' => 'Inactive rooms are not shown as columns.'],
+                'sort_order' => self::int() + ['minimum' => 0, 'description' => 'Position in lists; lower comes first.'],
+            ], []),
+            'CalendarToday' => self::object([
+                'date' => self::str() + ['description' => 'The local day, `YYYY-MM-DD`.'],
+                'booked' => self::int() + ['description' => 'Confirmed bookings that start that day.'],
+                'checked_in' => self::int() + ['description' => 'Of those, the customers who arrived.'],
+                'requests' => self::int() + ['description' => 'Open requests from now on, any day.'],
+                'reminders_sent' => self::int() + ['description' => 'Reminders sent that day.'],
+            ], ['date', 'booked', 'checked_in', 'requests', 'reminders_sent']),
+            'CalendarBookingSuggestRequest' => self::object([
+                'starts_at' => self::str() + ['description' => 'The time to suggest, ISO 8601 with an offset.'],
+                'profile_id' => self::int() + ['description' => 'Suggest another person. Default: the same one.'],
+            ], ['starts_at']),
             'CalendarStaffRequest' => self::object([
+                'unit_id' => self::int(true) + ['description' => 'The branch they work in; null for none.'],
                 'bookable' => self::bool() + ['description' => 'Offer this person on the public booking page.'],
                 'sort_order' => self::int() + ['description' => 'Position in lists and in "anyone" order; lower comes first.'],
             ], []),
@@ -9971,6 +10073,8 @@ final class CoreApiSchemas
                 'active' => self::bool(),
                 'sort_order' => self::int(),
                 'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
+                'room_id' => self::int(true) + ['description' => 'The room it needs; booked with the person.'],
+                'needs_approval' => self::bool() + ['description' => 'A customer\'s booking is a request staff accept first.'],
             ], ['id', 'name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_minor', 'currency', 'bookable_online', 'active', 'sort_order', 'staff_profile_ids']),
             'CalendarServiceRequest' => self::object([
                 'name' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],
@@ -9984,6 +10088,8 @@ final class CoreApiSchemas
                 'active' => self::bool() + ['description' => 'Inactive services cannot be booked.'],
                 'sort_order' => self::int() + ['minimum' => 0, 'description' => 'Position in lists; lower comes first.'],
                 'staff_profile_ids' => ['type' => 'array', 'maxItems' => 200, 'items' => self::int(), 'description' => 'The staff who provide it; the list replaces what is there.'],
+                'room_id' => self::int(true) + ['description' => 'The room it needs; null for none.'],
+                'needs_approval' => self::bool() + ['description' => 'Customers send a request instead of booking.'],
             ], []),
             'CalendarSlot' => self::object([
                 'starts_at' => self::str(),
@@ -10007,7 +10113,7 @@ final class CoreApiSchemas
                 'ends_at' => self::str(),
                 'blocks_from' => self::str() + ['description' => 'Start including the buffer before.'],
                 'blocks_until' => self::str() + ['description' => 'End including the buffer after.'],
-                'status' => self::str() + ['enum' => ['pending_payment', 'confirmed', 'cancelled', 'expired']],
+                'status' => self::str() + ['enum' => ['pending_payment', 'requested', 'confirmed', 'cancelled', 'expired'], 'description' => '`requested`: the customer asked for this time and staff accept it first.'],
                 'hold_expires_at' => self::str(true),
                 'source' => self::str() + ['enum' => ['staff', 'public', 'agent']],
                 'price_minor' => self::int(true),
@@ -10016,6 +10122,11 @@ final class CoreApiSchemas
                 'cancel_reason' => self::str(),
                 'payment_ref' => self::str(true) + ['description' => 'The reference from the payment plugin, once paid (SDK 1.98).'],
                 'created_at' => self::str(true),
+                'room_id' => self::int(true) + ['description' => 'The room it holds.'],
+                'checked_in_at' => self::str(true) + ['description' => 'When the customer arrived.'],
+                'suggested_at' => self::str(true) + ['description' => 'When staff suggested this time for a request.'],
+                'reminder_sent_at' => self::str(true),
+                'room_name' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => self::str(), 'description' => 'In lists: the room\'s name, language code => text.'],
             ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
             'CalendarBookingCreateRequest' => self::object([
                 'service_id' => self::int() + ['description' => 'The service to book.'],
@@ -11465,7 +11576,7 @@ final class CoreApiSchemas
                 'counts' => SchemaBuilder::ref('DataTypeBulkCounts'),
                 'results' => ['type' => 'array', 'items' => SchemaBuilder::ref('DataTypeBulkResult')],
             ], ['key', 'action', 'counts', 'results'])),
-        ] + self::workspacePluginComponents();
+        ] + self::workspacePluginComponents() + ContactsApiSchemas::components();
     }
 
     /**
@@ -12493,6 +12604,44 @@ final class CoreApiSchemas
                     'tags' => ['messages'],
                     'request' => 'CustomerChatRequest',
                     'responses' => [201 => self::jsonResponse('The message', 'CustomerMessageResponse')] + $notFound + $refused + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/public/plans',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The plans the website shows (public, WS.5)',
+                    'description' => 'Built from the active plans, their monthly prices and limits, plus the website.plans setting. '
+                        . 'Prices are decimal strings in normal units, or null when not set. Cached for five minutes; '
+                        . 'readable from the website origins (WHITY_SITE_ORIGINS).',
+                    'tags' => ['plans'],
+                    'responses' => [
+                        200 => self::jsonResponse('The plans', 'PublicPlansResponse'),
+                        503 => self::errorResponse('The plans could not be read'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/public/contact',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Send the website contact form (public)',
+                    'description' => 'Files the message in the inbox of the workspace named by website.contact_workspace. '
+                        . 'Limited per address. A filled website field is dropped quietly with the same answer. '
+                        . 'A form-encoded post (scripts off) is answered with a redirect back to the contact page.',
+                    'tags' => ['messages'],
+                    'request' => 'PublicContactRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The message was saved', 'PublicContactResponse'),
+                        303 => ['description' => 'Back to the contact page (form post)'],
+                        422 => self::errorResponse('A field is missing or not valid'),
+                        429 => self::errorResponse('Too many messages'),
+                        503 => self::errorResponse('The contact form is not set up'),
+                    ],
                 ],
             ],
             [
@@ -15209,6 +15358,7 @@ final class CoreApiSchemas
             'toolsets' => ['type' => 'array', 'items' => self::str(), 'description' => 'Toolset ids or prefix.*; empty means every toolset'],
             'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']], 'description' => 'Where a new assignment starts, per permission'],
             'mayRead' => ['type' => 'array', 'maxItems' => 20, 'items' => self::int(), 'description' => 'Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person\'s own access.'],
+            'notifyByEmail' => ['type' => 'boolean', 'description' => 'Email the person it acts for when something waits for them: at most one an hour, and the email only opens Whity'],
         ];
     }
 
@@ -15501,6 +15651,24 @@ final class CoreApiSchemas
                     'Nothing runs. The agent can ask again.',
                     false,
                 ), static fn (mixed $v): bool => $v !== null),
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/agent-proposals/bulk-approve',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Approve several ordinary proposals together',
+                    'description' => 'Only Ordinary (tier 1) proposals are approved; each runs, is recorded and can be undone on its own. Check first and Needs verifying ones are never approved here and come back under refused.',
+                    'tags' => ['me'],
+                    'request' => self::object([
+                        'ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 1, 'maxItems' => 50, 'description' => 'The proposals to approve.'],
+                    ], ['ids']),
+                    'responses' => [
+                        200 => self::jsonResponse('What was approved and what has to be opened on its own', 'AgentProposalBulkApproveResponse'),
+                        422 => self::errorResponse('No ids, or more than 50'),
+                    ] + self::authErrors(),
+                ],
             ],
         ];
     }
@@ -17141,6 +17309,15 @@ final class CoreApiSchemas
                     422 => self::errorResponse('Already cancelled'),
                 ] + $limits,
             ]),
+            $route('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/accept', [
+                'summary' => 'Take the time the business suggested for a request (public); the link changes and the new one is emailed',
+                'parameters' => [$token],
+                'responses' => [
+                    200 => self::jsonResponse('Booked', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                    422 => self::errorResponse('No suggested time to take'),
+                ] + $limits,
+            ]),
             $route('GET', '/api/public/bookings/{token:[a-f0-9]{64}}/ics', [
                 'summary' => 'The booking as an .ics file to add to a calendar (public)',
                 'parameters' => [$token],
@@ -17156,6 +17333,60 @@ final class CoreApiSchemas
                     200 => ['description' => 'iCalendar', 'content' => ['text/calendar' => ['schema' => ['type' => 'string']]]],
                     404 => self::errorResponse('Not found'),
                 ] + $limits,
+            ]),
+        ];
+    }
+
+    /**
+     * The workspace's connection to Taskaat (WHIT-962, A10). Not MCP tools: agents reach
+     * Taskaat through the taskaat_* tools, and connecting is a person's act.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function taskaatRoutes(): array
+    {
+        return [
+            self::permissionRoute('GET', '/api/taskaat/connection', 'tasks:read', [
+                'summary' => 'Whether this workspace is connected to Taskaat',
+                'description' => 'Tasks and boards live in the workspace\'s Taskaat (T.3). Never returns a token.',
+                'tags' => ['tasks'],
+                // Agents reach Taskaat through the taskaat_* tools; connecting is a person's act.
+                'mcp' => ['expose' => false],
+                'responses' => [200 => self::jsonResponse('The connection', 'TaskaatConnectionResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/taskaat/connect', 'tasks:manage', [
+                'summary' => 'Begin connecting this workspace to Taskaat',
+                'description' => 'People only, never an agent. Registers Whity with Taskaat (OAuth dynamic client registration, PKCE) '
+                    . 'and returns Taskaat\'s consent page to send the person to. Taskaat returns them to /tasks/connect.',
+                'tags' => ['tasks'],
+                // Agents reach Taskaat through the taskaat_* tools; connecting is a person's act.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => self::jsonResponse('Where to sign in', 'TaskaatConnectResponse'),
+                    502 => self::errorResponse('Taskaat could not be reached'),
+                    503 => self::errorResponse('Whity does not know its own web address (FRONTEND_URL)'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/taskaat/connect/complete', 'tasks:manage', [
+                'summary' => 'Finish connecting with the code Taskaat sent back',
+                'description' => 'Single use, by the person who started it. The tokens are kept encrypted and never returned.',
+                'tags' => ['tasks'],
+                // Agents reach Taskaat through the taskaat_* tools; connecting is a person's act.
+                'mcp' => ['expose' => false],
+                'request' => 'TaskaatConnectCompleteRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The connection', 'TaskaatConnectionResponse'),
+                    422 => self::errorResponse('Expired, not started here, or refused by Taskaat'),
+                    502 => self::errorResponse('Taskaat could not be reached'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/taskaat/connection', 'tasks:manage', [
+                'summary' => 'Disconnect this workspace from Taskaat',
+                'description' => 'Forgets the tokens. To revoke them in Taskaat too, remove Whity from Taskaat\'s connected apps.',
+                'tags' => ['tasks'],
+                // Agents reach Taskaat through the taskaat_* tools; connecting is a person's act.
+                'mcp' => ['expose' => false],
+                'responses' => [200 => self::jsonResponse('The connection', 'TaskaatConnectionResponse')] + self::authErrors(),
             ]),
         ];
     }
@@ -17312,7 +17543,7 @@ final class CoreApiSchemas
             self::permissionRoute('GET', '/api/calendar/bookings', 'calendar:read', [
                 'summary' => 'List bookings in a range',
                 'tags' => ['calendar'],
-                'parameters' => array_merge($range, [$person, self::queryParam('status', 'string', 'Comma-separated statuses. Default: `confirmed,pending_payment`.')]),
+                'parameters' => array_merge($range, [$person, self::queryParam('status', 'string', 'Comma-separated statuses. Default: `confirmed,pending_payment,requested`.'), self::queryParam('unit_id', 'integer', 'Only this branch: bookings whose person or room is in it.')]),
                 'responses' => [200 => self::jsonResponse('Bookings', self::listEnvelope('CalendarBooking'))] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/calendar/bookings', 'calendar:write', [
@@ -17355,6 +17586,78 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
                     404 => self::errorResponse('Not found'),
                     422 => self::errorResponse('Already cancelled'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/accept', 'calendar:write', [
+                'summary' => 'Accept a customer\'s request; it becomes a confirmed booking',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Not a request'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/suggest', 'calendar:write', [
+                'summary' => 'Suggest another time for a customer\'s request',
+                'description' => 'The request moves to the new time and stays a request; the customer is emailed and takes it from their link.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarBookingSuggestRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('That time was just taken'),
+                    422 => self::errorResponse('Not a request'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/check-in', 'calendar:write', [
+                'summary' => 'Check the customer in: they arrived',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Not a confirmed booking'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/calendar/bookings/{id:\d+}/check-in', 'calendar:write', [
+                'summary' => 'Undo a check-in',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Not a confirmed booking'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/today', 'calendar:read', [
+                'summary' => 'Today at a glance: booked, checked in, open requests and reminders sent',
+                'tags' => ['calendar'],
+                'parameters' => [
+                    self::queryParam('date', 'string', 'A local day, `YYYY-MM-DD`. Default: today.'),
+                    self::queryParam('unit_id', 'integer', 'Only this branch.'),
+                ],
+                'responses' => [200 => self::jsonResponse('Today', self::dataEnvelope(SchemaBuilder::ref('CalendarToday')))] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/rooms', 'calendar:read', [
+                'summary' => 'List rooms',
+                'tags' => ['calendar'],
+                'responses' => [200 => self::jsonResponse('Rooms', self::listEnvelope('CalendarRoom'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/rooms', 'calendar:manage', [
+                'summary' => 'Add a room a service can need',
+                'tags' => ['calendar'],
+                'request' => 'CalendarRoomRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The room', self::dataEnvelope(SchemaBuilder::ref('CalendarRoom'))),
+                    404 => self::errorResponse('No such branch'),
+                    422 => self::errorResponse('A missing name'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/calendar/rooms/{id:\d+}', 'calendar:manage', [
+                'summary' => 'Change a room; fields left out keep their value',
+                'tags' => ['calendar'],
+                'request' => 'CalendarRoomRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The room', self::dataEnvelope(SchemaBuilder::ref('CalendarRoom'))),
+                    404 => self::errorResponse('Not found'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/calendar/events', 'calendar:read', [

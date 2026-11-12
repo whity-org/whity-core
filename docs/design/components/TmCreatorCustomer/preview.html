@@ -1,0 +1,43 @@
+<!-- @dsCard group="Mobile" height=954 width=1880 subtitle="M.30, M.31, M.32: creating a workspace, a customer joining in one tap, and approving a sign-in by number" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Mobile creators and customers</title><style>html,body{height:100%;margin:0} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 22 }); }
+  var T0 = { home: 'Home', inbox: 'Inbox', create: 'Create', agents: 'Chat', agentsIcon: 'comment', more: 'More' };
+  function status() { return h('div', { className: 'wm-status', 'aria-hidden': 'true' }, h('span', null, '9:41'), h('i'), h('span', null, I('wifi', 16), I('battery', 18))); }
+  function tabbar(active, T, badges) { T = T || T0; badges = badges || { inbox: 3 };
+    function tab(k, icon) { return h('div', { key: k, className: 'wm-tab' + (active === k ? ' is-on' : '') }, I(icon, 24), T[k], badges[k] ? h('b', null, badges[k]) : null); }
+    return h('nav', { className: 'wm-tabbar', 'aria-label': 'Main' }, tab('home', 'dashboard'), tab('inbox', 'inbox'), h('button', { key: 'c', className: 'wm-create', 'aria-label': T.create }, I('plus', 28)), tab('agents', T.agentsIcon || 'robot'), tab('more', 'menu')); }
+  function bottom(o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.tabs === false ? null : tabbar(o.active, o.T, o.badges), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function phone(label, kids, o) { o = o || {}; return h('div', { className: 'wm-col' }, h('div', { className: 'wm-label' }, label), h('div', { className: 'wm-phone', dir: o.dir }, status(), kids, o.overlay || null)); }
+  function search(t, f) { return h('div', { className: 'wm-search' }, I('search', 20), h('span', null, t), f ? h('button', { type: 'button' }, I('filter', 16), f) : null); }
+  function stage(blue, tag, kids, keys) { var LOT = { 'YOUR BRAND, OUR PLATFORM': ['brand-sheet-platform', 'view'], 'AGENTS PROPOSE': ['agents-propose', 'view'], 'YOU DECIDE': ['approve-set-down', 'view'], 'IN THE APP': ['approve-set-down', 'view'], 'UPDATING · LOOPS': ['updating', 'loop'], 'ALL CAUGHT UP': ['all-caught-up', 'view'] }; var l = LOT[tag]; if (!l) return h('div', { className: 'wm-lottie' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, 'LOTTIE · ' + tag), kids, keys ? h('div', { className: 'wm-keys' }, keys.map(function (k, i) { return h('span', { key: i }, k); })) : null); return h('div', { className: 'wm-lottie has-file' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, l[0] + '.json'), h('div', { className: 'w-lottie', 'data-lottie': 'lottie/' + l[0] + '.json', 'data-play': l[1] }, h('div', { className: 'w-lottie__fallback' }, kids))); }
+  function at(cls, x, y, extra) { return h('div', { className: cls, style: Object.assign({ left: x, top: y }, extra || {}) }); }
+  function dots(n, on) { var a = []; for (var i = 0; i < n; i++) a.push(h('i', { key: i, className: i === on ? 'is-on' : '' })); return h('div', { className: 'wm-dots' }, a); }
+  function foot(kids) { return h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-form', style: { borderTop: 0 } }, kids), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function q(title, sub, step, of) { return h(F, null, h('div', { className: 'wm-progress', 'aria-hidden': 'true' }, h('i', { style: { width: Math.round(step / of * 100) + '%' } })), h('div', { className: 'wm-q' }, h('h1', null, title), sub ? h('p', null, sub) : null)); }
+  function choice(t, sub, on, icon) { return h('div', { className: 'wm-choice' + (on ? ' is-on' : '') }, icon ? I(icon, 24) : null, h('span', null, t, sub ? h('small', null, sub) : null), h('i', { className: 'wm-radio' })); }
+  function navbar(t) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), h('span')); }
+
+  var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  var inst = h(F, null, navbar(), q('Where should it live?', 'Your workspace runs on a Whity installation.', 1, 4),
+    h('div', { className: 'wm-pad', style: { paddingTop: 12 } }, choice('Whity', 'app.whity.dev · free trial, plans in JOD', true, 'world'), choice('Another installation', 'A company that runs Whity for its customers', false, 'link'), h(W.Input, { label: 'Installation address', placeholder: 'office.example.jo', dir: 'ltr', disabled: true })),
+    h('div', { style: { flex: 1 } }), foot(h(W.Button, null, 'Continue')));
+  var brand = h(F, null, navbar(), q('Make it yours', 'You can change all of this later.', 2, 4),
+    h('div', { className: 'wm-pad', style: { paddingTop: 12 } }, h(W.Input, { label: 'Company name', defaultValue: 'Example Bakery' }), h('div', { className: 'wm-logo-pick' }, h('span', null, 'E'), h(W.Button, { variant: 'outline', icon: 'camera' }, 'Take or choose a logo')),
+      h('div', { className: 'wm-cap' }, h('b', null, 'Main colour')), h('div', { className: 'wm-colors' }, ['#0961bb', '#b74c05', '#1a7f5a', '#9d2398', '#3a3a3a'].map(function (c, i) { return h('i', { key: c, className: i === 1 ? 'is-on' : '', style: { background: c } }); }))),
+    h('div', { style: { height: 12 } }), h('div', { className: 'wm-preview', style: W.tenantTheme('#b74c05', dark ? 'dark' : 'light') }, h('span', { className: 'wm-preview__tag' }, 'YOUR APP, LIVE'), h('div', { style: { display: 'flex', gap: 10, alignItems: 'center' } }, h(W.TenantLogo, { name: 'Example Bakery', size: 28 })), h(W.Button, null, 'Approve')),
+    h('div', { style: { flex: 1 } }), foot(h(W.Button, null, 'Continue')));
+  var customer = h('div', { style: Object.assign({ display: 'contents' }, W.tenantTheme('#b74c05', dark ? 'dark' : 'light')) }, h('div', { className: 'wm-hero', style: { flex: 'none', paddingTop: 48 } }, h('span', { className: 'wm-ws__logo', style: { background: 'var(--primary)', width: 72, height: 72, borderRadius: 20, fontSize: 30 } }, 'E'), h('h1', null, 'Example Bakery orders'), h('p', null, 'Order trays for your office or event, and track them to your door.')),
+    h('div', { style: { flex: 1 } }), h('div', { className: 'wm-pad', style: { paddingBottom: 12 } }, h('div', { className: 'wm-sso is-dark' }, I('apple', 22), 'Continue with Apple'), h('div', { className: 'wm-sso' }, I('google', 20), 'Continue with Google'), h('div', { className: 'wm-alt' }, h('span', null, 'Use email instead')), h('div', { className: 'wm-cap', style: { textAlign: 'center' } }, 'Creates your Whity ID and joins Example Bakery. Built on Whity.')), h('div', { className: 'wm-home-ind' }, h('i')));
+  var approve = h(F, null, h('div', { className: 'wm-body', style: { justifyContent: 'center' } }), h('div', { className: 'wm-scrim' }),
+    h('div', { className: 'wm-sheet', role: 'dialog', 'aria-label': 'Sign-in request' }, h('div', { className: 'wm-grab' }), h('div', { className: 'wm-verify' }, h('span', { className: 'wm-verify__ic' }, I('two-step', 32)), h('h2', null, 'Is this you signing in?'), h('p', null, 'Chrome on a Mac · Amman, Jordan · just now'), h('p', null, 'Tap the number shown on that screen.'),
+      h('div', { className: 'wm-nums' }, h('span', null, '17'), h('span', null, '42'), h('span', null, '08'))), h(W.Button, { variant: 'outline' }, 'No, it wasn’t me'), h('div', { className: 'wm-home-ind' }, h('i'))));
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wm-row' }, phone('Creator · choose the installation', inst), phone('Creator · name, logo, colour', brand), phone('Customer · from a QR, one tap', customer), phone('Approving a sign-in elsewhere', approve)));
+</script>
+</body>
+</html>

@@ -90,10 +90,13 @@ async function proxyRequest(request: Request, method: string): Promise<Response>
     // the browser navigates itself. Scoped to the SSO routes to leave every other
     // proxied call's behaviour unchanged.
     const isSsoRedirectRoute = /(^|\/)auth\/sso\//.test(pathWithoutApi);
+    // The website's contact form posted with scripts off is answered with a 303
+    // back to whity.dev (section 29); the browser has to follow it, not us.
+    const isWebsiteFormRedirect = /^(v1\/)?public\/contact$/.test(pathWithoutApi);
     const options: RequestInit & { duplex?: string } = {
       method,
       headers,
-      redirect: isSsoRedirectRoute ? 'manual' : 'follow',
+      redirect: isSsoRedirectRoute || isWebsiteFormRedirect ? 'manual' : 'follow',
     };
 
     if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {

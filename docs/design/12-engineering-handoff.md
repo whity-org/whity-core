@@ -1,4 +1,4 @@
-# Engineering handoff (v2.9)
+# Engineering handoff
 
 Everything a web or Flutter team, or a coding agent, needs to build Whity screens and bring whity-core in line with the brand. `tokens.json` is the source of truth for this system; if this page and `tokens.json` ever differ, `tokens.json` wins. Every value traces back to `00-decision-register.md`.
 
@@ -16,9 +16,10 @@ Everything a web or Flutter team, or a coding agent, needs to build Whity screen
 | `handoff/editor/whity-document.ts`, `README.md` | web | The document editor's contract (document model, blocks, marks, comments, suggestions, plugin block registry, saved blocks, props, publish checks) and its TipTap/ProseMirror mapping (section 18) |
 | `handoff/flutter/lib/whity_brand.dart` | Flutter | `WhityBrand` ThemeExtension: plane, plane deep, mark sheet, blueprint, plane shadows, logo sizes, durations. Use beside `whity_tokens` |
 | `handoff/flutter/pubspec_fonts.yaml` | Flutter | Font entries |
-| `handoff/icons/ink/*.svg`, `paper/*.svg`, `icons.json` | all | The 116 icons for light and dark grounds, their Tabler names and which mirror |
+| `handoff/icons/ink/*.svg`, `paper/*.svg`, `icons.json` | all | The 156 icons for light and dark grounds, their Tabler names and which mirror |
 | `handoff/logos/` | all | Every cut and colourway (SVG), the lockups, the app icon, `favicon.svg` and `favicon.ico`, PNG exports, Built on Whity |
-| `handoff/motion/approve-set-down.json` | all | The set-down transition (200 ms) |
+| `handoff/motion/*.json`, `README.md` | all | The 31 Lottie files (LT.1–LT.4): brand stories, website spots, and the app's moments (empty, done, first run, waiting, errors), with the web player and Flutter code |
+| `handoff/emails/*.html`, `README.md` | server | The 15 emails in English and Arabic (EM.1), with placeholders |
 
 ## Web (Next.js, Tailwind v4, shadcn)
 
@@ -76,4 +77,4 @@ Add `whity_brand.dart` next to `whity_tokens`, register `WhityBrand.light` / `.d
 
 ## Agent brief
 
-When you build a Whity screen: read `README.md` first; use the tokens, never raw colours; Noto Sans at 15px, never below 13px, never 700; plain words, with codes only behind Show technical details; common actions as labelled buttons; one filled main button per view, and the plane only under it, approved agent work and hovered clickable cards; controls 40px with ¼ corners; cards bordered, floating layers with `shadow-float`; Tabler icons by the names in `icons.json`; every agent action attributed with `ActorChip` and either allowed by its scope or shown as an `ActionProposal`; Undo instead of "Are you sure?" where it can be undone; Western digits and JOD to 3 decimals; the name always "Whity" in Latin letters; fictional names or placeholders for companies, plans and prices.
+When you build a Whity screen: read `README.md` first; use the tokens, never raw colours; Noto Sans at 15px, never below 13px, never 700; plain words, with codes only behind Show technical details; common actions as labelled buttons; one filled main button per view, and the plane only under it, approved agent work and hovered clickable cards; controls 40px with ¼ corners; cards bordered, floating layers with `shadow-float`; Tabler icons by the names in `icons.json`; every agent action attributed with `ActorChip` and either allowed by its scope or shown as an `ActionProposal`; Undo instead of "Are you sure?" where it can be undone; Western digits, and money to its currency's own decimals (JOD has 3); the name always "Whity" in Latin letters; fictional names or placeholders for companies, plans and prices.

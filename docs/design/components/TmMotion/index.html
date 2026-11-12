@@ -1,0 +1,183 @@
+<!-- @dsCard group="Mobile" height=954 width=1880 subtitle="M.20, M.21, M.24: destructive swipes feel heavy; tier-3 cards feel stuck and ask for verification; approving sets work down" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1880px;min-height:954px}</style><meta charset="utf-8"><title>Mobile motion and resistance</title><style>html,body{height:100%;margin:0} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 22 }); }
+  var T0 = { home: 'Home', inbox: 'Inbox', create: 'Create', agents: 'Chat', agentsIcon: 'comment', more: 'More' };
+  function status() { return h('div', { className: 'wm-status', 'aria-hidden': 'true' }, h('span', null, '9:41'), h('i'), h('span', null, I('wifi', 16), I('battery', 18))); }
+  function tabbar(active, T, badges) { T = T || T0; badges = badges || { inbox: 3 };
+    function tab(k, icon) { return h('div', { key: k, className: 'wm-tab' + (active === k ? ' is-on' : '') }, I(icon, 24), T[k], badges[k] ? h('b', null, badges[k]) : null); }
+    return h('nav', { className: 'wm-tabbar', 'aria-label': 'Main' }, tab('home', 'dashboard'), tab('inbox', 'inbox'), h('button', { key: 'c', className: 'wm-create', 'aria-label': T.create }, I('plus', 28)), tab('agents', T.agentsIcon || 'robot'), tab('more', 'menu')); }
+  function bottom(o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.tabs === false ? null : tabbar(o.active, o.T, o.badges), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function phone(label, kids, o) { o = o || {}; return h('div', { className: 'wm-col' }, h('div', { className: 'wm-label' }, label), h('div', { className: 'wm-phone', dir: o.dir }, status(), kids, o.overlay || null)); }
+  function search(t, f) { return h('div', { className: 'wm-search' }, I('search', 20), h('span', null, t), f ? h('button', { type: 'button' }, I('filter', 16), f) : null); }
+  function stage(blue, tag, kids, keys) { var LOT = { 'YOUR BRAND, OUR PLATFORM': ['brand-sheet-platform', 'view'], 'AGENTS PROPOSE': ['agents-propose', 'view'], 'YOU DECIDE': ['approve-set-down', 'view'], 'IN THE APP': ['approve-set-down', 'view'], 'UPDATING · LOOPS': ['updating', 'loop'], 'ALL CAUGHT UP': ['all-caught-up', 'view'] }; var l = LOT[tag]; if (!l) return h('div', { className: 'wm-lottie' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, 'LOTTIE · ' + tag), kids, keys ? h('div', { className: 'wm-keys' }, keys.map(function (k, i) { return h('span', { key: i }, k); })) : null); return h('div', { className: 'wm-lottie has-file' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, l[0] + '.json'), h('div', { className: 'w-lottie', 'data-lottie': 'lottie/' + l[0] + '.json', 'data-play': l[1] }, h('div', { className: 'w-lottie__fallback' }, kids))); }
+  function at(cls, x, y, extra) { return h('div', { className: cls, style: Object.assign({ left: x, top: y }, extra || {}) }); }
+  function dots(n, on) { var a = []; for (var i = 0; i < n; i++) a.push(h('i', { key: i, className: i === on ? 'is-on' : '' })); return h('div', { className: 'wm-dots' }, a); }
+  function foot(kids) { return h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-form', style: { borderTop: 0 } }, kids), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function q(title, sub, step, of) { return h(F, null, h('div', { className: 'wm-progress', 'aria-hidden': 'true' }, h('i', { style: { width: Math.round(step / of * 100) + '%' } })), h('div', { className: 'wm-q' }, h('h1', null, title), sub ? h('p', null, sub) : null)); }
+  function choice(t, sub, on, icon) { return h('div', { className: 'wm-choice' + (on ? ' is-on' : '') }, icon ? I(icon, 24) : null, h('span', null, t, sub ? h('small', null, sub) : null), h('i', { className: 'wm-radio' })); }
+  function navbar(t) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), h('span')); }
+
+  function srow(off, label, cap) { return h('div', { style: { display: 'grid', gap: 6 } }, h('div', { className: 'wm-swipe' }, h('div', { className: 'wm-swipe__under' }, I('delete', 20), label), h('div', { className: 'wm-swipe__row', style: { transform: 'translateX(' + (-off) + 'px)' } }, h('span', { className: 'wm-li__ic' }, I('page', 20)), h('b', null, 'Ideas for Ramadan boxes'), h('span', { className: 'wm-li__end' }, 'Note'))), h('div', { className: 'wm-cap' }, cap)); }
+  var destr = h(F, null, h('div', { className: 'wm-head' }, h('h1', null, 'Heavy to delete'), h('p', null, 'One swipe, three moments')),
+    h('div', { className: 'wm-body' }, srow(40, '', h(F, null, h('b', null, 'Thumb moves 120, row moves 40.'), ' Resistance tells you this one matters.')), srow(250, 'Delete', h(F, null, h('b', null, '70%: firm haptic tick.'), ' The red fills; past here, letting go deletes.')), srow(0, '', h(F, null, h('b', null, 'Let go early:'), ' it springs back, no harm done.')),
+      h('div', { className: 'wm-meter' }, h('div', { className: 'is-hit' }), h('div', { className: 'is-hit' }), h('div'), h('span', null, '0'), h('span', { style: { textAlign: 'center' } }, '70% no return'), h('span', { style: { textAlign: 'end' } }, '100%'))),
+    h('div', { className: 'wm-bottom' }, h('div', { style: { padding: '0 16px 12px' } }, h(W.Toast, { variant: 'success', title: 'Note deleted', action: { label: 'Undo', icon: 'undo' }, duration: 10000, paused: true, elapsed: 2000 })), tabbar('home'), h('div', { className: 'wm-home-ind' }, h('i'))));
+  function t3card() { return h('div', { className: 'wm-deck wm-stuck' }, h('span', { className: 'wm-stuck__lock', 'aria-hidden': 'true' }, I('lock', 18)), h('article', { className: 'wm-dcard is-doc' },
+    h('div', { className: 'wm-dcard__top' }, h(W.Avatar, { name: 'Ibrahim Mansour', size: 24 }), h('span', null, 'Ibrahim Mansour'), h('span', null, '08:12')), h('h3', null, 'Clear Ibrahim’s two-step sign-in'), h('div', { className: 'wm-dcard__why' }, 'He lost his phone and recovery codes. Approving lets his password alone sign him in until he sets it up again.'),
+    h('div', { className: 'wm-dcard__btns' }, h(W.Button, { variant: 'outline' }, 'Reject'), h(W.Button, { icon: 'lock' }, 'Verify to approve')))); }
+  var stuck = h(F, null, h('div', { className: 'wm-head' }, h('h1', null, 'Stuck on purpose'), h('p', null, 'A swipe on a tier-3 card')), h('div', { className: 'wm-body' }, t3card(),
+    h('div', { className: 'wm-cap' }, h('b', null, 'The card moves 10px at most,'), ' tilts a little, shudders twice and settles back, with two short buzzes. Then the verification sheet rises.')), bottom({ active: 'home' }));
+  var verify = h(F, null, h('div', { className: 'wm-head' }, h('h1', null, 'Stuck on purpose')), h('div', { className: 'wm-body' }, t3card()), h('div', { className: 'wm-scrim' }),
+    h('div', { className: 'wm-sheet', role: 'dialog', 'aria-label': 'Verification needed' }, h('div', { className: 'wm-grab' }), h('div', { className: 'wm-verify' }, h('span', { className: 'wm-verify__ic' }, I('two-step', 32)), h('h2', null, 'This needs you to verify'), h('p', null, 'Clearing someone’s two-step can’t be swiped. Confirm it’s you, then check the details before approving.')), h(W.Button, { icon: 'two-step' }, 'Verify with Face ID'), h(W.Button, { variant: 'ghost' }, 'Not now'), h('div', { className: 'wm-home-ind' }, h('i'))));
+  var setdown = h(F, null, h('div', { className: 'wm-head' }, h('h1', null, 'Approve sets it down')), h('div', { className: 'wm-body' },
+    stage(false, 'IN THE APP', h(F, null, at('wm-ghost', 110, 40, { borderColor: 'var(--input)' }), at('wm-sheetx is-loose on-grey', 150, 36, { transform: 'rotate(-5deg)', opacity: .5 }), at('wm-plat', 120, 120), at('wm-sheetx', 108, 108, { boxShadow: '-10px 10px 0 0 oklch(0.3 0.1 255)', border: '1px solid var(--border)' })), ['0 ms tap', '200 ms sets down', '400 ms solid + Undo']),
+    h('div', { className: 'wm-cap' }, h('b', null, 'The story’s motion, for real.'), ' When you approve, the dashed card drops onto its plane and turns solid; the next card slides up from below. Reduce motion: a cross-fade and one haptic.')), bottom({ active: 'home' }));
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wm-row' }, phone('Destructive swipe', destr), phone('Tier 3: it won’t move', stuck), phone('Tier 3: then it asks', verify), phone('Approve: set down', setdown)));
+</script>
+<!-- whity-lottie --><script>window.WHITY_LOTTIE={"lottie/approve-set-down.json":{"v":"5.7.4","fr":60,"ip":0,"op":73,"w":480,"h":320,"nm":"approve-set-down","ddd":0,"assets":[],"layers":[{"ddd":0,"ind":1,"ty":4,"nm":"done","sr":1,"ks":{"o":{"a":1,"k":[{"t":33,"s":[0],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":36,"s":[100]}]},"r":{"a":0,"k":0},"p":{"a":0,"k":[401.0,66.0,0]},"a":{"a":0,"k":[0,0,0]},"s":{"a":1,"k":[{"t":34,"s":[0,0,100],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":46,"s":[112,112,100],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":54,"s":[100,100,100]}]}},"ao":0,"shapes":[{"ty":"gr","nm":"tick","it":[{"ty":"sh","nm":"path","ks":{"a":0,"k":{"i":[[0,0],[0,0],[0,0]],"o":[[0,0],[0,0],[0,0]],"v":[[-9.9,0],[-2.6399999999999997,7.04],[10.559999999999999,-6.6]],"c":false}}},{"ty":"tm","nm":"trim","s":{"a":0,"k":0},"e":{"a":1,"k":[{"t":40,"s":[0],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":56,"s":[100]}]},"o":{"a":0,"k":0},"m":1},{"ty":"st","nm":"c:onprimary","c":{"a":0,"k":[1,1,1,1]},"o":{"a":0,"k":100},"w":{"a":0,"k":4},"lc":2,"lj":2,"ml":4},{"ty":"tr","nm":"transform","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]},{"ty":"gr","nm":"badge","it":[{"ty":"el","nm":"ellipse","d":1,"p":{"a":0,"k":[0,0]},"s":{"a":0,"k":[46,46]}},{"ty":"fl","nm":"c:ok","c":{"a":0,"k":[0.0392,0.4941,0.2275,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","nm":"transform","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]}],"ip":0,"op":73,"st":0,"bm":0},{"ddd":0,"ind":2,"ty":4,"nm":"content","sr":1,"ks":{"o":{"a":0,"k":100},"r":{"a":0,"k":0},"p":{"a":0,"k":[0,0,0]},"a":{"a":0,"k":[0,0,0]},"s":{"a":0,"k":[100,100,100]}},"ao":0,"shapes":[{"ty":"gr","nm":"robot","it":[{"ty":"gr","nm":"eyes","it":[{"ty":"el","nm":"ellipse","d":1,"p":{"a":0,"k":[-4.32,0]},"s":{"a":0,"k":[3.84,3.84]}},{"ty":"el","nm":"ellipse","d":1,"p":{"a":0,"k":[4.32,0]},"s":{"a":0,"k":[3.84,3.84]}},{"ty":"fl","nm":"c:primary","c":{"a":0,"k":[0.0338,0.3817,0.734,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","nm":"transform","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]},{"ty":"rc","nm":"rect","d":1,"p":{"a":0,"k":[0,0]},"s":{"a":0,"k":[24,24]},"r":{"a":0,"k":7.199999999999999}},{"ty":"fl","nm":"c:tint","c":{"a":0,"k":[0.9216,0.9529,0.9882,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","nm":"transform","p":{"a":0,"k":[-136.0,-61.0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]},{"ty":"gr","nm":"bar","it":[{"ty":"rc","nm":"rect","d":1,"p":{"a":0,"k":[-50.0,-61.0]},"s":{"a":0,"k":[110,8]},"r":{"a":0,"k":4.0}},{"ty":"fl","nm":"c:soft","c":{"a":0,"k":[0.4109,0.4109,0.4109,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","nm":"transform","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]},{"ty":"gr","nm":"bar","it":[{"ty":"rc","nm":"rect","d":1,"p":{"a":0,"k":[-20,-18]},"s":{"a":0,"k":[260,14]},"r":{"a":0,"k":7.0}},{"ty":"fl","nm":"c:ink","c":{"a":0,"k":[0.0394,0.0394,0.0394,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","nm":"transform","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]},{"ty":"gr","nm":"bar","it":[{"ty":"rc","nm":"rect","d":1,"p":{"a":0,"k":[-60,14]},"s":{"a":0,"k":[180,12]},"r":{"a":0,"k":6.0}},{"ty":"fl","nm":"c:ink","c":{"a":0,"k":[0.0394,0.0394,0.0394,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","nm":"transform","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]}],"ip":0,"op":73,"st":0,"bm":0,"parent":4},{"ddd":0,"ind":3,"ty":4,"nm":"buttons","sr":1,"ks":{"o":{"a":1,"k":[{"t":15,"s":[100],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":24,"s":[0]}]},"r":{"a":0,"k":0},"p":{"a":0,"k":[0,0,0]},"a":{"a":0,"k":[0,0,0]},"s":{"a":0,"k":[100,100,100]}},"ao":0,"shapes":[{"ty":"gr","nm":"decline","it":[{"ty":"gr","nm":"t","it":[{"ty":"rc","nm":"rect","d":1,"p":{"a":0,"k":[0,0]},"s":{"a":0,"k":[40,6]},"r":{"a":0,"k":3}},{"ty":"fl","nm":"c:soft","c":{"a":0,"k":[0.4109,0.4109,0.4109,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","nm":"transform","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]},{"ty":"rc","nm":"rect","d":1,"p":{"a":0,"k":[0,0]},"s":{"a":0,"k":[92,34]},"r":{"a":0,"k":17}},{"ty":"st","nm":"c:line","c":{"a":0,"k":[0.8982,0.8982,0.8982,1]},"o":{"a":0,"k":100},"w":{"a":0,"k":1.5},"lc":2,"lj":2,"ml":4},{"ty":"fl","nm":"c:card","c":{"a":0,"k":[1,1,1,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","nm":"transform","p":{"a":0,"k":[12.0,59.0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]},{"ty":"gr","nm":"approve","it":[{"ty":"gr","nm":"t","it":[{"ty":"rc","nm":"rect","d":1,"p":{"a":0,"k":[0,0]},"s":{"a":0,"k":[44,6]},"r":{"a":0,"k":3}},{"ty":"fl","nm":"c:onprimary","c":{"a":0,"k":[1,1,1,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","nm":"transform","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]},{"ty":"rc","nm":"rect","d":1,"p":{"a":0,"k":[0,0]},"s":{"a":0,"k":[92,34]},"r":{"a":0,"k":17}},{"ty":"fl","nm":"c:primary","c":{"a":0,"k":[0.0338,0.3817,0.734,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","nm":"transform","p":{"a":0,"k":[112.0,59.0]},"a":{"a":0,"k":[0,0]},"s":{"a":1,"k":[{"t":2,"s":[100,100],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":7,"s":[90,90],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":13,"s":[100,100]}]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]}],"ip":0,"op":73,"st":0,"bm":0,"parent":4},{"ddd":0,"ind":4,"ty":4,"nm":"card","sr":1,"ks":{"o":{"a":0,"k":100},"r":{"a":0,"k":0},"p":{"a":1,"k":[{"t":0,"s":[240,160],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":10,"s":[240,160],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":17,"s":[240,152],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":30,"s":[247,153]}]},"a":{"a":0,"k":[0,0,0]},"s":{"a":1,"k":[{"t":0,"s":[100,100,100],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":10,"s":[100,100,100],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":17,"s":[102,102,100],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":28,"s":[100,100,100]}]}},"ao":0,"shapes":[{"ty":"gr","nm":"dashed","it":[{"ty":"rc","nm":"rect","d":1,"p":{"a":0,"k":[0,0]},"s":{"a":0,"k":[340,190]},"r":{"a":0,"k":16}},{"ty":"st","nm":"c:primary","c":{"a":0,"k":[0.0338,0.3817,0.734,1]},"o":{"a":1,"k":[{"t":16,"s":[70],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":24,"s":[0]}]},"w":{"a":0,"k":2},"lc":2,"lj":2,"ml":4,"d":[{"n":"d","nm":"dash","v":{"a":0,"k":8}},{"n":"g","nm":"gap","v":{"a":0,"k":6}},{"n":"o","nm":"offset","v":{"a":0,"k":0}}]},{"ty":"tr","nm":"transform","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]},{"ty":"gr","nm":"solid","it":[{"ty":"rc","nm":"rect","d":1,"p":{"a":0,"k":[0,0]},"s":{"a":0,"k":[340,190]},"r":{"a":0,"k":16}},{"ty":"st","nm":"c:primary","c":{"a":0,"k":[0.0338,0.3817,0.734,1]},"o":{"a":1,"k":[{"t":16,"s":[0],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":24,"s":[100]}]},"w":{"a":0,"k":2},"lc":2,"lj":2,"ml":4},{"ty":"tr","nm":"transform","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]},{"ty":"gr","nm":"frame","it":[{"ty":"rc","nm":"rect","d":1,"p":{"a":0,"k":[0,0]},"s":{"a":0,"k":[340,190]},"r":{"a":0,"k":16}},{"ty":"fl","nm":"c:card","c":{"a":0,"k":[1,1,1,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","nm":"transform","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]}],"ip":0,"op":73,"st":0,"bm":0},{"ddd":0,"ind":5,"ty":4,"nm":"plane","sr":1,"ks":{"o":{"a":1,"k":[{"t":15,"s":[0],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":19,"s":[100]}]},"r":{"a":0,"k":0},"p":{"a":1,"k":[{"t":16,"s":[0,0],"o":{"x":[0.2],"y":[0]},"i":{"x":[0],"y":[1]}},{"t":32,"s":[-14,14]}]},"a":{"a":0,"k":[0,0,0]},"s":{"a":0,"k":[100,100,100]}},"ao":0,"shapes":[{"ty":"gr","nm":"plane","it":[{"ty":"rc","nm":"rect","d":1,"p":{"a":0,"k":[0,0]},"s":{"a":0,"k":[340,190]},"r":{"a":0,"k":16}},{"ty":"fl","nm":"c:plane","c":{"a":0,"k":[0,0.1744,0.369,1]},"o":{"a":0,"k":100},"r":1},{"ty":"tr","nm":"transform","p":{"a":0,"k":[0,0]},"a":{"a":0,"k":[0,0]},"s":{"a":0,"k":[100,100]},"r":{"a":0,"k":0},"o":{"a":0,"k":100},"sk":{"a":0,"k":0},"sa":{"a":0,"k":0}}]}],"ip":0,"op":73,"st":0,"bm":0,"parent":4}],"markers":[{"tm":0,"cm":"approve","dr":72}]}};</script><script src="../../preview-runtime/lottie_light.min.js"></script><script>/* Whity Lottie player (LT.2, LT.3). Needs lottie-web's light build (window.lottie).
+   <div class="w-lottie" data-lottie="assets/lottie/approve-set-down.json" data-play="view|manual|loop"></div>
+   - Colours: every fill/stroke named "c:<token>" takes the live CSS token (dark mode, each workspace's colour).
+   - view: plays once when scrolled into view; click or Enter replays. Never loops.
+   - loop: only for real loading states.
+   - manual: inside [data-lottie-scope], buttons [data-lottie-do="approve"|"undo"] play it forwards or backwards.
+   - Less motion asked for (prefers-reduced-motion): shows the end state, and the buttons jump between states.
+   - Without the library, the page keeps its fallback (.w-lottie__fallback) and the buttons still switch states. */
+(function () {
+  'use strict';
+  var TOK = { primary: '--primary', plane: '--plane-deep', card: '--card', line: '--border', muted: '--muted', ink: '--foreground',
+              soft: '--muted-foreground', ok: '--success', tint: '--primary-tint', tenant: '--tenant-color', onprimary: '--primary-foreground' };
+  var reduce = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+  var cache = {}, ctx = null;
+
+  function rgb(v) {
+    if (!v) return null;
+    try {
+      if (!ctx) { var c = document.createElement('canvas'); c.width = c.height = 1; ctx = c.getContext('2d', { willReadFrequently: true }); }
+      ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = v.trim(); ctx.fillRect(0, 0, 1, 1);
+      var d = ctx.getImageData(0, 0, 1, 1).data;
+      return [d[0] / 255, d[1] / 255, d[2] / 255, 1];
+    } catch (e) { return null; }
+  }
+  function recolour(data, el) {
+    var cs = getComputedStyle(el), map = {};
+    Object.keys(TOK).forEach(function (k) { var v = cs.getPropertyValue(TOK[k]); if (v && v.trim()) map[k] = rgb(v); });
+    (function walk(o) {
+      if (Array.isArray(o)) { o.forEach(walk); return; }
+      if (!o || typeof o !== 'object') return;
+      if ((o.ty === 'fl' || o.ty === 'st') && typeof o.nm === 'string' && o.nm.indexOf('c:') === 0) {
+        var c = map[o.nm.slice(2)]; if (c && o.c && o.c.a === 0) o.c.k = c;
+      }
+      for (var k in o) if (o.hasOwnProperty(k) && typeof o[k] === 'object') walk(o[k]);
+    })(data);
+    return data;
+  }
+  function getData(src) {
+    if (window.WHITY_LOTTIE && window.WHITY_LOTTIE[src]) return Promise.resolve(window.WHITY_LOTTIE[src]);
+    if (!cache[src]) cache[src] = fetch(src).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+    return cache[src];
+  }
+  function scopeOf(el) { return el.closest('[data-lottie-scope]') || el.parentNode; }
+  function say(scope, key) {
+    var live = scope.querySelector('[data-lottie-say]');
+    var t = scope.getAttribute('data-say-' + key);
+    if (live && t) live.textContent = t;
+  }
+  function setState(scope, st) { scope.setAttribute('data-state', st); }
+
+  function mount(el) {
+    if (el.__w) return;
+    el.__w = { anim: null };
+    var mode = el.getAttribute('data-play') || 'view';
+    var scope = scopeOf(el);
+    if (mode === 'manual') bindControls(el, scope);
+    if (!window.lottie) return; // fallback stays
+    var src = el.getAttribute('data-lottie');
+    getData(src).then(function (raw) { build(el, raw, mode, scope, 0); }).catch(function () {});
+  }
+
+  function build(el, raw, mode, scope, frame) {
+    var stage = el.querySelector('.w-lottie__stage');
+    if (!stage) { stage = document.createElement('div'); stage.className = 'w-lottie__stage'; stage.setAttribute('aria-hidden', 'true'); el.appendChild(stage); }
+    if (el.__w.anim) { el.__w.anim.destroy(); stage.textContent = ''; }
+    var anim = window.lottie.loadAnimation({ container: stage, renderer: 'svg', loop: mode === 'loop', autoplay: false,
+      animationData: recolour(JSON.parse(JSON.stringify(raw)), el), rendererSettings: { preserveAspectRatio: 'xMidYMid meet' } });
+    el.__w.anim = anim; el.__w.raw = raw;
+    anim.addEventListener('DOMLoaded', function () {
+      el.classList.add('is-ready');
+      var last = anim.totalFrames - 1;
+      if (window.WHITY_LOTTIE_STATIC) { anim.goToAndStop(mode === 'manual' ? 0 : last, true); return; }
+      if (mode === 'manual') {
+        var approved = scope.getAttribute('data-state') === 'approved';
+        anim.goToAndStop(frame != null && frame > 0 ? frame : (approved ? last : 0), true);
+      } else if (mode === 'loop') {
+        if (reduce.matches) anim.goToAndStop(0, true); else anim.play();
+      } else {
+        if (el.__w.played || reduce.matches) anim.goToAndStop(last, true);
+        else anim.goToAndStop(0, true), watch(el);
+        if (!el.__w.click) { el.__w.click = 1; el.addEventListener('click', function () { if (!reduce.matches && el.__w.anim) el.__w.anim.goToAndPlay(0, true); }); }
+      }
+    });
+  }
+
+  var io = 'IntersectionObserver' in window ? new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (e.isIntersecting && e.intersectionRatio > 0.35) {
+        var el = e.target; io.unobserve(el); el.__w.played = true;
+        if (el.__w.anim) el.__w.anim.goToAndPlay(0, true);
+      }
+    });
+  }, { threshold: [0, 0.35, 0.6] }) : null;
+  function watch(el) { if (io) io.observe(el); else if (el.__w.anim) el.__w.anim.goToAndStop(el.__w.anim.totalFrames - 1, true); }
+
+  function bindControls(el, scope) {
+    scope.querySelectorAll('[data-lottie-do]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var act = b.getAttribute('data-lottie-do'), a = el.__w.anim;
+        if (act === 'approve' && scope.getAttribute('data-state') !== 'approved') {
+          setState(scope, 'approved'); say(scope, 'approved');
+          if (a) { if (reduce.matches) a.goToAndStop(a.totalFrames - 1, true); else { a.setDirection(1); a.play(); } }
+        } else if (act === 'undo' && scope.getAttribute('data-state') === 'approved') {
+          setState(scope, 'waiting'); say(scope, 'undone');
+          if (a) { if (reduce.matches) a.goToAndStop(0, true); else { a.setDirection(-1); a.play(); } }
+        }
+        var next = scope.querySelector(act === 'approve' ? '[data-lottie-do="undo"]' : '[data-lottie-do="approve"]');
+        if (next) next.focus();
+      });
+    });
+  }
+
+  // Colour pickers: <button data-lottie-colour="#1a7f5a" data-lottie-target="#brand-anim">
+  function bindColours(root) {
+    root.querySelectorAll('[data-lottie-colour]').forEach(function (b) {
+      if (b.__w) return; b.__w = 1;
+      b.addEventListener('click', function () {
+        var el = document.querySelector(b.getAttribute('data-lottie-target')); if (!el) return;
+        el.style.setProperty('--tenant-color', b.getAttribute('data-lottie-colour'));
+        (b.closest('[role="radiogroup"]') || document).querySelectorAll('[data-lottie-colour]').forEach(function (o) { o.setAttribute('aria-checked', o === b ? 'true' : 'false'); });
+        if (el.__w && el.__w.raw) { el.__w.played = true; build(el, el.__w.raw, el.getAttribute('data-play') || 'view', scopeOf(el), 0); if (!reduce.matches) setTimeout(function () { el.__w.anim && el.__w.anim.goToAndPlay(0, true); }, 30); }
+      });
+    });
+  }
+
+  // Theme changes: rebuild with the new colours, keeping the frame.
+  function refresh() {
+    document.querySelectorAll('.w-lottie').forEach(function (el) {
+      if (el.__w && el.__w.anim && el.__w.raw) { var f = el.__w.anim.currentFrame; build(el, el.__w.raw, el.getAttribute('data-play') || 'view', scopeOf(el), Math.round(f)); }
+    });
+  }
+  if (window.matchMedia) { var mq = window.matchMedia('(prefers-color-scheme: dark)'); (mq.addEventListener ? mq.addEventListener('change', refresh) : mq.addListener(refresh)); }
+  new MutationObserver(refresh).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  function scan(root) { root = root || document; root.querySelectorAll('.w-lottie[data-lottie]').forEach(mount); bindColours(root); }
+  window.WhityLottie = { scan: scan, refresh: refresh };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { scan(); }); else scan();
+})();
+</script><script>setTimeout(function () { window.WhityLottie && WhityLottie.scan(); }, 60);</script>
+</body>
+</html>

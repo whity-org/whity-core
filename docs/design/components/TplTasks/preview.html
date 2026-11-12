@@ -1,0 +1,68 @@
+<!-- @dsCard group="Templates · Work" height=1280 width=1440 subtitle="T.1–T.4: tasks run on Taskaat; agents finish their own work and bring evidence against a “done when” check for you to accept" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Tasks</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function evList(items) { return h('ul', { className: 'wk-ev' }, items.map(function (e, i) { return h('li', { key: i, className: e[0] ? 'is-ok' : 'is-wait' }, I(e[0] ? 'success' : 'clock', 16), h('div', null, e[1], h('small', null, e[2]))); })); }
+  var EV = [[1, 'PO-0151 for 24 bags, JOD 384.000, approved by you', '08:55'], [1, 'Sent to Jordan Flour Mills by email', '09:01'], [1, 'Supplier confirmed delivery on Thursday 12 November', '09:40 · their reply is attached']];
+  var DONEWHEN = 'A purchase order for 24 bags of flour is approved, sent to Jordan Flour Mills, and delivery is confirmed for this week.';
+
+  function task(o) { return h('div', { className: 'wk-task' + (o.sel ? ' is-sel' : '') }, h('span', { className: 'wk-tick' + (o.st === 'done' ? ' is-done' : o.st === 'gate' ? ' is-gate' : ''), 'aria-hidden': 'true' }, o.st === 'done' ? I('check', 12) : null),
+    h('div', { style: { minWidth: 0 } }, h('b', null, o.t), h('small', null, o.sub)), o.badge || h('span'), chip(o.p, o.c), h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'flex-end' } }, av(o.a, o.ag), h('span', { className: 'wk-due' + (o.late ? ' is-late' : '') }, o.due))); }
+  var list = h('div', null, h('div', { className: 'wk-glabel is-late' }, I('alert', 14), 'Overdue'), h('div', { className: 'wk-list' }, task({ t: 'Send October statements to 3 customers', sub: 'Billing assistant · for Awss Haddad', p: 'Collections', c: '#9d2398', a: 'Billing assistant', ag: 1, due: 'Yesterday', late: 1, badge: prog(2, 3) })),
+    h('div', { className: 'wk-glabel' }, 'Today'), h('div', { className: 'wk-list' }, task({ sel: 1, st: 'gate', t: 'Reorder flour for both branches', sub: 'Stock assistant · for Ahmad Khalil', p: 'Supplies', c: '#1a7f5a', a: 'Stock assistant', ag: 1, due: 'Today', badge: h(W.Badge, { variant: 'warning' }, 'Awaiting your review') }),
+      task({ t: 'Call Example Café about INV-1042', sub: 'You', p: 'Collections', c: '#9d2398', a: 'Amro Saleh', due: 'Today' }), task({ t: 'Check the fridge temperature log', sub: 'Awss Haddad · from Food safety committee', p: 'Food safety', c: '#b74c05', a: 'Awss Haddad', due: 'Today' })),
+    h('div', { className: 'wk-glabel' }, 'This week'), h('div', { className: 'wk-list' }, task({ t: 'Price the Ramadan boxes', sub: 'Emad Nasser · from Meeting 14', p: 'Ramadan boxes', c: '#0961bb', a: 'Emad Nasser', due: 'Tue' }), task({ t: 'Draft the supplier contract renewal', sub: 'Notes assistant · for you', p: 'Supplies', c: '#1a7f5a', a: 'Notes assistant', ag: 1, due: 'Wed', badge: h(W.Badge, { variant: 'info' }, 'Working') }), task({ t: 'Prepare the Abdoun window display', sub: 'Ibrahim Mansour', p: 'Abdoun', c: '#3a3a3a', a: 'Ibrahim Mansour', due: 'Thu' })),
+    h('div', { className: 'wk-glabel' }, 'Done today'), h('div', { className: 'wk-list' }, task({ st: 'done', t: 'Count shelf A', sub: 'Stock assistant · for Ahmad Khalil', p: 'Supplies', c: '#1a7f5a', a: 'Stock assistant', ag: 1, due: '08:15', badge: h(W.Badge, { variant: 'success' }, 'Done, verified') })));
+  var detail = h('div', { className: 'wk-panel' }, h('section', null, h('div', { className: 'wk-meta' }, chip('Supplies', '#1a7f5a'), h('span', null, 'This week'), h('span', { style: { marginInlineStart: 'auto' } }, h(W.IconButton, { icon: 'more', label: 'More' }))), h('h2', null, 'Reorder flour for both branches'), h(W.ActorChip, { kind: 'agent', name: 'Stock assistant', onBehalfOf: 'Ahmad Khalil' }), h('div', { className: 'wk-meta' }, I('calendar', 14), h('span', null, 'Due today'), h('span', null, '·'), h('span', null, 'From Weekly stock check'))),
+    h('section', null, h('h3', null, I('flag', 14), 'Done when'), h('div', { className: 'wk-donewhen' }, DONEWHEN), h('small', { style: { color: 'var(--muted-foreground)', fontSize: 13 } }, 'Written by Ahmad before the work started.')),
+    h('section', null, h('h3', null, I('evidence', 14), 'Evidence from Stock assistant · 09:42'), evList(EV), h('div', { className: 'wk-gate' }, h('b', null, 'Awaiting your review'), h('span', { style: { fontSize: 14 } }, 'Accept it and the task is done and verified. Send it back to say what’s missing.'), h('div', null, h(W.Button, { variant: 'outline' }, 'Send back'), h(W.Button, { icon: 'check' }, 'Accept as done')))),
+    h('section', null, h('h3', null, 'Decisions'), h('div', { className: 'wk-dec' }, 'Chose Jordan Flour Mills over Example Mills: 6% cheaper, same delivery day.', h('small', null, 'Stock assistant · Monday'))),
+    h('section', null, sync('On Taskaat · TSK-218 · synced 2 min ago')));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Tasks', h(F, null, h(W.PageHeader, { title: 'Tasks', description: 'Example Bakery’s work, on Taskaat. Agents finish their own tasks and bring evidence.', actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'external' }, 'Open in Taskaat'), h(W.Button, { icon: 'plus' }, 'New task')) }),
+    h('div', { className: 'wk-bar' }, h(W.Tabs, { items: [{ value: 'me', label: 'My tasks', count: 7 }, { value: 'by', label: 'Assigned by me', count: 4 }, { value: 'ag', label: 'Agents’ tasks', count: 5 }, { value: 'all', label: 'All' }], defaultValue: 'me' })),
+    h('div', { className: 'wk-bar' }, filter('Board', 'Any'), filter('Due', 'This week', true), filter('Who', 'Anyone'), h('span', { className: 'wk-grow' }), h(W.Segmented, { label: 'View', options: [{ value: 'l', label: 'List', icon: 'list-bullet' }, { value: 'b', label: 'Board', icon: 'kanban' }, { value: 'c', label: 'Calendar', icon: 'calendar' }], defaultValue: 'l' })),
+    h('div', { className: 'wk-split' }, list, detail))));
+</script>
+</body>
+</html>

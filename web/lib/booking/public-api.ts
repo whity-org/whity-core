@@ -217,6 +217,11 @@ export const publicBookingApi = {
     })).data;
   },
 
+  /** Take the time the business suggested for a request (design 3.3). The link changes: the new token comes back. */
+  async acceptSuggestion(token: string): Promise<PublicBooking & { manage_token?: string | null }> {
+    return (await send<{ data: PublicBooking & { manage_token?: string | null } }>(`${LINK(token)}/accept`, { method: 'POST', body: '{}' })).data;
+  },
+
   async cancel(token: string, reason: string): Promise<PublicBooking> {
     return (await send<{ data: PublicBooking }>(`${LINK(token)}/cancel`, {
       method: 'POST',

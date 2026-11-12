@@ -100,6 +100,16 @@ final class BookingPaymentRealEngineTest extends TestCase
             {
                 ($this->tell)('awaitingPayment');
             }
+
+            public function requested(int $tenantId, array $booking): void
+            {
+                ($this->tell)('requested');
+            }
+
+            public function suggested(int $tenantId, array $booking): void
+            {
+                ($this->tell)('suggested');
+            }
         });
 
         $this->cake = $services->insert(1, [

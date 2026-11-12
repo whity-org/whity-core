@@ -15,6 +15,10 @@
     "en": "Remove the default logo or brand image for all workspaces",
     "ar": "إزالة شعار أو صورة افتراضية لكل المساحات"
   },
+  "delete_api_calendar_bookings_id_check_in": {
+    "en": "Undo a check-in",
+    "ar": "إلغاء تسجيل الوصول"
+  },
   "delete_api_calendar_events_id": {
     "en": "Remove a calendar event",
     "ar": "حذف حدث من التقويم"
@@ -307,6 +311,10 @@
     "en": "List calendar events",
     "ar": "عرض أحداث التقويم"
   },
+  "get_api_calendar_rooms": {
+    "en": "List rooms",
+    "ar": "عرض الغرف"
+  },
   "get_api_calendar_services": {
     "en": "List services",
     "ar": "عرض الخدمات"
@@ -331,6 +339,10 @@
     "en": "List time off and extra hours",
     "ar": "عرض الإجازات والساعات الإضافية"
   },
+  "get_api_calendar_today": {
+    "en": "Today at a glance",
+    "ar": "نظرة على اليوم"
+  },
   "get_api_chat_chats": {
     "en": "List the team chats you are in",
     "ar": "عرض محادثات الفريق التي أنت فيها"
@@ -346,6 +358,26 @@
   "get_api_chat_directory": {
     "en": "Find people and agents to mention",
     "ar": "البحث عن أشخاص ووكلاء للإشارة إليهم"
+  },
+  "get_api_contacts": {
+    "en": "List customers and suppliers",
+    "ar": "عرض العملاء والموردين"
+  },
+  "get_api_contacts_id": {
+    "en": "Get a customer or supplier",
+    "ar": "عرض عميل أو مورد"
+  },
+  "get_api_contacts_imports": {
+    "en": "List contact imports",
+    "ar": "عرض عمليات استيراد جهات الاتصال"
+  },
+  "get_api_contacts_imports_id": {
+    "en": "Get a contact import",
+    "ar": "عرض عملية استيراد"
+  },
+  "get_api_contacts_tags": {
+    "en": "List the tags on contacts",
+    "ar": "عرض وسوم جهات الاتصال"
   },
   "get_api_convening_bodies": {
     "en": "List the bodies that hold meetings",
@@ -954,9 +986,17 @@
     "en": "Change a calendar event",
     "ar": "تعديل حدث في التقويم"
   },
+  "patch_api_calendar_rooms_id": {
+    "en": "Change a room",
+    "ar": "تعديل غرفة"
+  },
   "patch_api_calendar_services_id": {
     "en": "Change a service",
     "ar": "تعديل خدمة"
+  },
+  "patch_api_contacts_id": {
+    "en": "Change a customer or supplier",
+    "ar": "تعديل عميل أو مورد"
   },
   "patch_api_convening_bodies_id": {
     "en": "Rename a body, move it, retire it or bring it back",
@@ -1133,17 +1173,33 @@
     "en": "Book a service for a customer",
     "ar": "حجز خدمة لعميل"
   },
+  "post_api_calendar_bookings_id_accept": {
+    "en": "Accept a booking request",
+    "ar": "قبول طلب حجز"
+  },
   "post_api_calendar_bookings_id_cancel": {
     "en": "Cancel a booking",
     "ar": "إلغاء حجز"
+  },
+  "post_api_calendar_bookings_id_check_in": {
+    "en": "Check a customer in",
+    "ar": "تسجيل وصول عميل"
   },
   "post_api_calendar_bookings_id_move": {
     "en": "Move a booking",
     "ar": "تغيير موعد حجز"
   },
+  "post_api_calendar_bookings_id_suggest": {
+    "en": "Suggest another time for a request",
+    "ar": "اقتراح موعد آخر لطلب"
+  },
   "post_api_calendar_events": {
     "en": "Add a calendar event",
     "ar": "إضافة حدث إلى التقويم"
+  },
+  "post_api_calendar_rooms": {
+    "en": "Add a room",
+    "ar": "إضافة غرفة"
   },
   "post_api_calendar_services": {
     "en": "Add a service",
@@ -1168,6 +1224,34 @@
   "post_api_chat_chats_id_read": {
     "en": "Mark a team chat read",
     "ar": "تعليم محادثة فريق كمقروءة"
+  },
+  "post_api_contacts": {
+    "en": "Add a customer or supplier",
+    "ar": "إضافة عميل أو مورد"
+  },
+  "post_api_contacts_id_archive": {
+    "en": "Archive a customer or supplier",
+    "ar": "أرشفة عميل أو مورد"
+  },
+  "post_api_contacts_id_restore": {
+    "en": "Restore an archived contact",
+    "ar": "استعادة جهة اتصال مؤرشفة"
+  },
+  "post_api_contacts_imports": {
+    "en": "Upload a spreadsheet of contacts",
+    "ar": "رفع جدول جهات اتصال"
+  },
+  "post_api_contacts_imports_id_check": {
+    "en": "Check what an import will do",
+    "ar": "التحقق مما سيفعله الاستيراد"
+  },
+  "post_api_contacts_imports_id_run": {
+    "en": "Run a contact import",
+    "ar": "تنفيذ استيراد جهات الاتصال"
+  },
+  "post_api_contacts_imports_id_undo": {
+    "en": "Undo a contact import",
+    "ar": "التراجع عن استيراد جهات الاتصال"
   },
   "post_api_convening_bodies": {
     "en": "Set up a body that holds meetings",
@@ -1709,5 +1793,73 @@
   "put_api_tenants_id_subscription": {
     "en": "Set a workspace's subscription or apply a plan",
     "ar": "تعيين اشتراك مساحة عمل أو باقتها"
+  },
+  "taskaat_add_milestone": {
+    "en": "Add a milestone to a task",
+    "ar": "إضافة مرحلة إلى مهمة"
+  },
+  "taskaat_complete_milestone": {
+    "en": "Tick a task's milestone",
+    "ar": "تعليم مرحلة من مهمة كمنجزة"
+  },
+  "taskaat_complete_task": {
+    "en": "Mark a task done",
+    "ar": "تعليم مهمة كمنجزة"
+  },
+  "taskaat_create_kb_entry": {
+    "en": "Record a decision",
+    "ar": "تسجيل قرار"
+  },
+  "taskaat_create_task": {
+    "en": "Create a task in Taskaat",
+    "ar": "إنشاء مهمة في Taskaat"
+  },
+  "taskaat_get_project": {
+    "en": "Read a Taskaat board",
+    "ar": "قراءة لوحة في Taskaat"
+  },
+  "taskaat_get_task": {
+    "en": "Read a task in Taskaat",
+    "ar": "قراءة مهمة في Taskaat"
+  },
+  "taskaat_get_task_activity": {
+    "en": "See what happened on a task",
+    "ar": "عرض ما جرى على مهمة"
+  },
+  "taskaat_get_task_gate_history": {
+    "en": "See a task's review verdicts",
+    "ar": "عرض قرارات مراجعة مهمة"
+  },
+  "taskaat_list_kb_entries": {
+    "en": "List a board's decisions",
+    "ar": "عرض قرارات لوحة"
+  },
+  "taskaat_list_projects": {
+    "en": "List the Taskaat boards",
+    "ar": "عرض لوحات Taskaat"
+  },
+  "taskaat_list_tasks": {
+    "en": "List tasks in Taskaat",
+    "ar": "عرض المهام في Taskaat"
+  },
+  "taskaat_set_output_contract": {
+    "en": "Write a task's done-when check",
+    "ar": "كتابة شرط إنجاز مهمة"
+  },
+  "taskaat_store_artifact": {
+    "en": "Attach evidence to a task",
+    "ar": "إرفاق دليل بمهمة"
+  },
+  "taskaat_submit_task_review": {
+    "en": "Accept a task or send it back",
+    "ar": "قبول مهمة أو إعادتها"
+  },
+  "taskaat_uncomplete_task": {
+    "en": "Reopen a done task",
+    "ar": "إعادة فتح مهمة منجزة"
+  },
+  "taskaat_update_task": {
+    "en": "Change a task in Taskaat",
+    "ar": "تعديل مهمة في Taskaat"
   }
 }

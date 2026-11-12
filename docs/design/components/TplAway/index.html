@@ -1,0 +1,60 @@
+<!-- @dsCard group="Templates · Work" height=887 width=1440 subtitle="OR.1: handing your approvals and agents’ proposals to someone while you’re away, with dates, and the delegations in force" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1440px;min-height:887px}</style><meta charset="utf-8"><title>I am away</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function node(kind, ic, t, sub, sel) { return h('div', { className: 'wk-node is-' + kind + (sel ? ' is-sel' : '') }, h('span', null, I(ic, 16)), h('div', null, h('b', null, t), sub ? h('small', null, sub) : null)); }
+  function line(plus) { return h('div', { className: 'wk-line' + (plus ? ' has-plus' : '') }); }
+
+  var form = h(W.Card, { title: 'I’m away', description: 'While you’re away, your decisions go to someone you trust. You can come back early.' }, h('div', { style: { display: 'grid', gap: 14 } },
+    h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 } }, h(W.Input, { label: 'From', defaultValue: 'Tuesday 10 November' }), h(W.Input, { label: 'Back on', defaultValue: 'Sunday 15 November' })),
+    h('div', { className: 'wk-mem', style: { padding: 10, border: '1px solid var(--border)', borderRadius: 10 } }, h(W.Avatar, { name: 'Emad Nasser', size: 32 }), h('div', null, h('b', null, 'Emad Nasser'), h('small', null, 'Manager · can already approve up to JOD 2,000')), I('chevron-down', 16)),
+    h('div', null, h('b', { style: { fontSize: 14 } }, 'What goes to Emad'), h('div', { className: 'wk-perm' }, h('div', null, 'Approvals in flows', h('small', null, 'Purchases, leave, expense claims')), h(W.Switch, { defaultChecked: true, 'aria-label': 'Approvals in flows' })), h('div', { className: 'wk-perm' }, h('div', null, 'Your agents’ proposals', h('small', null, 'Billing assistant, Bookkeeping assistant')), h(W.Switch, { defaultChecked: true, 'aria-label': 'Agents’ proposals' })), h('div', { className: 'wk-perm' }, h('div', null, 'Documents to sign', h('small', null, 'Purchase orders, letters')), h(W.Switch, { defaultChecked: false, 'aria-label': 'Documents to sign' })), h('div', { className: 'wk-perm' }, h('div', null, 'Above JOD 2,000', h('small', null, 'More than Emad can approve: wait for you')), h(W.Badge, { variant: 'secondary' }, 'Waits'))),
+    h(W.Input, { label: 'Message when people write to you', defaultValue: 'I’m away until 15 November. Emad Nasser is deciding for me.' }), h('div', { style: { display: 'flex', justifyContent: 'flex-end', gap: 8 } }, h(W.Button, { variant: 'ghost' }, 'Cancel'), h(W.Button, { icon: 'away' }, 'Hand over from 10 November'))));
+  var rows = [{ id: 1, f: 'Amro Saleh', t: 'Emad Nasser', w: 'Approvals and agents’ proposals', d: '10–15 Nov', st: ['info', 'Starts Tuesday'] }, { id: 2, f: 'Ahmad Khalil', t: 'Awss Haddad', w: 'Purchases up to JOD 500 · Sweifieh', d: 'Until revoked', st: ['success', 'In force'] }, { id: 3, f: 'Ibrahim Mansour', t: 'Role: HR', w: 'Leave requests', d: '1–7 Nov', st: ['secondary', 'Ended'] }];
+  var cols = [{ key: 'f', label: 'From', render: function (r) { return h('div', { className: 'wy-person' }, h(W.Avatar, { name: r.f, size: 24 }), h('b', null, r.f)); } }, { key: 't', label: 'To' }, { key: 'w', label: 'What' }, { key: 'd', label: 'When' }, { key: 'st', label: '', render: function (r) { return h(W.Badge, { variant: r.st[0] }, r.st[1]); } }];
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Delegations', h(F, null, h(W.PageHeader, { title: 'Delegations', description: 'Who decides for whom, for how long. Names, never numbers.', actions: h(W.Button, { variant: 'outline', icon: 'plus' }, 'New delegation') }),
+    h('div', { className: 'wk-split', style: { gridTemplateColumns: '520px minmax(0,1fr)' } }, form, h(W.Card, { title: 'Delegations', style: { padding: 0 } }, h(W.DataTable, { label: 'Delegations', columns: cols, rows: rows, rowMenu: true }))))));
+</script>
+</body>
+</html>

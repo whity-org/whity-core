@@ -321,6 +321,137 @@ final class BookingRealEngineTest extends TestCase
         self::assertSame(1, (int) $this->scalar("SELECT COUNT(*) FROM calendar_bookings WHERE tenant_id = 1 AND status = 'confirmed'"));
     }
 
+    /** @return array<string, mixed> the cake service's values, as insert() and update() take them */
+    private function cakeValues(): array
+    {
+        return [
+            'name' => ['en' => 'Cake tasting', 'ar' => 'تذوق الكعك'], 'description' => [],
+            'duration_minutes' => 30, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 15,
+            'price_minor' => 12500, 'currency' => 'JOD', 'bookable_online' => true, 'active' => true, 'sort_order' => 0,
+        ];
+    }
+
+    public function testAServiceThatNeedsARoomTakesItFromEveryoneElse(): void
+    {
+        $rooms = new \Whity\Core\Calendar\RoomRepository($this->pdo);
+        $room = $rooms->insert(1, ['name' => ['en' => 'Tasting room'], 'unit_id' => null, 'active' => true, 'sort_order' => 0]);
+        $this->services->update(1, $this->cake, ['room_id' => $room] + $this->cakeValues());
+
+        $first = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
+        self::assertSame($room, $first['room_id']);
+
+        // Baker 12 is free at 10:00, but the room is not.
+        $slots = $this->service->availability(1, $this->cake, 12, self::at('2026-11-16T10:00:00+03:00'), self::at('2026-11-16T10:30:00+03:00'));
+        self::assertSame([], $slots);
+        try {
+            $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 12));
+            self::fail('The room was booked twice.');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(409, $e->status);
+        }
+
+        // Cancelling frees the room.
+        $this->service->cancel(1, (int) $first['id'], 'staff', '');
+        self::assertNotSame([], $this->service->availability(1, $this->cake, 12, self::at('2026-11-16T10:00:00+03:00'), self::at('2026-11-16T10:30:00+03:00')));
+    }
+
+    public function testAServiceThatNeedsApprovalSendsARequestStaffAcceptOrMove(): void
+    {
+        $this->services->update(1, $this->cake, ['needs_approval' => true] + $this->cakeValues());
+
+        $request = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
+        self::assertSame(BookingRepository::STATUS_REQUESTED, $request['status']);
+        // A request holds its time.
+        self::assertSame([], $this->service->availability(1, $this->cake, 11, self::at('2026-11-16T10:00:00+03:00'), self::at('2026-11-16T10:30:00+03:00')));
+        // Checking in a request is refused.
+        try {
+            $this->service->checkIn(1, (int) $request['id'], true);
+            self::fail('A request was checked in.');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(422, $e->status);
+        }
+
+        // Staff suggest 11:00; the customer takes it.
+        $suggested = $this->service->suggest(1, (int) $request['id'], self::at('2026-11-16T11:00:00+03:00'), null);
+        self::assertSame(BookingRepository::STATUS_REQUESTED, $suggested['status']);
+        self::assertNotNull($suggested['suggested_at']);
+        self::assertSame('2026-11-16T08:00:00Z', $suggested['starts_at']);
+        $booked = $this->service->acceptSuggestion(1, (int) $request['id']);
+        self::assertSame(BookingRepository::STATUS_CONFIRMED, $booked['status']);
+
+        // A desk booking is never a request.
+        $desk = $this->service->book(1, $this->request('2026-11-16T13:00:00+03:00', 11, ['public' => false, 'source' => BookingRepository::SOURCE_STAFF]));
+        self::assertSame(BookingRepository::STATUS_CONFIRMED, $desk['status']);
+        try {
+            $this->service->accept(1, (int) $desk['id']);
+            self::fail('A confirmed booking was accepted again.');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(422, $e->status);
+        }
+    }
+
+    public function testInstantBookingOffTurnsBookingPageBookingsIntoRequests(): void
+    {
+        $this->settings->setTenant(1, 'calendar.instant_booking', 'false');
+        $request = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
+        self::assertSame(BookingRepository::STATUS_REQUESTED, $request['status']);
+        $accepted = $this->service->accept(1, (int) $request['id']);
+        self::assertSame(BookingRepository::STATUS_CONFIRMED, $accepted['status']);
+    }
+
+    public function testCheckInAndTheTodayCounts(): void
+    {
+        $this->services->update(1, $this->cake, ['needs_approval' => false] + $this->cakeValues());
+        $booked = $this->service->book(1, $this->request('2026-11-15T10:00:00+03:00', 11));
+        $this->service->book(1, $this->request('2026-11-15T11:00:00+03:00', 11));
+        $this->settings->setTenant(1, 'calendar.instant_booking', 'false');
+        $this->service->book(1, $this->request('2026-11-17T11:00:00+03:00', 12));
+
+        $in = $this->service->checkIn(1, (int) $booked['id'], true);
+        self::assertNotNull($in['checked_in_at']);
+
+        $today = $this->service->today(1, null, null);
+        self::assertSame(['date' => '2026-11-15', 'booked' => 2, 'checked_in' => 1, 'requests' => 1, 'reminders_sent' => 0], $today);
+
+        $out = $this->service->checkIn(1, (int) $booked['id'], false);
+        self::assertNull($out['checked_in_at']);
+
+        // Another workspace sees none of it.
+        self::assertSame(['date' => '2026-11-15', 'booked' => 0, 'checked_in' => 0, 'requests' => 0, 'reminders_sent' => 0], $this->service->today(2, null, null));
+    }
+
+    public function testAReminderChannelIsAskedAfterTheEmailAndAFailureIsContained(): void
+    {
+        $plugins = new \Whity\Core\Calendar\CalendarPlugins();
+        $asked = [];
+        $channel = new class (static function (int $id) use (&$asked): void {
+            $asked[] = $id;
+        }) implements \Whity\Core\Calendar\ReminderChannel {
+            public function __construct(private readonly \Closure $record)
+            {
+            }
+
+            public function name(): string
+            {
+                return 'whatsapp';
+            }
+
+            public function remind(int $tenantId, array $booking): void
+            {
+                ($this->record)((int) $booking['id']);
+                throw new \RuntimeException('the provider is down');
+            }
+        };
+        self::assertTrue($plugins->addReminderChannel('example', $channel));
+        self::assertFalse($plugins->addReminderChannel('other', $channel));
+        $this->service->setPlugins($plugins);
+
+        $booking = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
+        $this->pdo->exec("UPDATE calendar_bookings SET reminder_due_at = '2026-11-15 03:00:00' WHERE id = " . (int) $booking['id']);
+        self::assertSame('sent', $this->service->sendReminder(1, (int) $booking['id'], (string) $booking['starts_at']));
+        self::assertSame([(int) $booking['id']], $asked);
+    }
+
     /** @return array{0: string, 1: string, 2: string, 3: string} */
     private function connectionParts(): array
     {

@@ -22,7 +22,7 @@
       var has = g[1].some(function (x) { return x[1] === active; });
       return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
   function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
   function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
   function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
@@ -32,11 +32,11 @@
   function tier(t, d, kid) { return h('div', null, h('div', { className: 'wy-tier__head' }, h('b', null, t), h('span', null, d)), kid); }
   ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wy-tiers' },
     tier('1 · Undoable: act, then offer Undo', 'Deactivate a user, retire a promotion, hide a card, archive. It happens at once; the toast offers Undo for 10 seconds, and the record keeps a Reactivate.',
-      h('div', { className: 'wy-tier__stage' }, h(W.Toast, { variant: 'success', title: 'Omar Khalil is deactivated', description: 'He’s signed out everywhere. Reactivate him from his page at any time.', action: { label: 'Undo', icon: 'undo' }, duration: 10000, paused: true, elapsed: 3000 }))),
+      h('div', { className: 'wy-tier__stage' }, h(W.Toast, { variant: 'success', title: 'Ahmad Khalil is deactivated', description: 'He’s signed out everywhere. Reactivate him from his page at any time.', action: { label: 'Undo', icon: 'undo' }, duration: 10000, paused: true, elapsed: 3000 }))),
     tier('2 · Hard to undo: a dialog that names the consequence', 'Delete a role, a unit or a group; reject a sign-up; revoke an AI credential. The title is the question; the text says what happens to people and data.',
       h(W.ConfirmDialog, { inline: true, title: 'Delete the Branch manager role?', description: '6 people hold it. They lose its 24 permissions unless another role gives them. Documents and history keep the role’s name.', confirmLabel: 'Delete role' })),
     tier('3 · Security or irreversible: the dialog, and type the name', 'Clear someone’s two-step, approve a password reset, delete a workspace, uninstall with data. The action stays disabled until the name is typed.',
-      h(W.ConfirmDialog, { inline: true, title: 'Clear two-step for Hala Mansour?', description: 'This removes her authenticator and recovery codes and emails her a reset link. Until she sets them up again, her password alone signs her in. It’s logged with your name.', confirmText: 'hala@examplebakery.jo', confirmLabel: 'Clear two-step', icon: 'two-step' }))));
+      h(W.ConfirmDialog, { inline: true, title: 'Clear two-step for Ibrahim Mansour?', description: 'This removes his authenticator and recovery codes and emails him a reset link. Until he sets them up again, his password alone signs him in. It’s logged with your name.', confirmText: 'ibrahim@examplebakery.jo', confirmLabel: 'Clear two-step', icon: 'two-step' }))));
 </script>
 </body>
 </html>

@@ -71,6 +71,25 @@ final class ConversationRepository
     }
 
     /**
+     * A customer's open conversation on a channel, by the customer it is linked
+     * to rather than by address (a WhatsApp conversation is kept under the
+     * phone number the customer wrote from).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findOpenForCustomer(int $tenantId, string $channel, int $profileId): ?array
+    {
+        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM conversations c ' . self::JOINS
+            . ' WHERE c.tenant_id = :tid AND c.channel = :channel AND c.customer_profile_id = :pid
+                AND c.status <> \'closed\'
+              ORDER BY c.last_message_at DESC, c.id DESC LIMIT 1');
+        $stmt->execute([':tid' => $tenantId, ':channel' => $channel, ':pid' => $profileId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row === false ? null : $row;
+    }
+
+    /**
      * The contact's most recent conversation on the channel that is not closed.
      *
      * @return array<string, mixed>|null

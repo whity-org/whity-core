@@ -58,9 +58,9 @@
       blk('h2', h('h3', null, 'Open invoices')),
       blk('table', h('table', null, h('thead', null, h('tr', null, h('th', null, 'Invoice'), h('th', null, 'Due'), h('th', { className: 'is-num' }, 'Amount'))),
         h('tbody', null, h('tr', null, h('td', null, 'INV-1042'), h('td', null, '14 Oct 2026'), h('td', { className: 'is-num' }, 'JOD 301.600')), h('tr', null, h('td', null, 'INV-1051'), h('td', null, '21 Oct 2026'), h('td', { className: 'is-num' }, 'JOD 96.000'))))),
-      o.agentBlock === false ? null : h('div', { className: 'wy-blk wy-blk--p is-suggested' }, h('div', { className: 'wy-blk__by' }, h(W.ActorChip, { kind: 'agent', name: 'Billing assistant', onBehalfOf: 'Rana' }), 'suggests a paragraph'), h('p', null, 'If you have already paid, thank you, and please ignore this letter. Payments can take two working days to reach us.')),
+      o.agentBlock === false ? null : h('div', { className: 'wy-blk wy-blk--p is-suggested' }, h('div', { className: 'wy-blk__by' }, h(W.ActorChip, { kind: 'agent', name: 'Billing assistant', onBehalfOf: 'Amro' }), 'suggests a paragraph'), h('p', null, 'If you have already paid, thank you, and please ignore this letter. Payments can take two working days to reach us.')),
       blk('p', h('p', null, 'Kind regards,')),
-      blk('p', h('p', null, mf('Sender name', 'Rana Haddad', p), h('br'), mf('Company name', 'Example Bakery', p))));
+      blk('p', h('p', null, mf('Sender name', 'Amro Saleh', p), h('br'), mf('Company name', 'Example Bakery', p))));
   }
 
   ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wy-edx', style: { height: '100%' } },

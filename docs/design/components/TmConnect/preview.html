@@ -1,0 +1,40 @@
+<!-- @dsCard group="Mobile" height=954 width=1880 subtitle="M.13 to M.17: find your installation by email, take its theme, and switch between workspaces" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Mobile connect and theme</title><style>html,body{height:100%;margin:0} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 22 }); }
+  var T0 = { home: 'Home', inbox: 'Inbox', create: 'Create', agents: 'Chat', agentsIcon: 'comment', more: 'More' };
+  function status() { return h('div', { className: 'wm-status', 'aria-hidden': 'true' }, h('span', null, '9:41'), h('i'), h('span', null, I('wifi', 16), I('battery', 18))); }
+  function tabbar(active, T, badges) { T = T || T0; badges = badges || { inbox: 3 };
+    function tab(k, icon) { return h('div', { key: k, className: 'wm-tab' + (active === k ? ' is-on' : '') }, I(icon, 24), T[k], badges[k] ? h('b', null, badges[k]) : null); }
+    return h('nav', { className: 'wm-tabbar', 'aria-label': 'Main' }, tab('home', 'dashboard'), tab('inbox', 'inbox'), h('button', { key: 'c', className: 'wm-create', 'aria-label': T.create }, I('plus', 28)), tab('agents', T.agentsIcon || 'robot'), tab('more', 'menu')); }
+  function bottom(o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.tabs === false ? null : tabbar(o.active, o.T, o.badges), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function phone(label, kids, o) { o = o || {}; return h('div', { className: 'wm-col' }, h('div', { className: 'wm-label' }, label), h('div', { className: 'wm-phone', dir: o.dir }, status(), kids, o.overlay || null)); }
+  function search(t, f) { return h('div', { className: 'wm-search' }, I('search', 20), h('span', null, t), f ? h('button', { type: 'button' }, I('filter', 16), f) : null); }
+  var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  function themed(hex, kids) { return h('div', { style: Object.assign({ display: 'contents' }, W.tenantTheme(hex, dark ? 'dark' : 'light')) }, kids); }
+  var welcome = h(F, null, h('div', { className: 'wm-hero' }, h(W.Mark, { size: 56, label: 'Whity' }), h('h1', null, 'Sign in to your workspace'), h('p', null, 'Use your work email. We’ll find where your company runs Whity.')),
+    h('div', { className: 'wm-form' }, h('input', { className: 'wy-input', defaultValue: 'amro@examplebakery.jo', 'aria-label': 'Work email', inputMode: 'email', dir: 'ltr' }), h(W.Button, null, 'Continue'),
+      h('div', { className: 'wm-alt' }, h('span', null, I('qr', 18), 'Scan a QR code'), h('span', null, I('link', 18), 'Type an address'))), h('div', { className: 'wm-home-ind' }, h('i')));
+  var found = h(F, null, h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, ''), h('span')),
+    h('div', { className: 'wm-hero', style: { alignContent: 'start', paddingTop: 12 } }, h('h1', null, 'We found your workspace')),
+    h('div', { className: 'wm-found' }, h('div', { className: 'wm-ws__logo', style: { background: '#b74c05', width: 64, height: 64, borderRadius: 18, fontSize: 26 } }, 'E'), h('b', null, 'Example Bakery'), h('code', null, 'office.examplebakery.jo'), h('small', null, 'Its look and colours'), h('div', { className: 'wm-swatches' }, h('i', { style: { background: '#b74c05' } }), h('i', { style: { background: '#feeee7' } }), h('i', { style: { background: '#4f1c00' } }), h('i', { style: { background: '#ffffff' } }))),
+    h('div', { style: { flex: 1 } }), h('div', { className: 'wm-form' }, h(W.Button, null, 'Continue to Example Bakery'), h('div', { className: 'wm-alt' }, h('span', null, 'Not your company? Try another email'))), h('div', { className: 'wm-home-ind' }, h('i')));
+  var themedHome = themed('#b74c05', h(F, null, h('div', { className: 'wm-head' }, h('div', { className: 'wm-head__top' }, h(W.TenantLogo, { name: 'Example Bakery', size: 28 }), h(W.Avatar, { name: 'Amro Saleh', size: 36 })), h('h1', null, 'Good morning, Amro'), h('p', null, 'Signed in to Example Bakery')),
+    h('div', { className: 'wm-body' }, h('div', { className: 'wm-steps' }, h('div', null, I('success', 20), 'Theme from office.examplebakery.jo'), h('div', null, I('success', 20), 'Colours checked for contrast'), h('div', null, I('success', 20), 'Text at your phone’s size')),
+      h('div', { className: 'wm-sec' }, h('h2', null, 'Waiting for you')), h('div', { className: 'wm-list' }, h('div', { className: 'wm-li' }, h('span', { className: 'wm-li__ic' }, I('document', 20)), h('div', null, h('b', null, 'Purchase order PO-0142'), h('small', null, 'Ahmad Khalil')), h('div', { className: 'wm-li__end' }, h('strong', null, 'JOD 1,240.000'), '1 d')))),
+    h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-actbar' }, h(W.Button, null, 'Open Inbox')), tabbar('home'), h('div', { className: 'wm-home-ind' }, h('i')))));
+  function ws(c, n, sub, on) { return h('div', { className: 'wm-ws' }, h('span', { className: 'wm-ws__logo', style: { background: c } }, n.charAt(0)), h('div', null, h('b', null, n), h('small', null, sub)), on ? I('check', 22) : null); }
+  var sw = h(F, null, h('div', { className: 'wm-scrim' }), h('div', { className: 'wm-sheet', role: 'dialog', 'aria-label': 'Workspaces' }, h('div', { className: 'wm-grab' }), h('h2', null, 'Your workspaces'),
+    h('div', { className: 'wm-list' }, ws('#b74c05', 'Example Bakery', 'office.examplebakery.jo · Owner', true), ws('#0961bb', 'Example Clinic', 'whity.dev · Accountant'), ws('#1a7f5a', 'Example Trading', 'erp.exampletrading.jo · Viewer')),
+    h(W.Button, { variant: 'outline', icon: 'plus' }, 'Add a workspace'), h('div', { className: 'wm-home-ind' }, h('i'))));
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wm-row' },
+    phone('1 · Before connecting: Whity', welcome), phone('2 · Found by email', found), phone('3 · Connected: their theme', themedHome),
+    phone('Switch workspace (hold Home)', themed('#b74c05', h(F, null, h('div', { className: 'wm-head' }, h('h1', null, 'Good morning, Amro')), h('div', { className: 'wm-body' }), h('div', { className: 'wm-bottom' }, tabbar('home'), h('div', { className: 'wm-home-ind' }, h('i'))))), { overlay: sw })));
+</script>
+</body>
+</html>

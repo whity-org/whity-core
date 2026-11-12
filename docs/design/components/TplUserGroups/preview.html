@@ -22,7 +22,7 @@
       var has = g[1].some(function (x) { return x[1] === active; });
       return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
   function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
   function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
   function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
@@ -38,7 +38,7 @@
     footer: h(F, null, h(W.Button, { variant: 'ghost', icon: 'delete' }, 'Delete group'), h('span', { style: { flex: 1 } }), h(W.Button, { variant: 'outline' }, 'Cancel'), h(W.Button, null, 'Save')) },
     h('div', { style: { display: 'grid', gap: 16 } }, h(W.Input, { label: 'Name', defaultValue: 'Abdoun team' }), h(W.Textarea, { label: 'Description', defaultValue: 'Everyone working at the Abdoun branch.', rows: 2 }),
       h('div', null, h('div', { className: 'wy-field__label', style: { marginBottom: 8 } }, 'Who is in it'), rule),
-      h(W.Alert, { variant: 'info', title: 'In it right now: 3 people' }, h('div', { style: { display: 'grid', gap: 8, marginTop: 8 } }, person('Dana Yousef', 'Branch manager'), person('Sami Nasser', 'Staff'), person('Omar Khalil', 'Staff, moving from Sweifieh'))),
+      h(W.Alert, { variant: 'info', title: 'In it right now: 3 people' }, h('div', { style: { display: 'grid', gap: 8, marginTop: 8 } }, person('Ibrahim Mansour', 'Branch manager'), person('Emad Nasser', 'Staff'), person('Ahmad Khalil', 'Staff, moving from Sweifieh'))),
       h('p', { className: 'wy-muted', style: { margin: 0, fontSize: 13 } }, 'Changing the rule changes who receives Purchase orders from now on. Documents already sent keep their recipients.')))));
 </script>
 </body>

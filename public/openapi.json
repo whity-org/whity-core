@@ -7392,9 +7392,18 @@
                         "name": "status",
                         "in": "query",
                         "required": false,
-                        "description": "Comma-separated statuses. Default: `confirmed,pending_payment`.",
+                        "description": "Comma-separated statuses. Default: `confirmed,pending_payment,requested`.",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "name": "unit_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this branch: bookings whose person or room is in it.",
+                        "schema": {
+                            "type": "integer"
                         }
                     }
                 ],
@@ -7695,6 +7704,110 @@
                 ]
             }
         },
+        "/api/v1/calendar/bookings/{id}/accept": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_accept",
+                "summary": "Accept a customer's request; it becomes a confirmed booking",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/bookings/{id}/cancel": {
             "post": {
                 "operationId": "post_api_v1_calendar_bookings_id_cancel",
@@ -7793,6 +7906,212 @@
                     },
                     "422": {
                         "description": "Already cancelled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/bookings/{id}/check-in": {
+            "delete": {
+                "operationId": "delete_api_v1_calendar_bookings_id_check_in",
+                "summary": "Undo a check-in",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a confirmed booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_check_in",
+                "summary": "Check the customer in: they arrived",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a confirmed booking",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7927,6 +8246,141 @@
                     },
                     "422": {
                         "description": "A cancelled booking, or outside the booking window",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/bookings/{id}/suggest": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_suggest",
+                "summary": "Suggest another time for a customer's request",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "The request moves to the new time and stays a request; the customer is emailed and takes it from their link.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarBookingSuggestRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "That time was just taken",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a request",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8302,6 +8756,319 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/CalendarEventResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/rooms": {
+            "get": {
+                "operationId": "get_api_v1_calendar_rooms",
+                "summary": "List rooms",
+                "tags": [
+                    "calendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rooms",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarRoom"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_calendar_rooms",
+                "summary": "Add a room a service can need",
+                "tags": [
+                    "calendar"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarRoomRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The room",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarRoom"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such branch",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A missing name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/rooms/{id}": {
+            "patch": {
+                "operationId": "patch_api_v1_calendar_rooms_id",
+                "summary": "Change a room; fields left out keep their value",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarRoomRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The room",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarRoom"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
                                 }
                             }
                         }
@@ -9932,6 +10699,110 @@
                 ]
             }
         },
+        "/api/v1/calendar/today": {
+            "get": {
+                "operationId": "get_api_v1_calendar_today",
+                "summary": "Today at a glance: booked, checked in, open requests and reminders sent",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "date",
+                        "in": "query",
+                        "required": false,
+                        "description": "A local day, `YYYY-MM-DD`. Default: today.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "unit_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this branch.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Today",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarToday"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/chat/chats": {
             "get": {
                 "operationId": "get_api_v1_chat_chats",
@@ -11179,6 +12050,1511 @@
                         }
                     }
                 }
+            }
+        },
+        "/api/v1/contacts": {
+            "get": {
+                "operationId": "get_api_v1_contacts",
+                "summary": "List customers and suppliers",
+                "tags": [
+                    "contacts"
+                ],
+                "description": "Sorted by name. Filter by kind, tag or a search over name, contact person, email, mobile and tax number.",
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "query",
+                        "required": false,
+                        "description": "`customer` or `supplier`. Leave out for everyone; a contact can be both.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "tag_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only contacts with this tag.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": false,
+                        "description": "Search text.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "archived",
+                        "in": "query",
+                        "required": false,
+                        "description": "`true` for archived contacts instead.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "description": "Page, from 1.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "description": "Rows per page, at most 200. Default 50.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Contacts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Contact"
+                                            }
+                                        },
+                                        "pagination": {
+                                            "$ref": "#/components/schemas/Pagination"
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "pagination"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_contacts",
+                "summary": "Add a customer or supplier",
+                "tags": [
+                    "contacts"
+                ],
+                "description": "Needs a name. A customer unless said otherwise; it can be both. Tags are names, made on first use. When the email is the verified email of someone in the workspace, the contact is linked to them.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ContactRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The contact",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Contact"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Missing name or a value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/contacts/imports": {
+            "get": {
+                "operationId": "get_api_v1_contacts_imports",
+                "summary": "List recent contact imports",
+                "tags": [
+                    "contacts"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Imports",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ContactImportListItem"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_contacts_imports",
+                "summary": "Upload a spreadsheet of contacts (Excel or CSV)",
+                "tags": [
+                    "contacts"
+                ],
+                "description": "Send `file` as multipart, or JSON with `file_name` and either `text` (a CSV's text) or `content_base64`. Whity finds the header row and suggests where each column goes. Nothing changes yet.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ContactImportUploadRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The import",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ContactImport"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A file Whity can't read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/contacts/imports/{id}": {
+            "get": {
+                "operationId": "get_api_v1_contacts_imports_id",
+                "summary": "Get an import: its columns, what it will do or did, and whether it can be undone",
+                "tags": [
+                    "contacts"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The import",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ContactImport"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/contacts/imports/{id}/check": {
+            "post": {
+                "operationId": "post_api_v1_contacts_imports_id_check",
+                "summary": "Check an import: what will be created, updated and skipped. Nothing changes",
+                "tags": [
+                    "contacts"
+                ],
+                "description": "Rows are matched to existing contacts by `match_by` (default: tax number, then mobile, then email, whichever has a column). An update fills in what the row has and never empties a field.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ContactImportCheckRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The import",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ContactImport"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already ran",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A column match Whity can't use",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/contacts/imports/{id}/run": {
+            "post": {
+                "operationId": "post_api_v1_contacts_imports_id_run",
+                "summary": "Run a checked import",
+                "tags": [
+                    "contacts"
+                ],
+                "description": "Works the rows out again against the contacts as they are now, and applies them in one go. Can be undone for 24 hours.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The import",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ContactImport"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not checked, or already ran",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/contacts/imports/{id}/skipped.csv": {
+            "get": {
+                "operationId": "get_api_v1_contacts_imports_id_skipped_csv",
+                "summary": "Download the rows an import skips, each with its reason",
+                "tags": [
+                    "contacts"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CSV",
+                        "content": {
+                            "text/csv": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not checked yet",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/contacts/imports/{id}/undo": {
+            "post": {
+                "operationId": "post_api_v1_contacts_imports_id_undo",
+                "summary": "Undo an import, within 24 hours of it running",
+                "tags": [
+                    "contacts"
+                ],
+                "description": "Contacts it added are removed, contacts it changed get their earlier values back, and the tags it added come off.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The import",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ContactImport"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not run, already undone, or more than 24 hours ago",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/contacts/tags": {
+            "get": {
+                "operationId": "get_api_v1_contacts_tags",
+                "summary": "List the tags used on contacts, with how many contacts have each",
+                "tags": [
+                    "contacts"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tags",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    },
+                                                    "count": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "name",
+                                                    "count"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/contacts/{id}": {
+            "get": {
+                "operationId": "get_api_v1_contacts_id",
+                "summary": "Get one customer or supplier",
+                "tags": [
+                    "contacts"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The contact",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Contact"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_contacts_id",
+                "summary": "Change a customer or supplier; fields left out keep their value",
+                "tags": [
+                    "contacts"
+                ],
+                "description": "`tags`, when sent, replaces the contact's tags.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ContactRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The contact",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Contact"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/contacts/{id}/archive": {
+            "post": {
+                "operationId": "post_api_v1_contacts_id_archive",
+                "summary": "Archive a customer or supplier",
+                "tags": [
+                    "contacts"
+                ],
+                "description": "Archived contacts leave the lists and can be restored.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The contact",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Contact"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/contacts/{id}/restore": {
+            "post": {
+                "operationId": "post_api_v1_contacts_id_restore",
+                "summary": "Bring an archived customer or supplier back",
+                "tags": [
+                    "contacts"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The contact",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Contact"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/v1/convening-bodies": {
@@ -32132,6 +34508,122 @@
                 }
             }
         },
+        "/api/v1/me/agent-proposals/bulk-approve": {
+            "post": {
+                "operationId": "post_api_v1_me_agent_proposals_bulk_approve",
+                "summary": "Approve several ordinary proposals together",
+                "tags": [
+                    "me"
+                ],
+                "description": "Only Ordinary (tier 1) proposals are approved; each runs, is recorded and can be undone on its own. Check first and Needs verifying ones are never approved here and come back under refused.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "minItems": 1,
+                                        "maxItems": 50,
+                                        "description": "The proposals to approve."
+                                    }
+                                },
+                                "required": [
+                                    "ids"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "What was approved and what has to be opened on its own",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentProposalBulkApproveResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No ids, or more than 50",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/agent-proposals/{id}/approve": {
             "post": {
                 "operationId": "post_api_v1_me_agent_proposals_id_approve",
@@ -48729,6 +51221,104 @@
                 }
             }
         },
+        "/api/v1/public/bookings/{token}/accept": {
+            "post": {
+                "operationId": "post_api_v1_public_bookings_token_accept",
+                "summary": "Take the time the business suggested for a request (public); the link changes and the new one is emailed",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The 64-character token from the customer's email."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Booked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This link is invalid or has expired",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No suggested time to take",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/public/bookings/{token}/cancel": {
             "post": {
                 "operationId": "post_api_v1_public_bookings_token_cancel",
@@ -49643,6 +52233,111 @@
                 }
             }
         },
+        "/api/v1/public/contact": {
+            "post": {
+                "operationId": "post_api_v1_public_contact",
+                "summary": "Send the website contact form (public)",
+                "tags": [
+                    "messages"
+                ],
+                "description": "Files the message in the inbox of the workspace named by website.contact_workspace. Limited per address. A filled website field is dropped quietly with the same answer. A form-encoded post (scripts off) is answered with a redirect back to the contact page.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublicContactRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The message was saved",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicContactResponse"
+                                }
+                            }
+                        }
+                    },
+                    "303": {
+                        "description": "Back to the contact page (form post)"
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A field is missing or not valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many messages",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The contact form is not set up",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/public/forms/{slug}": {
             "get": {
                 "operationId": "get_api_v1_public_forms_slug",
@@ -50138,6 +52833,68 @@
                     },
                     "500": {
                         "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/plans": {
+            "get": {
+                "operationId": "get_api_v1_public_plans",
+                "summary": "The plans the website shows (public, WS.5)",
+                "tags": [
+                    "plans"
+                ],
+                "description": "Built from the active plans, their monthly prices and limits, plus the website.plans setting. Prices are decimal strings in normal units, or null when not set. Cached for five minutes; readable from the website origins (WHITY_SITE_ORIGINS).",
+                "responses": {
+                    "200": {
+                        "description": "The plans",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicPlansResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The plans could not be read",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -56183,6 +58940,372 @@
                     },
                     "422": {
                         "description": "Validation failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/taskaat/connect": {
+            "post": {
+                "operationId": "post_api_v1_taskaat_connect",
+                "summary": "Begin connecting this workspace to Taskaat",
+                "tags": [
+                    "tasks"
+                ],
+                "description": "People only, never an agent. Registers Whity with Taskaat (OAuth dynamic client registration, PKCE) and returns Taskaat's consent page to send the person to. Taskaat returns them to /tasks/connect.",
+                "responses": {
+                    "200": {
+                        "description": "Where to sign in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TaskaatConnectResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Taskaat could not be reached",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Whity does not know its own web address (FRONTEND_URL)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/taskaat/connect/complete": {
+            "post": {
+                "operationId": "post_api_v1_taskaat_connect_complete",
+                "summary": "Finish connecting with the code Taskaat sent back",
+                "tags": [
+                    "tasks"
+                ],
+                "description": "Single use, by the person who started it. The tokens are kept encrypted and never returned.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TaskaatConnectCompleteRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The connection",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TaskaatConnectionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Expired, not started here, or refused by Taskaat",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Taskaat could not be reached",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/taskaat/connection": {
+            "delete": {
+                "operationId": "delete_api_v1_taskaat_connection",
+                "summary": "Disconnect this workspace from Taskaat",
+                "tags": [
+                    "tasks"
+                ],
+                "description": "Forgets the tokens. To revoke them in Taskaat too, remove Whity from Taskaat's connected apps.",
+                "responses": {
+                    "200": {
+                        "description": "The connection",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TaskaatConnectionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "get": {
+                "operationId": "get_api_v1_taskaat_connection",
+                "summary": "Whether this workspace is connected to Taskaat",
+                "tags": [
+                    "tasks"
+                ],
+                "description": "Tasks and boards live in the workspace's Taskaat (T.3). Never returns a token.",
+                "responses": {
+                    "200": {
+                        "description": "The connection",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TaskaatConnectionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -64772,6 +67895,10 @@
                                 "readable"
                             ]
                         }
+                    },
+                    "notifyByEmail": {
+                        "type": "boolean",
+                        "description": "Whether the person it acts for hears by email when something waits for them (A12)"
                     }
                 },
                 "required": [
@@ -64801,7 +67928,8 @@
                     "waiting",
                     "lastActiveAt",
                     "onItsOwn",
-                    "mayRead"
+                    "mayRead",
+                    "notifyByEmail"
                 ]
             },
             "AgentAction": {
@@ -65203,6 +68331,10 @@
                         },
                         "description": "Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access."
                     },
+                    "notifyByEmail": {
+                        "type": "boolean",
+                        "description": "Email the person it acts for when something waits for them: at most one an hour, and the email only opens Whity"
+                    },
                     "presetKey": {
                         "type": "string",
                         "description": "Start from this preset; fields sent override its own"
@@ -65424,6 +68556,10 @@
                             "type": "integer"
                         },
                         "description": "Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access."
+                    },
+                    "notifyByEmail": {
+                        "type": "boolean",
+                        "description": "Email the person it acts for when something waits for them: at most one an hour, and the email only opens Whity"
                     }
                 }
             },
@@ -65584,6 +68720,14 @@
                     "tool": {
                         "type": "string"
                     },
+                    "tier": {
+                        "type": "integer",
+                        "enum": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
                     "summary": {
                         "type": "string"
                     },
@@ -65646,6 +68790,7 @@
                     "agent",
                     "status",
                     "tool",
+                    "tier",
                     "summary",
                     "arguments",
                     "diff",
@@ -65656,6 +68801,52 @@
                     "expiresAt",
                     "createdAt",
                     "action"
+                ]
+            },
+            "AgentProposalBulkApproveResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "approved": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/AgentProposal"
+                                }
+                            },
+                            "refused": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "reason": {
+                                            "type": "string",
+                                            "enum": [
+                                                "not_found",
+                                                "open_on_its_own",
+                                                "not_waiting"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "reason"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "approved",
+                            "refused"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "AgentProposalListResponse": {
@@ -66743,10 +69934,12 @@
                         "type": "string",
                         "enum": [
                             "pending_payment",
+                            "requested",
                             "confirmed",
                             "cancelled",
                             "expired"
-                        ]
+                        ],
+                        "description": "`requested`: the customer asked for this time and staff accept it first."
                     },
                     "hold_expires_at": {
                         "type": "string",
@@ -66782,6 +69975,33 @@
                     "created_at": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "room_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The room it holds."
+                    },
+                    "checked_in_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When the customer arrived."
+                    },
+                    "suggested_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When staff suggested this time for a request."
+                    },
+                    "reminder_sent_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "room_name": {
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "In lists: the room's name, language code => text."
                     }
                 },
                 "required": [
@@ -66878,6 +70098,22 @@
                     "keep_to_hours": {
                         "type": "boolean",
                         "description": "Refuse a time outside working hours. Always on for agents."
+                    }
+                },
+                "required": [
+                    "starts_at"
+                ]
+            },
+            "CalendarBookingSuggestRequest": {
+                "type": "object",
+                "properties": {
+                    "starts_at": {
+                        "type": "string",
+                        "description": "The time to suggest, ISO 8601 with an offset."
+                    },
+                    "profile_id": {
+                        "type": "integer",
+                        "description": "Suggest another person. Default: the same one."
                     }
                 },
                 "required": [
@@ -67023,6 +70259,65 @@
                     "hours"
                 ]
             },
+            "CalendarRoom": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "$ref": "#/components/schemas/LocalizedLabel"
+                    },
+                    "unit_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The branch (organisational unit) it is in."
+                    },
+                    "active": {
+                        "type": "boolean"
+                    },
+                    "sort_order": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "unit_id",
+                    "active",
+                    "sort_order"
+                ]
+            },
+            "CalendarRoomRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "$ref": "#/components/schemas/LocalizedLabel"
+                            }
+                        ],
+                        "description": "Text, or a `{ar, en}` map."
+                    },
+                    "unit_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The branch it is in; null for none."
+                    },
+                    "active": {
+                        "type": "boolean",
+                        "description": "Inactive rooms are not shown as columns."
+                    },
+                    "sort_order": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Position in lists; lower comes first."
+                    }
+                }
+            },
             "CalendarService": {
                 "type": "object",
                 "properties": {
@@ -67066,6 +70361,15 @@
                         "items": {
                             "type": "integer"
                         }
+                    },
+                    "room_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The room it needs; booked with the person."
+                    },
+                    "needs_approval": {
+                        "type": "boolean",
+                        "description": "A customer's booking is a request staff accept first."
                     }
                 },
                 "required": [
@@ -67156,6 +70460,15 @@
                             "type": "integer"
                         },
                         "description": "The staff who provide it; the list replaces what is there."
+                    },
+                    "room_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The room it needs; null for none."
+                    },
+                    "needs_approval": {
+                        "type": "boolean",
+                        "description": "Customers send a request instead of booking."
                     }
                 }
             },
@@ -67196,6 +70509,10 @@
                     },
                     "currency": {
                         "type": "string"
+                    },
+                    "instant_booking": {
+                        "type": "boolean",
+                        "description": "Off: every booking from the booking page is a request."
                     }
                 },
                 "required": [
@@ -67276,6 +70593,10 @@
                             ]
                         },
                         "description": "Days shown as the weekend."
+                    },
+                    "instant_booking": {
+                        "type": "boolean",
+                        "description": "Off turns every booking from the booking page into a request staff accept."
                     }
                 }
             },
@@ -67320,6 +70641,11 @@
                     },
                     "feed_enabled": {
                         "type": "boolean"
+                    },
+                    "unit_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The branch (organisational unit) they work in."
                     }
                 },
                 "required": [
@@ -67333,6 +70659,11 @@
             "CalendarStaffRequest": {
                 "type": "object",
                 "properties": {
+                    "unit_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The branch they work in; null for none."
+                    },
                     "bookable": {
                         "type": "boolean",
                         "description": "Offer this person on the public booking page."
@@ -67410,6 +70741,38 @@
                 "required": [
                     "starts_at",
                     "ends_at"
+                ]
+            },
+            "CalendarToday": {
+                "type": "object",
+                "properties": {
+                    "date": {
+                        "type": "string",
+                        "description": "The local day, `YYYY-MM-DD`."
+                    },
+                    "booked": {
+                        "type": "integer",
+                        "description": "Confirmed bookings that start that day."
+                    },
+                    "checked_in": {
+                        "type": "integer",
+                        "description": "Of those, the customers who arrived."
+                    },
+                    "requests": {
+                        "type": "integer",
+                        "description": "Open requests from now on, any day."
+                    },
+                    "reminders_sent": {
+                        "type": "integer",
+                        "description": "Reminders sent that day."
+                    }
+                },
+                "required": [
+                    "date",
+                    "booked",
+                    "checked_in",
+                    "requests",
+                    "reminders_sent"
                 ]
             },
             "CapabilityDenial": {
@@ -68173,6 +71536,524 @@
                 "required": [
                     "data"
                 ]
+            },
+            "Contact": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "contact_person": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "mobile": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string"
+                    },
+                    "tax_number": {
+                        "type": "string"
+                    },
+                    "payment_terms": {
+                        "type": "string",
+                        "description": "How they pay, in the workspace's words."
+                    },
+                    "address": {
+                        "type": "string"
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "is_customer": {
+                        "type": "boolean"
+                    },
+                    "is_supplier": {
+                        "type": "boolean"
+                    },
+                    "profile_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The person in Whity this contact is, when known."
+                    },
+                    "profile": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "display_name": {
+                                "type": "string"
+                            }
+                        },
+                        "description": "Only on a single contact."
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "name": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "name"
+                            ]
+                        }
+                    },
+                    "archived": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "contact_person",
+                    "email",
+                    "mobile",
+                    "phone",
+                    "tax_number",
+                    "payment_terms",
+                    "address",
+                    "notes",
+                    "is_customer",
+                    "is_supplier",
+                    "profile_id",
+                    "tags",
+                    "archived",
+                    "created_at",
+                    "updated_at"
+                ]
+            },
+            "ContactImport": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "file_name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "uploaded",
+                            "checked",
+                            "imported",
+                            "undone"
+                        ]
+                    },
+                    "row_count": {
+                        "type": "integer"
+                    },
+                    "columns": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "index": {
+                                    "type": "integer"
+                                },
+                                "header": {
+                                    "type": "string"
+                                },
+                                "examples": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "empty": {
+                                    "type": "boolean"
+                                },
+                                "suggestion": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                        "target": {
+                                            "type": "string"
+                                        },
+                                        "confidence": {
+                                            "type": "string",
+                                            "enum": [
+                                                "sure",
+                                                "doubtful"
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            "required": [
+                                "index",
+                                "header",
+                                "examples",
+                                "empty",
+                                "suggestion"
+                            ]
+                        }
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "key": {
+                                    "type": "string"
+                                },
+                                "label": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "key",
+                                "label"
+                            ]
+                        }
+                    },
+                    "options": {
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": true
+                    },
+                    "summary": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "create": {
+                                "type": "integer"
+                            },
+                            "update": {
+                                "type": "integer"
+                            },
+                            "skip": {
+                                "type": "integer"
+                            },
+                            "rows": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "row": {
+                                            "type": "integer"
+                                        },
+                                        "action": {
+                                            "type": "string",
+                                            "enum": [
+                                                "create",
+                                                "update",
+                                                "skip"
+                                            ]
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "contact_id": {
+                                            "type": "integer"
+                                        },
+                                        "reason": {
+                                            "type": "string"
+                                        },
+                                        "changes": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "row",
+                                        "action",
+                                        "name"
+                                    ]
+                                }
+                            },
+                            "fixes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "row": {
+                                            "type": "integer"
+                                        },
+                                        "column": {
+                                            "type": "string"
+                                        },
+                                        "from": {
+                                            "type": "string"
+                                        },
+                                        "to": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "row",
+                                        "column",
+                                        "from",
+                                        "to"
+                                    ]
+                                }
+                            },
+                            "tags": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "imported_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "undone_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "undo_until": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "can_undo": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "file_name",
+                    "status",
+                    "row_count",
+                    "columns",
+                    "targets",
+                    "options",
+                    "summary",
+                    "imported_at",
+                    "undone_at",
+                    "undo_until",
+                    "can_undo",
+                    "created_at"
+                ]
+            },
+            "ContactImportCheckRequest": {
+                "type": "object",
+                "properties": {
+                    "mapping": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "nullable": true
+                        },
+                        "description": "Column index (from 0) => target key from `targets`. Columns left out are skipped."
+                    },
+                    "match_by": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "tax_number",
+                            "mobile",
+                            "email",
+                            "name",
+                            null
+                        ],
+                        "description": "How a row finds an existing contact."
+                    },
+                    "country_code": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Added to local mobile and phone numbers, such as `+962`."
+                    },
+                    "default_kind": {
+                        "type": "string",
+                        "enum": [
+                            "customer",
+                            "supplier",
+                            "both"
+                        ],
+                        "description": "For rows with no customer-or-supplier column. Default customer."
+                    },
+                    "add_tags": {
+                        "type": "array",
+                        "maxItems": 10,
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Tags added to every imported contact."
+                    }
+                },
+                "required": [
+                    "mapping"
+                ]
+            },
+            "ContactImportListItem": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "file_name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "summary": {
+                        "type": "object",
+                        "properties": {
+                            "create": {
+                                "type": "integer"
+                            },
+                            "update": {
+                                "type": "integer"
+                            },
+                            "skip": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "create",
+                            "update",
+                            "skip"
+                        ],
+                        "nullable": true
+                    },
+                    "created_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "imported_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "undo_until": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "can_undo": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "file_name",
+                    "status",
+                    "summary",
+                    "imported_at",
+                    "undo_until",
+                    "can_undo",
+                    "created_at"
+                ]
+            },
+            "ContactImportUploadRequest": {
+                "type": "object",
+                "properties": {
+                    "file_name": {
+                        "type": "string",
+                        "description": "The file's name, such as `customers.xlsx`."
+                    },
+                    "text": {
+                        "type": "string",
+                        "description": "A CSV file's text."
+                    },
+                    "content_base64": {
+                        "type": "string",
+                        "description": "An Excel (.xlsx) or CSV file, base64."
+                    }
+                }
+            },
+            "ContactRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "The name of the customer or supplier, such as a company."
+                    },
+                    "contact_person": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "Who to talk to there."
+                    },
+                    "email": {
+                        "type": "string",
+                        "maxLength": 320,
+                        "description": "Email address."
+                    },
+                    "mobile": {
+                        "type": "string",
+                        "maxLength": 40,
+                        "description": "Tidied: spaces and dashes go, `00` becomes `+`."
+                    },
+                    "phone": {
+                        "type": "string",
+                        "maxLength": 40,
+                        "description": "Landline or office phone, tidied like mobile."
+                    },
+                    "tax_number": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "description": "Tax number, as on their invoices."
+                    },
+                    "payment_terms": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "How they pay, in your own words, such as \"CliQ, within 14 days\"."
+                    },
+                    "address": {
+                        "type": "string",
+                        "maxLength": 1000,
+                        "description": "Postal or delivery address."
+                    },
+                    "notes": {
+                        "type": "string",
+                        "maxLength": 4000,
+                        "description": "Anything else worth knowing."
+                    },
+                    "is_customer": {
+                        "type": "boolean",
+                        "description": "They buy from the workspace. Default true on a new contact."
+                    },
+                    "is_supplier": {
+                        "type": "boolean",
+                        "description": "The workspace buys from them. A contact can be both."
+                    },
+                    "profile_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Link to a person in the workspace; null unlinks."
+                    },
+                    "tags": {
+                        "type": "array",
+                        "maxItems": 20,
+                        "items": {
+                            "type": "string",
+                            "maxLength": 128
+                        },
+                        "description": "Tag names; the list replaces the contact's tags."
+                    }
+                }
             },
             "ConveningBody": {
                 "type": "object",
@@ -83102,10 +86983,16 @@
                         "type": "string",
                         "enum": [
                             "pending_payment",
+                            "requested",
                             "confirmed",
                             "cancelled",
                             "expired"
-                        ]
+                        ],
+                        "description": "`requested`: the customer asked for this time and staff accept it first."
+                    },
+                    "suggested": {
+                        "type": "boolean",
+                        "description": "The business suggested this time for the request; the customer can take it."
                     },
                     "starts_at": {
                         "type": "string"
@@ -83301,6 +87188,10 @@
                                     "items": {
                                         "type": "integer"
                                     }
+                                },
+                                "sends_request": {
+                                    "type": "boolean",
+                                    "description": "Booking it sends a request the business accepts first."
                                 }
                             },
                             "required": [
@@ -83466,6 +87357,66 @@
                         "required": [
                             "token",
                             "messages"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "PublicContactRequest": {
+                "type": "object",
+                "properties": {
+                    "topic": {
+                        "type": "string",
+                        "enum": [
+                            "question",
+                            "demo",
+                            "partners",
+                            "other"
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "company": {
+                        "type": "string"
+                    },
+                    "contact": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "lang": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "ar"
+                        ]
+                    },
+                    "website": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "contact",
+                    "message"
+                ]
+            },
+            "PublicContactResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "received": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "received"
                         ]
                     }
                 },
@@ -84028,6 +87979,129 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "PublicLocalizedText": {
+                "type": "object",
+                "properties": {
+                    "en": {
+                        "type": "string"
+                    },
+                    "ar": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "en"
+                ]
+            },
+            "PublicPlansResponse": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "integer"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "decimals": {
+                        "type": "integer"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    },
+                    "plans": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "highlight": {
+                                    "type": "boolean"
+                                },
+                                "name": {
+                                    "$ref": "#/components/schemas/PublicLocalizedText"
+                                },
+                                "tagline": {
+                                    "$ref": "#/components/schemas/PublicLocalizedText"
+                                },
+                                "price": {
+                                    "type": "object",
+                                    "properties": {
+                                        "monthly": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "required": [
+                                        "monthly"
+                                    ]
+                                },
+                                "limits": {
+                                    "type": "object",
+                                    "properties": {
+                                        "staff": {
+                                            "type": "integer"
+                                        },
+                                        "customersPerMonth": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "features": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/PublicLocalizedText"
+                                    }
+                                },
+                                "cta": {
+                                    "type": "object",
+                                    "properties": {
+                                        "label": {
+                                            "$ref": "#/components/schemas/PublicLocalizedText"
+                                        },
+                                        "href": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "label",
+                                        "href"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "highlight",
+                                "name",
+                                "price",
+                                "limits",
+                                "features"
+                            ]
+                        }
+                    },
+                    "dedicatedHosting": {
+                        "type": "object",
+                        "properties": {
+                            "fromMonthly": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "fromMonthly"
+                        ]
+                    }
+                },
+                "required": [
+                    "version",
+                    "currency",
+                    "decimals",
+                    "updatedAt",
+                    "plans",
+                    "dedicatedHosting"
                 ]
             },
             "PublicSignupAcceptedResponse": {
@@ -87926,6 +92000,79 @@
                 },
                 "required": [
                     "name"
+                ]
+            },
+            "TaskaatConnectCompleteRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "The authorization code Taskaat sent back to /tasks/connect."
+                    },
+                    "state": {
+                        "type": "string",
+                        "description": "The state Taskaat sent back with the code."
+                    }
+                },
+                "required": [
+                    "code",
+                    "state"
+                ]
+            },
+            "TaskaatConnectResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "authorize_url": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "authorize_url"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "TaskaatConnection": {
+                "type": "object",
+                "properties": {
+                    "connected": {
+                        "type": "boolean"
+                    },
+                    "taskaat_url": {
+                        "type": "string",
+                        "description": "Taskaat's web address, for \"Open in Taskaat\" links: /dashboard/{project-slug}?task={task-id}."
+                    },
+                    "connected_at": {
+                        "type": "string"
+                    },
+                    "connected_by": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "needs_reconnect": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "connected",
+                    "taskaat_url"
+                ]
+            },
+            "TaskaatConnectionResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/TaskaatConnection"
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "Tenant": {
