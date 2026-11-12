@@ -6,14 +6,15 @@
  * stay Western). See ./input.tsx, which does the same for `<Input type="date">`.
  */
 
-import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
+import { useInterfaceLocale } from '@/lib/interface-locale';
 import { DatePicker as BaseDatePicker, type DatePickerProps } from '@whity/ui/date-picker';
 
 export type { DatePickerProps } from '@whity/ui/date-picker';
 
 export function DatePicker(props: DatePickerProps) {
   const t = useTranslation('common');
-  const locale = useFormattingLocale();
+  const locale = useInterfaceLocale();
 
   return (
     <BaseDatePicker

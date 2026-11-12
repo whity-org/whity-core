@@ -2,15 +2,20 @@
 
 /** The design system's Input with this app's translations. See ./dialog.tsx. */
 
-import { useFormattingLocale, useRichTranslation, useTranslation } from '@whity/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
+import { useInterfaceLocale } from '@/lib/interface-locale';
 import { Input as BaseInput } from '@whity/ui/input';
 
 export type { InputProps } from '@whity/ui/input';
 
 export function Input(props: React.ComponentProps<typeof BaseInput>) {
   const t = useTranslation('common');
-  const rt = useRichTranslation('common');
-  const locale = useFormattingLocale();
+  const locale = useInterfaceLocale();
+  // One sentence for the translator; the part inside <0>…</0> is drawn as a link.
+  const [before = '', browse = '', after = ''] = t(
+    'ui.input.dropzonePrompt',
+    '<0>Click to browse</0> or drag and drop files',
+  ).split(/<\/?0>/);
 
   return (
     <BaseInput
@@ -30,9 +35,13 @@ export function Input(props: React.ComponentProps<typeof BaseInput>) {
       }}
       multipleFilesHint={t('ui.input.uploadMultiple', 'Upload multiple files')}
       singleFileHint={t('ui.input.uploadSingle', 'Upload single file')}
-      dropzonePrompt={rt('ui.input.dropzonePrompt', '<0>Click to browse</0> or drag and drop files', undefined, [
-        <span key="browse" className="text-primary hover:underline" />,
-      ])}
+      dropzonePrompt={
+        <>
+          {before}
+          <span className="text-primary hover:underline">{browse}</span>
+          {after}
+        </>
+      }
       {...props}
     />
   );
