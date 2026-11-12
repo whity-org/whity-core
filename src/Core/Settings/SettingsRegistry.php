@@ -405,6 +405,13 @@ final class SettingsRegistry
     // gated by this; they keep their own permission checks.
     public const PLUGINS_MCP_PROMPTS_REQUIRE_MARK = 'plugins.mcp_prompts_require_mark';
 
+    // SDK 1.102 (WHIT-985): the code plugins the operator lets send Whity's own billing
+    // emails (receipts, failed payments) to a workspace's payers, in the INSTANCE's brand
+    // (Mail\BillingEmails). Comma-separated plugin names; EMPTY by default, so nothing can
+    // send them until the operator names a plugin. GLOBAL-ONLY: mail in the instance's
+    // brand to any workspace is a phishing path, and code plugins are install-wide.
+    public const PLUGINS_BILLING_EMAIL_SENDERS = 'plugins.billing_email_senders';
+
     // Document/label designer server-side render tier (ADR 0012 / WC-docdesigner
     // Track 2). GLOBAL-ONLY operator switch: the render endpoint calls out to the
     // separate `whity_render` Docker service (headless-Chromium + Puppeteer), a
@@ -888,6 +895,7 @@ final class SettingsRegistry
         self::PLUGINS_STORE_ALLOWED_HOSTS,
         self::PLUGINS_STORE_ENABLED,
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
+        self::PLUGINS_BILLING_EMAIL_SENDERS,
         // Master on/off switch for the render tier: infrastructure-level (is the
         // whole optional subsystem available on this instance), not a per-tenant
         // preference — a per-tenant override would be inert/misleading. The
@@ -1172,6 +1180,7 @@ final class SettingsRegistry
         // before this flag existed.
         self::PLUGINS_STORE_ENABLED => 'true',
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => 'false',
+        self::PLUGINS_BILLING_EMAIL_SENDERS => '',
         // Heavyweight optional add-on (a whole separate Chromium-bearing
         // container) — opt-in, not opt-out. A sovereign deploy that never runs
         // the `render` compose profile stays disabled here regardless.
@@ -1603,6 +1612,7 @@ final class SettingsRegistry
             self::PLUGINS_STORE_ALLOWED_HOSTS => null, // free-form strings
             self::PLUGINS_STORE_ENABLED => self::validateBoolean($value, self::PLUGINS_STORE_ENABLED),
             self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => self::validateBoolean($value, self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK),
+            self::PLUGINS_BILLING_EMAIL_SENDERS => self::validatePluginNameList($value, self::PLUGINS_BILLING_EMAIL_SENDERS),
             self::DOCUMENTS_RENDER_ENABLED => self::validateBoolean($value, self::DOCUMENTS_RENDER_ENABLED),
             self::DOCUMENTS_RENDER_MAX_ROWS => self::validateRenderMaxRows($value),
             self::DOCUMENTS_RENDER_MAX_PAGES => self::validateRenderMaxPages($value),
@@ -2119,6 +2129,24 @@ final class SettingsRegistry
     }
 
     /** Comma-separated MCP tool names, each `[A-Za-z0-9_-]{1,64}`; empty is fine. */
+    /**
+     * Comma-separated plugin names, each one a plugin could be loaded under (it has a slug).
+     */
+    private static function validatePluginNameList(string $value, string $key): ?string
+    {
+        if (trim($value) === '') {
+            return null;
+        }
+        foreach (explode(',', $value) as $name) {
+            $name = trim($name);
+            if ($name === '' || strlen($name) > 128 || \Whity\Sdk\PluginNamespace::slug($name) === null) {
+                return "{$key} must be a comma-separated list of plugin names.";
+            }
+        }
+
+        return null;
+    }
+
     private static function validateToolNameList(string $value, string $key): ?string
     {
         if (trim($value) === '') {

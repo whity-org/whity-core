@@ -71,7 +71,7 @@ final class SettingsRegistryTest extends TestCase
              // goes to somebody outside the company, so no tenant decides it.
              'affiliate.clawback_on_refund', 'affiliate.withholding_bp',
              'dunning.retry_schedule_days', 'dunning.lock_after_days',
-             'plugins.store_allowed_hosts', 'plugins.store_enabled', 'plugins.mcp_prompts_require_mark',
+             'plugins.store_allowed_hosts', 'plugins.store_enabled', 'plugins.mcp_prompts_require_mark', 'plugins.billing_email_senders',
              'documents.render_enabled', 'documents.theme', 'documents.theme_by_kind', 'documents.slot_bindings', 'documents.background_issuing', 'documents.render_max_rows',
              'documents.render_max_pages', 'documents.render_max_template_bytes',
              'documents.flow_max_blocks', 'documents.flow_max_table_rows',
@@ -464,7 +464,8 @@ final class SettingsRegistryTest extends TestCase
         // 106 since WHIT-925: meters.enforcement and billing.default_plan.
         // 114 since WHIT-941: eight calendar.* keys.
         // 117 since WHIT-960: website.plans and website.contact_workspace.
-        self::assertCount(117, $describe);
+        // 118 since WHIT-985: plugins.billing_email_senders.
+        self::assertCount(118, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
