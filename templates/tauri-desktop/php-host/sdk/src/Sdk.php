@@ -1256,12 +1256,6 @@ namespace Whity\Sdk;
  *
  * Purely additive.)
  *
- * 1.104 (CUSTOMER-GRADE PLUGIN PERMISSIONS: a plugin implements
- * {@see PluginCustomerPermissionsInterface} to list those of its own permissions that reach only
- * the caller's own records. A workspace's customers may then hold them, and Settings > Sign-up
- * may offer a role made of them, whatever their action (`manage`, `upload`, `review`). The host
- * refuses core and administrative resources, permissions the plugin does not own, and resources
- * another plugin also declares, and forgets the list when the plugin is disabled (#1872, WHIT-995).
  * 1.103 (DOCUMENT BLOCKS: a plugin adds blocks to the document editor (editor M7, E.17–E.20).
  * A code plugin implements {@see PluginDocumentBlocksInterface} with {@see Documents\DocumentBlock}
  * declarations; a workspace plugin lists the same shape under `documents.blocks` in its manifest
@@ -1269,6 +1263,15 @@ namespace Whity\Sdk;
  * and an optional print view in the screen vocabulary's display blocks, naming fields as
  * `{{data.key}}`. Whity's own renderer draws it, and a Verified plugin's blocks carry the mark.
  * Without a print view a block is for notes and wiki pages only (WHIT-993).
+ *
+ * Purely additive.)
+ *
+ * 1.104 (CUSTOMER-GRADE PLUGIN PERMISSIONS: a plugin implements
+ * {@see PluginCustomerPermissionsInterface} to list those of its own permissions that reach only
+ * the caller's own records. A workspace's customers may then hold them, and Settings > Sign-up
+ * may offer a role made of them, whatever their action (`manage`, `upload`, `review`). The host
+ * refuses core and administrative resources, permissions the plugin does not own, and resources
+ * another plugin also declares, and forgets the list when the plugin is disabled (#1872, WHIT-995).
  *
  * Purely additive.)
  *
