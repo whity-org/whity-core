@@ -144,6 +144,7 @@ final class CoreApiSchemas
             self::featureRoutes(),
             self::documentSourceRoutes(),
             self::documentCollabRoutes(),
+            self::documentAgentRoutes(),
             self::documentThemeRoutes(),
             self::documentTemplateSlotRoutes(),
             self::workspacePluginRoutes(),
@@ -7682,6 +7683,74 @@ final class CoreApiSchemas
                 'stale' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'The suggestions skipped because their text or block has gone; now stale'],
                 'draft_version' => self::int(),
             ], ['decided', 'stale', 'draft_version'])),
+            // ── Agents in the editor (editor M6; E.30, E.31; Q3, Q4) ─────────
+            'DocumentAgentRequest' => self::object([
+                'id' => self::int(),
+                'document_id' => self::int(),
+                'request' => self::str() + ['description' => 'What the person asked'],
+                'anchor_block_id' => self::str(true) + ['description' => 'The block the person had selected, if any'],
+                'quote' => self::str(true) + ['description' => 'The text the person had selected, if any'],
+                'status' => ['type' => 'string', 'enum' => ['queued', 'running', 'done', 'failed', 'stopped'], 'description' => 'queued until the agent picks it up'],
+                'agent' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::str(), 'name' => self::str()], 'description' => 'The agent asked or working on it; null for any of the person\'s agents'],
+                'for' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']) + ['description' => 'The person who asked'],
+                'title' => self::str(true) + ['description' => 'What the agent is doing now, in plain words'],
+                'progress' => ['type' => 'object', 'nullable' => true, 'properties' => ['done' => self::int(), 'total' => self::int()], 'description' => 'When the agent knows the count'],
+                'detail' => self::str(true) + ['description' => 'What it did, or what went wrong'],
+                'stopping' => self::bool() + ['description' => 'The person pressed Stop and the agent has not stopped yet'],
+                'at' => self::str() + ['description' => 'When it was asked, ISO 8601 UTC'],
+                'updated_at' => self::str() + ['description' => 'ISO 8601 UTC'],
+            ], ['id', 'document_id', 'request', 'status', 'agent', 'for', 'title', 'progress', 'detail', 'stopping', 'at', 'updated_at']),
+            'DocumentAgentRequestResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentAgentRequest')),
+            'DocumentAgentRequestListResponse' => self::listEnvelope('DocumentAgentRequest'),
+            'DocumentAgentRequestCreateRequest' => self::object([
+                'request' => self::str() + ['description' => 'What to do, at most 4000 characters'],
+                'agent_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'One of your workspace agents (GET /api/me/agents); null for any agent you have connected'],
+                'anchor_block_id' => self::str(true) + ['description' => 'The selected block, if any'],
+                'quote' => self::str(true) + ['description' => 'The selected text, if any'],
+            ], ['request']),
+            'DocumentAgentRequestUpdateRequest' => self::object([
+                'status' => ['type' => 'string', 'enum' => ['running', 'done', 'failed', 'stopped'], 'description' => 'running while working; done, failed or stopped to finish'],
+                'title' => self::str(true) + ['description' => 'What you are doing now, in plain words, for example Reading the payment terms'],
+                'done' => ['type' => 'integer', 'nullable' => true, 'description' => 'How many of total are done'],
+                'total' => ['type' => 'integer', 'nullable' => true, 'description' => 'How many there are, when known'],
+                'detail' => self::str(true) + ['description' => 'When finishing: what you did, or what went wrong and what to do next'],
+            ], ['status']),
+            'DocumentAgentRequestUpdateResponse' => self::dataEnvelope(self::object([
+                'stop' => self::bool() + ['description' => 'true: the person pressed Stop; report stopped and end'],
+                'request' => SchemaBuilder::ref('DocumentAgentRequest'),
+            ], ['stop', 'request'])),
+            'DocumentAgentRequestNextResponse' => self::dataEnvelope(['type' => 'object', 'nullable' => true, 'additionalProperties' => true, 'description' => 'A DocumentAgentRequest with document_id and next (what to do), or null when nothing waits']),
+            'DocumentAgentView' => self::object([
+                'id' => self::int(),
+                'kind' => self::str(),
+                'title' => self::str(),
+                'lang' => self::str(),
+                'reading' => ['type' => 'string', 'enum' => ['draft', 'published'], 'description' => 'Which version these blocks are'],
+                'draft_version' => self::int(),
+                'published_version' => ['type' => 'integer', 'nullable' => true],
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The contract Block[], each with its id'],
+                'suggestions' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentSuggestion'), 'description' => 'Open suggestions'],
+                'comments' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentCommentThread'), 'description' => 'Open comment threads'],
+            ], ['id', 'kind', 'title', 'lang', 'reading', 'draft_version', 'published_version', 'blocks', 'suggestions', 'comments']),
+            'DocumentAgentViewResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentAgentView')),
+            'DocumentSuggestBlocksRequest' => self::object([
+                'after_block_id' => self::str(true) + ['description' => 'The block to go after; null for the start of the document'],
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The contract Block[] to insert, with new ids'],
+                'summary' => self::str() + ['description' => 'What the change does, in a few words'],
+                'request_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'The request you are working on, if any'],
+            ], ['blocks', 'summary']),
+            'DocumentSuggestRewriteRequest' => self::object([
+                'block_id' => self::str() + ['description' => 'The block, from document_read'],
+                'delete_text' => self::str() + ['description' => 'The exact text to replace; "" to insert'],
+                'insert' => self::str() + ['description' => 'The new text; "" to delete'],
+                'occurrence' => self::int() + ['description' => 'Which match of delete_text in the block, from 0 (default 0)'],
+                'summary' => self::str() + ['description' => 'What the change does, for example Replace 30 days with 14 days'],
+                'request_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'The request you are working on, if any'],
+            ], ['block_id', 'delete_text', 'insert', 'summary']),
+            'DocumentCommentReplyRequest' => self::object([
+                'text' => self::str() + ['description' => 'The reply, in plain text'],
+                'suggestion_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'The suggestions this reply made, if any'],
+            ], ['text']),
             'DocumentCommentMessage' => self::object([
                 'id' => self::int(),
                 'by' => SchemaBuilder::ref('DocumentActor'),
@@ -15924,6 +15993,147 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The plugin, allowed or not', 'DocumentBackgroundIssuerResponse'),
                     404 => self::errorResponse('No plugin here declares that it issues with no person'),
                     422 => self::errorResponse('allowed is not a boolean, or the system tenant'),
+                ] + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
+     * Agents in the editor (editor M6; E.30, E.31; IMPLEMENTATION-NOTES 3.4,
+     * owner's answers Q3, Q4, Q9). A person asks; the request waits until the
+     * person's own agent picks it up over MCP. The agent's tools are named by
+     * their operationId and write only suggestions and comments, recording the
+     * agent and the person it acts for. The person's three routes are
+     * `refuse` for agents.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function documentAgentRoutes(): array
+    {
+        $refuse = ['agentPolicy' => 'refuse'];
+        $hidden = self::errorResponse('Document not found or not visible to the caller');
+
+        return [
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/agent-requests', 'documents:suggest', [
+                'summary' => 'Ask an agent to work on an editor document',
+                'description' =>
+                    'The request waits until the agent, connected over MCP for this person, picks it up with '
+                    . 'document_agent_requests_next. Whatever it does arrives as suggestions and comments a person '
+                    . 'decides on. People only: an agent never asks an agent.',
+                'tags' => ['documents'],
+                'mcp' => $refuse,
+                'request' => 'DocumentAgentRequestCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The request, queued', 'DocumentAgentRequestResponse'),
+                    404 => $hidden,
+                    422 => self::errorResponse('Empty request, or an agent you are not using (details.code agent_not_connected)'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/document-sources/{id:\d+}/agent-requests', 'documents:read', [
+                'summary' => 'My agent requests on an editor document',
+                'description' => 'The latest 20, newest first, with what each agent is doing now. The editor polls it while one runs.',
+                'tags' => ['documents'],
+                'mcp' => $refuse,
+                'responses' => [
+                    200 => self::jsonResponse('The requests', 'DocumentAgentRequestListResponse'),
+                    404 => $hidden,
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-agent-requests/{rid:\d+}/stop', 'documents:read', [
+                'summary' => 'Stop an agent request',
+                'description' => 'One nobody picked up stops at once; a running one is told on its agent\'s next update. Only the person who asked.',
+                'tags' => ['documents'],
+                'mcp' => $refuse,
+                'responses' => [
+                    200 => self::jsonResponse('The request', 'DocumentAgentRequestResponse'),
+                    404 => self::errorResponse('Not a request of yours'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-agent-requests/next', 'documents:read', [
+                'operationId' => 'document_agent_requests_next',
+                'summary' => 'Pick up the next document request your person asked of you',
+                'description' =>
+                    'For agents. Returns the oldest waiting request (now running) with document_id and what to do '
+                    . 'next, or null. Then read with document_read (pass request_id), suggest, and report with '
+                    . 'document_agent_request_update.',
+                'tags' => ['documents'],
+                'responses' => [
+                    200 => self::jsonResponse('The request, or null', 'DocumentAgentRequestNextResponse'),
+                    403 => self::errorResponse('Not an agent (details.code agents_only)'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-agent-requests/{rid:\d+}/progress', 'documents:read', [
+                'operationId' => 'document_agent_request_update',
+                'summary' => 'Report how a document request is going',
+                'description' =>
+                    'For the agent working on it. Say what you are doing now in plain words, with done and total '
+                    . 'when known; finish with done, failed (say what went wrong) or stopped. When the answer has '
+                    . 'stop: true, the person pressed Stop: report stopped and end.',
+                'tags' => ['documents'],
+                'request' => 'DocumentAgentRequestUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Whether to stop, and the request', 'DocumentAgentRequestUpdateResponse'),
+                    403 => self::errorResponse('Not an agent (details.code agents_only)'),
+                    404 => self::errorResponse('Not a request you are working on'),
+                    422 => self::errorResponse('Invalid status, title, counts or detail'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/document-sources/{id:\d+}/agent-view', 'documents:read', [
+                'operationId' => 'document_read',
+                'summary' => 'Read an editor document as blocks, with its open comments and suggestions',
+                'description' =>
+                    'Every block carries its id, which document_suggest_rewrite and document_suggest_blocks anchor to. '
+                    . 'An agent reads the draft when it passes the request_id it is working on, and the published '
+                    . 'version otherwise (409 not_published when there is none).',
+                'tags' => ['documents'],
+                'parameters' => [
+                    self::queryParam('request_id', 'string', 'The request from document_agent_requests_next you are working on'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The document', 'DocumentAgentViewResponse'),
+                    404 => $hidden,
+                    409 => self::errorResponse('Not published, and no request_id (details.code not_published)'),
+                    422 => self::errorResponse('request_id is not yours for this document'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/agent-suggestions/blocks', 'documents:suggest', [
+                'operationId' => 'document_suggest_blocks',
+                'summary' => 'Suggest new blocks after a block of an editor document',
+                'description' =>
+                    'A suggestion a person accepts or rejects; the draft is not changed. Records you and the '
+                    . 'person you act for. Blocks need ids the document does not use.',
+                'tags' => ['documents'],
+                'request' => 'DocumentSuggestBlocksRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The suggestion', 'DocumentSuggestionResponse'),
+                    404 => $hidden,
+                    422 => self::errorResponse('Invalid blocks or summary, or the patch does not apply'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/agent-suggestions/rewrite', 'documents:suggest', [
+                'operationId' => 'document_suggest_rewrite',
+                'summary' => 'Suggest replacing text in a block of an editor document',
+                'description' =>
+                    'The text is found by what it says (delete_text, its occurrence), not by position. A '
+                    . 'suggestion a person accepts or rejects; the draft is not changed.',
+                'tags' => ['documents'],
+                'request' => 'DocumentSuggestRewriteRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The suggestion', 'DocumentSuggestionResponse'),
+                    404 => $hidden,
+                    422 => self::errorResponse('Invalid block, text or summary, or the text is not in the block'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/reply', 'documents:comment', [
+                'operationId' => 'document_comment_reply',
+                'summary' => 'Reply in a comment thread on an editor document',
+                'description' => 'Plain text, optionally naming the suggestions the reply made. Records you and the person you act for.',
+                'tags' => ['documents'],
+                'request' => 'DocumentCommentReplyRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The message', 'DocumentCommentMessageResponse'),
+                    404 => self::errorResponse('Document or thread not found, or not visible to the caller'),
+                    422 => self::errorResponse('Empty text or invalid suggestion_ids'),
                 ] + self::authErrors(),
             ]),
         ];

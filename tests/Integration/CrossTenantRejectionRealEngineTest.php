@@ -2578,6 +2578,29 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         self::assertCount(1, $repo->commentsFor(self::TENANT_A, [$threadId])[$threadId] ?? []);
     }
 
+    // ============ document agent requests (editor M6, migration 260) ============
+    //
+    // A person's Ask an agent. Every read, claim, report and stop binds
+    // tenant_id, so another workspace's ids reach nothing.
+
+    public function testDocumentAgentRequestsAreTenantScoped(): void
+    {
+        $repo = new \Whity\Core\Document\Agent\DocumentAgentRequestRepository($this->pdo);
+        $docA = $this->documentSourceIn(self::TENANT_A);
+        $id = $repo->create(self::TENANT_A, $docA, 101, ['agent_principal_id' => null, 'request' => 'Tidy up', 'anchor_block_id' => null, 'quote' => null]);
+
+        self::assertNull($repo->find($id, self::TENANT_B), "Tenant A's request must be absent to Tenant B");
+        self::assertSame([], $repo->forSource(self::TENANT_B, $docA, 101));
+        self::assertNull($repo->claimNext(self::TENANT_B, 101, 'agent-x'), 'a cross-tenant claim takes nothing');
+        self::assertFalse($repo->requestStop($id, self::TENANT_B, 101), 'a cross-tenant stop touches zero rows');
+        self::assertSame('queued', $repo->find($id, self::TENANT_A)['status'] ?? null, "Tenant A's request is untouched");
+
+        $claimed = $repo->claimNext(self::TENANT_A, 101, 'agent-x');
+        self::assertSame($id, $claimed['id'] ?? null);
+        self::assertFalse($repo->report($id, self::TENANT_B, 'agent-x', ['status' => 'done', 'title' => null, 'progress_done' => null, 'progress_total' => null, 'detail' => null]));
+        self::assertSame('running', $repo->find($id, self::TENANT_A)['status'] ?? null);
+    }
+
     // ==================== invitations (WHIT-417) ====================
     //
     // An invitation belongs to the tenant that issued it and carries that
