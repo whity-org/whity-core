@@ -118,6 +118,7 @@ final class CoreApiSchemas
             self::conveningRoutes(),
             self::calendarRoutes(),
             self::taskaatRoutes(),
+            self::taskRoutes(),
             self::publicBookingRoutes(),
             self::delegationRoutes(),
             self::auditRoutes(),
@@ -4771,6 +4772,115 @@ final class CoreApiSchemas
                 'code' => array_merge(self::str(), ['description' => 'The authorization code Taskaat sent back to /tasks/connect.']),
                 'state' => array_merge(self::str(), ['description' => 'The state Taskaat sent back with the code.']),
             ], ['code', 'state']),
+
+            // A10: tasks and boards as Taskaat's record tools return them (Taskaat owns the shape).
+            'TaskPerson' => array_merge(self::object([
+                'ref' => self::str(),
+                'name' => self::str(),
+            ], ['ref', 'name']), ['nullable' => true]),
+            'TaskAssignee' => array_merge(self::object([
+                'kind' => ['type' => 'string', 'enum' => ['person', 'agent']],
+                'ref' => array_merge(self::str(), ['description' => 'whity:<workspace>:person:<id> or whity:<workspace>:agent:<id>.']),
+                'name' => self::str(),
+                'for' => ['$ref' => '#/components/schemas/TaskPerson'],
+                'by' => ['$ref' => '#/components/schemas/TaskPerson'],
+            ], ['kind', 'ref', 'name']), ['nullable' => true]),
+            'TaskRecord' => self::object([
+                'id' => self::str(),
+                'short_id' => self::str(),
+                'title' => self::str(),
+                'status' => ['type' => 'string', 'enum' => ['pending', 'in_progress', 'done']],
+                'column' => ['type' => 'string', 'enum' => ['todo', 'doing', 'review', 'done']],
+                'priority' => self::str(true),
+                'due_date' => self::str(true),
+                'section_id' => self::str(true),
+                'labels' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'name' => self::str(), 'color' => self::str(true)], ['id', 'name'])],
+                'assignee' => ['$ref' => '#/components/schemas/TaskAssignee'],
+                'executor' => self::str(true),
+                'checks' => array_merge(self::object(['met' => self::int(), 'total' => self::int()], ['met', 'total']), ['nullable' => true]),
+                'gate' => ['type' => 'string', 'enum' => ['none', 'awaiting_review', 'sent_back', 'accepted', 'unverified']],
+                'current_state' => self::str(true),
+                'completed_at' => self::str(true),
+                'updated_at' => self::str(true),
+                'url' => array_merge(self::str(), ['description' => 'The same task in Taskaat ("Open in Taskaat").']),
+                'project' => self::object(['id' => self::str(), 'slug' => self::str(), 'name' => self::str()], []),
+            ], ['id', 'short_id', 'title', 'status', 'column', 'gate', 'url']),
+            'TaskBoardSummary' => self::object([
+                'id' => self::str(),
+                'slug' => self::str(),
+                'prefix' => self::str(true),
+                'name' => self::str(),
+                'open_count' => self::int(),
+                'done_count' => self::int(),
+                'url' => self::str(),
+            ], ['id', 'slug', 'name', 'url']),
+            'TaskBoardsResponse' => self::dataEnvelope(self::object([
+                'boards' => ['type' => 'array', 'items' => ['$ref' => '#/components/schemas/TaskBoardSummary']],
+            ], ['boards'])),
+            'TaskBoardResponse' => self::dataEnvelope(self::object([
+                'project' => self::object(['id' => self::str(), 'slug' => self::str(), 'prefix' => self::str(true), 'name' => self::str()], ['id', 'slug', 'name']),
+                'columns' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'title' => self::str()], ['id', 'title'])],
+                'sections' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'name' => self::str()], ['id', 'name'])],
+                'labels' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'name' => self::str(), 'color' => self::str(true)], ['id', 'name'])],
+                'tasks' => ['type' => 'array', 'items' => ['$ref' => '#/components/schemas/TaskRecord']],
+            ], ['project', 'columns', 'tasks'])),
+            'TaskListResponse' => self::dataEnvelope(self::object([
+                'tasks' => ['type' => 'array', 'items' => ['$ref' => '#/components/schemas/TaskRecord']],
+                'next_cursor' => self::str(true),
+            ], ['tasks'])),
+            'TaskDetailResponse' => self::dataEnvelope(self::object([
+                'id' => self::str(),
+                'short_id' => self::str(),
+                'title' => self::str(),
+                'status' => self::str(),
+                'column' => ['type' => 'string', 'enum' => ['todo', 'doing', 'review', 'done']],
+                'gate' => ['type' => 'string', 'enum' => ['none', 'awaiting_review', 'sent_back', 'accepted', 'unverified']],
+                'priority' => self::str(true),
+                'due_date' => self::str(true),
+                'assignee' => ['$ref' => '#/components/schemas/TaskAssignee'],
+                'detail' => self::str(true),
+                'url' => self::str(),
+                'project' => self::object(['id' => self::str(), 'slug' => self::str(), 'name' => self::str()], []),
+                'checks' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::str(),
+                    'text' => self::str(),
+                    'kind' => self::str(true),
+                    'status' => ['type' => 'string', 'enum' => ['met', 'not_met', 'pending']],
+                    'note' => self::str(true),
+                ], ['id', 'text', 'status'])],
+                'evidence' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::str(),
+                    'format' => self::str(true),
+                    'excerpt' => self::str(),
+                    'created_at' => self::str(true),
+                ], ['id', 'excerpt'])],
+                'milestones' => ['type' => 'array', 'items' => self::object(['index' => self::int(), 'text' => self::str(), 'done' => self::bool()], ['index', 'text', 'done'])],
+                'gate_history' => ['type' => 'array', 'items' => self::object(['verdict' => self::str(), 'by' => self::str(true), 'note' => self::str(true), 'at' => self::str(true)], ['verdict'])],
+            ], ['id', 'short_id', 'title', 'column', 'gate', 'url', 'checks', 'evidence'])),
+            'TaskAssigneeRequest' => array_merge(self::object([
+                'kind' => ['type' => 'string', 'enum' => ['person', 'agent']],
+                'id' => array_merge(self::int(), ['description' => 'A person\'s profile id or an agent\'s id in this workspace.']),
+            ], ['kind', 'id']), ['nullable' => true]),
+            'TaskCreateRequest' => self::object([
+                'board' => array_merge(self::str(), ['description' => 'The board: a Taskaat project prefix, slug or id.']),
+                'title' => self::str(),
+                'detail' => self::str(),
+                'due_date' => array_merge(self::str(), ['description' => 'YYYY-MM-DD.']),
+                'priority' => ['type' => 'string', 'enum' => ['rush', 'high', 'medium', 'low']],
+                'assignee' => ['$ref' => '#/components/schemas/TaskAssigneeRequest'],
+            ], ['board', 'title']),
+            'TaskCreatedResponse' => self::dataEnvelope(self::object(['created' => self::bool()], ['created'])),
+            'TaskUpdateRequest' => self::object([
+                'title' => self::str(),
+                'due_date' => self::str(),
+                'priority' => ['type' => 'string', 'enum' => ['rush', 'high', 'medium', 'low']],
+                'assignee' => ['$ref' => '#/components/schemas/TaskAssigneeRequest'],
+                'column' => array_merge(['type' => 'string', 'enum' => ['todo', 'doing', 'done']], ['description' => 'Awaiting review is reached by submitting evidence, never by moving the card.']),
+            ], []),
+            'TaskReviewRequest' => self::object([
+                'decision' => ['type' => 'string', 'enum' => ['accept', 'send_back']],
+                'note' => array_merge(self::str(), ['description' => 'Required to send back: what to change.']),
+            ], ['decision']),
 
             // GET /api/plugins/store/catalog — a store's public catalogue entry.
             'StoreCataloguePlugin' => self::object([
@@ -17505,6 +17615,78 @@ final class CoreApiSchemas
                     200 => ['description' => 'iCalendar', 'content' => ['text/calendar' => ['schema' => ['type' => 'string']]]],
                     404 => self::errorResponse('Not found'),
                 ] + $limits,
+            ]),
+        ];
+    }
+
+    /**
+     * Tasks and Boards through the workspace's Taskaat (A10, T.2-T.4). Whity keeps no copy;
+     * agents use the taskaat_* tools, so none of these is an MCP tool.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function taskRoutes(): array
+    {
+        $notMcp = ['expose' => false];
+        $taskaat = [
+            409 => self::errorResponse('The workspace is not connected to Taskaat, or the connection lapsed'),
+            501 => self::errorResponse('This Taskaat does not have the record tools yet'),
+            502 => self::errorResponse('Taskaat could not be reached'),
+        ];
+
+        return [
+            self::permissionRoute('GET', '/api/tasks/boards', 'tasks:read', [
+                'summary' => 'List the boards (Taskaat projects)',
+                'tags' => ['tasks'],
+                'mcp' => $notMcp,
+                'responses' => [200 => self::jsonResponse('The boards', 'TaskBoardsResponse')] + $taskaat + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/tasks/boards/{board}', 'tasks:read', [
+                'summary' => 'Read a board: its columns, sections, labels and tasks',
+                'description' => 'Columns are To do, Doing, Awaiting review and Done. Done holds tasks finished in the last 14 days.',
+                'tags' => ['tasks'],
+                'mcp' => $notMcp,
+                'responses' => [200 => self::jsonResponse('The board', 'TaskBoardResponse'), 404 => self::errorResponse('No such board')] + $taskaat + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/tasks', 'tasks:read', [
+                'summary' => 'List tasks: mine, assigned by me, agents\' or all',
+                'tags' => ['tasks'],
+                'mcp' => $notMcp,
+                'parameters' => [
+                    self::queryParam('view', 'string', '`mine` (default), `by_me`, `agents` or `all`.'),
+                    self::queryParam('board', 'string', 'Only this board.'),
+                    self::queryParam('status', 'string', '`open` (default), `pending`, `in_progress`, `done` or `all`.'),
+                ],
+                'responses' => [200 => self::jsonResponse('The tasks', 'TaskListResponse'), 422 => self::errorResponse('An unknown view or status')] + $taskaat + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/tasks', 'tasks:write', [
+                'summary' => 'Create a task on a board',
+                'tags' => ['tasks'],
+                'mcp' => $notMcp,
+                'request' => 'TaskCreateRequest',
+                'responses' => [201 => self::jsonResponse('Created', 'TaskCreatedResponse'), 422 => self::errorResponse('A missing title or board, or someone outside the workspace')] + $taskaat + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/tasks/{task}', 'tasks:read', [
+                'summary' => 'Read a task with its check, evidence and review',
+                'description' => 'Reading never starts the task.',
+                'tags' => ['tasks'],
+                'mcp' => $notMcp,
+                'responses' => [200 => self::jsonResponse('The task', 'TaskDetailResponse'), 404 => self::errorResponse('No such task')] + $taskaat + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/tasks/{task}', 'tasks:write', [
+                'summary' => 'Change a task, or move it between To do, Doing and Done',
+                'description' => 'Moving to Done runs Taskaat\'s gates: a task with a check and no passing evidence is refused, or closes as Done, unverified.',
+                'tags' => ['tasks'],
+                'mcp' => $notMcp,
+                'request' => 'TaskUpdateRequest',
+                'responses' => [200 => self::jsonResponse('The task', 'TaskDetailResponse'), 422 => self::errorResponse('Refused, with Taskaat\'s reason')] + $taskaat + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/tasks/{task}/review', 'tasks:write', [
+                'summary' => 'Review a task: accept it as done, or send it back',
+                'tags' => ['tasks'],
+                'mcp' => $notMcp,
+                'request' => 'TaskReviewRequest',
+                'responses' => [200 => self::jsonResponse('The task', 'TaskDetailResponse'), 422 => self::errorResponse('No check to review, or no reason to send back')] + $taskaat + self::authErrors(),
             ]),
         ];
     }
