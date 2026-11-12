@@ -293,6 +293,14 @@ export interface DataTableProps<TData> {
    * `manualFiltering` at the `useTable` call.
    */
   search?: DataTableServerSearch
+  /**
+   * Below 640px: "stack" (the default) shows each row as a small card, the
+   * first column as its title and the others as label and value lines under
+   * it (the "Your fields" rows of the phone designs), so nothing scrolls
+   * sideways. "scroll" keeps the table and lets it scroll inside its frame,
+   * for the few tables that only make sense as a grid.
+   */
+  phoneLayout?: "stack" | "scroll"
   className?: string
 }
 
@@ -522,8 +530,11 @@ export function DataTable<TData>({
   pagination,
   sorting: serverSorting,
   search: serverSearch,
+  phoneLayout = "stack",
   className,
 }: DataTableProps<TData>) {
+  // Totals are a grid by nature, so a table with a foot keeps scrolling.
+  const stack = phoneLayout === "stack" && !totals
   const [clientSorting, setClientSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = React.useState("")
@@ -897,9 +908,11 @@ export function DataTable<TData>({
         >
           <Table
             aria-label={ariaLabel}
+            data-phone-layout={stack ? "stack" : undefined}
+            className={stack ? "max-sm:block max-sm:!w-full max-sm:[&_tbody]:block" : undefined}
             style={enableColumnResizing ? { width: table.getCenterTotalSize() } : undefined}
           >
-            <TableHeader className={stickyHeader ? "sticky top-0 z-[1]" : undefined}>
+            <TableHeader className={cn(stickyHeader && "sticky top-0 z-[1]", stack && "max-sm:hidden")}>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => {
@@ -1057,7 +1070,8 @@ export function DataTable<TData>({
                   aria-selected={selection ? selection.selected.has(row.id) : undefined}
                   className={cn(
                     onRowClick && "cursor-pointer",
-                    selection?.selected.has(row.id) && "bg-primary-tint hover:bg-primary-tint"
+                    selection?.selected.has(row.id) && "bg-primary-tint hover:bg-primary-tint",
+                    stack && "max-sm:flex max-sm:flex-wrap max-sm:items-start max-sm:gap-x-3 max-sm:px-4 max-sm:py-3"
                   )}
                   onClick={
                     onRowClick
@@ -1067,15 +1081,23 @@ export function DataTable<TData>({
                       : undefined
                   }
                 >
-                  {row.getVisibleCells().map((cell) => (
+                  {row.getVisibleCells().map((cell, cellIndex, cells) => {
+                    const role = stack ? phoneCellRole(cell.column.id, cellIndex, cells) : undefined
+                    const header = cell.column.columnDef.header
+                    return (
                     <TableCell
                       key={cell.id}
-                      className={(cell.column.columnDef.meta as { className?: string } | undefined)?.className}
+                      data-label={role === "line" && typeof header === "string" ? header : undefined}
+                      className={cn(
+                        (cell.column.columnDef.meta as { className?: string } | undefined)?.className,
+                        role && PHONE_CELL[role]
+                      )}
                       style={enableColumnResizing ? { width: cell.column.getSize() } : undefined}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
-                  ))}
+                    )
+                  })}
                 </TableRow>
               ))}
             </TableBody>
@@ -1302,4 +1324,31 @@ export function useDataTableQuery({
       },
     }),
   }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * The phone layout of a row (below 640px, `phoneLayout="stack"`).
+ *
+ * The row becomes a wrapping flex box: the checkbox (if any), the first
+ * column as the title and the row's actions share the top line (`order`
+ * moves the actions up from the end of the row); every other
+ * column is a full-width line with its header as a muted label at the start
+ * and the value at the end. The header row is hidden, since each line now
+ * names itself. Classes only, so the markup and every selector stay the same.
+ * ────────────────────────────────────────────────────────────────────────── */
+type PhoneCellRole = "select" | "title" | "actions" | "line"
+
+const PHONE_CELL: Record<PhoneCellRole, string> = {
+  select: "max-sm:order-1 max-sm:h-auto max-sm:p-0 max-sm:pt-0.5",
+  title: "max-sm:order-2 max-sm:h-auto max-sm:min-w-0 max-sm:flex-1 max-sm:p-0 max-sm:whitespace-normal max-sm:font-medium",
+  actions: "max-sm:order-3 max-sm:ms-auto max-sm:h-auto max-sm:p-0",
+  line:
+    "max-sm:order-4 max-sm:flex max-sm:h-auto max-sm:min-w-0 max-sm:basis-full max-sm:items-baseline max-sm:justify-between max-sm:gap-3 max-sm:p-0 max-sm:pt-1.5 max-sm:text-end max-sm:whitespace-normal max-sm:break-words max-sm:before:shrink-0 max-sm:before:text-start max-sm:before:text-muted-foreground max-sm:before:content-[attr(data-label)]",
+}
+
+function phoneCellRole(columnId: string, index: number, cells: { column: { id: string } }[]): PhoneCellRole {
+  if (columnId === "__select") return "select"
+  if (columnId === "__row-actions") return "actions"
+  const firstData = cells.findIndex((c) => c.column.id !== "__select" && c.column.id !== "__row-actions")
+  return index === firstData ? "title" : "line"
 }
