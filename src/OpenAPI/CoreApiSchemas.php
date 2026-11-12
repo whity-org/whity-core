@@ -6669,7 +6669,7 @@ final class CoreApiSchemas
                 'source' => self::str(),
             ], ['data', 'pagination', 'source']),
 
-            // -- Team chat (CH.1, CH.2; migration 251) ----------------------------
+            // -- Team chat (CH.1, CH.2; migration 253) ----------------------------
             // People and agents in one chat. An agent is always marked: who it is,
             // who it works for, and what it may do in that chat.
             'ChatPerson' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']),
