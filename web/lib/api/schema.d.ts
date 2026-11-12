@@ -9754,6 +9754,8 @@ export interface components {
                 /** @description False when you cannot read this document yourself, so its name is withheld */
                 readable: boolean;
             }[];
+            /** @description Whether the person it acts for hears by email when something waits for them (A12) */
+            notifyByEmail: boolean;
         };
         AgentAction: {
             id: number;
@@ -9864,6 +9866,8 @@ export interface components {
             };
             /** @description Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access. */
             mayRead?: number[];
+            /** @description Email the person it acts for when something waits for them: at most one an hour, and the email only opens Whity */
+            notifyByEmail?: boolean;
             /** @description Start from this preset; fields sent override its own */
             presetKey?: string;
         };
@@ -9937,6 +9941,8 @@ export interface components {
             };
             /** @description Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access. */
             mayRead?: number[];
+            /** @description Email the person it acts for when something waits for them: at most one an hour, and the email only opens Whity */
+            notifyByEmail?: boolean;
         };
         AgentPreset: {
             key: string;

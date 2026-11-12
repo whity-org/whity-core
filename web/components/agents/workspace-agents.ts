@@ -48,6 +48,8 @@ export interface WorkspaceAgent extends AgentPersona {
   onItsOwn: AgentOnItsOwnCounts;
   /** A document this viewer can't read keeps its place, with no title. */
   mayRead: { id: number; title: string | null; kind: string | null; readable: boolean }[];
+  /** A12: the person it acts for hears by email when something waits for them. */
+  notifyByEmail?: boolean;
 }
 
 export interface AgentPreset extends AgentPersona {

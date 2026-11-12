@@ -66223,6 +66223,10 @@
                                 "readable"
                             ]
                         }
+                    },
+                    "notifyByEmail": {
+                        "type": "boolean",
+                        "description": "Whether the person it acts for hears by email when something waits for them (A12)"
                     }
                 },
                 "required": [
@@ -66252,7 +66256,8 @@
                     "waiting",
                     "lastActiveAt",
                     "onItsOwn",
-                    "mayRead"
+                    "mayRead",
+                    "notifyByEmail"
                 ]
             },
             "AgentAction": {
@@ -66654,6 +66659,10 @@
                         },
                         "description": "Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access."
                     },
+                    "notifyByEmail": {
+                        "type": "boolean",
+                        "description": "Email the person it acts for when something waits for them: at most one an hour, and the email only opens Whity"
+                    },
                     "presetKey": {
                         "type": "string",
                         "description": "Start from this preset; fields sent override its own"
@@ -66875,6 +66884,10 @@
                             "type": "integer"
                         },
                         "description": "Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access."
+                    },
+                    "notifyByEmail": {
+                        "type": "boolean",
+                        "description": "Email the person it acts for when something waits for them: at most one an hour, and the email only opens Whity"
                     }
                 }
             },

@@ -53,6 +53,8 @@ final class EmailContent
         public readonly string $ctaTone = 'brand',
         public readonly ?string $notice = null,
         public readonly string $language = 'en',
+        /** Draw the rows above the paragraphs (`new-sign-in`: the facts, then what to do). */
+        public readonly bool $rowsFirst = false,
     ) {
     }
 

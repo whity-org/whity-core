@@ -1739,6 +1739,19 @@ $emailNotifications = new \Whity\Core\Mail\EmailNotifications(
     $logger
 );
 $emailNotifications->subscribe($hookManager);
+// EM.1: one sender for every email a workspace sends (its brand, its language),
+// and the two security emails that can't be turned off. The workspace branding
+// source is handed over once the entitlement service exists (below).
+$brandedEmailSender = new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService, $logger);
+// SDK 1.99 (WHIT-978): plugins send as the workspace through the same sender.
+\Whity\register_service(\Whity\Sdk\Mail\WorkspaceEmails::class, new \Whity\Core\Mail\SdkWorkspaceEmails($brandedEmailSender)); // @phpstan-ignore-line
+$accountSecurityMailer = new \Whity\Core\Mail\AccountSecurityMailer(
+    $brandedEmailSender,
+    $profileEmailRepository,
+    $db->getPdo(),
+    $frontendUrls->base() . '/settings',
+);
+$authHandler->setSecurityMailer($accountSecurityMailer);
 
 $registerHandler = new RegisterApiHandler($db->getPdo(), $settingsService, $emailVerificationProvider, $hookManager);
 $router->register('POST', '/api/register', [$registerHandler, 'register'], null);
@@ -1829,6 +1842,7 @@ $twoFactorProofThrottle = new LoginThrottleService(
     'two_factor_proof',
 );
 $twoFactorHandler = new TwoFactorHandler($db->getPdo(), $totpService, $backupCodesService, $tokenValidator, $auditLogger, $twoFactorProofThrottle);
+$twoFactorHandler->setSecurityMailer($accountSecurityMailer);
 $router->register('POST', '/api/auth/2fa/setup', [$twoFactorHandler, 'setup'], null);
 $router->register('POST', '/api/auth/2fa/confirm', [$twoFactorHandler, 'confirm'], null);
 $router->register('POST', '/api/auth/2fa/disable', [$twoFactorHandler, 'disable'], null);
@@ -2807,6 +2821,8 @@ $router->register('POST', '/api/instance/complete-setup', [$instanceHandler, 'co
 $entitlementService = new \Whity\Core\Entitlement\EntitlementService(
     new \Whity\Core\Entitlement\TenantEntitlementRepository($db->getPdo())
 );
+// EM.1: workspace emails carry the workspace's brand, and white-label by plan.
+$brandedEmailSender->useBranding(new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService));
 $tenantEntitlementsHandler = new \Whity\Api\TenantEntitlementsApiHandler(
     $db->getPdo(),
     $entitlementService,
@@ -3126,6 +3142,25 @@ $planLimitMeters = new \Whity\Core\Entitlement\MeterService(
     $entitlementService,
     $settingsService
 );
+// EM.1 `plan-limit`: the people who can choose a plan hear when the workspace
+// comes close to a limit, or passes it on an instance that warns.
+$planLimitMailer = new \Whity\Core\Mail\PlanLimitMailer(
+    $brandedEmailSender,
+    new \Whity\Core\Mail\WorkspaceRecipients($db->getPdo(), $roleChecker),
+    $settingsService,
+    $frontendUrls->base() . '/billing',
+    static function (int $tenantId) use ($db): string {
+        $stmt = $db->getPdo()->prepare('SELECT name FROM tenants WHERE id = :id');
+        $stmt->execute([':id' => $tenantId]);
+        $name = $stmt->fetchColumn();
+
+        return is_string($name) && $name !== '' ? $name : 'your workspace';
+    },
+);
+$planLimitThreshold = \Closure::fromCallable([$planLimitMailer, 'crossed']);
+$planLimitMeters->onThreshold(static function (int $t, string $k, int $u, int $l, string $st, string $r) use ($planLimitThreshold): void {
+    $planLimitThreshold($t, $k, $u, $l, $st, $r);
+});
 $planLimitsHandler = new \Whity\Api\PlanLimitsApiHandler(
     new \Whity\Core\Usage\PlanLimitsReport(
         $db->getPdo(),
@@ -3474,6 +3509,9 @@ $documentRenderMeters = new \Whity\Core\Entitlement\MeterService(
     $entitlementService,
     $settingsService
 );
+$documentRenderMeters->onThreshold(static function (int $t, string $k, int $u, int $l, string $st, string $r) use ($planLimitThreshold): void {
+    $planLimitThreshold($t, $k, $u, $l, $st, $r);
+});
 
 // 13a-nonies-bis. ISSUED DOCUMENTS (#947 item 1) — the records a persisted
 // render creates, and their immutable artifacts. Reads are gated on
@@ -5853,6 +5891,19 @@ $agentProposals = new \Whity\Core\Agent\AgentProposalRepository(
     // WHIT-991: created, decided and undone, for plugins.
     new \Whity\Core\Agent\AgentProposalEvents($hookManager),
 );
+// A12 / EM.1 `needs-approval`: the person an agent acts for hears by email that
+// something waits for them (only opens the app; one an hour per agent; the
+// agent's page and Preferences turn it off).
+(new \Whity\Core\Notification\AgentEmailNotifier(
+    $db->getPdo(),
+    $agentProposals,
+    new \Whity\Core\Notification\NotificationPreferenceRepository($db->getPdo()),
+    $profileEmailRepository,
+    new DatabaseSharedStore($db->getPdo()),
+    $brandedEmailSender,
+    $frontendUrls->base() . '/admin/approvals',
+    $logger,
+))->subscribe($hookManager);
 // WHIT-833: previews of what a proposed call would change. Register one with
 // $proposalDiffs->register('<tool name>', fn (array $arguments, int $tenantId): ?array => ...).
 $proposalDiffs = new \Whity\Mcp\Tools\ProposalDiffRegistry();
