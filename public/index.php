@@ -1173,6 +1173,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::DOCUMENTS_READ,
     ];
     $items[] = [
+        'id' => 'saved-blocks',
+        'label' => 'Saved blocks',
+        'href' => '/admin/document-sources/saved-blocks',
+        'icon' => 'stack-2',
+        'group' => 'documents',
+        'order' => 7,
+        // Editor M7 (E.21-E.22): a person's own saved blocks and the workspace
+        // library, to rename, delete, see where a synced block is used and
+        // edit the original. Mirrors GET /api/saved-blocks, gated documents:read.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::DOCUMENTS_READ,
+    ];
+    $items[] = [
         'id' => 'document-templates',
         'label' => 'Document templates',
         'href' => '/admin/document-templates',
