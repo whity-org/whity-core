@@ -1,0 +1,4 @@
+# Mobile create and agents
+
+- **Create** (M.11): the centre button opens a bottom sheet over the current screen. **Ask an agent** leads (tap to type, or the microphone to speak), then six large tiles chosen for the person's role (Fill a form, Scan a receipt, Stock count, New note, New invoice, Ask for leave). **Change these** lets each person pick their own. The sheet closes by swiping down or tapping outside.
+- **Chat tab** (M.12, changed by CH.1–CH.3): the fourth tab was Agents; it is now **Chat**, shared by people and agents (`TmChat`). A chat with one agent is shown here: the composer sits at the bottom with **hold to speak**, and an agent's offer to act appears as a dashed proposal inside its reply, with a button; nothing happens until the person approves each action. **Agents today** keeps the day's counts (done, waiting for you) and activity, newest first, with each agent "for you".

@@ -1,5 +1,221 @@
 # Implementation notes
 
+The working plan for design system 3.3, checked against `develop` at `b7aae8e5` on 12 Nov 2026 (WHIT-952). This is step 1 of `START-HERE.md`: organise, no feature code. The 2.9 working plan of 2 Nov and the M0 notes of 29 Oct are kept unchanged [below](#design-29-working-plan-2-nov-2026); their done and partly-done status is carried into the tables here.
+
+How it was checked: the code was read on `origin/develop` and the merged pull requests were listed. No screen was compared with its screenshots; each milestone does that.
+
+## What the 3.3 merge did
+
+3.3 was merged into `docs/design/` three ways against the original 2.9 package, as 2.9 was, not unzipped over it. The 3.3 package was drawn from the brand team's own 2.9, so it lacks everything the team added in the repo (the same list as 2.9's "For the design team to pick up", below).
+
+| Result | Files | Notes |
+| --- | --- | --- |
+| Added | 777 | Sections 26-29, `business/`, `sites/`, `handoff/emails/`, `handoff/motion/`, 80 more icons, 106 new cards (`Tm*`, `Site*`, `Email*`, 28 new `Tpl*`) with screenshots, the 3.3 PDF |
+| Taken from 3.3 | 406 | Unchanged in the repo since 2.9. 99 existing cards changed only their example people (WS.4: the Whity team instead of Rana, Omar, Lina) |
+| Merged line by line | 3 | `00-decision-register.md`, `13-app-map.md`, `PLAN.md`, no conflicts. The register keeps E.40-E.47, the 6.3 and 6.8 changes and the S.1-S.12 answers; the plan keeps M4d and "merge on green"; the app map keeps D1 and the messages, calendar, public forms and customer sign-up rows |
+| Merged by hand | 1 | `CLAUDE-snippet.md`: 3.3's text, plus the three rules 3.3 dropped again (16px editor sheet, "with the permission it used", the editor pointer) and "merge on green" in place of "stop for approval" (owner, 2 Nov, Q7 below) |
+| 3.3's version | 1 | `HANDOFF.md`: the repo had changed only its first line, to say 2.9 was merged; this file says so now |
+| Repo's version kept | 8 | 3.3 didn't change them: `16-documents.md`, `18-document-editor.md`, `19-plugin-store.md`, `handoff/editor/README.md`, `handoff/editor/whity-document.ts`, and the `EditorAgents`, `EditorBlocks`, `EditorCollab` READMEs |
+| Repo-only, kept | 18 | The team's notes (`AGENT-*`, `DESIGN-ASKS.md`, `DOCUMENT-*`, `MCP-TOOL-SURFACE.md`, `VERIFIED-PLUGINS-SECURITY.md`, `WHITY-BUILDER.md`, this file), the `Cover` card, `assets/motion` and `assets/social` (3.3 spells them `Motion` and `Social`; the files are the same) |
+| Removed | 1 | `Whity-Brand-Guidelines-v2.9.pdf`, replaced by 3.3's |
+| Moved | 1 | `START-HERE.md` from the zip's root to `docs/design/` |
+
+The business model PDFs in `business/` and the 3.3 guideline PDF are byte-for-byte the copies in `D:\Projects\Whity`.
+
+Outside `docs/design/`: `CLAUDE.md` takes the merged snippet and keeps its own rule on size tokens. 3.3 grows the curated icons from 116 to 156, and `web/__tests__/design-system-rules.test.ts` holds `packages/ui/src/icon-map.ts` equal to `icons.json` with a fixed count, so the map was regenerated with `scripts/generate-icon-map.mjs` and the count changed to 156. Every new Tabler name exists in `@tabler/icons-react` 3.49, below the 3.50 the lock file installs. Nothing uses the new icons yet.
+
+## Is the folder complete
+
+- **Cards:** all 270 cards in `cards.html` have a folder with `README.md`, `index.html` and `preview.html`, and a light and a dark screenshot. Every card named in `13-app-map.md`, `PLAN.md` and sections 26-29 exists. Only `Cover` has a folder and no entry in `cards.html`, as in 2.9.
+- **Dark screenshots that aren't dark:** 27 cards ship a dark screenshot identical to the light one: the six `Email*` cards, the 13 `TplDoc*` starters (paper, so expected) and eight Arabic cards (`TplAgentApprovalsAr`, `TplAgentRecordAr`, `TplBillingAr`, `TplDocRoutingAr`, `TplFormBuilderAr`, `TplUserRecordAr`, `TplDocInvoiceAr`, `TplDocInvoiceLong`). The Arabic ones were already like this in 2.9. The `Email*` cards matter: E1 is done when the emails match in dark mode, and there is no dark target. Ask for them.
+- **Counts:** 15 emails in English and Arabic, 31 Lottie files, 156 icons, 5 sites with 20 pages a language, 48 `Tm*` and 22 `Site*` cards, as `HANDOFF.md` says.
+- **Fonts:** 3.3's `fonts/` ships Noto Sans, Noto Sans Arabic and Geist Mono at weight 700 (and Geist Mono 600) although 3.6 rules out 700. They were in 2.9 too. Not copied into the app; nothing needs them.
+- **Still not designed:** `HANDOFF.md`'s list (publisher page, public marketplace, everything "To design" in section 28), plus what 2.9 left open and 3.3 didn't draw: the theme picker and Document themes screen (WHIT-785), the user menu (WHIT-827), Decided and Edit in Approvals (WHIT-828), the impact plan (WHIT-829), issuing an agent credential (WHIT-830), E.40-E.47 blocks, the Messages inbox (WHIT-939 ask), the calendar staff screens (WHIT-946 ask), public forms and customer sign-up settings (WHIT-906, WHIT-915 asks), and usage and the limit warning on Billing (`brand-ask-limit-warning.md`). `DESIGN-ASKS.md` has them.
+
+## The repository's own tokens, fonts, icons and logos
+
+Nothing was replaced.
+
+| Kind | In the repo | Against `docs/design/` |
+| --- | --- | --- |
+| Tokens (source) | `src/design/tokens/base.json` 3.0.0, generated by `src/design/tokens/generate-tokens.js` into `src/design/tokens/generated/` and `packages/tokens/generated/` | 3.3 didn't change `tokens.json`, `tokens.css`, `handoff/web/` or `handoff/flutter/` since 2.9 |
+| Web CSS | `packages/tokens/generated/theme.css`, `base.css`, `fonts.css` (`@whity/tokens` 0.2.0) | All 56 colours that both define are equal within 2/255: the repo writes oklch, `handoff/web/tokens.css` writes hex. The repo is ahead on sizes (2.9's 15px, `--control-h` 40/32/44, `--row-h` 48, the Larger text scale, from A0). `handoff/web/tokens.css` has `--space-*`, `--logo-*` and `--mark-cut-switch`, which the repo doesn't generate; nothing in the app asks for them |
+| Fonts | `packages/tokens/fonts/` (10 files) | All 10 are byte-identical to `fonts/`. The repo has no 700 files (by rule) and no Geist Mono 600 |
+| Icons | `packages/ui/src/icon-map.ts` (Tabler by name), `packages/ui/src/icon.tsx` | Generated from `handoff/icons/icons.json`; now 156 (above). The SVG exports in `handoff/icons/ink` and `paper` aren't used: the app draws Tabler components |
+| Logos | `packages/ui/src/mark.tsx`, `lockup.tsx`, `built-on-whity.tsx`, `tenant-logo.tsx`; `web/app/app-icon/` (a route) and `web/app/manifest.webmanifest`; `docs/design/assets/Logos/` | `mark.tsx` draws the same paths as `handoff/logos/whity-mark-colour.svg`. `handoff/logos/favicon.svg` and `favicon.ico` have no copy in `web/public/`, which still holds Next's starter SVGs (`next.svg`, `vercel.svg`, `globe.svg`, `file.svg`, `window.svg`). The favicon comes from the workspace's branding or the app icon route |
+| Flutter | `flutter/whity_tokens/` (generated `tokens.dart`) | `handoff/flutter/lib/whity_brand.dart` (the plane, blueprint, logo sizes) isn't in the repo. There is no Flutter app in this repository |
+| Motion | none | `handoff/motion/` (31 Lottie files, `whity-lottie.js`, Flutter code) has no counterpart; no `lottie` dependency |
+| Templates | `templates/tauri-desktop/src-tauri/icons/` | The desktop template's own app icons; not compared |
+
+## Where each website lives
+
+| Site | Lives in | Stack | What the port means |
+| --- | --- | --- | --- |
+| whity.dev | `whity-org/whity-web`, repo root (Worker `whity-dev-site`) | Astro, Cloudflare Workers static assets | Not plain static: the `sites/whity.dev` pages become Astro pages. It already has `index`, `install`, `license`, `privacy`, `security`, `404`, `platform`, `plugin-sdk`, `ecosystem`, `contribute`, `cli`, `terms` and a blog. 3.3 adds the module pages, Partners, About, Contact and `ar/` |
+| docs.whity.dev | `whity-org/whity-web/docs-site` (Worker `whity-docs-site`) | Astro Starlight | Compiled from this repo's `docs/wiki` and `docs/adr` by `docs-site/scripts/sync-docs.mjs`; `docs/design/` isn't published. `notify-docs-site.yml` sends a rebuild on every `docs/**` push, so this PR triggers one |
+| brand.whity.dev | `whity-org/whity-web/brand-site` (Worker `whity-brand-site`), files in `whity-web/brand/` | Astro | Section 12 item 9: its logo files were last seen matching 2.2 |
+| health.whity.dev | this repo, `ops/watchdog/` (Worker `whity-watchdog`, route `health.whity.dev`) | Plain Cloudflare Worker reading KV | Kept apart from the app on purpose (the outage of 9 Sep). `SiteStatus` is a restyle of `ops/watchdog/src/index.js`; it already has the real status data |
+| id.whity.dev | `whity-org/whity-id` | Laravel with React and Inertia (`resources/js/Pages`), Blade mail | `SiteId` lands in its pages, not here |
+
+No site needed a new repository.
+
+## Already built in core
+
+| Area | What exists | Where |
+| --- | --- | --- |
+| Messages | Customer conversations: an inbox, email and web chat channels, a channel interface for plugins (`PluginMessageChannelsInterface`), merged inbox sources. WhatsApp and SMS are paid plugins | ADR 0016; #1811, #1820 (SDK 1.97), #1821 (migrations 243-245), #1824; `/admin/messages`, `/messages`, `/chat/[workspace]`, `src/Core/Messaging` |
+| Calendar | Staff calendars, services, availability (hours and time off), the public booking page and the customer's booking page, reminders through Messages, ICS feed and `.ics` attachment, outside busy times, a payment step | ADR 0017; #1819, #1822, #1823, #1825, #1826 (SDK 1.98), #1827, #1828; `/calendar`, `/calendar/services`, `/calendar/hours`, `/calendar/settings`, `/book/[workspace]`, `/booking/[token]`, `src/Core/Calendar` |
+| Plan limits | BM.2: 5 staff and 500 customers a month on the free plan, agents not counted, add-on packs, warn mode; Built on Whity follows the plan | #1787 (catalogue, default plan), #1799 (server), #1800 (Billing screen, add-on pack editor); `/billing/plan-limits.tsx`, `src/Core/Entitlement`, `src/Core/Usage` |
+
+**3.3 cards against that work:**
+
+| Card | Built by | Fits | Doesn't fit yet |
+| --- | --- | --- | --- |
+| `TplAppointments` | Calendar (`/calendar` and its sub-pages) | Day and week, services with length and price, who can do each, per-person hours and time off, reminders | Columns of **rooms** and **branches** (no room resource or branch filter); **checked in** state; **requests** that need the staff's OK with Accept and Suggest another time; a Today panel. Reminders go by email in core; WhatsApp at 24 and 2 hours is the paid plugin's. Meetings in `src/Core/Convening` don't block calendar time |
+| `TplBookingPage` | `/book/[workspace]`, `/booking/[token]` | Service, day, time, summary, book, move and cancel by link up to a cut-off | The address on the tenant's own domain (`examplebakery.jo/book`) needs the custom-domain work; Google or Apple sign-in creating a Whity ID (M.31) needs Whity ID; confirmation by WhatsApp is the paid plugin's; approval-needed services send a request (as above) |
+| `TplChat` | Not this. Core Messages are conversations **with customers**; `TplChat` (CH.1-CH.2) is the team's own chat, people and agents together, with groups, mentions and proposals in the thread | The conversation and message tables, the web chat transport and the agent proposal card could be reused | Everything else: groups and direct chats between staff, agents as members with "for Emad", joining lines, read-from-join scope, chats linked to a board, meeting or record. **Question for the owner (Q3)** |
+| `TplSubscriptions` | Not this. Plan limits are the workspace's **own** Whity plan (Billing, section 25). `TplSubscriptions` (SU.1) is plans a tenant **sells to its customers** | `src/Core/Subscription` and `src/Core/Plan` model the workspace's plan and could lend their shapes | Customer plans, subscribers, renewals, retries, pause on failure, CliQ and card. Taking money is Whity Pay's (a paid plugin, the installer's own Stripe, Polar or Paddle). **Q4** |
+| `TplBilling` (changed only in names) | #1800 | Plans and add-on packs | Usage against the limits and the warning: no design yet (ask in `brand-ask-limit-warning.md`). The `plan-limit` email in `handoff/emails/` is the first design of the warning |
+
+## Milestones
+
+Status: **done** (built and merged), **partial** (some of it is built), **missing** (nothing yet). Estimates are in pull requests of the size the 2.9 milestones had (one session each).
+
+### Overview
+
+| Milestone | Status | Server work | Estimate |
+| --- | --- | --- | --- |
+| Editor M0 Survey | Done | — | — |
+| Editor M1 Foundation | Done | — | — |
+| Editor M2 Core | Done | — | — |
+| Editor M3 Rich blocks | Done | — | — |
+| Editor M4 Templates (with M4b labels, M4c issuing) | Done | — | — |
+| Editor M4d Themes | Done (server); picker waits on WHIT-785 | — | 1 when the card exists |
+| Editor M5 Comments and suggestions | Done (#1519) | — | — |
+| Editor M6 Agents | Missing | MCP tools, run streaming | 2 |
+| Editor M7 Plugin and saved blocks | Missing | Block registry, saved blocks tables, SDK minor | 3 |
+| Editor M8 Arabic, type, accessibility | Partial | Theme options E.46, E.47 | 1-2 |
+| A0 Ease-of-use foundation | Done (#1546) | — | — |
+| A1 Home, People, Inbox | Done (#1561, #1572, #1575, #1588; S2, S3) | — | — |
+| A2 Forms | Done (#1569 and follow-ups; S4) | — | — |
+| A3 Documents and routing | Done (#1570, #1638; S5) | — | — |
+| A4 AI and agents | Done (#1564; S6) | — | — |
+| A5 Plugin store | Done (#1562; S7). Store moves to Whity ID | Store module in whity-id | — |
+| A6 Workspace, billing, settings | Done (#1563 and follow-ups; S8) | — | — |
+| A7 Quick wins | Missing | Two-step reset, away, receipt | 2-3 |
+| A8 Contacts and import | Missing | Contacts table, import engine | 3 |
+| A9 Custom fields | Missing | Field definitions and values | 2-3 |
+| A10 Tasks on Taskaat | Missing | Taskaat link | 3, plus Taskaat's side |
+| A11 Receiving, waste, bank | Missing, not core | Front Office | — (Q6) |
+| A12 Reports, agent notifications | Missing | Notifications partly; reports need accounts | 1 here, the rest with Front Office |
+| A13 Lottie and Animations | Missing | One preference key | 2 |
+| W1 whity.dev | Partial (Astro site exists, 2.x design) | `GET /api/public/plans` | 2 + 1 server |
+| W2 health.whity.dev | Partial (Worker exists, own look) | — | 1 |
+| W3 id.whity.dev | Partial (whity-id has sign-in) | Passkeys, Apple, Google | 2, in whity-id |
+| W4 brand and W5 docs | Partial | — | 1 each |
+| W6 Company pages and footer | Partial (security, privacy, license, 404 exist) | `POST /api/public/contact` | 2 + 1 server |
+| W7 Installer | Partial (`/install` page exists; the script doesn't) | — | 2 |
+| W8 Launch check | Missing | — | 1 |
+| E1 Fifteen emails | Partial (one branded layout; 8 emails built on it) | Several senders | 3 |
+
+### Editor M0-M8
+
+Paths: `packages/ui/src/editor/` (the editor), `packages/features/src/document-editor/` (the screen), `src/Core/Document/` (server), `web/app/(protected)/admin/document-sources/[id]` (A33).
+
+- **M0-M5 done.** M0 #1409, M2 #1416, M4b #1434, M4d #1471, M5 #1519 (migrations 183-186). M1, M3, M4 and M4c are in the history between them. The 3.3 editor cards changed only names. Each later milestone still owes its screenshot pass in both themes and Arabic.
+- **M6 Agents, missing.** Cards `EditorAgents`. Lands in `packages/ui/src/editor/bubble.tsx` (Rewrite in the selection bubble), a new `agent-panel.tsx`, `collab-rail.tsx` for @agent replies. Server: MCP tools `documents.read`, `documents.suggest_blocks`, `documents.suggest_rewrite`, `documents.reply_comment` writing only `document_suggestions` and comments with the agent's actor and the person it acts for (M0 notes 3.4); a streamed run with Stop (`AgentRunStatus` exists in `packages/ui`); routines (E.32) on the scheduler. Fits: proposals, actors and per-permission modes are built (items 10, 11). 2 PRs.
+- **M7 Plugin and saved blocks, missing.** Cards `EditorCustomBlocks`. Lands in `packages/ui/src/editor/` (registry, plugin-off placeholder, saved block node) and the SDK (`PluginDocumentBlocksInterface`, `PluginDocumentThemesInterface`). Server: block registry from manifests, `saved_blocks` and `saved_block_versions` tables, the next-publish rule. Doesn't fit: E.17 in 3.3 still says Verified plugins render natively with the SDK components; the register here says a Verified plugin is a signed declaration drawn by Whity's renderer, and publishers' JavaScript never runs in the app (owner, 3 Nov). The merged register keeps the owner's wording. 3 PRs, one SDK minor.
+- **M8 Arabic, type, accessibility, partial.** Arabic labels and mirroring are in; `readex-pro-arabic-600.woff2` ships. Missing: the theme options title face and large print (E.46, E.47), an axe check on the editor (axe runs on components in `web/__tests__/*.a11y.test.tsx`, not the editor), a keyboard audit. 1-2 PRs.
+
+### App A0-A6 (2.9, carried forward)
+
+Done by the 2.9 milestones and server items S1-S8; the tables [below](#milestones-1) say what each covered. 3.3 changed these cards only in their example people, so nothing is owed against 3.3 beyond the open asks and these: the store pages (A5) move to Whity ID with the store; A6's Billing needs usage and the limit warning once designed.
+
+### A7 Quick wins on built pages
+
+| Card | Lands in | Now | Server |
+| --- | --- | --- | --- |
+| `TplApprovalsList` (AQ.1) | `web/app/(protected)/admin/approvals/page.tsx`, `DataTable` selection and bulk bar (A0) | One at a time | Bulk approve for tier-1 items only, one audit entry each |
+| `TplGatingTwoStep` (AG.1) | `admin/approval-gating`, `admin/registrations` | Request dates and tiers are in (S3) | A two-step reset needing a second admin, never the requester (state table, migration); identity check by passkey or Face ID: WebAuthn exists only for document signing (`src/Core/Document/Signing/SigningSecondFactor.php`) |
+| `TplAway` (OR.1) | `admin/delegations`, account menu | Delegations with names | "I'm away" as a dated delegation set from the person's own account |
+| `TplReceipt80` (N8) | `src/Core/Document/Print` and the starters | 13 A4 starters | An 80 mm page size at 72 mm print width; the JoFotara QR belongs to Front Office (2 Nov), so core prints the receipt without it. **Q5** |
+
+2-3 PRs.
+
+### A8 Contacts and import
+
+Cards `TplContacts`, `TplImport`, contacts in `TmOpsMobile`, `TmFinanceMobile`. Lands in a new `web/app/(protected)/contacts`, `packages/features/src/contacts`, `src/Core/Contacts`. Server: one `contacts` table (customer, supplier or both, tags through `src/Core/Taxonomy`), linked to the customer's person and profile where there is one (customer sign-up, Messages and Calendar each keep their own customer today); an import engine with a preview of create, update and skip and a 24-hour undo (the label-sheet matcher in `src/Core/Document/Print/LabelCsv.php` maps columns but reads CSV only; Excel needs a reader). Doesn't fit: items, opening stock and opening balances have no home in core; they belong to Front Office. 3 PRs.
+
+### A9 Custom fields
+
+Cards `TplCustomFields`, "Add a field" in `TmFinanceMobile`. Lands in settings (`web/app/(protected)/admin/settings`) and every list that shows them. Server: field definitions per record type and values (migration), reusing the form builder's kinds from `src/Core/Form`; exposure in lists, filters, document merge fields (documents already have their own fields, migration 163) and flow conditions. Doesn't fit: of the named record types only contacts would be core's (after A8); items are Front Office's, tasks are Taskaat's, and flows (`TplFlows`, `TplFlowBuilder`) aren't built. 2-3 PRs after A8.
+
+### A10 Tasks and boards on Taskaat
+
+Cards `TplTasks`, `TplBoard`, `TmTasks`, `TmBoards`. Lands in a new `web/app/(protected)/tasks` and `boards`. Server: a Taskaat connection per workspace (OAuth to Taskaat, a project per workspace or team), a proxy that reads and writes through Taskaat's API so there is no second task engine (T.1-T.4), "Open in Taskaat" links, and Taskaat tools reached from the workspace MCP. Nothing exists in core. Needs Taskaat's team to agree the API. 3 PRs here.
+
+### A11 Receiving, waste and bank (N4-N6)
+
+Cards `TplReceiving`, `TplAdjustments`, `TplBankRec` and their phone screens. Core has no purchase orders, stock, bills, ledger or bank accounts; Front Office is the paid product with those (2.9 note P01). They don't land in core. **Q6.**
+
+### A12 Reports and agent notifications (N7, N9)
+
+`TplReports` reads the accounts, so it follows A11 into Front Office. `TplAgentNotify` lands in core: agent notifications by email go through `MessagingService` (Messages lane), with the one-an-hour limit and no actions in the message; WhatsApp is the paid plugin's channel. Lands in `admin/agents` (per-agent setting) and `src/Core/Notification`. 1 PR here.
+
+### A13 Lottie and the Animations setting (LT.4)
+
+Cards `TplMoments`, `TmMoments`, `TmMotion`. Lands in a new `packages/ui/src/lottie.tsx` built on `handoff/motion/whity-lottie.js` (adds `lottie-web` or the light player), the moments in `empty-state.tsx`, the approvals set-down, first run and waiting states, and Account › Preferences (`web/app/(protected)/settings`). Server: an `animations` key (full, calm, off) beside text size and technical details in `src/Api/DisplayPreferencesApiHandler.php`. Fits. The 31 files are about 1 MB together; load them lazily. 2 PRs.
+
+### Websites W1-W8
+
+- **W1 whity.dev** (`whity-web` root, Astro): restyle to `SiteHome` and `SiteHomeAr`, the module pages, `ar/`. Server here: `GET /api/public/plans` from the plan bundles (ADR 0010, `src/Core/Plan`) plus a marketing layer (tagline, features, highlight, order, visible), CORS for `https://whity.dev`, `Cache-Control: public, max-age=300` (contract in `sites/README.md`). Feature claims must be checked against what has shipped. 2 PRs in whity-web, 1 here.
+- **W2 health.whity.dev** (`ops/watchdog/src/index.js`, here): restyle to `SiteStatus` in both languages; the data is already real. 1 PR.
+- **W3 id.whity.dev** (whity-id): `SiteId` sign-in, number-match approval, account. Passkeys, Apple and Google are whity-id work. 2 PRs there.
+- **W4 brand.whity.dev** (`whity-web/brand-site`): `SiteBrand`, the brand kit linked to `handoff/logos/`. **W5 docs.whity.dev** (`whity-web/docs-site`): `SiteDocs`; Arabic articles don't exist, so each says "coming". 1 PR each.
+- **W6 company pages and footer** (`whity-web`): Partners, About and Contact are new; Security, Privacy, Licence and 404 exist in the old look. Server here: `POST /api/public/contact` with rate limiting, sent through Messages so it lands in the operator's inbox. The privacy text waits for the lawyer. 2 PRs there, 1 here.
+- **W7 installer:** `whity.dev/install.sh` as section 29 specifies (Docker or Node.js checks, one plain line when missing, a signed-in Whity at localhost:3000). The script is new; it could live in this repo next to `docker-compose.yml` and be published by whity-web. 2 PRs.
+- **W8 launch check:** links, claims, `llms.txt` (whity-web generates one for docs today), `security.txt`, the brand kit. 1 PR.
+
+### E1 The fifteen emails
+
+Core has one branded layout (`src/Core/Mail/EmailLayout.php`, `EmailContent.php`, `EmailBranding.php`) and eight senders on it: verify email, reset password, invitation, two-step recovery, customer sign-up, document signing code, booking messages. 3.3's fifteen: verify email, reset password, invitation, new sign-in, two-step off, workspace ready, needs approval, daily summary, invoice, quote, receipt, payment reminder, payment failed, plan limit, Whity's own receipt. Lands in `src/Core/Mail/` (restyle the layout to `handoff/emails/`: 17px text, one button, Sent with Whity removable by plan) and the senders. Missing senders: new sign-in, two-step off, workspace ready, needs approval (no actions inside), daily summary, plan limit (from warn mode), and Whity's receipt (Whity Pay or billing). Invoice, quote, receipt, payment reminder and payment failed are documents sent through Messages; with JoFotara they are Front Office's. White-label sending from the workspace's domain uses the email domains settings. 3 PRs.
+
+## Recommended order
+
+1. **E1 layout and the security emails** (verify, reset, invitation, new sign-in, two-step off). Small, all core, every later feature sends through it.
+2. **A7 quick wins**, then **A13 Lottie** (needs only a preference key).
+3. **W2 health** and the **plans and contact endpoints** (W1, W6 server side), so whity-web can start W1 and W6 in parallel; then W4, W5, W7, W8 last before launch.
+4. **Editor M6**, then **M7** (M7 carries an SDK minor), then **M8**.
+5. **A8 contacts and import**, then **A9 custom fields**.
+6. **A10 Taskaat**, once Taskaat's API is agreed.
+7. **A12 agent notifications**; A11 and the reports wait for Front Office.
+
+W3 runs in whity-id whenever its team has room. Server work for each step comes first in its own PR, as in 2.9.
+
+## Questions for the owner
+
+| # | Question | Default until answered |
+| --- | --- | --- |
+| Q1 | The 3.3 package came from the brand team's 2.9, not the repo's: it drops E.40-E.47, the S.1-S.12 answers of 2-3 Nov, M4d, D1 and three snippet rules again. Ask the brand team to start 3.4 from this folder? | Merged three ways; the repo's decisions stand |
+| Q2 | 3.3's snippet and `PLAN.md` say stop for approval between milestones. Your rule is merge on green. | Merge on green; the snippet says so |
+| Q3 | `TplChat` is a team chat for people and agents. Core's Messages are customer conversations. One product or two? Build team chat in core on the Messages tables? | Separate; team chat not planned until you say |
+| Q4 | `TplSubscriptions` sells plans to a tenant's customers. Core, or part of Whity Pay (paid)? | Whity Pay plugin, since it takes money |
+| Q5 | `TplReceipt80` shows the JoFotara QR; JoFotara is Front Office's (2 Nov). A core 80 mm receipt without it? | Yes, core receipt without the QR; Front Office adds it |
+| Q6 | A11 (receiving, waste, bank) and A12's reports read stock and accounts, which core doesn't have. Front Office? | Front Office; not in core's plan |
+| Q7 | `TplAppointments` has rooms, branches, check-in and requests to approve; the calendar has none. Add them to the calendar now (A-something) or wait? | A calendar follow-up after A7, server first |
+| Q8 | The near-term pages (`TplContacts`, `TplImport`, `TplCustomFields`) name items, opening stock and balances. Only contacts in core? | Contacts in core; items and balances with Front Office |
+| Q9 | The sites say Whity is hosted in the EU (WS.18). Is app.whity.dev in the EU today? | Check before W1 ships the claim |
+| Q10 | The `Email*` cards and eight Arabic cards have no real dark screenshots. Ask the brand team? | Ask (with the other asks) |
+| Q11 | W7's installer script: here or in whity-web? | Here, published by whity-web |
+
+## For the design team to pick up
+
+Everything in 2.9's list below still applies. New with 3.3: the dark `Email*` screenshots; whether `fonts/` should keep the 700 files; the rooms, branches and requests on the calendar against what's built; and starting 3.4 from this folder.
+
+---
+
+# Design 2.9 working plan (2 Nov 2026)
+
 The working plan for design system 2.9 (A0 to A6), checked against `develop` at `a8fd3a96` on 2 Nov 2026. This replaces the M0 summary and M0's foundation table. The rest of the M0 notes, including the owner's answers of 29 Oct, are kept unchanged [below](#m0-notes-29-oct-2026).
 
 How it was checked: the code was read on `origin/develop`, screen by screen against each card's README. Screens were not compared with screenshots; each milestone does that. The only browser check was `app.whity.dev/login` on v0.2.23: body 14px, button 36px, input 28px with 12px text.

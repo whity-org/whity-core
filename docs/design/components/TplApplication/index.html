@@ -1,0 +1,61 @@
+<!-- @dsCard group="Templates · Work" height=900 width=1440 subtitle="AA.1: one application: answers, a documents check by an agent, and your score, with others’ scores hidden until you’ve scored" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1440px;min-height:900px}</style><meta charset="utf-8"><title>Application</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function kpi(l, v, s, cls) { return h('div', { className: 'wk-kpi' }, h('span', null, l), h('b', null, v), s ? h('small', { className: cls || '' }, s) : null); }
+  function num(v, cls) { return h('span', { className: 'wk-num' + (cls ? ' ' + cls : '') }, v); }
+  function prop(agent, forWho, title, lines, why, btns) { return h('div', { className: 'wk-minutes', style: { gap: 10 } }, h(W.ActorChip, { kind: 'agent', name: agent, onBehalfOf: forWho }), h('b', { style: { fontSize: 16 } }, title), h('ul', { className: 'wk-ev' }, lines.map(function (l, i) { return h('li', { key: i, className: 'is-ok' }, I(l[0], 16), h('div', null, l[1], h('small', null, l[2]))); })), why ? h('small', { style: { color: 'var(--muted-foreground)', fontSize: 13 } }, why) : null, h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end' } }, btns)); }
+
+  function crit(t, n, note) { return h('div', { className: 'wk-crit' }, h('b', null, t), h('div', { className: 'wk-pips', role: 'radiogroup', 'aria-label': t }, [1, 2, 3, 4, 5].map(function (i) { return h('span', { key: i, role: 'radio', 'aria-checked': i === n, className: i <= n ? 'is-on' : '' }, i); })), h('small', null, note)); }
+  var left = h('div', { style: { display: 'grid', gap: 16 } }, h(W.Card, { title: 'Answers' }, h(W.DescriptionList, { items: [{ label: 'Experience', value: '6 years, 3 as a pastry chef' }, { label: 'Last job', value: 'Pastry chef, a hotel in Amman' }, { label: 'Specialities', value: 'Laminated dough, Arabic sweets, wedding cakes' }, { label: 'Early shifts', value: 'Yes, from 05:00' }, { label: 'Can start', value: '1 December' }] })),
+    h(W.Card, { title: 'Documents' }, h('div', { style: { display: 'grid', gap: 10 } }, h(W.ActorChip, { kind: 'agent', name: 'Screening assistant', onBehalfOf: 'Example Bakery' }), h('small', { style: { color: 'var(--muted-foreground)' } }, 'Checked against what this application needs · 1 missing'),
+      h('div', { className: 'wk-docs' }, h('div', { className: 'wk-doc' }, I('success', 16), h('span', null, 'CV'), h('small', null, 'PDF, 2 pages')), h('div', { className: 'wk-doc' }, I('success', 16), h('span', null, 'Pastry certificate'), h('small', null, 'Matches his name')), h('div', { className: 'wk-doc is-miss' }, I('clock', 16), h('span', null, 'Health certificate'), h('small', null, 'Asked Ibrahim on 3 Nov · reminder tomorrow'))))));
+  var side = h('div', { style: { display: 'grid', gap: 16 } }, h(W.Card, { title: 'Your score', description: 'Against this stage’s criteria, 1 to 5' }, crit('Experience', 4, 'Strong hotel pastry work; less bakery volume.'), crit('Skills', 5, 'Portfolio photos of laminated dough are excellent.'), crit('Availability', 3, 'Can start 1 December; we hoped for mid-November.'),
+      h(W.Textarea, { label: 'Note for the team', defaultValue: 'Worth a trial shift. Ask about weekend availability.' }), h('div', { style: { display: 'flex', justifyContent: 'flex-end', marginTop: 10 } }, h(W.Button, null, 'Save my score'))),
+    h(W.Card, { title: 'Other reviewers' }, h('div', { className: 'wy-person', style: { color: 'var(--muted-foreground)' } }, I('hide', 16), h('span', null, 'Emad’s and Awss’s scores show after you save yours, so they don’t sway you.'))));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Applications', h(F, null, recHead({ avatar: h(W.Avatar, { name: 'Ibrahim Mansour', size: 52 }), title: 'Ibrahim Mansour', badges: h(W.Badge, { variant: 'info' }, 'Review'), facts: [['form', 'Pastry chef, Abdoun'], ['calendar', 'Applied 2 November'], ['routing', 'Stage 3 of 5'], ['mail', 'ibrahim.m@mail.jo']], actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'send' }, 'Ask for more'), h(W.Button, { variant: 'outline' }, 'Decline'), h(W.Button, { iconEnd: 'chevron-right' }, 'Move to Trial shift')) }),
+    h('div', { className: 'wk-split', style: { gridTemplateColumns: 'minmax(0,1fr) 440px', marginTop: 16 } }, left, side))));
+</script>
+</body>
+</html>

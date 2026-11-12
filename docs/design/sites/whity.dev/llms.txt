@@ -1,0 +1,19 @@
+# Whity
+
+> Whity is an open-source, white-label platform a company's systems sit on: invoices and money, stock, approvals, documents, tasks, chat and appointments, with AI agents that propose work and wait for a person to approve. Arabic and English. Whity Core is AGPL-3.0 with a plugin exception; the plugin SDK is MIT. Whity Cloud is hosted in the EU and free for up to 5 people.
+
+## For companies
+
+- [What Whity does](https://whity.dev/index.html#do)
+- [Money](https://whity.dev/money.html), [Stock](https://whity.dev/stock.html), [Approvals](https://whity.dev/approvals.html), [Documents](https://whity.dev/documents.html)
+- [Plans](https://whity.dev/index.html#plans): live from https://app.whity.dev/api/public/plans
+- [Security](https://whity.dev/security.html), [Privacy](https://whity.dev/privacy.html)
+- [Partners](https://whity.dev/partners.html), [Contact](https://whity.dev/contact.html)
+
+## For builders
+
+- [Install](https://whity.dev/install.html): `curl -fsSL https://whity.dev/install.sh | sh`
+- [Source on GitHub](https://github.com/whity-org/whity-core)
+- [Docs](https://docs.whity.dev)
+- [Licence](https://whity.dev/license.html)
+- [Brand and the name](https://brand.whity.dev)

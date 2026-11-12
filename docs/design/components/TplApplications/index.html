@@ -1,0 +1,59 @@
+<!-- @dsCard group="Templates · Work" height=849 width=1440 subtitle="AA.1: applications people send, by type, moving through stages with scores and a documents check" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1440px;min-height:849px}</style><meta charset="utf-8"><title>Applications</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function kpi(l, v, s, cls) { return h('div', { className: 'wk-kpi' }, h('span', null, l), h('b', null, v), s ? h('small', { className: cls || '' }, s) : null); }
+  function num(v, cls) { return h('span', { className: 'wk-num' + (cls ? ' ' + cls : '') }, v); }
+  function prop(agent, forWho, title, lines, why, btns) { return h('div', { className: 'wk-minutes', style: { gap: 10 } }, h(W.ActorChip, { kind: 'agent', name: agent, onBehalfOf: forWho }), h('b', { style: { fontSize: 16 } }, title), h('ul', { className: 'wk-ev' }, lines.map(function (l, i) { return h('li', { key: i, className: 'is-ok' }, I(l[0], 16), h('div', null, l[1], h('small', null, l[2]))); })), why ? h('small', { style: { color: 'var(--muted-foreground)', fontSize: 13 } }, why) : null, h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end' } }, btns)); }
+
+  var pipe = h('div', { className: 'wk-pipe' }, [['Received', 23], ['Screening', 9], ['Review', 6, 1], ['Trial shift', 3], ['Decision', 1]].map(function (s) { return h('div', { key: s[0], className: s[2] ? 'is-on' : '' }, h('span', null, s[0]), h('b', null, s[1])); }));
+  var rows = [{ id: 1, n: 'Ibrahim Mansour', st: 'Review', sc: '4.0', d: [0, '1 missing'], r: ['Amro Saleh', 'Emad Nasser'], at: '2 Nov' }, { id: 2, n: 'Awss Haddad', st: 'Review', sc: '3.7', d: [1, 'Complete'], r: ['Emad Nasser', 'Ahmad Khalil'], at: '1 Nov' }, { id: 3, n: 'Awss Zoubi', st: 'Review', sc: '–', d: [1, 'Complete'], r: ['Ahmad Khalil'], at: '4 Nov' }, { id: 4, n: 'Ibrahim Odeh', st: 'Review', sc: '4.5', d: [1, 'Complete'], r: ['Amro Saleh', 'Emad Nasser', 'Ahmad Khalil'], at: '30 Oct' }, { id: 5, n: 'Emad Shami', st: 'Review', sc: '2.3', d: [0, '2 missing'], r: ['Emad Nasser'], at: '3 Nov' }];
+  var cols = [{ key: 'n', label: 'Applicant', render: function (r) { return h('div', { className: 'wy-person' }, h(W.Avatar, { name: r.n, size: 28 }), h('b', null, r.n)); } }, { key: 'sc', label: 'Average score', align: 'end', render: function (r) { return h('span', { className: 'wk-num' }, r.sc); } },
+    { key: 'd', label: 'Documents', render: function (r) { return h(W.Badge, { variant: r.d[0] ? 'success' : 'warning' }, r.d[1]); } }, { key: 'r', label: 'Scored by', render: function (r) { return h('div', { className: 'wk-faces' }, r.r.map(function (x) { return h(W.Avatar, { key: x, name: x, size: 24 }); })); } }, { key: 'at', label: 'Applied', align: 'end' }];
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Applications', h(F, null, h(W.PageHeader, { title: 'Applications', description: 'Requests people send you, reviewed in stages', actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'settings' }, 'Application types'), h(W.Button, { icon: 'plus' }, 'New application type')) }),
+    h('div', { className: 'wk-bar' }, h(W.Tabs, { items: [{ value: 'c', label: 'Pastry chef, Abdoun', count: 23 }, { value: 's', label: 'Supplier applications', count: 4 }, { value: 'p', label: 'Catering partners', count: 2 }], defaultValue: 'c' }), h('span', { className: 'wk-grow' }), h(W.Button, { variant: 'ghost', icon: 'external' }, 'Public page')),
+    pipe, h('div', { className: 'wk-bar' }, filter('Documents', 'Any'), filter('Score', 'Any'), filter('Scored by me', 'Not yet', true)), h(W.Card, { style: { padding: 0 } }, h(W.DataTable, { label: 'In review', columns: cols, rows: rows, selectable: true, rowMenu: true })))));
+</script>
+</body>
+</html>

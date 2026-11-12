@@ -1,0 +1,75 @@
+<!-- @dsCard group="Templates · Work" height=877 width=1440 subtitle="CH.2: adding an agent to a group: what it can read, who it works for here, and what it may do" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1440px;min-height:877px}</style><meta charset="utf-8"><title>Chat add an agent</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function tag() { return h('span', { className: 'wk-agenttag' }, I('robot', 10), 'Agent'); }
+  function msg(n, agent, forWho, time, body, extra) { return h('div', { className: 'wk-msg' + (agent ? ' is-agent' : '') }, h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: 32 }), h('div', null, h('div', { className: 'wk-msg__who' }, h('b', null, n), agent ? tag() : null, agent && forWho ? h('span', null, 'for ' + forWho) : null, h('span', null, time)), h('div', { className: 'wk-msg__body' }, body, extra || null))); }
+  function sys(ic, t) { return h('div', { className: 'wk-sys' }, I(ic, 12), t); }
+  function crow(av2, t, sub, end, sel) { return h('div', { className: 'wk-crow' + (sel ? ' is-sel' : '') }, av2, h('div', { style: { minWidth: 0 } }, h('b', null, t), h('small', null, sub)), end || h('span')); }
+  function gic(ic) { return h('span', { className: 'wk-gicon' }, I(ic || 'users', 18)); }
+  function mem(n, sub, agent, end) { return h('div', { className: 'wk-mem' }, h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: 32 }), h('div', { style: { minWidth: 0 } }, h('b', null, n, ' ', agent ? tag() : null), h('small', null, sub)), end || h('span')); }
+  var CHATS = h('div', { className: 'wk-chats' }, h('header', null, h(W.Input, { label: '', placeholder: 'Search chats', 'aria-label': 'Search chats' }), h(W.Segmented, { label: 'Show', options: [{ value: 'a', label: 'All' }, { value: 'p', label: 'People' }, { value: 'g', label: 'Agents' }], defaultValue: 'a' })),
+    h('div', { className: 'wk-chats__sec' }, 'Groups'), crow(gic('kanban'), 'Ramadan boxes', 'Stock assistant: I’ve prepared the order…', h('em', null, 3), 1), crow(gic('tenant'), 'Abdoun branch', 'Awss: opening at 7 from the 15th', null),
+    h('div', { className: 'wk-chats__sec' }, 'Direct'), crow(h(W.Avatar, { name: 'Emad Nasser', size: 36, status: 'online' }), 'Emad Nasser', 'Can you sign PO-0142 today?', h('em', null, 1)), crow(h(W.Avatar, { name: 'Stock assistant', kind: 'agent', size: 36 }), 'Stock assistant', 'Agent · counted shelf A', null), crow(h(W.Avatar, { name: 'Billing assistant', kind: 'agent', size: 36 }), 'Billing assistant', 'Agent · 3 reminders ready', h('em', null, 1)), crow(h(W.Avatar, { name: 'Awss Haddad', size: 36 }), 'Awss Haddad', 'Thanks!', null));
+  var THREAD = h('div', { className: 'wk-thread' }, h('header', null, gic('kanban'), h('div', { style: { flex: 1 } }, h('b', null, 'Ramadan boxes'), h('small', null, '4 people and 2 agents · linked to the Ramadan boxes board')), h(W.IconButton, { icon: 'video', label: 'Call' }), h(W.IconButton, { icon: 'more', label: 'More' })),
+    h('div', { className: 'wk-msgs' }, sys('robot', 'Emad added Stock assistant on 6 Nov. It reads this chat from then on and can propose orders.'),
+      msg('Emad Nasser', 0, null, '09:02', 'How many gift boxes do we have for the first week?'),
+      msg('Stock assistant', 1, 'Emad', '09:02', '120 at the Central kitchen, none in the branches. At last year’s pace the first week needs about 400.'),
+      msg('Amro Saleh', 0, null, '09:05', h(F, null, h('span', { className: 'wk-mention' }, '@Stock assistant'), ' order 300 more. ', h('span', { className: 'wk-mention' }, '@Marketing assistant'), ' start the announcement once they’re confirmed.')),
+      msg('Stock assistant', 1, 'Amro', '09:06', 'I’ve prepared the order. It’s over JOD 250, so it needs your approval, Amro.', h('div', { className: 'wk-msg__card' }, h('b', null, 'Purchase order · 300 gift boxes'), h('span', { style: { fontSize: 14 } }, 'Amman Print · JOD 285.000 · delivery Wednesday'), h('footer', null, h(W.Badge, { variant: 'warning' }, 'Waiting for Amro'), h('span', { style: { marginInlineStart: 'auto', display: 'flex', gap: 6 } }, h(W.Button, { variant: 'outline', size: 'sm' }, 'View'), h(W.Button, { size: 'sm', icon: 'check' }, 'Approve'))))),
+      sys('transfer', 'Stock assistant handed the announcement to Marketing assistant. It starts when the order is confirmed.'),
+      h('div', { className: 'wk-working' }, h(W.Avatar, { name: 'Marketing assistant', kind: 'agent', size: 20 }), 'Marketing assistant is drafting the announcement', h('span', { className: 'wk-dots' }, h('i'), h('i'), h('i')))),
+    h('div', { className: 'wk-compose' }, h('span', null, 'Message Ramadan boxes · type @ for a person or an agent'), h('div', null, h(W.IconButton, { icon: 'attach', label: 'Attach' }), h(W.IconButton, { icon: 'at', label: 'Mention' }), h(W.IconButton, { icon: 'microphone', label: 'Voice' }), h(W.Button, { size: 'sm', icon: 'send' }, 'Send'))));
+
+  function perm(t, sub, v) { return h('div', { className: 'wk-perm' }, h('div', null, t, h('small', null, sub)), h(W.Segmented, { label: t, options: [{ value: 'o', label: 'Off' }, { value: 'a', label: 'Ask first' }, { value: 'y', label: 'Allowed' }], defaultValue: v })); }
+  var modal = h('div', { className: 'wk-modal', role: 'dialog', 'aria-label': 'Add an agent' }, h('h2', null, 'Add an agent to Ramadan boxes'),
+    h('div', { className: 'wk-mem', style: { padding: 10, border: '1.5px solid var(--primary)', borderRadius: 10, background: 'var(--primary-tint)' } }, h(W.Avatar, { name: 'Billing assistant', kind: 'agent', size: 32 }), h('div', null, h('b', null, 'Billing assistant'), h('small', null, 'Invoices, reminders and payments')), I('chevron-down', 16)),
+    h('div', { style: { display: 'grid', gap: 6 } }, h('b', { style: { fontSize: 14 } }, 'It can read'), h(W.Segmented, { label: 'It can read', options: [{ value: 'n', label: 'From now on' }, { value: 'w', label: 'The last 7 days' }, { value: 'a', label: 'Everything' }], defaultValue: 'n' })),
+    h(W.Select ? W.Select : W.Input, { label: 'Works for, in this chat', defaultValue: 'Amro Saleh (you)', options: [{ value: 'r', label: 'Amro Saleh (you)' }] }),
+    h('div', null, h('b', { style: { fontSize: 14 } }, 'What it may do here'), perm('Post and reply', 'Write in this chat', 'y'), perm('Prepare invoices', 'For orders discussed here', 'a'), perm('Send messages to customers', 'By WhatsApp or email', 'a'), perm('Issue credit notes', 'Never more than you can', 'o')),
+    h('small', { style: { color: 'var(--muted-foreground)' } }, 'Everyone in the chat sees that it joined and what it may do. It never sees other chats.'), h('footer', null, h(W.Button, { variant: 'ghost' }, 'Cancel'), h(W.Button, { icon: 'robot' }, 'Add Billing assistant')));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Chat', h('div', { className: 'wk-modalwrap' }, h('div', { className: 'wk-chat' }, CHATS, THREAD, h('div', { className: 'wk-side' })), h('div', { className: 'wk-scrim' }), modal)));
+</script>
+</body>
+</html>
