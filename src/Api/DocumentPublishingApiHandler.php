@@ -616,10 +616,11 @@ final class DocumentPublishingApiHandler
     private function blockers(int $tenantId, int $callerId, array $row): array
     {
         // Checked as it would publish: synced saved blocks as their blocks (E.38).
-        $row['blocks'] = $this->current($tenantId, $row['blocks'] ?? []);
+        $blocks = $this->current($tenantId, $row['blocks'] ?? []);
+        $row['blocks'] = $blocks;
         $type = $row['record_type'] !== null ? (string) $row['record_type'] : null;
         $blockers = DocumentPublishCheck::blockers(
-            is_array($row['blocks'] ?? null) ? array_values($row['blocks']) : [],
+            $blocks,
             $this->fields->paths($tenantId, $type) + self::ownPaths($row['own_fields'] ?? []),
         );
 
