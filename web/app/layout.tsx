@@ -65,7 +65,13 @@ export async function generateMetadata(): Promise<Metadata> {
     title: b.siteName,
     description: "Authentication and plugin management platform",
     icons: {
-      ...(b.faviconUrl ? { icon: b.faviconUrl } : {}),
+      // A workspace favicon wins; otherwise the Whity mark (F2, handoff/logos).
+      icon: b.faviconUrl
+        ? b.faviconUrl
+        : [
+            { url: "/favicon.svg", type: "image/svg+xml" },
+            { url: "/favicon.ico", sizes: "any" },
+          ],
       ...(installable ? { apple: appIconUrl("180", install.version) } : {}),
     },
     ...(installable

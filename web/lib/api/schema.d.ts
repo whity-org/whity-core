@@ -10250,6 +10250,8 @@ export interface components {
             /** @enum {string} */
             textSize: "standard" | "larger";
             showTechnicalDetails: boolean;
+            /** @enum {string} */
+            animations: "full" | "calm" | "off";
         };
         DisplayPreferencesResponse: {
             data: components["schemas"]["DisplayPreferences"];
@@ -10258,6 +10260,8 @@ export interface components {
             /** @enum {string} */
             textSize?: "standard" | "larger";
             showTechnicalDetails?: boolean;
+            /** @enum {string} */
+            animations?: "full" | "calm" | "off";
         };
         Document: {
             id: number;
@@ -11340,6 +11344,13 @@ export interface components {
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines?: ("address" | "taxId" | "phone" | "email")[];
                 };
+                /**
+                 * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
+                 * @enum {string}
+                 */
+                titleFace?: "readex" | "noto";
+                /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
+                largePrint?: boolean;
             };
         };
         DocumentThemeListResponse: {
@@ -11390,6 +11401,13 @@ export interface components {
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines?: ("address" | "taxId" | "phone" | "email")[];
                 };
+                /**
+                 * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
+                 * @enum {string}
+                 */
+                titleFace?: "readex" | "noto";
+                /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
+                largePrint?: boolean;
             };
         };
         DocumentThemeRef: {
@@ -11468,6 +11486,13 @@ export interface components {
                 /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                 lines?: ("address" | "taxId" | "phone" | "email")[];
             };
+            /**
+             * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
+             * @enum {string}
+             */
+            titleFace?: "readex" | "noto";
+            /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
+            largePrint?: boolean;
         };
         DocumentThemeUsage: {
             /** @description Documents whose draft names the theme */
@@ -14391,6 +14416,13 @@ export interface components {
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines: ("address" | "taxId" | "phone" | "email")[];
                 };
+                /**
+                 * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
+                 * @enum {string}
+                 */
+                titleFace: "readex" | "noto";
+                /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
+                largePrint: boolean;
             };
             /** @description Where each token came from, by its path (`accent`, `letterhead.lines`…): a theme ref, `document` for an override, or `branding.main_color` */
             sources: {
