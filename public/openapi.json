@@ -69241,6 +69241,18 @@
                                         "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
                                     }
                                 }
+                            },
+                            "titleFace": {
+                                "type": "string",
+                                "enum": [
+                                    "readex",
+                                    "noto"
+                                ],
+                                "description": "The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic)."
+                            },
+                            "largePrint": {
+                                "type": "boolean",
+                                "description": "Large print: an 11pt body in print, with headings scaled by the same steps."
                             }
                         },
                         "description": "The values it sets over the theme it extends. Leave a token out to keep the base's."
@@ -69392,6 +69404,18 @@
                                         "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
                                     }
                                 }
+                            },
+                            "titleFace": {
+                                "type": "string",
+                                "enum": [
+                                    "readex",
+                                    "noto"
+                                ],
+                                "description": "The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic)."
+                            },
+                            "largePrint": {
+                                "type": "boolean",
+                                "description": "Large print: an 11pt body in print, with headings scaled by the same steps."
                             }
                         },
                         "description": "The values it sets, replacing the whole token set. Leave a token out to use the base's."
@@ -69629,6 +69653,18 @@
                                 "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
                             }
                         }
+                    },
+                    "titleFace": {
+                        "type": "string",
+                        "enum": [
+                            "readex",
+                            "noto"
+                        ],
+                        "description": "The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic)."
+                    },
+                    "largePrint": {
+                        "type": "boolean",
+                        "description": "Large print: an 11pt body in print, with headings scaled by the same steps."
                     }
                 }
             },
@@ -80511,13 +80547,27 @@
                                     "logo",
                                     "lines"
                                 ]
+                            },
+                            "titleFace": {
+                                "type": "string",
+                                "enum": [
+                                    "readex",
+                                    "noto"
+                                ],
+                                "description": "The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic)."
+                            },
+                            "largePrint": {
+                                "type": "boolean",
+                                "description": "Large print: an 11pt body in print, with headings scaled by the same steps."
                             }
                         },
                         "required": [
                             "accent",
                             "accentOnDark",
                             "accentUse",
-                            "letterhead"
+                            "letterhead",
+                            "titleFace",
+                            "largePrint"
                         ],
                         "description": "Every token, resolved"
                     },

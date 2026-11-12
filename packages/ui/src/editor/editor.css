@@ -365,7 +365,7 @@
 .wy-pv__lh b { color: var(--foreground); font-weight: 600; }
 .wy-pv__lhend { text-align: end; display: grid; gap: 2px; align-content: start; }
 /* The document title: Readex Pro 600 in the tenant's print colour. */
-.wy-pv__title { margin: 0 0 4px; font-family: var(--font-display); font-weight: 600; font-size: var(--doc-text-print-title); line-height: var(--doc-leading-title); color: var(--doc-accent, var(--brand)); }
+.wy-pv__title { margin: 0 0 4px; font-family: var(--doc-title-font, var(--font-display)); font-weight: 600; font-size: var(--doc-text-print-title); line-height: var(--doc-leading-title); color: var(--doc-accent, var(--brand)); }
 /* E.45: a theme with accentUse `title-and-headings` gives H1-H3 the print colour too. */
 .wy-pv__stack[data-accent-use="title-and-headings"] .wy-doc :is(h2, h3, h4) { color: var(--doc-accent, var(--brand)); }
 /* Stage 6 (6.5) and E.33 on paper; at 96 dpi a pt is the same size on screen. */
@@ -374,6 +374,13 @@
 .wy-pv .wy-doc h3 { font-size: var(--doc-text-print-h2); padding-top: 10px; }
 .wy-pv .wy-doc h4 { font-size: var(--doc-text-print-h3); padding-top: 8px; }
 .wy-pv .wy-doc table[data-type="table"] { font-size: var(--doc-text-print-label); }
+/* E.47 large print: the print sizes scale by the body's step, 9.5pt to 11pt (as flow.css). */
+.wy-pv__stack[data-large-print] .wy-pv__title { font-size: calc(var(--doc-text-print-title) * 11 / 9.5); }
+.wy-pv__stack[data-large-print] .wy-doc { font-size: calc(var(--doc-text-print-body) * 11 / 9.5); }
+.wy-pv__stack[data-large-print] .wy-doc h2 { font-size: calc(var(--doc-text-print-h1) * 11 / 9.5); }
+.wy-pv__stack[data-large-print] .wy-doc h3 { font-size: calc(var(--doc-text-print-h2) * 11 / 9.5); }
+.wy-pv__stack[data-large-print] .wy-doc h4 { font-size: calc(var(--doc-text-print-h3) * 11 / 9.5); }
+.wy-pv__stack[data-large-print] .wy-doc table[data-type="table"] { font-size: calc(var(--doc-text-print-label) * 11 / 9.5); }
 .wy-pv .wy-doc table[data-type="table"] td { border: 0; border-bottom: 1px solid var(--border); }
 /* On paper the header row is a rule under muted labels, not a filled row. */
 .wy-pv .wy-doc table[data-type="table"][data-header-row="true"] tr:first-child td { background: none; border-bottom: 1.5px solid var(--foreground); color: var(--muted-foreground); }
@@ -434,6 +441,8 @@
  * dark mode the theme's `accentOnDark`, which never prints.
  * ------------------------------------------------------------------ */
 .wy-sheet__title { color: var(--foreground); }
+/* E.46: Readex Pro 600 unless the theme sets the title in the body face. */
+.wy-sheet__title { font-family: var(--doc-title-font, var(--font-display)); }
 .dark .wy-sheet__title { color: var(--doc-accent-on-dark, var(--foreground)); }
 
 /*
