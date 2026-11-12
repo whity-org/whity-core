@@ -1,0 +1,62 @@
+<!-- @dsCard group="Mobile" height=954 width=1880 subtitle="M.34 to M.38: a seeded Whity pattern or a photo, picked with one thumb, and how it shows everywhere" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1880px;min-height:954px}</style><meta charset="utf-8"><title>Mobile onboarding picture</title><style>html,body{height:100%;margin:0} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 22 }); }
+  var T0 = { home: 'Home', inbox: 'Inbox', create: 'Create', agents: 'Chat', agentsIcon: 'comment', more: 'More' };
+  function status() { return h('div', { className: 'wm-status', 'aria-hidden': 'true' }, h('span', null, '9:41'), h('i'), h('span', null, I('wifi', 16), I('battery', 18))); }
+  function tabbar(active, T, badges) { T = T || T0; badges = badges || { inbox: 3 };
+    function tab(k, icon) { return h('div', { key: k, className: 'wm-tab' + (active === k ? ' is-on' : '') }, I(icon, 24), T[k], badges[k] ? h('b', null, badges[k]) : null); }
+    return h('nav', { className: 'wm-tabbar', 'aria-label': 'Main' }, tab('home', 'dashboard'), tab('inbox', 'inbox'), h('button', { key: 'c', className: 'wm-create', 'aria-label': T.create }, I('plus', 28)), tab('agents', T.agentsIcon || 'robot'), tab('more', 'menu')); }
+  function bottom(o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.tabs === false ? null : tabbar(o.active, o.T, o.badges), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function phone(label, kids, o) { o = o || {}; return h('div', { className: 'wm-col' }, h('div', { className: 'wm-label' }, label), h('div', { className: 'wm-phone', dir: o.dir }, status(), kids, o.overlay || null)); }
+  function search(t, f) { return h('div', { className: 'wm-search' }, I('search', 20), h('span', null, t), f ? h('button', { type: 'button' }, I('filter', 16), f) : null); }
+  function stage(blue, tag, kids, keys) { var LOT = { 'YOUR BRAND, OUR PLATFORM': ['brand-sheet-platform', 'view'], 'AGENTS PROPOSE': ['agents-propose', 'view'], 'YOU DECIDE': ['approve-set-down', 'view'], 'IN THE APP': ['approve-set-down', 'view'], 'UPDATING · LOOPS': ['updating', 'loop'], 'ALL CAUGHT UP': ['all-caught-up', 'view'] }; var l = LOT[tag]; if (!l) return h('div', { className: 'wm-lottie' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, 'LOTTIE · ' + tag), kids, keys ? h('div', { className: 'wm-keys' }, keys.map(function (k, i) { return h('span', { key: i }, k); })) : null); return h('div', { className: 'wm-lottie has-file' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, l[0] + '.json'), h('div', { className: 'w-lottie', 'data-lottie': 'lottie/' + l[0] + '.json', 'data-play': l[1] }, h('div', { className: 'w-lottie__fallback' }, kids))); }
+  function at(cls, x, y, extra) { return h('div', { className: cls, style: Object.assign({ left: x, top: y }, extra || {}) }); }
+  function dots(n, on) { var a = []; for (var i = 0; i < n; i++) a.push(h('i', { key: i, className: i === on ? 'is-on' : '' })); return h('div', { className: 'wm-dots' }, a); }
+  function foot(kids) { return h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-form', style: { borderTop: 0 } }, kids), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function q(title, sub, step, of) { return h(F, null, h('div', { className: 'wm-progress', 'aria-hidden': 'true' }, h('i', { style: { width: Math.round(step / of * 100) + '%' } })), h('div', { className: 'wm-q' }, h('h1', null, title), sub ? h('p', null, sub) : null)); }
+  function choice(t, sub, on, icon) { return h('div', { className: 'wm-choice' + (on ? ' is-on' : '') }, icon ? I(icon, 24) : null, h('span', null, t, sub ? h('small', null, sub) : null), h('i', { className: 'wm-radio' })); }
+  function navbar(t) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), h('span')); }
+
+  var SEED = 'amro@examplebakery.jo', HUE = W.brandHue('#0961bb'), BAKERY = W.brandHue('#b74c05');
+  var PHOTO = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e3cfb4"/><stop offset="1" stop-color="#93a6b8"/></linearGradient></defs><rect width="200" height="200" fill="url(#g)"/><rect x="128" y="18" width="46" height="70" rx="4" fill="#f3e7d6" opacity=".7"/><path d="M28 200c4-44 34-62 72-62s68 18 72 62z" fill="#2f4a6b"/><rect x="88" y="112" width="24" height="30" rx="10" fill="#c48f6c"/><ellipse cx="100" cy="88" rx="30" ry="35" fill="#d4a583"/><path d="M68 86c-2-30 16-46 34-46s34 14 32 44c-6-14-18-22-34-22s-26 8-32 24z" fill="#3a2a20"/></svg>');
+  function pa(seed, size, hue) { return h(W.Avatar, { name: 'Amro Saleh', pattern: seed, hue: hue == null ? HUE : hue, size: size }); }
+  function picks(on) { return h('div', { className: 'wm-avpicks', role: 'radiogroup', 'aria-label': 'Other patterns' }, [0, 1, 2, 3, 4, 5].map(function (i) { return h('button', { key: i, className: i === on ? 'is-on' : '', role: 'radio', 'aria-checked': i === on, 'aria-label': 'Pattern ' + (i + 1) }, pa(i ? SEED + '#' + i : SEED, 48)); })); }
+  var pickScreen = h(F, null, navbar(), q('Your picture', 'It shows next to everything you do, so people know it’s you.', 3, 5),
+    h('div', { className: 'wm-avstage' }, pa(SEED, 168), h('div', { className: 'wm-cap', style: { textAlign: 'center' } }, h('b', null, 'Made from your name.'), ' Shuffle or tap another one.')),
+    h('div', { style: { flex: 1 } }), picks(0), h('div', { style: { height: 16 } }),
+    h('div', { className: 'wm-avbtns' }, h(W.Button, { variant: 'outline', icon: 'shuffle' }, 'Shuffle'), h(W.Button, { variant: 'outline', icon: 'camera' }, 'Use a photo')),
+    foot(h(W.Button, null, 'Continue')));
+
+  var sheet = h(F, null, navbar(), q('Your picture', 'It shows next to everything you do, so people know it’s you.', 3, 5),
+    h('div', { className: 'wm-avstage' }, pa(SEED, 168)), h('div', { className: 'wm-scrim' }),
+    h('div', { className: 'wm-sheet', role: 'dialog', 'aria-label': 'Use a photo' }, h('div', { className: 'wm-grab' }), h('h2', null, 'Use a photo'),
+      h('div', { className: 'wm-opt' }, h(W.Avatar, { name: 'Amro Saleh', src: PHOTO, size: 40 }), h('span', { className: 'wm-opt__t' }, 'Your Google picture', h('small', null, 'From your Google account')), I('chevron-right', 20)),
+      h('div', { className: 'wm-opt' }, h('span', { className: 'wm-opt__ic' }, I('camera', 22)), h('span', { className: 'wm-opt__t' }, 'Take a photo'), I('chevron-right', 20)),
+      h('div', { className: 'wm-opt' }, h('span', { className: 'wm-opt__ic' }, I('image', 22)), h('span', { className: 'wm-opt__t' }, 'Choose from your photos'), I('chevron-right', 20)),
+      h(W.Button, { variant: 'ghost' }, 'Keep my pattern'), h('div', { className: 'wm-home-ind' }, h('i'))));
+  var crop = h('div', { className: 'wm-crop' }, h('div', { className: 'wm-nav' }, h('button', null, 'Back'), h('b', null, 'Move and zoom'), h('span')),
+    h('div', { className: 'wm-crop__area' }, h('div', { className: 'wm-crop__img', style: { backgroundImage: 'url("' + PHOTO + '")' } }), h('div', { className: 'wm-crop__ring' }), h('div', { className: 'wm-crop__hint' }, 'Drag to move · pinch or use the slider')),
+    h('div', { className: 'wm-zoom' }, h('span', null, I('zoom-out', 22)), h('div', { role: 'slider', 'aria-label': 'Zoom', 'aria-valuenow': 38 }, h('i'), h('b')), h('span', null, I('zoom-in', 22)), h('button', { 'aria-label': 'Turn' }, I('rotate', 22))),
+    h('div', { className: 'wm-sizes' }, h('span', null, 'How it’ll look'), h(W.Avatar, { name: 'Amro', src: PHOTO, size: 48 }), h(W.Avatar, { name: 'Amro', src: PHOTO, size: 32 }), h(W.Avatar, { name: 'Amro', src: PHOTO, size: 24 })),
+    h('div', { style: { flex: 1 } }), h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-form', style: { borderTop: 0, display: 'grid', gap: 8 } }, h(W.Button, null, 'Use this photo'), h(W.Button, { variant: 'ghost' }, 'Choose another')), h('div', { className: 'wm-home-ind' }, h('i'))));
+  function person(av, name, sub, tag) { return h('div', { className: 'wm-li' }, av, h('div', { style: { minWidth: 0 } }, h('b', null, name), h('small', null, sub)), tag ? h('span', { className: 'wm-tagx' }, tag) : h('span')); }
+  var everywhere = h(F, null, h('div', { className: 'wm-head' }, h('h1', null, 'People'), h('p', null, 'Example Bakery')),
+    h('div', { className: 'wm-body' }, h('div', { className: 'wm-scale', 'aria-label': 'Sizes' }, pa(SEED, 64), pa(SEED, 48), pa(SEED, 36), pa(SEED, 24), pa(SEED + '#2', 64), pa(SEED + '#2', 24)),
+      h('div', { className: 'wm-list wm-plist' },
+        person(pa(SEED, 40), 'Amro Saleh', 'Owner · pattern from Whity', 'You'),
+        person(h(W.Avatar, { name: 'Ahmad Khalil', src: PHOTO, size: 40 }), 'Ahmad Khalil', 'Purchasing · photo'),
+        person(pa('awss.haddad@examplebakery.jo', 40), 'Awss Haddad', 'Front of house · pattern'),
+        person(pa('emad.n@mail.jo', 40, BAKERY), 'Emad Nasser', 'Customer · joined from a QR', 'Customer'),
+        person(h(W.Avatar, { name: 'Billing assistant', kind: 'agent', size: 40 }), 'Billing assistant', 'Agent · never a pattern', 'Agent')),
+      h('div', { className: 'wm-cap' }, h('b', null, 'Colours come from where the Whity ID was made'), ' and stay the same in every workspace: Amro’s is Whity blue, Emad joined through Example Bakery, so his is warm.')),
+    bottom({ active: 'more' }));
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wm-row' }, phone('Pick a pattern', pickScreen), phone('Or use a photo', sheet), phone('Round crop, one thumb', crop), phone('How it shows everywhere', everywhere)));
+</script>
+</body>
+</html>

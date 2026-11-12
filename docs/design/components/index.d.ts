@@ -1,5 +1,5 @@
 import type * as React from 'react';
-type IconName = string; // one of window.Whity.iconNames (116 curated Tabler outline icons)
+type IconName = string; // one of window.Whity.iconNames (156 curated Tabler outline icons)
 type Tone = 'auto' | 'onbrand' | 'mono';
 export declare function Mark(props: { size?: number; cut?: 'main' | 'small'; tone?: Tone; label?: string; className?: string }): React.ReactElement;
 export declare function Lockup(props: { height?: number; layout?: 'horizontal' | 'stacked'; tone?: Tone; className?: string }): React.ReactElement;
@@ -12,6 +12,10 @@ export declare function IconButton(props: React.ButtonHTMLAttributes<HTMLButtonE
 export declare function Badge(props: { variant?: 'default' | 'secondary' | 'outline' | 'success' | 'info' | 'warning' | 'destructive'; icon?: IconName; children?: React.ReactNode; className?: string }): React.ReactElement;
 /** Decision 2.8: one tenant colour in (hex or oklch()), the derived CSS variables out: label white or near-black by 4.5:1, tint, colour on dark, plane. */
 export declare function tenantTheme(color: string, mode?: 'light' | 'dark'): Record<string, string>;
+/** SVG markup for a seeded avatar pattern (M.34). Same seed and hue always give the same picture. */
+export declare function avatarPattern(seed: string, hue?: number): string;
+/** The OKLCH hue (0-360) of a brand colour, used to colour avatar patterns. */
+export declare function brandHue(hex: string): number;
 /** WCAG contrast ratio of two hex colours. */
 export declare function contrast(a: string, b: string): number;
 /** JOD defaults to 3 decimals, other currencies to 2. */
@@ -78,7 +82,8 @@ export declare function TenantSwitcher(props: { tenants: { name: string; role?: 
 export declare function Segmented(props: { label: string; options: { value: string; label: string; icon?: IconName; iconOnly?: boolean; lang?: string }[]; defaultValue?: string; value?: string; onChange?: (v: string) => void; className?: string }): React.ReactElement;
 export declare function LanguageSwitch(props: { value?: 'en' | 'ar'; onChange?: (v: string) => void; label?: string; className?: string }): React.ReactElement;
 export declare function ThemeSwitch(props: { value?: 'light' | 'dark' | 'system'; compact?: boolean; onChange?: (v: string) => void; labels?: Record<string, string>; className?: string }): React.ReactElement;
-export declare function Avatar(props: { name: string; kind?: 'person' | 'agent' | 'system'; src?: string; size?: number; status?: 'online' | 'busy' | 'offline'; className?: string }): React.ReactElement;
+/** People without a photo get a seeded Whity pattern: pass `pattern` (a stable seed, e.g. the Whity ID) and `hue` (from brandHue of the installation colour where the ID was created). */
+export declare function Avatar(props: { name: string; kind?: 'person' | 'agent' | 'system'; src?: string; pattern?: string; hue?: number; size?: number; status?: 'online' | 'busy' | 'offline'; className?: string }): React.ReactElement;
 export declare function DescriptionList(props: { items: { label: React.ReactNode; value: React.ReactNode; mono?: boolean; copy?: boolean | string }[]; columns?: 1 | 2; none?: string; labels?: Record<string, string>; className?: string }): React.ReactElement;
 export interface UndoBarProps { text?: React.ReactNode; state?: 'open' | 'undone' | 'expired'; remainingLabel?: string; remaining?: number; total?: number; undoneBy?: string; onUndo?: () => void; labels?: Record<string, string>; className?: string }
 export declare function UndoBar(props: UndoBarProps): React.ReactElement;

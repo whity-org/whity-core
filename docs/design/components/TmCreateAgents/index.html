@@ -1,0 +1,38 @@
+<!-- @dsCard group="Mobile" height=954 width=1440 subtitle="M.11, M.12, CH.3: the Create sheet, a chat with an agent in the Chat tab, and agents today" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1440px;min-height:954px}</style><meta charset="utf-8"><title>Mobile create and agents</title><style>html,body{height:100%;margin:0} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 22 }); }
+  var T0 = { home: 'Home', inbox: 'Inbox', create: 'Create', agents: 'Chat', agentsIcon: 'comment', more: 'More' };
+  function status() { return h('div', { className: 'wm-status', 'aria-hidden': 'true' }, h('span', null, '9:41'), h('i'), h('span', null, I('wifi', 16), I('battery', 18))); }
+  function tabbar(active, T, badges) { T = T || T0; badges = badges || { inbox: 3 };
+    function tab(k, icon) { return h('div', { key: k, className: 'wm-tab' + (active === k ? ' is-on' : '') }, I(icon, 24), T[k], badges[k] ? h('b', null, badges[k]) : null); }
+    return h('nav', { className: 'wm-tabbar', 'aria-label': 'Main' }, tab('home', 'dashboard'), tab('inbox', 'inbox'), h('button', { key: 'c', className: 'wm-create', 'aria-label': T.create }, I('plus', 28)), tab('agents', T.agentsIcon || 'robot'), tab('more', 'menu')); }
+  function bottom(o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.tabs === false ? null : tabbar(o.active, o.T, o.badges), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function phone(label, kids, o) { o = o || {}; return h('div', { className: 'wm-col' }, h('div', { className: 'wm-label' }, label), h('div', { className: 'wm-phone', dir: o.dir }, status(), kids, o.overlay || null)); }
+  function search(t, f) { return h('div', { className: 'wm-search' }, I('search', 20), h('span', null, t), f ? h('button', { type: 'button' }, I('filter', 16), f) : null); }
+  function tile(ic, t) { return h('div', { className: 'wm-tile' }, I(ic, 28), t); }
+  var create = h(F, null, h('div', { className: 'wm-head' }, h('h1', null, 'Good morning, Amro')), h('div', { className: 'wm-body' }), bottom({ active: 'home' }));
+  var sheet = h(F, null, h('div', { className: 'wm-scrim' }), h('div', { className: 'wm-sheet', role: 'dialog', 'aria-label': 'Create' }, h('div', { className: 'wm-grab' }), h('h2', null, 'Create'),
+    h('div', { className: 'wm-ask' }, I('robot', 24), h('span', null, 'Ask an agent'), I('microphone', 22)),
+    h('div', { className: 'wm-tiles' }, tile('form', 'Fill a form'), tile('camera', 'Scan a receipt'), tile('table', 'Stock count'), tile('page', 'New note'), tile('invoice', 'New invoice'), tile('calendar', 'Ask for leave')),
+    h('div', { className: 'wm-edit' }, 'Change these'), h('div', { className: 'wm-home-ind' }, h('i'))));
+  var chat = h(F, null, h('div', { className: 'wm-head' }, h('div', { className: 'wm-head__top' }, h('h1', null, 'Billing assistant'), h(W.Avatar, { name: 'Amro Saleh', size: 36 })), h('div', { className: 'wm-seg' }, h('span', { className: 'is-on' }, 'Chat'), h('span', null, 'Agents today'))),
+    h('div', { className: 'wm-body' }, h('div', { className: 'wm-chat' },
+      h('div', { className: 'wm-bub is-me' }, 'Who still owes us money from October?'),
+      h('div', { className: 'wm-bub is-agent' }, h('small', null, 'Billing assistant'), '3 customers owe JOD 512.000 in total. Example Café is the oldest, 12 days late.',
+        h('div', { className: 'wm-prop' }, h('b', null, 'Send them reminders?'), h('span', { style: { fontSize: 15, color: 'var(--muted-foreground)' } }, 'By WhatsApp, in their language. You approve each one.'), h(W.Button, { variant: 'outline', icon: 'check' }, 'Prepare 3 reminders'))))),
+    bottom({ active: 'agents', action: h('div', { className: 'wm-compose' }, h('span', { className: 'wm-compose__in' }, 'Ask the Billing assistant…'), h('span', { className: 'wm-mic', 'aria-label': 'Hold to speak' }, I('microphone', 22))) }));
+  function act(who, t, time, kind) { return h('div', { className: 'wm-li' + (kind ? ' is-agent' : '') }, h('span', { className: 'wm-li__ic' }, I(kind === 'propose' ? 'approval' : 'robot', 20)), h('div', { style: { minWidth: 0 } }, h('b', { style: { whiteSpace: 'normal' } }, t), h('small', null, who)), h('div', { className: 'wm-li__end' }, time)); }
+  var today = h(F, null, h('div', { className: 'wm-head' }, h('div', { className: 'wm-head__top' }, h('h1', null, 'Chat'), h(W.Avatar, { name: 'Amro Saleh', size: 36 })), h('div', { className: 'wm-seg' }, h('span', null, 'Chats'), h('span', { className: 'is-on' }, 'Agents today'))),
+    h('div', { className: 'wm-body' }, h('div', { className: 'wm-mini' }, h('div', null, h('span', null, 'Done'), h('b', null, '14')), h('div', null, h('span', null, 'Waiting for you'), h('b', null, '3'))),
+      h('div', { className: 'wm-list' }, act('Billing assistant · for you', 'Sent 4 receipts by WhatsApp', '09:12', 'act'), act('Stock assistant · for you', 'Proposed a reorder from Example Mills', '08:40', 'propose'), act('Billing assistant · for you', 'Read 32 invoices to find overdue ones', '08:05', 'act'))),
+    bottom({ active: 'agents' }));
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wm-row' }, phone('Create, from any tab', create, { overlay: sheet }), phone('Chat · with an agent', chat), phone('Chat · agents today', today)));
+</script>
+</body>
+</html>
