@@ -67,8 +67,9 @@ final class MessagingService implements HostWiredService
 
     /**
      * Send to a person or an address, in their open conversation on the channel
-     * or a new one. For other core modules: the calendar's reminders use this
-     * with `source: calendar.reminder`.
+     * or a new one. For other core modules, each with its own `source`. The
+     * calendar's booking emails and reminders don't go through here yet: they
+     * go to the Mailer through EmailBookingMessenger.
      *
      * @return array<string, mixed> the message
      *
