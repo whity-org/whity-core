@@ -52233,6 +52233,111 @@
                 }
             }
         },
+        "/api/v1/public/contact": {
+            "post": {
+                "operationId": "post_api_v1_public_contact",
+                "summary": "Send the website contact form (public)",
+                "tags": [
+                    "messages"
+                ],
+                "description": "Files the message in the inbox of the workspace named by website.contact_workspace. Limited per address. A filled website field is dropped quietly with the same answer. A form-encoded post (scripts off) is answered with a redirect back to the contact page.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublicContactRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The message was saved",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicContactResponse"
+                                }
+                            }
+                        }
+                    },
+                    "303": {
+                        "description": "Back to the contact page (form post)"
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A field is missing or not valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many messages",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The contact form is not set up",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/public/forms/{slug}": {
             "get": {
                 "operationId": "get_api_v1_public_forms_slug",
@@ -52728,6 +52833,68 @@
                     },
                     "500": {
                         "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/plans": {
+            "get": {
+                "operationId": "get_api_v1_public_plans",
+                "summary": "The plans the website shows (public, WS.5)",
+                "tags": [
+                    "plans"
+                ],
+                "description": "Built from the active plans, their monthly prices and limits, plus the website.plans setting. Prices are decimal strings in normal units, or null when not set. Cached for five minutes; readable from the website origins (WHITY_SITE_ORIGINS).",
+                "responses": {
+                    "200": {
+                        "description": "The plans",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicPlansResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The plans could not be read",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -87197,6 +87364,66 @@
                     "data"
                 ]
             },
+            "PublicContactRequest": {
+                "type": "object",
+                "properties": {
+                    "topic": {
+                        "type": "string",
+                        "enum": [
+                            "question",
+                            "demo",
+                            "partners",
+                            "other"
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "company": {
+                        "type": "string"
+                    },
+                    "contact": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "lang": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "ar"
+                        ]
+                    },
+                    "website": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "contact",
+                    "message"
+                ]
+            },
+            "PublicContactResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "received": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "received"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "PublicFormBotSettingsResponse": {
                 "type": "object",
                 "properties": {
@@ -87752,6 +87979,129 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "PublicLocalizedText": {
+                "type": "object",
+                "properties": {
+                    "en": {
+                        "type": "string"
+                    },
+                    "ar": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "en"
+                ]
+            },
+            "PublicPlansResponse": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "integer"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "decimals": {
+                        "type": "integer"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    },
+                    "plans": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "highlight": {
+                                    "type": "boolean"
+                                },
+                                "name": {
+                                    "$ref": "#/components/schemas/PublicLocalizedText"
+                                },
+                                "tagline": {
+                                    "$ref": "#/components/schemas/PublicLocalizedText"
+                                },
+                                "price": {
+                                    "type": "object",
+                                    "properties": {
+                                        "monthly": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "required": [
+                                        "monthly"
+                                    ]
+                                },
+                                "limits": {
+                                    "type": "object",
+                                    "properties": {
+                                        "staff": {
+                                            "type": "integer"
+                                        },
+                                        "customersPerMonth": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "features": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/PublicLocalizedText"
+                                    }
+                                },
+                                "cta": {
+                                    "type": "object",
+                                    "properties": {
+                                        "label": {
+                                            "$ref": "#/components/schemas/PublicLocalizedText"
+                                        },
+                                        "href": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "label",
+                                        "href"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "highlight",
+                                "name",
+                                "price",
+                                "limits",
+                                "features"
+                            ]
+                        }
+                    },
+                    "dedicatedHosting": {
+                        "type": "object",
+                        "properties": {
+                            "fromMonthly": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "fromMonthly"
+                        ]
+                    }
+                },
+                "required": [
+                    "version",
+                    "currency",
+                    "decimals",
+                    "updatedAt",
+                    "plans",
+                    "dedicatedHosting"
                 ]
             },
             "PublicSignupAcceptedResponse": {
