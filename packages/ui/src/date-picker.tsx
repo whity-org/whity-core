@@ -75,6 +75,12 @@ export interface DatePickerProps {
   className?: string
   id?: string
   name?: string
+  /**
+   * The language the field and the calendar are written in (a BCP 47 tag, for
+   * example `ar`). Month and weekday names follow it; digits stay Western,
+   * as everywhere in Whity. Defaults to English.
+   */
+  locale?: string
 }
 
 const MONTH_NAMES = [
@@ -95,11 +101,31 @@ function parseDateValue(val?: Date | string): Date | null {
   return isNaN(parsed.getTime()) ? null : parsed
 }
 
-function formatDate(date: Date): string {
-  const m = MONTH_NAMES[date.getMonth()].slice(0, 3)
-  const d = date.getDate()
-  const y = date.getFullYear()
-  return `${m} ${d}, ${y}`
+function formatDate(date: Date, locale?: string): string {
+  if (!locale || locale.startsWith("en")) {
+    const m = MONTH_NAMES[date.getMonth()].slice(0, 3)
+    return `${m} ${date.getDate()}, ${date.getFullYear()}`
+  }
+  return new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    numberingSystem: "latn",
+  }).format(date)
+}
+
+function formatMonthYear(year: number, month: number, locale?: string): string {
+  if (!locale || locale.startsWith("en")) return `${MONTH_NAMES[month]} ${year}`
+  return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", numberingSystem: "latn" }).format(
+    new Date(year, month, 1)
+  )
+}
+
+/** Sunday first, as the grid is laid out. 1 January 2023 was a Sunday. */
+function dayNames(locale?: string): string[] {
+  if (!locale || locale.startsWith("en")) return DAY_NAMES
+  const format = new Intl.DateTimeFormat(locale, { weekday: "narrow" })
+  return Array.from({ length: 7 }, (_, i) => format.format(new Date(2023, 0, 1 + i)))
 }
 
 function isSameDay(d1: Date, d2: Date): boolean {
@@ -133,6 +159,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
       className,
       id,
       name,
+      locale,
     },
     ref
   ) => {
@@ -207,7 +234,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
               <IconCalendar className="size-3.5 shrink-0" aria-hidden="true" />
             </div>
 
-            <span className="truncate">{selectedDate ? formatDate(selectedDate) : placeholder}</span>
+            <span className="truncate">{selectedDate ? formatDate(selectedDate, locale) : placeholder}</span>
 
             <div className="absolute end-2.5 flex items-center justify-center gap-1 shrink-0 z-10">
               {clearable && selectedDate && !disabled && (
@@ -234,10 +261,10 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
               aria-label={previousMonthLabel}
               className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
-              <IconChevronLeft className="size-4" />
+              <IconChevronLeft className="size-4 rtl:-scale-x-100" />
             </button>
             <span className="text-xs font-semibold text-foreground">
-              {MONTH_NAMES[month]} {year}
+              {formatMonthYear(year, month, locale)}
             </span>
             <button
               type="button"
@@ -245,14 +272,14 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
               aria-label={nextMonthLabel}
               className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
-              <IconChevronRight className="size-4" />
+              <IconChevronRight className="size-4 rtl:-scale-x-100" />
             </button>
           </div>
 
           {/* Day Names Row */}
           <div className="grid grid-cols-7 gap-1 text-center mb-1">
-            {DAY_NAMES.map((dayName) => (
-              <span key={dayName} className="text-xs font-semibold text-muted-foreground uppercase">
+            {dayNames(locale).map((dayName, index) => (
+              <span key={index} className="text-xs font-semibold text-muted-foreground uppercase">
                 {dayName}
               </span>
             ))}

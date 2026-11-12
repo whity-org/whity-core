@@ -110,7 +110,7 @@ describe('EmailDomainsPage — permission gate', () => {
 
     render(<EmailDomainsPage />);
 
-    expect(await screen.findByText('Access Denied')).toBeInTheDocument();
+    expect(await screen.findByText('Access denied')).toBeInTheDocument();
   });
 
   it('does not flash a refusal while permissions load', async () => {
@@ -121,7 +121,7 @@ describe('EmailDomainsPage — permission gate', () => {
     render(<EmailDomainsPage />);
 
     await waitFor(() => expect(mockApiClient).toHaveBeenCalled());
-    expect(screen.queryByText('Access Denied')).not.toBeInTheDocument();
+    expect(screen.queryByText('Access denied')).not.toBeInTheDocument();
   });
 
   it('renders for whoever holds the permission, whatever their role is called', async () => {

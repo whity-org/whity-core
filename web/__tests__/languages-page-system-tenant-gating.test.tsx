@@ -77,7 +77,7 @@ describe('LanguagesPage system-tenant-only gating (WC-583)', () => {
 
     render(<LanguagesPage />);
 
-    expect(await screen.findByText('Access Denied')).toBeInTheDocument();
+    expect(await screen.findByText('Access denied')).toBeInTheDocument();
   });
 
   it('shows Access Denied for a REGULAR tenant even when it holds languages:manage', async () => {

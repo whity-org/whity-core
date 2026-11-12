@@ -18,7 +18,7 @@ import { Avatar } from '@whity/ui/avatar';
 import { Icon } from '@whity/ui/icon';
 import { Switch } from '@whity/ui/switch';
 import { Input } from '@whity/ui/input';
-import { DatePicker } from '@whity/ui/date-picker';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';

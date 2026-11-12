@@ -13,7 +13,7 @@ import { EmbedScreen } from '@/components/plugin/embed-screen';
 import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { Skeleton } from '@whity/ui/skeleton';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { IconPuzzle } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 

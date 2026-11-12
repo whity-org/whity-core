@@ -12,7 +12,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { Input } from '@whity/ui/input';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 import {

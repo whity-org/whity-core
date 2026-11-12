@@ -59,6 +59,8 @@ export interface InputProps extends React.ComponentProps<"input"> {
   tooltipTriggerLabel?: string
   /** For type="date": the picker's own words, for hosts that translate them. */
   datePickerLabels?: {
+    /** The language of the calendar's month and weekday names (see DatePicker). */
+    locale?: string
     placeholder?: string
     clear?: string
     today?: string
@@ -326,6 +328,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             clearButtonLabel={datePickerLabels?.clearButton}
             previousMonthLabel={datePickerLabels?.previousMonth}
             nextMonthLabel={datePickerLabels?.nextMonth}
+            locale={datePickerLabels?.locale}
             defaultValue={props.defaultValue as string}
             value={props.value as string}
             onChange={(d) => {
