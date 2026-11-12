@@ -200,7 +200,6 @@ final class MigrationSchemaTest extends TestCase
             254 => 'unused in the 0.2.29 numbering (chat took 253, emails 257)',
             255 => 'unused in the 0.2.29 numbering',
             256 => 'unused in the 0.2.29 numbering',
-            259 => 'unused in the 0.2.29 numbering (emails moved to 257)',
         ];
 
         $deleted = array_values(array_filter(
