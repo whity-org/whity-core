@@ -22,7 +22,7 @@
       var has = g[1].some(function (x) { return x[1] === active; });
       return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
   function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
   function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
   function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
@@ -32,7 +32,7 @@
   function f(icon, t, n, on) { return h('a', { href: '#', className: on ? 'is-on' : '' }, I(icon), t, n != null ? h('small', null, n) : null); }
   var rail = h('nav', { className: 'wy-lib__rail', 'aria-label': 'Folders' }, f('document', 'All documents', 128), f('user', 'Created by me', 14), f('inbox', 'Waiting for me', 2, true), f('check', 'Approved by me', 31), f('tenant', 'From my unit', 46), f('view', 'Passed through my unit', 12),
     h('h4', null, 'Starred and collections'), f('highlight', 'Starred', 5), f('form', 'Suppliers 2026', 9), f('form', 'Audit, November', 4), h('a', { href: '#' }, I('plus'), 'New collection'));
-  var rows = [{ id: 1, s: true, t: 'Purchase order PO-0142', tp: 'Purchase order', from: 'Omar Khalil', d: 'Yesterday', v: 1 }, { id: 2, s: false, t: 'Leave approval · Lina Saad', tp: 'Leave approval', from: 'Lina Saad', d: 'Today', v: 1 }];
+  var rows = [{ id: 1, s: true, t: 'Purchase order PO-0142', tp: 'Purchase order', from: 'Ahmad Khalil', d: 'Yesterday', v: 1 }, { id: 2, s: false, t: 'Leave approval · Awss Haddad', tp: 'Leave approval', from: 'Awss Haddad', d: 'Today', v: 1 }];
   ReactDOM.createRoot(document.getElementById('root')).render(shell('Library', h(F, null,
     h(W.PageHeader, { title: 'Library', description: 'Every document issued in Example Bakery that you can see. Folders are saved searches; collections are your own.', actions: h(W.Button, { icon: 'plus' }, 'New document') }),
     h('div', { className: 'wy-lib' }, rail, h('div', null,

@@ -10,3 +10,7 @@ name: "whity-codeql"
 
 paths-ignore:
   - web/public/mockServiceWorker.js
+  # The design hand-off package: static reference mock-ups (preview.html files
+  # load React and fonts from public CDNs). Never served or shipped by the app,
+  # and kept byte-identical to the brand team's package.
+  - docs/design/**

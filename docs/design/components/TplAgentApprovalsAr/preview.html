@@ -13,11 +13,11 @@
       { label: 'Documents', items: [it('document', 'Library'), it('routing', 'Routing')] },
       { label: 'Platform', items: [it('tenant', 'Tenants'), it('plugin', 'Plugins'), it('branding', 'Branding'), it('audit', 'Audit log')] }]; }
   var topBar = h(React.Fragment, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  ReactDOM.createRoot(document.getElementById('root')).render(h(W.AppShell, { dir: 'rtl', searchLabel: 'بحث', tenant: 'مخبز المثال', user: 'رنا حداد', role: 'المالكة', topActions: topBar,
+  ReactDOM.createRoot(document.getElementById('root')).render(h(W.AppShell, { dir: 'rtl', searchLabel: 'بحث', tenant: 'مخبز المثال', user: 'عمرو صالح', role: 'المالك', topActions: topBar,
     nav: [{ items: [{ icon: 'dashboard', label: 'اللوحة' }, { icon: 'inbox', label: 'الوارد', count: 2 }, { icon: 'approval', label: 'الموافقات', count: 3, active: true }] }, { label: 'الذكاء الاصطناعي', items: [{ icon: 'ai-principal', label: 'الوكلاء' }, { icon: 'activity', label: 'سجل الوكلاء' }] }] },
     h(W.PageHeader, { title: 'الموافقات', description: 'يستأذن الوكلاء هنا قبل أي إجراء ضبطته على «اسأل أولًا».' }),
     h('div', { className: 'wy-queue__pos', style: { maxWidth: 560 } }, h('span', null, '1 من 3 بانتظار القرار')),
-    h(W.ActionProposal, { dir: 'rtl', agent: 'مساعد الفوترة', onBehalfOf: 'رنا', title: 'إرسال تذكير بالدفع إلى 12 عميلًا', changes: [{ label: 'الفواتير', after: '12 متأخرة · JOD 4,860' }, { label: 'الحالة', before: 'متأخرة', after: 'أُرسل التذكير' }], scope: ['invoice:remind'],
+    h(W.ActionProposal, { dir: 'rtl', agent: 'مساعد الفوترة', onBehalfOf: 'عمرو', title: 'إرسال تذكير بالدفع إلى 12 عميلًا', changes: [{ label: 'الفواتير', after: '12 متأخرة · JOD 4,860' }, { label: 'الحالة', before: 'متأخرة', after: 'أُرسل التذكير' }], scope: ['invoice:remind'],
       labels: { waiting: 'بانتظار موافقتك', approve: 'موافقة', reject: 'رفض', edit: 'تعديل', reversible: 'يمكن التراجع عنه', scope: 'يستخدم', forLabel: 'نيابةً عن', before: 'الآن', after: 'بعد' } })));
 </script>
 </body>

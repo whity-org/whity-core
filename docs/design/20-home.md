@@ -8,7 +8,7 @@ There is one home (H.1). Each card appears only when the person can see what it 
 
 | Part | Who sees it | What it holds |
 | --- | --- | --- |
-| Greeting | Everyone | "Good morning, Rana", the date and the workspace (and branch, if the person has one) |
+| Greeting | Everyone | "Good morning, Amro", the date and the workspace (and branch, if the person has one) |
 | Waiting for you | Everyone | Inbox documents and agent proposals, merged, oldest first, with inline decisions (H.2) |
 | Agents today | People with agents | The day's agent activity with a summary: done, waiting, undone |
 | Finish setting up | Owners and admins, until done | The steps that block real work, each with why it matters |

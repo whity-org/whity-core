@@ -1,6 +1,6 @@
 # Iconography
 
-**Tabler outline icons** (MIT), the set the product already uses through `@tabler/icons-react`: a 24px grid, round caps and joins, drawn in `currentColor`. This system curates 116 of them under Whity's own names, so screens and docs use the same word for the same thing.
+**Tabler outline icons** (MIT), the set the product already uses through `@tabler/icons-react`: a 24px grid, round caps and joins, drawn in `currentColor`. This system curates 156 of them under Whity's own names, so screens and docs use the same word for the same thing.
 
 ## Size and weight
 
@@ -17,13 +17,15 @@ The 16px stroke is thicker on purpose: it renders at the same optical weight as 
 
 Whity's words map to one icon each: `tenant` (building), `role` (shield-lock), `permission` (key), `delegation` (user-share), `ai-principal` and `robot` (robot face), `approval` (rubber stamp), `scope` (lock-access), `routing` (route), `inbox`, `plugin` (puzzle), `tool` (MCP tools), `audit` (history), `invoice`, `quote`, `receipt`, `money`. The document editor adds 28 (2.2): `bold`, `italic`, `underline`, `strike`, `code`, `highlight`, `heading-1` to `heading-3`, `list-bullet`, `list-numbered`, `list-todo`, `blockquote`, `table`, `image`, `columns`, `divider`, `page-break`, `field` (braces), `comment`, `comment-add`, `drag` (grip), `redo`, `text`, `outline`, `suggest`, `page` and `continuous`. The full list, with each Tabler name, is in `handoff/icons/icons.json` and on the Icon card.
 
+Mobile (3.0) adds 21: `wifi`, `battery`, `microphone`, `camera`, `apple`, `shuffle`, `rotate`, `key`, `archive`, `barcode`, `signature`, `at`, `fingerprint`, `shield`, `text-size`, `gesture`, `card`, `pause`, `play`, `attach`, `ban`. Mobile icons sit at 20px in rows and 24px in the tab bar. Work and operations (3.1) add `kanban`, `meeting`, `appointment`, `flag`, `video`, `record`, `gavel`, `evidence`, `check-in`, `package`, `transfer`, `recipe`, `batch`, `bank`, `wallet`, `trigger`, `branch`, `away` and `org`.
+
 ## Agents
 
 An agent is always Tabler's **robot face**, in the main colour on the tint (decision 5.1), in its avatar, actor chip and the AI principals screen. Never sparkles, brains, glowing effects or illustrated robots.
 
 ## Direction
 
-`chevron-left`, `chevron-right`, `arrow-right`, `send`, `undo`, `external` and `logout` mirror in right-to-left layouts; `Icon` does this by itself (`mirror: false` stops it). The mark never mirrors.
+`chevron-left`, `chevron-right`, `arrow-right`, `send`, `undo`, `external`, `logout`, `play` and `shuffle` mirror in right-to-left layouts; `Icon` does this by itself (`mirror: false` stops it). The mark never mirrors.
 
 ## Rules
 

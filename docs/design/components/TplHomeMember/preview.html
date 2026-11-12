@@ -14,7 +14,7 @@
       { label: L.Documents || 'Documents', items: [it('document', 'Library'), it('routing', 'Routing')] },
       { label: L.Platform || 'Platform', items: [it('tenant', 'Tenants'), it('plugin', 'Plugins'), it('branding', 'Branding'), it('audit', 'Audit log')] }]; }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: 'Rana Haddad', role: 'Owner', nav: nav('Plugins', o.L), topActions: topBar, labels: o.shellLabels }, kids); }
+  function shell(kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: 'Amro Saleh', role: 'Owner', nav: nav('Plugins', o.L), topActions: topBar, labels: o.shellLabels }, kids); }
   function logo(p, size) { return h('span', { className: size === 'lg' ? 'wy-pdetail__ic' : 'wy-ptile__ic', style: { background: p.color }, 'aria-hidden': 'true' }, p.whity ? h(W.Mark, { size: size === 'lg' ? 34 : 22, tone: 'onbrand', label: '' }) : p.initial || p.name.charAt(0)); }
   function trust(p, L) { L = L || {}; return p.whity ? h('span', { className: 'wy-trust wy-trust--whity' }, I('success', 12), L.byWhity || 'By Whity') : p.verified ? h('span', { className: 'wy-trust wy-trust--verified' }, I('success', 12), L.verified || 'Verified') : h('span', { className: 'wy-trust wy-trust--sandbox' }, I('lock', 12), L.sandboxed || 'Sandboxed'); }
   function adds(p, L) { L = L || {}; return h('div', { className: 'wy-adds' }, (p.adds || []).map(function (a) { var m = { screens: ['dashboard', L.screens || 'Screens'], blocks: ['page', L.blocks || 'Document blocks'], agent: ['robot', L.agent || 'Agent tools'], fields: ['field', L.fields || 'Fields'], connect: ['link', L.connect || 'Connects out'] }[a];
@@ -47,12 +47,12 @@
     h('div', { className: 'wy-appcard__src' }, logo(p), h('span', null, label || p.name), h(W.Menu, { label: 'Card options', items: [{ icon: 'hide', label: 'Hide from home' }, { icon: 'external', label: 'Open ' + p.name }] })), kids)); }
 
   var groups = [[null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox'], ['approval', 'Approvals']]], ['Documents', [['document', 'Library'], ['form', 'My submissions']]], ['Apps', [['table', 'Stock'], ['routing', 'Deliveries']]]];
-  ReactDOM.createRoot(document.getElementById('root')).render(h(W.AppShell, { tenant: 'Example Bakery', user: 'Omar Khalil', role: 'Staff · Sweifieh', nav: navH(groups), topActions: topBar },
-    h(W.PageHeader, { title: 'Good afternoon, Omar', description: 'Monday 2 November · Example Bakery, Sweifieh' }),
+  ReactDOM.createRoot(document.getElementById('root')).render(h(W.AppShell, { tenant: 'Example Bakery', user: 'Ahmad Khalil', role: 'Staff · Sweifieh', nav: navH(groups), topActions: topBar },
+    h(W.PageHeader, { title: 'Good afternoon, Ahmad', description: 'Monday 2 November · Example Bakery, Sweifieh' }),
     h('div', { className: 'wy-wait__none' }, I('success', 20), h('b', { style: { fontWeight: 500 } }, 'Nothing is waiting for you.'), h('span', null, 'Decisions and agent proposals for you will appear here.')),
     h('div', { className: 'wy-home', style: { marginTop: 16 } },
       h(W.Card, { title: 'Your recent documents', description: 'Drafts and what you sent this week' },
-        h(W.DataTable, { label: 'Recent documents', rows: [{ id: 1, t: 'Purchase order PO-0142', s: h(W.Badge, { variant: 'info' }, 'With Rana'), u: 'Yesterday' }, { id: 2, t: 'Delivery note DN-2207', s: h(W.Badge, { variant: 'success' }, 'Issued'), u: 'Sat 31 Oct' }, { id: 3, t: 'Stock count, Sweifieh', s: h(W.Badge, { variant: 'secondary' }, 'Draft'), u: 'Thu 29 Oct' }],
+        h(W.DataTable, { label: 'Recent documents', rows: [{ id: 1, t: 'Purchase order PO-0142', s: h(W.Badge, { variant: 'info' }, 'With Amro'), u: 'Yesterday' }, { id: 2, t: 'Delivery note DN-2207', s: h(W.Badge, { variant: 'success' }, 'Issued'), u: 'Sat 31 Oct' }, { id: 3, t: 'Stock count, Sweifieh', s: h(W.Badge, { variant: 'secondary' }, 'Draft'), u: 'Thu 29 Oct' }],
           columns: [{ key: 't', label: 'Document' }, { key: 's', label: 'Status', render: function (r) { return r.s; } }, { key: 'u', label: 'Updated', align: 'end' }] })),
       h('div', { className: 'wy-home__side' },
         appCard(P.inv, h(F, null, h('div', { className: 'wy-appcard__big' }, '1', h('small', null, 'item below reorder level')),

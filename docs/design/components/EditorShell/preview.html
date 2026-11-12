@@ -58,9 +58,9 @@
       blk('h2', h('h3', null, 'Open invoices')),
       blk('table', h('table', null, h('thead', null, h('tr', null, h('th', null, 'Invoice'), h('th', null, 'Due'), h('th', { className: 'is-num' }, 'Amount'))),
         h('tbody', null, h('tr', null, h('td', null, 'INV-1042'), h('td', null, '14 Oct 2026'), h('td', { className: 'is-num' }, 'JOD 301.600')), h('tr', null, h('td', null, 'INV-1051'), h('td', null, '21 Oct 2026'), h('td', { className: 'is-num' }, 'JOD 96.000'))))),
-      o.agentBlock === false ? null : h('div', { className: 'wy-blk wy-blk--p is-suggested' }, h('div', { className: 'wy-blk__by' }, h(W.ActorChip, { kind: 'agent', name: 'Billing assistant', onBehalfOf: 'Rana' }), 'suggests a paragraph'), h('p', null, 'If you have already paid, thank you, and please ignore this letter. Payments can take two working days to reach us.')),
+      o.agentBlock === false ? null : h('div', { className: 'wy-blk wy-blk--p is-suggested' }, h('div', { className: 'wy-blk__by' }, h(W.ActorChip, { kind: 'agent', name: 'Billing assistant', onBehalfOf: 'Amro' }), 'suggests a paragraph'), h('p', null, 'If you have already paid, thank you, and please ignore this letter. Payments can take two working days to reach us.')),
       blk('p', h('p', null, 'Kind regards,')),
-      blk('p', h('p', null, mf('Sender name', 'Rana Haddad', p), h('br'), mf('Company name', 'Example Bakery', p))));
+      blk('p', h('p', null, mf('Sender name', 'Amro Saleh', p), h('br'), mf('Company name', 'Example Bakery', p))));
   }
 
   ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wy-edx', style: { height: '100%' } },
@@ -73,10 +73,10 @@
         docBody({ hover: true }))),
       h('aside', { className: 'wy-edx__rail', 'aria-label': 'Comments and suggestions' },
         h('div', { className: 'wy-edx__railhead' }, h('span', null, '2 suggestions · 1 comment'), h(W.Button, { variant: 'ghost', size: 'sm' }, 'Accept all')),
-        rcard(150, { name: 'Omar Khalil', time: '13:40', text: 'Should we mention the 2% late fee here?', active: true, reply: true }),
-        rcard(282, { name: 'Rana Haddad', time: '13:52', sug: true, what: h(F, null, 'Replace ', h('b', null, '30 days'), ' with ', h('b', null, '14 days')) }),
-        rcard(520, { agent: 'Billing assistant', for: 'Rana', sug: true, what: 'Adds a paragraph after the table', text: 'Uses document:edit · asked 14:01' }))),
-    status(['214 words', 'English', 'Template', '|', 'Last edited by Rana Haddad at 14:02'])));
+        rcard(150, { name: 'Ahmad Khalil', time: '13:40', text: 'Should we mention the 2% late fee here?', active: true, reply: true }),
+        rcard(282, { name: 'Amro Saleh', time: '13:52', sug: true, what: h(F, null, 'Replace ', h('b', null, '30 days'), ' with ', h('b', null, '14 days')) }),
+        rcard(520, { agent: 'Billing assistant', for: 'Amro', sug: true, what: 'Adds a paragraph after the table', text: 'Uses document:edit · asked 14:01' }))),
+    status(['214 words', 'English', 'Template', '|', 'Last edited by Amro Saleh at 14:02'])));
 </script>
 </body>
 </html>

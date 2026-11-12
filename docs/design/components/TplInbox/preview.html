@@ -22,7 +22,7 @@
       var has = g[1].some(function (x) { return x[1] === active; });
       return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
   function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
   function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
   function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
@@ -30,11 +30,11 @@
       h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
   function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
   var rows = [
-    { id: 1, ic: 'document', t: 'Purchase order PO-0142', src: 'Documents', from: 'Omar Khalil', st: ['warning', 'Your decision'], when: 'Yesterday, 16:20', dec: true },
-    { id: 2, ic: 'calendar', t: 'Leave request · 3–5 November', src: 'Leave', from: 'Lina Saad', st: ['warning', 'Your decision'], when: 'Today, 10:04', dec: true },
+    { id: 1, ic: 'document', t: 'Purchase order PO-0142', src: 'Documents', from: 'Ahmad Khalil', st: ['warning', 'Your decision'], when: 'Yesterday, 16:20', dec: true },
+    { id: 2, ic: 'calendar', t: 'Leave request · 3–5 November', src: 'Leave', from: 'Awss Haddad', st: ['warning', 'Your decision'], when: 'Today, 10:04', dec: true },
     { id: 3, ic: 'list-todo', t: 'Supplier sign-up form · Example Mills', src: 'Forms', from: 'Public form', st: ['info', 'To review'], when: 'Today, 09:15' },
-    { id: 4, ic: 'document', t: 'Employment letter · Sami Nasser', src: 'Documents', from: 'Hala Mansour', st: ['secondary', 'For your information'], when: 'Sat 31 Oct' },
-    { id: 5, ic: 'document', t: 'Delivery note DN-2207', src: 'Documents', from: 'Dana Yousef', st: ['success', 'You approved'], when: 'Thu 29 Oct', done: true }];
+    { id: 4, ic: 'document', t: 'Employment letter · Emad Nasser', src: 'Documents', from: 'Ibrahim Mansour', st: ['secondary', 'For your information'], when: 'Sat 31 Oct' },
+    { id: 5, ic: 'document', t: 'Delivery note DN-2207', src: 'Documents', from: 'Emad Yousef', st: ['success', 'You approved'], when: 'Thu 29 Oct', done: true }];
   ReactDOM.createRoot(document.getElementById('root')).render(shell('Inbox', h(F, null,
     h(W.PageHeader, { title: 'Inbox', description: 'Documents, forms and requests that need you. Agent proposals are in Approvals.' }),
     h(W.Tabs, { items: [{ value: 'all', label: 'All', count: 4 }, { value: 'd', label: 'Documents', count: 2 }, { value: 'l', label: 'Leave', count: 1 }, { value: 'f', label: 'Forms', count: 1 }], defaultValue: 'all' }),

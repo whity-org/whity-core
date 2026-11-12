@@ -1,0 +1,61 @@
+<!-- @dsCard group="Templates · Near term" height=860 width=1440 subtitle="N3: importing a spreadsheet: match its columns to Whity’s fields and see what will happen before anything changes" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Import</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['customer', 'Contacts'], ['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions'], ['chart', 'Reports']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function kpi(l, v, s, cls) { return h('div', { className: 'wk-kpi' }, h('span', null, l), h('b', null, v), s ? h('small', { className: cls || '' }, s) : null); }
+  function num(v, cls) { return h('span', { className: 'wk-num' + (cls ? ' ' + cls : '') }, v); }
+  function tabs(items, on) { return h('div', { className: 'wk-bar' }, h(W.Tabs, { items: items.map(function (x, i) { return { value: String(i), label: x[0], count: x[1] }; }), defaultValue: String(on) })); }
+
+  function m(src, ex, dst, st) { return h('div', { className: 'wk-map' }, h('div', null, h('code', null, src), h('small', null, ex)), I('arrow-right', 16), h('div', null, dst), st); }
+  var map = h(W.Card, { title: 'Match the columns', description: 'customers-2026.xlsx · 182 rows · first row is the header', style: { padding: 0 } }, h('div', { className: 'wk-map is-head' }, h('span', null, 'In your file'), h('span'), h('span', null, 'In Whity'), h('span', null, '')),
+    m('Customer', 'Example Café', h(W.Badge, { variant: 'outline' }, 'Name'), h(W.Badge, { variant: 'success' }, 'Matched')), m('Phone', '0795550101', h(W.Badge, { variant: 'outline' }, 'Mobile'), h(W.Badge, { variant: 'success' }, 'Matched, +962 added')), m('Tax No', '12345678', h(W.Badge, { variant: 'outline' }, 'Tax number'), h(W.Badge, { variant: 'success' }, 'Matched')),
+    m('Area', 'Abdoun', h(W.Badge, { variant: 'outline' }, 'Tags'), h(W.Badge, { variant: 'info' }, 'Becomes a tag')), m('Tray', 'Large', h(W.Badge, { variant: 'outline' }, 'Tray size'), h(W.Badge, { variant: 'success' }, 'Your field')), m('Balance', '312', h('span', { style: { color: 'var(--muted-foreground)' } }, 'Opening balance, JOD'), h(W.Badge, { variant: 'warning' }, 'Check: no decimals')), m('Notes 2', '(empty in 170 rows)', h('span', { style: { color: 'var(--muted-foreground)' } }, 'Don’t import'), h(W.Badge, { variant: 'secondary' }, 'Skipped')));
+  var side = h('div', { style: { display: 'grid', gap: 16 } }, h(W.Card, { title: 'What will happen' }, h(W.DescriptionList, { items: [{ label: 'New contacts', value: h('b', null, '164') }, { label: 'Updated (same tax number)', value: '14' }, { label: 'Skipped, with reasons', value: h('span', { className: 'wk-low' }, '4') }, { label: 'New tags', value: 'Abdoun, Sweifieh, Khalda' }] }), h('div', { style: { marginTop: 10 } }, h(W.Button, { variant: 'ghost', size: 'sm', icon: 'download' }, 'Download the 4 skipped rows'))),
+    h(W.Alert, { variant: 'info', title: 'Nothing changes until you import' }, 'You can undo the whole import for 24 hours.'), h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end' } }, h(W.Button, { variant: 'outline' }, 'Back'), h(W.Button, { icon: 'upload' }, 'Import 178 contacts')));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Contacts', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: 'Contacts' }, { label: 'Import' }], title: 'Import contacts', description: 'From Excel or a CSV file. Items, opening stock and opening balances import the same way.' }),
+    h('div', { style: { marginBottom: 16 } }, h(W.Stepper, { steps: [{ label: 'Choose a file' }, { label: 'Match columns' }, { label: 'Check' }, { label: 'Import' }], current: 1 })),
+    h('div', { className: 'wk-split', style: { gridTemplateColumns: 'minmax(0,1fr) 380px' } }, map, side))));
+</script>
+</body>
+</html>

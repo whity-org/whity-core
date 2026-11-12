@@ -1,0 +1,42 @@
+<!-- @dsCard group="Mobile" height=954 width=1880 subtitle="M.27, M.33, M.29: sign up with email, confirm it, protect the account, then find or create a workspace" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1880px;min-height:954px}</style><meta charset="utf-8"><title>Mobile onboarding account</title><style>html,body{height:100%;margin:0} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 22 }); }
+  var T0 = { home: 'Home', inbox: 'Inbox', create: 'Create', agents: 'Chat', agentsIcon: 'comment', more: 'More' };
+  function status() { return h('div', { className: 'wm-status', 'aria-hidden': 'true' }, h('span', null, '9:41'), h('i'), h('span', null, I('wifi', 16), I('battery', 18))); }
+  function tabbar(active, T, badges) { T = T || T0; badges = badges || { inbox: 3 };
+    function tab(k, icon) { return h('div', { key: k, className: 'wm-tab' + (active === k ? ' is-on' : '') }, I(icon, 24), T[k], badges[k] ? h('b', null, badges[k]) : null); }
+    return h('nav', { className: 'wm-tabbar', 'aria-label': 'Main' }, tab('home', 'dashboard'), tab('inbox', 'inbox'), h('button', { key: 'c', className: 'wm-create', 'aria-label': T.create }, I('plus', 28)), tab('agents', T.agentsIcon || 'robot'), tab('more', 'menu')); }
+  function bottom(o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.tabs === false ? null : tabbar(o.active, o.T, o.badges), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function phone(label, kids, o) { o = o || {}; return h('div', { className: 'wm-col' }, h('div', { className: 'wm-label' }, label), h('div', { className: 'wm-phone', dir: o.dir }, status(), kids, o.overlay || null)); }
+  function search(t, f) { return h('div', { className: 'wm-search' }, I('search', 20), h('span', null, t), f ? h('button', { type: 'button' }, I('filter', 16), f) : null); }
+  function stage(blue, tag, kids, keys) { var LOT = { 'YOUR BRAND, OUR PLATFORM': ['brand-sheet-platform', 'view'], 'AGENTS PROPOSE': ['agents-propose', 'view'], 'YOU DECIDE': ['approve-set-down', 'view'], 'IN THE APP': ['approve-set-down', 'view'], 'UPDATING · LOOPS': ['updating', 'loop'], 'ALL CAUGHT UP': ['all-caught-up', 'view'] }; var l = LOT[tag]; if (!l) return h('div', { className: 'wm-lottie' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, 'LOTTIE · ' + tag), kids, keys ? h('div', { className: 'wm-keys' }, keys.map(function (k, i) { return h('span', { key: i }, k); })) : null); return h('div', { className: 'wm-lottie has-file' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, l[0] + '.json'), h('div', { className: 'w-lottie', 'data-lottie': 'lottie/' + l[0] + '.json', 'data-play': l[1] }, h('div', { className: 'w-lottie__fallback' }, kids))); }
+  function at(cls, x, y, extra) { return h('div', { className: cls, style: Object.assign({ left: x, top: y }, extra || {}) }); }
+  function dots(n, on) { var a = []; for (var i = 0; i < n; i++) a.push(h('i', { key: i, className: i === on ? 'is-on' : '' })); return h('div', { className: 'wm-dots' }, a); }
+  function foot(kids) { return h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-form', style: { borderTop: 0 } }, kids), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function q(title, sub, step, of) { return h(F, null, h('div', { className: 'wm-progress', 'aria-hidden': 'true' }, h('i', { style: { width: Math.round(step / of * 100) + '%' } })), h('div', { className: 'wm-q' }, h('h1', null, title), sub ? h('p', null, sub) : null)); }
+  function choice(t, sub, on, icon) { return h('div', { className: 'wm-choice' + (on ? ' is-on' : '') }, icon ? I(icon, 24) : null, h('span', null, t, sub ? h('small', null, sub) : null), h('i', { className: 'wm-radio' })); }
+  function navbar(t) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), h('span')); }
+
+  var signup = h(F, null, navbar(), q('Your details', 'You’ll use these to sign in to every workspace.', 1, 5),
+    h('div', { className: 'wm-pad', style: { paddingTop: 12 } }, h(W.Input, { label: 'Your name', defaultValue: 'Amro Saleh' }), h(W.Input, { label: 'Email', defaultValue: 'amro@examplebakery.jo', dir: 'ltr' }), h(W.Input, { label: 'Password', type: 'password', defaultValue: 'longpassword', helperText: 'At least 12 characters' })),
+    h('div', { style: { flex: 1 } }), foot(h(W.Button, null, 'Continue')));
+  function codeBoxes() { return h('div', { className: 'wm-code' }, ['4', '8', '1', '', '', ''].map(function (d, i) { return h('span', { key: i, className: i === 3 ? 'is-on' : '' }, d); })); }
+  var code = h(F, null, navbar(), q('Check your email', 'We sent a 6-digit code to amro@examplebakery.jo.', 2, 5), h('div', { className: 'wm-pad', style: { paddingTop: 16 } }, codeBoxes(), h('div', { className: 'wm-alt' }, h('span', null, 'Send a new code in 0:42'))),
+    h('div', { style: { flex: 1 } }), foot(h('div', { className: 'wm-cap', style: { textAlign: 'center' } }, 'The code fills in by itself when the email arrives.')));
+  var protect = h(F, null, navbar(), q('Protect your account', 'So only you can sign in, even if someone learns your password.', 4, 5),
+    h('div', { className: 'wm-pad', style: { paddingTop: 12 } }, choice('Use this phone', 'Face ID signs you in and approves sign-ins elsewhere', true, 'two-step'), choice('An authenticator app', 'Google Authenticator, Microsoft Authenticator and others', false, 'lock'), choice('Later', 'Some workspaces will ask before you can join', false, 'clock')),
+    h('div', { style: { flex: 1 } }), foot(h(W.Button, { icon: 'two-step' }, 'Use Face ID')));
+  var ws = h(F, null, navbar(), q('Your workspace', 'Where do you work on Whity?', 5, 5),
+    h('div', { className: 'wm-pad', style: { paddingTop: 12 } }, h('div', { className: 'wm-cap' }, h('b', null, 'Invitations for amro@examplebakery.jo')), h('div', { className: 'wm-list' }, h('div', { className: 'wm-ws' }, h('span', { className: 'wm-ws__logo', style: { background: '#b74c05' } }, 'E'), h('div', null, h('b', null, 'Example Bakery'), h('small', null, 'Invited by Emad Nasser · Owner')), h(W.Button, { size: 'sm' }, 'Join'))),
+      h('div', { className: 'wm-or' }, 'or'), choice('Create a workspace', 'For your company, on Whity or your own installation', false, 'plus'), choice('Join with a code or QR', 'From a link, a receipt or a poster', false, 'qr')),
+    h('div', { style: { flex: 1 } }), h('div', { className: 'wm-home-ind' }, h('i')));
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wm-row' }, phone('Email sign-up', signup), phone('Confirm the email', code), phone('Protect your account', protect), phone('Find or create a workspace', ws)));
+</script>
+</body>
+</html>

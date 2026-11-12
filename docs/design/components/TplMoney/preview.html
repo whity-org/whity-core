@@ -1,0 +1,61 @@
+<!-- @dsCard group="Templates · Work" height=1063 width=1440 subtitle="MO.1: money in and out, what waits for you, and budgets, with the accounting underneath" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Money</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function kpi(l, v, s, cls) { return h('div', { className: 'wk-kpi' }, h('span', null, l), h('b', null, v), s ? h('small', { className: cls || '' }, s) : null); }
+  function num(v, cls) { return h('span', { className: 'wk-num' + (cls ? ' ' + cls : '') }, v); }
+  function prop(agent, forWho, title, lines, why, btns) { return h('div', { className: 'wk-minutes', style: { gap: 10 } }, h(W.ActorChip, { kind: 'agent', name: agent, onBehalfOf: forWho }), h('b', { style: { fontSize: 16 } }, title), h('ul', { className: 'wk-ev' }, lines.map(function (l, i) { return h('li', { key: i, className: 'is-ok' }, I(l[0], 16), h('div', null, l[1], h('small', null, l[2]))); })), why ? h('small', { style: { color: 'var(--muted-foreground)', fontSize: 13 } }, why) : null, h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end' } }, btns)); }
+
+  function wait(ic, t, sub, btn, ag) { return h('div', { className: 'wk-task', style: { gridTemplateColumns: '28px minmax(0,1fr) auto' } }, h('span', { className: 'wk-chip', style: { width: 28, height: 28, padding: 0, justifyContent: 'center' } }, I(ic, 14)), h('div', { style: { minWidth: 0 } }, h('b', null, t), h('small', null, sub)), btn); }
+  function bud(t, a, b, pct, over) { return h('div', { className: 'wm-meter2' }, h('div', null, h('span', null, t), h('b', { className: 'wk-num' + (over ? ' wk-low' : '') }, a + ' of ' + b)), h('i', null, h('i', { style: { width: Math.min(pct, 100) + '%', background: over ? 'var(--destructive)' : undefined } }))); }
+  var left = h('div', { style: { display: 'grid', gap: 16 } }, h(W.Card, { title: 'Money in, less money out', description: 'Last 6 months, JOD' }, h(W.BarChart, { height: 180, data: [{ label: 'Jun', value: 2140 }, { label: 'Jul', value: 1820 }, { label: 'Aug', value: 2460 }, { label: 'Sep', value: 2980 }, { label: 'Oct', value: 3310 }, { label: 'Nov', value: 1240 }], highlight: 4 })),
+    h(W.Card, { title: 'Waiting for you' }, h('div', { className: 'wk-list' }, wait('receipt', 'Expense claim: fuel, delivery van · JOD 30.000', 'Awss Haddad · receipt read by Expense assistant', h(W.Button, { size: 'sm', variant: 'outline' }, 'Review')), wait('card', '2 card payments without a receipt', 'Company card •••• 4242 · Emad Nasser', h(W.Button, { size: 'sm', variant: 'outline' }, 'Remind Emad')), wait('robot', '14 entries sorted into accounts', 'Bookkeeping assistant · bank lines from 1–7 November', h(W.Button, { size: 'sm', variant: 'outline' }, 'Review')), wait('invoice', 'INV-1042 is 12 days late · JOD 312.000', 'Example Café · Billing assistant proposes a reminder', h(W.Button, { size: 'sm', variant: 'outline' }, 'Open')))));
+  var side = h(W.Card, { title: 'Budgets, November', description: 'By team, against what’s been spent', action: h(W.Button, { variant: 'ghost', size: 'sm' }, 'Edit') }, h('div', { style: { display: 'grid', gap: 14 } }, bud('Ingredients', 'JOD 8,200', '9,000', 91), bud('Packaging', 'JOD 1,140', '1,500', 76), bud('Marketing', 'JOD 380', '600', 63), bud('Fuel', 'JOD 290', '250', 116, 1), h('small', { style: { color: 'var(--destructive)', fontSize: 13 } }, 'Fuel is JOD 40 over. New fuel claims need Amro’s approval this month.')));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Money and expenses', h(F, null, h(W.PageHeader, { title: 'Money', description: 'Example Bakery · November 2026', actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'download' }, 'Export for your accountant'), h(W.Button, { icon: 'plus' }, 'New expense')) }),
+    h('div', { className: 'wk-bar' }, h(W.Tabs, { items: [{ value: 'o', label: 'Overview' }, { value: 'e', label: 'Expenses', count: 3 }, { value: 'i', label: 'Invoices' }, { value: 'p', label: 'Payments' }, { value: 'b', label: 'Budgets' }, { value: 'a', label: 'Accounts' }, { value: 't', label: 'Sales tax' }], defaultValue: 'o' })),
+    h('div', { className: 'wk-kpis' }, kpi('In the bank and cash', 'JOD 18,652.350', 'Arab Bank 18,240.350 · cash 412.000'), kpi('To collect', 'JOD 3,140.000', '5 invoices, 2 late', 'is-bad'), kpi('To pay', 'JOD 2,086.500', '4 bills this month'), kpi('Sales tax to pay', 'JOD 1,327.870', 'September–October · by 30 Nov')),
+    h('div', { className: 'wk-split', style: { gridTemplateColumns: 'minmax(0,1fr) 400px' } }, left, side))));
+</script>
+</body>
+</html>
