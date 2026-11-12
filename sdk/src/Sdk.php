@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.100).
+ * SDK identity (v1.101).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1237,12 +1237,21 @@ namespace Whity\Sdk;
  * such as Front Office's invoices and receipts (WHIT-978).
  *
  * Purely additive.)
+ *
+ * 1.101 (LOCALIZED TEXT IN BLOCK SCREENS: any text a person reads in a `screen: 'blocks'`
+ * descriptor (its label, and label, title, placeholder, emptyText, description, confirm,
+ * trigger and itemLabel anywhere in the tree, `value` on `text`, `text` on `heading`, `body` on `alert`) may be an
+ * {@see I18n\LocalizedText} value `{en, ar}`. The host serves it in the reader's language;
+ * renderers still receive strings. {@see Frontend\Blocks\BlockText} lists the fields and
+ * resolves a tree, and {@see Frontend\Blocks\BlockValidator} accepts the objects (WHIT-984).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.100.0';
+    public const VERSION = '1.101.0';
 
     /**
      * Static identity only — never instantiated.

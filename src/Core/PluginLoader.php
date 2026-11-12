@@ -43,7 +43,9 @@ use Whity\Core\Hooks\HookManager;
 use Whity\Core\Tenant\TenantContext;
 use Psr\Log\LoggerInterface;
 use Composer\Semver\Semver;
+use Whity\Sdk\Frontend\Blocks\BlockText;
 use Whity\Sdk\Frontend\Blocks\BlockValidator;
+use Whity\Sdk\I18n\LocalizedText;
 use Whity\Sdk\Hooks\HookVetoException;
 use Whity\Sdk\Manifest\ManifestPlugin;
 use Whity\Sdk\Http\Request;
@@ -4351,7 +4353,11 @@ class PluginLoader
             return $drop('id must be a kebab-case slug matching ' . self::FEATURE_ID_PATTERN, is_string($id) ? $id : null);
         }
 
+        // SDK 1.101: the label may be {en, ar}; it is served resolved.
         $label = $descriptor['label'] ?? null;
+        if (BlockText::isLocalized($label)) {
+            $label = LocalizedText::resolve($label, 'en');
+        }
         if (!is_string($label) || $label === '') {
             return $drop('label must be a non-empty string', $id);
         }

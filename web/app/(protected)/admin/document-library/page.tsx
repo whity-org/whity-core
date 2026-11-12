@@ -833,6 +833,8 @@ export default function DocumentLibraryPage() {
               emptyState={{
                 title: emptyState.title,
                 description: emptyState.description,
+                moment: emptyState.moment,
+                once: emptyState.moment === 'empty-documents' ? 'document-library' : undefined,
                 action: emptyState.pastTheEnd ? (
                   <Button variant="outline" size="sm" onClick={() => setPage(1)}>
                     {t('organizer.empty.pastEndAction', 'Go to the first page')}
