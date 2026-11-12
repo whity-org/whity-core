@@ -1,0 +1,1 @@
+- **A plugin screen whose data source filters its own route with a query string is no longer dropped.** The host compared the whole source, `?status=pending` included, with the plugin's routes, so Front Office's Stock and Reports screens never appeared; it now compares the path and keeps the query (WHIT-998).
