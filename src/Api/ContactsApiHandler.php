@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Auth\RoleChecker;
 use Whity\Core\Contacts\ContactRejectedException;
 use Whity\Core\Contacts\ContactService;
 use Whity\Core\Contacts\ContactTags;
@@ -36,6 +37,7 @@ final class ContactsApiHandler
         private readonly ContactService $contacts,
         private readonly ContactTags $tags,
         private readonly ContactImportService $imports,
+        private readonly ?RoleChecker $roleChecker = null,
     ) {
     }
 
@@ -55,7 +57,7 @@ final class ContactsApiHandler
                 'q' => $q['q'] ?? null,
                 'archived' => ($q['archived'] ?? '') === 'true',
             ];
-            $result = $this->contacts->list($tenantId, $filter, $perPage, ($page - 1) * $perPage);
+            $result = $this->contacts->list($tenantId, $filter, $perPage, ($page - 1) * $perPage, self::fieldFilters($request));
 
             return Response::json([
                 'data' => $result['data'],
@@ -72,7 +74,7 @@ final class ContactsApiHandler
     public function create(Request $request): Response
     {
         return $this->run($request, 'create', function (int $tenantId, ?int $actor) use ($request): Response {
-            return Response::json(['data' => $this->contacts->create($tenantId, JsonBody::parsed($request), $actor)], 201);
+            return Response::json(['data' => $this->contacts->create($tenantId, JsonBody::parsed($request), $actor, $this->permissions($tenantId, $actor))], 201);
         });
     }
 
@@ -87,8 +89,8 @@ final class ContactsApiHandler
     /** @param array<string, string> $params */
     public function update(Request $request, array $params): Response
     {
-        return $this->run($request, 'update', function (int $tenantId) use ($request, $params): Response {
-            return Response::json(['data' => $this->contacts->update($tenantId, (int) $params['id'], JsonBody::parsed($request))]);
+        return $this->run($request, 'update', function (int $tenantId, ?int $actor) use ($request, $params): Response {
+            return Response::json(['data' => $this->contacts->update($tenantId, (int) $params['id'], JsonBody::parsed($request), $this->permissions($tenantId, $actor))]);
         });
     }
 
@@ -241,6 +243,48 @@ final class ContactsApiHandler
         }
 
         throw new ContactRejectedException('Send the spreadsheet as a file, or as text or content_base64', 422, ['field' => 'file']);
+    }
+
+    /**
+     * The caller's permissions in this workspace, for fields that need one of
+     * their own to change.
+     *
+     * @return callable(string): bool
+     */
+    private function permissions(int $tenantId, ?int $actor): callable
+    {
+        $checker = $this->roleChecker;
+
+        return static fn (string $permission): bool => $checker !== null && $actor !== null
+            && $checker->hasPermissionForProfile($actor, $permission, $tenantId);
+    }
+
+    /**
+     * `field[<key>]=value` from the query string, as key => value.
+     *
+     * @return array<string, string>
+     */
+    private static function fieldFilters(Request $request): array
+    {
+        $raw = $_GET['field'] ?? null;
+        $qs = parse_url($request->getPath(), PHP_URL_QUERY);
+        if (is_string($qs) && $qs !== '') {
+            parse_str($qs, $parsed);
+            if (is_array($parsed['field'] ?? null)) {
+                $raw = $parsed['field'];
+            }
+        }
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $key => $value) {
+            if (is_string($key) && is_string($value) && $value !== '') {
+                $out[$key] = $value;
+            }
+        }
+
+        return $out;
     }
 
     /** @return array<string, string> */

@@ -73,6 +73,8 @@ final class CoreTables
         'convening_bodies' => '130_create_convening.php',
         'convening_body_members' => '130_create_convening.php',
         'core_schema_migrations' => '003_create_core_schema_migrations.php',
+        'custom_field_definitions' => '263_create_custom_fields.php',
+        'custom_field_values' => '263_create_custom_fields.php',
         'data_type_restore_states' => '089_create_data_type_restore_states.php',
         'deployments' => '004_create_deployment_tables.php',
         'desktop_app_releases' => '099_create_desktop_app_releases.php',
