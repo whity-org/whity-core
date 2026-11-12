@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Core\Branding\TenantHostRepository;
-use Whity\Core\Messaging\Email\EmailChannel;
 use Whity\Core\Messaging\MessagingException;
 use Whity\Core\Messaging\MessagingService;
 use Whity\Core\Messaging\WebChat\WebChatChannel;
@@ -26,14 +25,23 @@ use Whity\Sdk\Messaging\InboundMessage;
  *
  * WHERE IT GOES. Into the Messages inbox of the workspace the operator names in
  * `website.contact_workspace`, through {@see MessagingService::ingest()}, so the
- * team answers it like any other message. An email address arrives on the email
- * channel, so a reply goes back by email; a phone number arrives as a web
- * message the team calls back. Nothing is set up: the form answers 503 and the
- * page offers hello@whity.dev instead.
+ * team answers it like any other message. Nothing is set up: the form answers
+ * 503 and the page offers hello@whity.dev instead.
  *
- * ABUSE. Per address (5 an hour) and for the whole form (200 an hour), counted
- * before anything is read; a hidden `website` field people never fill, which
- * drops the message quietly with the same answer as a real one; and length caps.
+ * NOTHING ABOUT THE SENDER IS TRUSTED. Anyone can type anyone's address, so the
+ * message is filed as a website message, never on the email channel: it is not
+ * linked to a customer with that address, it never joins that customer's email
+ * thread, and a reply from the inbox does not email whoever was named. The
+ * address the visitor gave is in the message, marked as not checked.
+ *
+ * ABUSE. Counted per address before anything is read: 5 an hour, IPv6 counted
+ * per /64 (one connection holds a whole /64), and one shared bucket of 30 an
+ * hour for requests whose address the proxy did not pass on
+ * (TRUSTED_PROXY_HOPS), so a missing address never turns the limit off. Then
+ * 200 filed messages an hour for the whole form, charged only for messages
+ * that are actually filed, so junk cannot use up everyone's allowance. A hidden
+ * `website` field people never fill drops the message quietly with the same
+ * answer as a real one; and length caps.
  *
  * WHAT COMES BACK. 201 with no copy of the message (the contract says never
  * send it back), or, for the scripts-off form, a redirect to the contact page
@@ -51,6 +59,7 @@ final class PublicContactApiHandler
 
     private const WINDOW = 3600;
     private const PER_ADDRESS = 5;
+    private const PER_UNKNOWN_ADDRESS = 30;
     private const PER_FORM = 200;
 
     private const MAX_NAME = 120;
@@ -73,8 +82,10 @@ final class PublicContactApiHandler
         $body = JsonBody::parsed($request);
         $lang = ($body['lang'] ?? '') === 'ar' ? 'ar' : 'en';
 
-        $limited = $this->limit('contact:ip:', ClientIp::fromRequest($request), self::PER_ADDRESS)
-            ?? $this->limit('contact:all:', 'form', self::PER_FORM);
+        $address = self::addressKey(ClientIp::fromRequest($request));
+        $limited = $address === null
+            ? $this->limit('contact:ip:', 'unknown', self::PER_UNKNOWN_ADDRESS)
+            : $this->limit('contact:ip:', $address, self::PER_ADDRESS);
         if ($limited !== null) {
             return $form ? $this->back($lang, false) : $limited;
         }
@@ -97,23 +108,23 @@ final class PublicContactApiHandler
                 ? $this->back($lang, false)
                 : Response::error('Messages can\'t be received here right now.', 503);
         }
+        if (($limited = $this->limit('contact:all:', 'form', self::PER_FORM)) !== null) {
+            return $form ? $this->back($lang, false) : $limited;
+        }
 
-        $isEmail = filter_var($fields['contact'], FILTER_VALIDATE_EMAIL) !== false;
-        $from = $isEmail
-            ? strtolower($fields['contact'])
-            : 'website:' . substr(hash('sha256', $fields['contact']), 0, 24);
+        $from = 'website:' . substr(hash('sha256', strtolower($fields['contact'])), 0, 24);
         $text = implode("\n", array_filter([
             'From the website contact form (' . self::TOPIC_LABEL[$fields['topic']] . ')',
             'Name: ' . $fields['name'],
             $fields['company'] !== '' ? 'Company: ' . $fields['company'] : null,
-            'Reply to: ' . $fields['contact'],
+            'Reply to (as typed, not checked): ' . $fields['contact'],
             'Language: ' . ($lang === 'ar' ? 'Arabic' : 'English'),
         ])) . "\n\n" . $fields['message'];
 
         try {
             $saved = $this->messaging->ingest(
                 $tenantId,
-                $isEmail ? EmailChannel::KEY : WebChatChannel::KEY,
+                WebChatChannel::KEY,
                 new InboundMessage(
                     from: $from,
                     fromName: $fields['name'],
@@ -208,11 +219,25 @@ final class PublicContactApiHandler
         return new Response(303, '', ['Location' => $page]);
     }
 
-    private function limit(string $prefix, ?string $subject, int $max): ?Response
+    /** The address to count by: IPv4 as is, IPv6 by its /64; null when unknown. */
+    private static function addressKey(?string $ip): ?string
     {
-        if ($subject === null || $subject === '') {
+        if ($ip === null || trim($ip) === '') {
             return null;
         }
+        $packed = @inet_pton(trim($ip));
+        if ($packed === false) {
+            return trim($ip);
+        }
+        if (strlen($packed) === 16) {
+            return bin2hex(substr($packed, 0, 8)) . '::/64';
+        }
+
+        return trim($ip);
+    }
+
+    private function limit(string $prefix, string $subject, int $max): ?Response
+    {
         $key = $prefix . hash('sha256', $subject);
         if ($this->store->increment($key, self::WINDOW) > $max) {
             $this->store->decrement($key);

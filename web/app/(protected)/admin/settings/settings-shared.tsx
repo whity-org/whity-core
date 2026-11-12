@@ -433,7 +433,7 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
       label: t('settings.meta.website.plans.label', 'Plans on the website'),
       help: t(
         'settings.meta.website.plans.help',
-        'How your website shows the plans, as JSON: for each plan the Arabic name, a tagline, the features shown, the highlighted plan and the button. Prices, limits and order come from the plans themselves.'
+        'How your website shows the plans, as JSON: for each plan to show, "visible": true, the Arabic name, a tagline, the features shown, the highlighted plan and the button. Plans not listed stay off the website. Prices, limits and order come from the plans themselves.'
       ),
     },
     'website.contact_workspace': {

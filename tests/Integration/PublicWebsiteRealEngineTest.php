@@ -85,13 +85,15 @@ final class PublicWebsiteRealEngineTest extends TestCase
         $this->globals->set(SettingsRegistry::WEBSITE_PLANS, (string) json_encode([
             'plans' => [
                 'team' => [
+                    'visible' => true,
                     'highlight' => true,
                     'name' => ['en' => 'Team', 'ar' => 'الفريق'],
                     'tagline' => ['en' => 'For growing teams', 'ar' => 'للفرق المتنامية'],
                     'features' => [['en' => 'Your own web address and sign-in', 'ar' => 'عنوانك وصفحة دخولك الخاصة']],
                 ],
-                'free' => ['limits' => ['staff' => 3, 'customersPerMonth' => 100]],
+                'free' => ['visible' => true, 'limits' => ['staff' => 3, 'customersPerMonth' => 100]],
                 'hidden' => ['visible' => false],
+                'bare' => ['visible' => true],
             ],
             'dedicatedHosting' => ['fromMonthly' => '150'],
         ]));
@@ -104,7 +106,7 @@ final class PublicWebsiteRealEngineTest extends TestCase
         self::assertSame(1, $body['version']);
         self::assertSame('JOD', $body['currency']);
         self::assertSame(3, $body['decimals']);
-        self::assertSame(['free', 'team'], array_column($body['plans'], 'id'), 'active tiers only, in order; add-ons, retired, hidden and incomplete ones left out');
+        self::assertSame(['free', 'team'], array_column($body['plans'], 'id'), 'listed active tiers only, in order; unlisted, add-ons, retired, hidden and incomplete ones left out');
         [$freeOut, $teamOut] = $body['plans'];
 
         self::assertNull($freeOut['price']['monthly'], 'no price is null, never 0');
@@ -123,11 +125,16 @@ final class PublicWebsiteRealEngineTest extends TestCase
 
     public function testPlansAreCappedAtFourAndLinksMustBeHttps(): void
     {
+        $listed = [];
         foreach (['a', 'b', 'c', 'd', 'e'] as $i => $key) {
             $id = $this->plan($key, strtoupper($key), $i, 'Plan ' . $key);
             $this->limit($id, 'members.max', '5');
             $this->limit($id, 'customers.per_month', '50');
+            $listed[$key] = ['visible' => true];
         }
+        $none = json_decode($this->plansHandler()->index(new Request('GET', '/api/public/plans'))->getBody(), true);
+        self::assertSame([], $none['plans'], 'nothing listed, nothing published');
+        $this->globals->set(SettingsRegistry::WEBSITE_PLANS, (string) json_encode(['plans' => $listed]));
 
         $body = json_decode($this->plansHandler()->index(new Request('GET', '/api/public/plans'))->getBody(), true);
         self::assertSame(['a', 'b', 'c', 'd'], array_column($body['plans'], 'id'));
@@ -170,8 +177,10 @@ final class PublicWebsiteRealEngineTest extends TestCase
         $stmt->execute([':tid' => self::TEAM_INBOX]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         self::assertIsArray($row);
-        self::assertSame('email', $row['channel'], 'an email address can be answered by email');
-        self::assertSame('ahmad@example.com', $row['contact_address']);
+        self::assertSame('webchat', $row['channel'], 'never the email channel: the address is not checked');
+        self::assertStringStartsWith('website:', (string) $row['contact_address']);
+        self::assertStringContainsString('ahmad@example.com', (string) $row['body_text']);
+        self::assertStringContainsString('not checked', (string) $row['body_text']);
         self::assertStringContainsString('Can we see the stock screens?', (string) $row['body_text']);
         self::assertStringContainsString('Example Bakery', (string) $row['body_text']);
     }
@@ -203,6 +212,65 @@ final class PublicWebsiteRealEngineTest extends TestCase
         $response = $this->contact(['name' => 'Ahmad', 'contact' => '+962 79 000 0000', 'message' => 'Hello']);
 
         self::assertSame(503, $response->getStatusCode());
+    }
+
+    public function testATypedAddressNeverAttachesToThatCustomer(): void
+    {
+        $this->globals->set(SettingsRegistry::WEBSITE_CONTACT_WORKSPACE, 'whity-team');
+        $this->pdo->exec("INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
+                          VALUES (40, 'Real Customer', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        $this->pdo->exec("INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at) VALUES (40, 'real@bakery.example', true, true, CURRENT_TIMESTAMP)");
+        $roles = $this->pdo->prepare("SELECT id FROM roles WHERE name = 'user' AND tenant_id IS NULL");
+        $roles->execute();
+        $role = (int) $roles->fetchColumn();
+        $this->pdo->exec("INSERT INTO memberships (profile_id, tenant_id, role_id, status, kind, created_at) VALUES (40, " . self::TEAM_INBOX . ", {$role}, 'active', 'customer', CURRENT_TIMESTAMP)");
+
+        self::assertSame(201, $this->contact(['name' => 'Not them', 'contact' => 'real@bakery.example', 'message' => 'Cancel my order'])->getStatusCode());
+
+        $stmt = $this->pdo->prepare('SELECT channel, customer_profile_id FROM conversations WHERE tenant_id = :tid');
+        $stmt->execute([':tid' => self::TEAM_INBOX]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
+        self::assertSame('webchat', $row['channel']);
+        self::assertNull($row['customer_profile_id'], 'anyone can type an address; it must not file as that customer');
+    }
+
+    public function testWithoutAKnownAddressTheLimitStillApplies(): void
+    {
+        $this->globals->set(SettingsRegistry::WEBSITE_CONTACT_WORKSPACE, 'whity-team');
+        $handler = $this->contactHandler();
+        $last = 0;
+        for ($i = 0; $i < 31; $i++) {
+            $request = new Request('POST', '/api/public/contact', ['Content-Type' => 'application/json'], (string) json_encode(['name' => 'A', 'contact' => '+962 79 000 0000', 'message' => "m{$i}"]));
+            $last = $handler->send($request)->getStatusCode();
+        }
+
+        self::assertSame(429, $last, 'a missing client address must not switch the per-address limit off');
+    }
+
+    public function testIpv6IsCountedPerSlash64(): void
+    {
+        $this->globals->set(SettingsRegistry::WEBSITE_CONTACT_WORKSPACE, 'whity-team');
+        $handler = $this->contactHandler();
+        $codes = [];
+        for ($i = 1; $i <= 6; $i++) {
+            $request = new Request('POST', '/api/public/contact', ['X-Whity-Client-Ip' => "2001:db8:1:2::{$i}"], (string) json_encode(['name' => 'A', 'contact' => '+962 79 000 0000', 'message' => "m{$i}"]));
+            $codes[] = $handler->send($request)->getStatusCode();
+        }
+
+        self::assertSame(429, $codes[5], 'rotating inside one /64 is one address');
+    }
+
+    public function testJunkDoesNotUseUpTheWholeFormsAllowance(): void
+    {
+        $this->globals->set(SettingsRegistry::WEBSITE_CONTACT_WORKSPACE, 'whity-team');
+        $store = new ArraySharedStore();
+        $handler = new PublicContactApiHandler($this->messaging, new TenantHostRepository($this->pdo), $this->globals, $store);
+        for ($i = 0; $i < 3; $i++) {
+            $handler->send(new Request('POST', '/api/public/contact', ['X-Whity-Client-Ip' => "203.0.113.{$i}"], (string) json_encode(['name' => '', 'contact' => '', 'message' => ''])));
+        }
+
+        self::assertSame(0, $store->count('contact:all:' . hash('sha256', 'form')), 'invalid posts are not charged to everyone');
     }
 
     public function testFivePerAddressAnHour(): void

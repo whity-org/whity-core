@@ -21,6 +21,11 @@ use Whity\Core\Money\MoneyException;
  * whether a plan is shown at all. So changing a price in Whity changes the
  * website without a redeploy, and nothing about the website lives in `plans`.
  *
+ * ONLY WHAT IS LISTED IS PUBLISHED. A plan reaches the website only when the
+ * layer names it with `"visible": true`; an active plan the operator made for
+ * one customer, or a tier not yet announced, stays off the public page. With
+ * nothing listed the answer has no plans and the page keeps its own.
+ *
  * THE PAGE CHECKS EVERYTHING (`assets/plans.js`) and throws the whole answer
  * away when one plan breaks a rule, falling back to the plans built into the
  * page. So this only ever emits plans it would accept: an English name and
@@ -103,7 +108,7 @@ final class WebsitePlans
             }
             $key = (string) $row['plan_key'];
             $m = is_array($perPlan[$key] ?? null) ? $perPlan[$key] : [];
-            if (($m['visible'] ?? true) === false) {
+            if (($m['visible'] ?? false) !== true) {
                 continue;
             }
             $candidates[] = [
