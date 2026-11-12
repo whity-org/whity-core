@@ -10949,8 +10949,8 @@ final class CoreApiSchemas
                 'text' => ['type' => 'string', 'maxLength' => 300, 'description' => 'What was checked: "Called him on the number on file"'],
             ], ['text']),
             'IdentityCheckRequest' => self::object([
-                'request_id' => self::int(),
-                'profile_id' => self::int(),
+                'request_id' => ['type' => 'integer', 'description' => 'The two-step reset request about to be approved'],
+                'profile_id' => ['type' => 'integer', 'description' => 'The person a reset is about to be started for, when there is no request'],
             ], []),
             'IdentityCheckResponse' => self::dataEnvelope(self::object([
                 'method' => ['type' => 'string', 'enum' => ['totp', 'email_code']],
@@ -11013,7 +11013,7 @@ final class CoreApiSchemas
             'ForceResetRequest' => self::object([
                 'profile_id' => self::int(),
                 'code' => ['type' => 'string', 'description' => 'The admin\'s authenticator code, or the code emailed to them'],
-                'reason' => self::str(true),
+                'reason' => ['type' => 'string', 'nullable' => true, 'description' => 'Why the reset is needed, shown to the second admin'],
             ], ['profile_id', 'code']),
             'ForceResetResponse' => self::dataEnvelope(self::object([
                 'id' => self::int(),

@@ -149,7 +149,7 @@ final class TwoFactorRecoveryApprovalsApiHandler
             }
 
             $this->auditApproval($ctx['userId'], $result['profile_id'], $method);
-            $this->sendResetLink((string) ($result['email'] ?? ''), (string) ($result['reset_token'] ?? ''));
+            $this->sendResetLink($result['email'], $result['reset_token']);
 
             return Response::json(['data' => ['id' => $requestId, 'status' => 'approved']], 200);
         } catch (\Throwable $e) {

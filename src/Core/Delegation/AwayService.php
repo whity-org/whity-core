@@ -187,7 +187,7 @@ final class AwayService
         $stmt->bindValue(':limit', max(1, min($limit, 200)), PDO::PARAM_INT);
         $stmt->execute();
 
-        return array_map(fn (array $row): array => $this->present($row, $today), $stmt->fetchAll(PDO::FETCH_ASSOC));
+        return array_values(array_map(fn (array $row): array => $this->present($row, $today), $stmt->fetchAll(PDO::FETCH_ASSOC)));
     }
 
     private const COLUMNS = 'a.id, a.profile_id, a.delegate_profile_id, a.starts_on, a.back_on, a.covers, a.message,

@@ -301,8 +301,8 @@ final class TwoFactorRecoveryService
      * $tenantId (never trust a bare request id).
      *
      * @param string $method how the approving admin confirmed it was them
-     * @return array{stage:string, request_id:int, profile_id:int, email?:string, reset_token?:string}|string|null
-     *   'first' or 'cleared' as the stage; a REFUSED_* reason; null = not found,
+     * @return array{stage:string, request_id:int, profile_id:int, email:string, reset_token:string}|string|null
+     *   'first' or 'cleared' as the stage (email and reset_token empty for 'first'); a REFUSED_* reason; null = not found,
      *   not pending, not a member of $tenantId, or an account a sign-in provider governs.
      */
     public function approveForTenant(int $requestId, int $tenantId, int $approverProfileId, string $method): array|string|null
@@ -343,7 +343,7 @@ final class TwoFactorRecoveryService
 
     /**
      * @param array<string, mixed>|false $row
-     * @return array{stage:string, request_id:int, profile_id:int, email?:string, reset_token?:string}|string|null
+     * @return array{stage:string, request_id:int, profile_id:int, email:string, reset_token:string}|string|null
      */
     private function decide(array|false $row, int $requestId, int $approverProfileId, string $method): array|string|null
     {
@@ -374,7 +374,7 @@ final class TwoFactorRecoveryService
             $mark->execute([':approver' => $approverProfileId, ':method' => $method, ':id' => $requestId]);
 
             return $mark->rowCount() === 1
-                ? ['stage' => 'first', 'request_id' => $requestId, 'profile_id' => $profileId]
+                ? ['stage' => 'first', 'request_id' => $requestId, 'profile_id' => $profileId, 'email' => '', 'reset_token' => '']
                 : null;
         }
 

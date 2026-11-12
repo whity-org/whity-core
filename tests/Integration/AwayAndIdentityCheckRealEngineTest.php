@@ -92,6 +92,7 @@ final class AwayAndIdentityCheckRealEngineTest extends TestCase
         $this->away->start(self::TENANT, self::AMRO, self::EMAD, '2026-12-01', '2026-12-05', ['flows'], null, self::TODAY);
 
         $current = $this->away->current(self::TENANT, self::AMRO, self::TODAY);
+        self::assertIsArray($current);
         self::assertSame('2026-12-01', $current['startsOn']);
         self::assertSame([], $this->away->coveredBy(self::TENANT, self::EMAD, 'proposals', '2026-11-16'));
     }
@@ -146,15 +147,26 @@ final class AwayAndIdentityCheckRealEngineTest extends TestCase
 
     private function identityCheck(): IdentityCheck
     {
-        $mailer = new class ($this->sent) implements Mailer {
+        $sent = &$this->sent;
+        $mailer = new class ($sent) implements Mailer {
+            /** @var list<string> */
+            private array $sent;
+
             /** @param list<string> $sent */
-            public function __construct(private array &$sent)
+            public function __construct(array &$sent)
             {
+                $this->sent = &$sent;
             }
 
             public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
             {
                 $this->sent[] = substr($subject, -6);
+            }
+
+            /** @return list<string> */
+            public function sent(): array
+            {
+                return $this->sent;
             }
         };
         $settings = new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo));
