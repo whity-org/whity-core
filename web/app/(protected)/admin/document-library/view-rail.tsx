@@ -295,7 +295,7 @@ export function ViewRail({
     <nav
       data-testid="document-rail"
       aria-label={t('organizer.rail.label', 'Document folders')}
-      className="w-64 shrink-0 space-y-6"
+      className="w-full shrink-0 space-y-6 md:w-64"
     >
       {sections.map((group) => {
         const groupViews = views.filter((v) => v.group === group.key && !isTemplate(v));

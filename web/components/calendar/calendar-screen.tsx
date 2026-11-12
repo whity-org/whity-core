@@ -264,7 +264,9 @@ function CalendarBody({
             <Icon name="chevron-right" />
           </Button>
         </div>
-        <h2 className="min-w-0 flex-1 text-lg font-semibold text-foreground [overflow-wrap:anywhere]" data-testid="calendar-title" aria-live="polite">
+        {/* On a phone the date takes its own line above the buttons, so it never
+            breaks inside a word. */}
+        <h2 className="order-first min-w-0 basis-full text-lg font-semibold break-words text-foreground sm:order-none sm:flex-1 sm:basis-auto" data-testid="calendar-title" aria-live="polite">
           {title ?? ''}
         </h2>
         {access.canWrite && (
