@@ -249,5 +249,7 @@ final class TasksApiRealEngineTest extends TestCase
 
         self::assertSame(501, $response->getStatusCode());
         self::assertStringContainsString('Taskaat needs an update', self::body($response)['error']);
+        // The screens label this state in the reader's language from the code, not the sentence.
+        self::assertSame(['code' => 'taskaat_update_needed'], self::body($response)['details']);
     }
 }

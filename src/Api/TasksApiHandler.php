@@ -386,7 +386,7 @@ final class TasksApiHandler
         try {
             return $work($tenantId, $actor);
         } catch (TaskaatException $e) {
-            return Response::error($e->clientMessage, $e->status);
+            return Response::error($e->clientMessage, $e->status, $e->errorCode !== null ? ['code' => $e->errorCode] : []);
         } catch (\Throwable $e) {
             error_log('[TasksApiHandler] failed: ' . $e->getMessage());
 

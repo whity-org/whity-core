@@ -127,7 +127,7 @@ final class TaskaatClient
         if (($rpcError['code'] ?? null) === -32601 || stripos($text, 'unknown tool') !== false) {
             // An older Taskaat that doesn't know the record tools yet.
             error_log('[Taskaat] ' . $tool . ' unavailable: ' . (is_array($response['error'] ?? null) ? (string) ($response['error']['message'] ?? '') : $text));
-            throw new TaskaatException('Taskaat needs an update before tasks can show here. Open them in Taskaat meanwhile.', 501);
+            throw new TaskaatException('Taskaat needs an update before tasks can show here. Open them in Taskaat meanwhile.', 501, TaskaatException::UPDATE_NEEDED);
         }
         // A refusal Taskaat wrote for a person (a gate, a missing task): pass it on as it came.
         throw new TaskaatException($text !== '' ? self::plain($text) : 'Taskaat refused the request.', 422);

@@ -25,6 +25,7 @@ import { useActionPermission } from '@/hooks/useActionPermission';
 import { api } from '@/lib/api/client';
 import { NewTaskDialog } from './new-task-dialog';
 import { TaskaatConnection } from './taskaat-connection';
+import { TaskaatUpdateNote } from './taskaat-update-note';
 import { TaskPanel } from './task-panel';
 import { GateBadge } from './task-status';
 import { tasksResult, type TaskRecord } from './task-types';
@@ -122,14 +123,7 @@ export function TasksScreen() {
         </TabsList>
       </Tabs>
 
-      {loaded.data?.gap === 'update' && (
-        <Alert variant="info">
-          <AlertDescription>
-            {loaded.data.message}{' '}
-            <a className="underline" href="https://app.taskaat.dev" target="_blank" rel="noopener noreferrer">{t('connected.open', 'Open in Taskaat')}</a>
-          </AlertDescription>
-        </Alert>
-      )}
+      {loaded.data?.gap === 'update' && <TaskaatUpdateNote />}
       {loaded.error && <Alert variant="destructive"><AlertDescription>{loaded.error}</AlertDescription></Alert>}
       {loaded.loading && !loaded.data && <div className="space-y-2" role="status" aria-live="polite">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>}
 

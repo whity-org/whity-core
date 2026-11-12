@@ -16,13 +16,20 @@ export class TasksError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    /** A stable code for a state the screens label themselves, e.g. `taskaat_update_needed`. */
+    public readonly code: string | null = null,
   ) {
     super(message);
   }
 }
 
+/** The 501 a Taskaat without the record tools answers with (TaskaatException::UPDATE_NEEDED). */
+export const TASKAAT_UPDATE_NEEDED = 'taskaat_update_needed';
+
 /** Throw a TasksError for an openapi-fetch result that failed. */
-export function tasksResult<T>(result: { data?: { data: T }; error?: { error?: string }; response: Response }, fallback: string): T {
+export function tasksResult<T>(result: { data?: { data: T }; error?: { error?: string; details?: unknown }; response: Response }, fallback: string): T {
   if (result.data) return result.data.data;
-  throw new TasksError(result.error?.error || fallback, result.response.status);
+  const details = result.error?.details;
+  const code = details && typeof details === 'object' && typeof (details as { code?: unknown }).code === 'string' ? (details as { code: string }).code : null;
+  throw new TasksError(result.error?.error || fallback, result.response.status, code);
 }

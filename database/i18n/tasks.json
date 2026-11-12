@@ -92,6 +92,7 @@
         "tab.all": "All",
         "tab.byMe": "Assigned by me",
         "tab.mine": "My tasks",
-        "title": "Tasks"
+        "title": "Tasks",
+        "update.note": "Taskaat needs an update before tasks can show here. Open them in Taskaat meanwhile."
     }
 }

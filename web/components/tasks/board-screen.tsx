@@ -21,22 +21,11 @@ import { useActionPermission } from '@/hooks/useActionPermission';
 import { api } from '@/lib/api/client';
 import { NewTaskDialog } from './new-task-dialog';
 import { TaskaatConnection } from './taskaat-connection';
+import { TaskaatUpdateNote } from './taskaat-update-note';
 import { TaskPanel } from './task-panel';
 import { GateBadge } from './task-status';
 import { tasksResult, type TaskBoard, type TaskBoardSummary, type TaskColumn } from './task-types';
 import { useTaskaat } from './use-taskaat';
-
-function UpdateNote({ message }: { message: string }) {
-  const t = useTranslation('tasks');
-  return (
-    <Alert variant="info">
-      <AlertDescription>
-        {message}{' '}
-        <a className="underline" href="https://app.taskaat.dev" target="_blank" rel="noopener noreferrer">{t('connected.open', 'Open in Taskaat')}</a>
-      </AlertDescription>
-    </Alert>
-  );
-}
 
 /** /boards: every board, with how many tasks are open and done. */
 export function BoardsScreen() {
@@ -54,7 +43,7 @@ export function BoardsScreen() {
         description={t('boards.description', 'Each board is a Taskaat project. The same tasks show in Tasks and on the board.')}
         action={<Button asChild variant="outline"><Link href="/tasks">{t('boards.list', 'Task list')}</Link></Button>}
       />
-      {loaded.data?.gap === 'update' && <UpdateNote message={loaded.data.message} />}
+      {loaded.data?.gap === 'update' && <TaskaatUpdateNote />}
       {loaded.error && <Alert variant="destructive"><AlertDescription>{loaded.error}</AlertDescription></Alert>}
       {loaded.loading && !loaded.data && <div className="space-y-2" role="status" aria-live="polite">{Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>}
       {loaded.data?.value && loaded.data.value.length === 0 && (
@@ -119,7 +108,7 @@ export function BoardScreen({ board }: { board: string }) {
           </div>
         }
       />
-      {loaded.data?.gap === 'update' && <UpdateNote message={loaded.data.message} />}
+      {loaded.data?.gap === 'update' && <TaskaatUpdateNote />}
       {loaded.error && <Alert variant="destructive"><AlertDescription>{loaded.error}</AlertDescription></Alert>}
       {loaded.loading && !loaded.data && <div className="space-y-2" role="status" aria-live="polite">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>}
 
