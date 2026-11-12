@@ -11991,6 +11991,287 @@
                 ]
             }
         },
+        "/api/v1/document-agent-requests/next": {
+            "post": {
+                "operationId": "document_agent_requests_next",
+                "summary": "Pick up the next document request your person asked of you",
+                "tags": [
+                    "documents"
+                ],
+                "description": "For agents. Returns the oldest waiting request (now running) with document_id and what to do next, or null. Then read with document_read (pass request_id), suggest, and report with document_agent_request_update.",
+                "responses": {
+                    "200": {
+                        "description": "The request, or null",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentAgentRequestNextResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not an agent (details.code agents_only)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-agent-requests/{rid}/progress": {
+            "post": {
+                "operationId": "document_agent_request_update",
+                "summary": "Report how a document request is going",
+                "tags": [
+                    "documents"
+                ],
+                "description": "For the agent working on it. Say what you are doing now in plain words, with done and total when known; finish with done, failed (say what went wrong) or stopped. When the answer has stop: true, the person pressed Stop: report stopped and end.",
+                "parameters": [
+                    {
+                        "name": "rid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentAgentRequestUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Whether to stop, and the request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentAgentRequestUpdateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not an agent (details.code agents_only)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not a request you are working on",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid status, title, counts or detail",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-agent-requests/{rid}/stop": {
+            "post": {
+                "operationId": "post_api_v1_document_agent_requests_rid_stop",
+                "summary": "Stop an agent request",
+                "tags": [
+                    "documents"
+                ],
+                "description": "One nobody picked up stops at once; a running one is told on its agent's next update. Only the person who asked.",
+                "parameters": [
+                    {
+                        "name": "rid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentAgentRequestResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not a request of yours",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/document-background-issuing": {
             "get": {
                 "operationId": "get_api_v1_document_background_issuing",
@@ -14337,6 +14618,558 @@
                 ]
             }
         },
+        "/api/v1/document-sources/{id}/agent-requests": {
+            "get": {
+                "operationId": "get_api_v1_document_sources_id_agent_requests",
+                "summary": "My agent requests on an editor document",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The latest 20, newest first, with what each agent is doing now. The editor polls it while one runs.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentAgentRequestListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_document_sources_id_agent_requests",
+                "summary": "Ask an agent to work on an editor document",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The request waits until the agent, connected over MCP for this person, picks it up with document_agent_requests_next. Whatever it does arrives as suggestions and comments a person decides on. People only: an agent never asks an agent.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentAgentRequestCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The request, queued",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentAgentRequestResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Empty request, or an agent you are not using (details.code agent_not_connected)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-sources/{id}/agent-suggestions/blocks": {
+            "post": {
+                "operationId": "document_suggest_blocks",
+                "summary": "Suggest new blocks after a block of an editor document",
+                "tags": [
+                    "documents"
+                ],
+                "description": "A suggestion a person accepts or rejects; the draft is not changed. Records you and the person you act for. Blocks need ids the document does not use.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentSuggestBlocksRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The suggestion",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentSuggestionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid blocks or summary, or the patch does not apply",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-sources/{id}/agent-suggestions/rewrite": {
+            "post": {
+                "operationId": "document_suggest_rewrite",
+                "summary": "Suggest replacing text in a block of an editor document",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The text is found by what it says (delete_text, its occurrence), not by position. A suggestion a person accepts or rejects; the draft is not changed.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentSuggestRewriteRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The suggestion",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentSuggestionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid block, text or summary, or the text is not in the block",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-sources/{id}/agent-view": {
+            "get": {
+                "operationId": "document_read",
+                "summary": "Read an editor document as blocks, with its open comments and suggestions",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Every block carries its id, which document_suggest_rewrite and document_suggest_blocks anchor to. An agent reads the draft when it passes the request_id it is working on, and the published version otherwise (409 not_published when there is none).",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "request_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "The request from document_agent_requests_next you are working on",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The document",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentAgentViewResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not published, and no request_id (details.code not_published)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "request_id is not yours for this document",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/document-sources/{id}/changes": {
             "get": {
                 "operationId": "get_api_v1_document_sources_id_changes",
@@ -14858,6 +15691,131 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-sources/{id}/comments/{tid}/reply": {
+            "post": {
+                "operationId": "document_comment_reply",
+                "summary": "Reply in a comment thread on an editor document",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Plain text, optionally naming the suggestions the reply made. Records you and the person you act for.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "tid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentCommentReplyRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The message",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentCommentMessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or thread not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Empty text or invalid suggestion_ids",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -66036,6 +66994,325 @@
                     "name"
                 ]
             },
+            "DocumentAgentRequest": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "document_id": {
+                        "type": "integer"
+                    },
+                    "request": {
+                        "type": "string",
+                        "description": "What the person asked"
+                    },
+                    "anchor_block_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The block the person had selected, if any"
+                    },
+                    "quote": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The text the person had selected, if any"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "queued",
+                            "running",
+                            "done",
+                            "failed",
+                            "stopped"
+                        ],
+                        "description": "queued until the agent picks it up"
+                    },
+                    "agent": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "description": "The agent asked or working on it; null for any of the person's agents"
+                    },
+                    "for": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name"
+                        ],
+                        "description": "The person who asked"
+                    },
+                    "title": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "What the agent is doing now, in plain words"
+                    },
+                    "progress": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "done": {
+                                "type": "integer"
+                            },
+                            "total": {
+                                "type": "integer"
+                            }
+                        },
+                        "description": "When the agent knows the count"
+                    },
+                    "detail": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "What it did, or what went wrong"
+                    },
+                    "stopping": {
+                        "type": "boolean",
+                        "description": "The person pressed Stop and the agent has not stopped yet"
+                    },
+                    "at": {
+                        "type": "string",
+                        "description": "When it was asked, ISO 8601 UTC"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "description": "ISO 8601 UTC"
+                    }
+                },
+                "required": [
+                    "id",
+                    "document_id",
+                    "request",
+                    "status",
+                    "agent",
+                    "for",
+                    "title",
+                    "progress",
+                    "detail",
+                    "stopping",
+                    "at",
+                    "updated_at"
+                ]
+            },
+            "DocumentAgentRequestCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "request": {
+                        "type": "string",
+                        "description": "What to do, at most 4000 characters"
+                    },
+                    "agent_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "One of your workspace agents (GET /api/me/agents); null for any agent you have connected"
+                    },
+                    "anchor_block_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The selected block, if any"
+                    },
+                    "quote": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The selected text, if any"
+                    }
+                },
+                "required": [
+                    "request"
+                ]
+            },
+            "DocumentAgentRequestListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentAgentRequest"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentAgentRequestNextResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": true,
+                        "description": "A DocumentAgentRequest with document_id and next (what to do), or null when nothing waits"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentAgentRequestResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/DocumentAgentRequest"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentAgentRequestUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "running",
+                            "done",
+                            "failed",
+                            "stopped"
+                        ],
+                        "description": "running while working; done, failed or stopped to finish"
+                    },
+                    "title": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "What you are doing now, in plain words, for example Reading the payment terms"
+                    },
+                    "done": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "How many of total are done"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "How many there are, when known"
+                    },
+                    "detail": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When finishing: what you did, or what went wrong and what to do next"
+                    }
+                },
+                "required": [
+                    "status"
+                ]
+            },
+            "DocumentAgentRequestUpdateResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "stop": {
+                                "type": "boolean",
+                                "description": "true: the person pressed Stop; report stopped and end"
+                            },
+                            "request": {
+                                "$ref": "#/components/schemas/DocumentAgentRequest"
+                            }
+                        },
+                        "required": [
+                            "stop",
+                            "request"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentAgentView": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "lang": {
+                        "type": "string"
+                    },
+                    "reading": {
+                        "type": "string",
+                        "enum": [
+                            "draft",
+                            "published"
+                        ],
+                        "description": "Which version these blocks are"
+                    },
+                    "draft_version": {
+                        "type": "integer"
+                    },
+                    "published_version": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "blocks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "The contract Block[], each with its id"
+                    },
+                    "suggestions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentSuggestion"
+                        },
+                        "description": "Open suggestions"
+                    },
+                    "comments": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentCommentThread"
+                        },
+                        "description": "Open comment threads"
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind",
+                    "title",
+                    "lang",
+                    "reading",
+                    "draft_version",
+                    "published_version",
+                    "blocks",
+                    "suggestions",
+                    "comments"
+                ]
+            },
+            "DocumentAgentViewResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/DocumentAgentView"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "DocumentArtifact": {
                 "type": "object",
                 "properties": {
@@ -66448,6 +67725,25 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "DocumentCommentReplyRequest": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "The reply, in plain text"
+                    },
+                    "suggestion_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "The suggestions this reply made, if any"
+                    }
+                },
+                "required": [
+                    "text"
                 ]
             },
             "DocumentCommentThread": {
@@ -68590,6 +69886,73 @@
                 "required": [
                     "key",
                     "description"
+                ]
+            },
+            "DocumentSuggestBlocksRequest": {
+                "type": "object",
+                "properties": {
+                    "after_block_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The block to go after; null for the start of the document"
+                    },
+                    "blocks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "The contract Block[] to insert, with new ids"
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "What the change does, in a few words"
+                    },
+                    "request_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The request you are working on, if any"
+                    }
+                },
+                "required": [
+                    "blocks",
+                    "summary"
+                ]
+            },
+            "DocumentSuggestRewriteRequest": {
+                "type": "object",
+                "properties": {
+                    "block_id": {
+                        "type": "string",
+                        "description": "The block, from document_read"
+                    },
+                    "delete_text": {
+                        "type": "string",
+                        "description": "The exact text to replace; \"\" to insert"
+                    },
+                    "insert": {
+                        "type": "string",
+                        "description": "The new text; \"\" to delete"
+                    },
+                    "occurrence": {
+                        "type": "integer",
+                        "description": "Which match of delete_text in the block, from 0 (default 0)"
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "What the change does, for example Replace 30 days with 14 days"
+                    },
+                    "request_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The request you are working on, if any"
+                    }
+                },
+                "required": [
+                    "block_id",
+                    "delete_text",
+                    "insert",
+                    "summary"
                 ]
             },
             "DocumentSuggestion": {

@@ -209,6 +209,7 @@ final class TenantOwnedTables
         'document_suggestions' => '183_create_document_suggestions.php',
         'document_comment_threads' => '184_create_document_comment_threads.php',
         'document_comments' => '185_create_document_comments.php',
+        'document_agent_requests' => '252_create_document_agent_requests.php',
         // Whity Builder (WHIT-760): a workspace's own plugins as published
         // manifest versions, the live pointer, and the permission slugs they
         // declare (migration 164).
