@@ -58,6 +58,7 @@ final class TenantOwnedTables
         'resource_role_assignments' => '088_create_resource_role_assignments.php',
         'permission_delegations' => '014_create_permission_delegations.php',
         'audit_log' => '016_create_audit_log.php',
+        'away_periods' => '251_add_two_admin_resets_and_away.php',
         'persons' => '018_create_persons.php',
         'relations' => '020_create_relations.php',
         'tenant_settings' => '025_create_tenant_settings.php',
@@ -212,6 +213,7 @@ final class TenantOwnedTables
         'document_suggestions' => '183_create_document_suggestions.php',
         'document_comment_threads' => '184_create_document_comment_threads.php',
         'document_comments' => '185_create_document_comments.php',
+        'document_agent_requests' => '252_create_document_agent_requests.php',
         // Whity Builder (WHIT-760): a workspace's own plugins as published
         // manifest versions, the live pointer, and the permission slugs they
         // declare (migration 164).

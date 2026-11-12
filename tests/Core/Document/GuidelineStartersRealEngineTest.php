@@ -172,6 +172,18 @@ final class GuidelineStartersRealEngineTest extends TestCase
         self::assertSame(['start', 'end', 'end', 'end'], $tables[1]['align']);
     }
 
+    public function testTheTitleFaceAndLargePrintReachWhityRender(): void
+    {
+        $printer = new WhityDocumentPrinter([], [], static fn (): ?array => null, static fn (): ?array => null, static fn (): ?string => null, new PrintLabels());
+        $doc = ['title' => 'Terms', 'lang' => 'en', 'blocks' => [['id' => 'p1', 'type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Hi']]]]];
+
+        $standard = $printer->payload($doc, null, null, null, ['accent' => '#1f5fbf', 'titleFace' => 'readex', 'largePrint' => false]);
+        self::assertSame(['accent' => '#1f5fbf'], $standard['theme'], 'the defaults send nothing new');
+
+        $options = $printer->payload($doc, null, null, null, ['accent' => '#1f5fbf', 'titleFace' => 'noto', 'largePrint' => true]);
+        self::assertSame(['accent' => '#1f5fbf', 'titleFace' => 'noto', 'largePrint' => true], $options['theme']);
+    }
+
     public function testANewWorkspaceGetsEveryStarter(): void
     {
         $this->seeder->provisionTenant(1, 'Example Bakery');

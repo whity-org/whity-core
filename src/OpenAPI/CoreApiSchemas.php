@@ -144,6 +144,7 @@ final class CoreApiSchemas
             self::featureRoutes(),
             self::documentSourceRoutes(),
             self::documentCollabRoutes(),
+            self::documentAgentRoutes(),
             self::documentThemeRoutes(),
             self::documentTemplateSlotRoutes(),
             self::workspacePluginRoutes(),
@@ -2873,6 +2874,52 @@ final class CoreApiSchemas
     private static function delegationRoutes(): array
     {
         return [
+            self::permissionRoute('GET', '/api/away-periods', 'delegation:manage', [
+                'summary' => 'Everyone\'s "I\'m away" periods, newest first',
+                'tags' => ['delegations'],
+                'responses' => [200 => self::jsonResponse('Away periods', 'AwayPeriodListResponse')] + self::authErrors(),
+            ]),
+            [
+                'method' => 'GET',
+                'path' => '/api/me/away',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Your "I\'m away", or null',
+                    'tags' => ['me'],
+                    'responses' => [200 => self::jsonResponse('Your away period', 'AwayPeriodResponse')] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/away',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Hand your decisions to someone while you\'re away',
+                    'description' => 'Replaces any away period you had. In force from startsOn up to backOn.',
+                    'tags' => ['me'],
+                    'request' => 'AwayPeriodRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('Your away period', 'AwayPeriodResponse'),
+                        422 => self::errorResponse('Yourself as the delegate, someone outside the workspace, bad dates, or nothing to hand over'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'DELETE',
+                'path' => '/api/me/away',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Back early: end your away period at once',
+                    'tags' => ['me'],
+                    'responses' => [
+                        200 => self::jsonResponse('Ended', 'AwayPeriodResponse'),
+                        404 => self::errorResponse('You aren\'t away'),
+                    ] + self::authErrors(),
+                ],
+            ],
             self::permissionRoute('GET', '/api/delegations', 'delegation:manage', [
                 'summary' => 'List the tenant\'s permission delegations',
                 'tags' => ['delegations'],
@@ -7826,6 +7873,74 @@ final class CoreApiSchemas
                 'stale' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'The suggestions skipped because their text or block has gone; now stale'],
                 'draft_version' => self::int(),
             ], ['decided', 'stale', 'draft_version'])),
+            // ── Agents in the editor (editor M6; E.30, E.31; Q3, Q4) ─────────
+            'DocumentAgentRequest' => self::object([
+                'id' => self::int(),
+                'document_id' => self::int(),
+                'request' => self::str() + ['description' => 'What the person asked'],
+                'anchor_block_id' => self::str(true) + ['description' => 'The block the person had selected, if any'],
+                'quote' => self::str(true) + ['description' => 'The text the person had selected, if any'],
+                'status' => ['type' => 'string', 'enum' => ['queued', 'running', 'done', 'failed', 'stopped'], 'description' => 'queued until the agent picks it up'],
+                'agent' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::str(), 'name' => self::str()], 'description' => 'The agent asked or working on it; null for any of the person\'s agents'],
+                'for' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']) + ['description' => 'The person who asked'],
+                'title' => self::str(true) + ['description' => 'What the agent is doing now, in plain words'],
+                'progress' => ['type' => 'object', 'nullable' => true, 'properties' => ['done' => self::int(), 'total' => self::int()], 'description' => 'When the agent knows the count'],
+                'detail' => self::str(true) + ['description' => 'What it did, or what went wrong'],
+                'stopping' => self::bool() + ['description' => 'The person pressed Stop and the agent has not stopped yet'],
+                'at' => self::str() + ['description' => 'When it was asked, ISO 8601 UTC'],
+                'updated_at' => self::str() + ['description' => 'ISO 8601 UTC'],
+            ], ['id', 'document_id', 'request', 'status', 'agent', 'for', 'title', 'progress', 'detail', 'stopping', 'at', 'updated_at']),
+            'DocumentAgentRequestResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentAgentRequest')),
+            'DocumentAgentRequestListResponse' => self::listEnvelope('DocumentAgentRequest'),
+            'DocumentAgentRequestCreateRequest' => self::object([
+                'request' => self::str() + ['description' => 'What to do, at most 4000 characters'],
+                'agent_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'One of your workspace agents (GET /api/me/agents); null for any agent you have connected'],
+                'anchor_block_id' => self::str(true) + ['description' => 'The selected block, if any'],
+                'quote' => self::str(true) + ['description' => 'The selected text, if any'],
+            ], ['request']),
+            'DocumentAgentRequestUpdateRequest' => self::object([
+                'status' => ['type' => 'string', 'enum' => ['running', 'done', 'failed', 'stopped'], 'description' => 'running while working; done, failed or stopped to finish'],
+                'title' => self::str(true) + ['description' => 'What you are doing now, in plain words, for example Reading the payment terms'],
+                'done' => ['type' => 'integer', 'nullable' => true, 'description' => 'How many of total are done'],
+                'total' => ['type' => 'integer', 'nullable' => true, 'description' => 'How many there are, when known'],
+                'detail' => self::str(true) + ['description' => 'When finishing: what you did, or what went wrong and what to do next'],
+            ], ['status']),
+            'DocumentAgentRequestUpdateResponse' => self::dataEnvelope(self::object([
+                'stop' => self::bool() + ['description' => 'true: the person pressed Stop; report stopped and end'],
+                'request' => SchemaBuilder::ref('DocumentAgentRequest'),
+            ], ['stop', 'request'])),
+            'DocumentAgentRequestNextResponse' => self::dataEnvelope(['type' => 'object', 'nullable' => true, 'additionalProperties' => true, 'description' => 'A DocumentAgentRequest with document_id and next (what to do), or null when nothing waits']),
+            'DocumentAgentView' => self::object([
+                'id' => self::int(),
+                'kind' => self::str(),
+                'title' => self::str(),
+                'lang' => self::str(),
+                'reading' => ['type' => 'string', 'enum' => ['draft', 'published'], 'description' => 'Which version these blocks are'],
+                'draft_version' => self::int(),
+                'published_version' => ['type' => 'integer', 'nullable' => true],
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The contract Block[], each with its id'],
+                'suggestions' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentSuggestion'), 'description' => 'Open suggestions'],
+                'comments' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentCommentThread'), 'description' => 'Open comment threads'],
+            ], ['id', 'kind', 'title', 'lang', 'reading', 'draft_version', 'published_version', 'blocks', 'suggestions', 'comments']),
+            'DocumentAgentViewResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentAgentView')),
+            'DocumentSuggestBlocksRequest' => self::object([
+                'after_block_id' => self::str(true) + ['description' => 'The block to go after; null for the start of the document'],
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The contract Block[] to insert, with new ids'],
+                'summary' => self::str() + ['description' => 'What the change does, in a few words'],
+                'request_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'The request you are working on, if any'],
+            ], ['blocks', 'summary']),
+            'DocumentSuggestRewriteRequest' => self::object([
+                'block_id' => self::str() + ['description' => 'The block, from document_read'],
+                'delete_text' => self::str() + ['description' => 'The exact text to replace; "" to insert'],
+                'insert' => self::str() + ['description' => 'The new text; "" to delete'],
+                'occurrence' => self::int() + ['description' => 'Which match of delete_text in the block, from 0 (default 0)'],
+                'summary' => self::str() + ['description' => 'What the change does, for example Replace 30 days with 14 days'],
+                'request_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'The request you are working on, if any'],
+            ], ['block_id', 'delete_text', 'insert', 'summary']),
+            'DocumentCommentReplyRequest' => self::object([
+                'text' => self::str() + ['description' => 'The reply, in plain text'],
+                'suggestion_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'The suggestions this reply made, if any'],
+            ], ['text']),
             'DocumentCommentMessage' => self::object([
                 'id' => self::int(),
                 'by' => SchemaBuilder::ref('DocumentActor'),
@@ -11018,8 +11133,66 @@ final class CoreApiSchemas
                 // Why they asked, in their own words. Optional, so often null.
                 'reason' => self::str(true),
                 'created_at' => self::str(),
-            ], ['id', 'profile_id', 'email', 'display_name', 'created_at']),
+                // AG.1: where it came from ("Chrome on Windows", or "admin" when an admin started it).
+                'requested_from' => self::str(true),
+                'last_signed_in_at' => self::str(true),
+                // What admins did to confirm it's really the person, with who and when.
+                'checks' => ['type' => 'array', 'items' => self::object([
+                    'text' => self::str(),
+                    'by_profile_id' => self::int(),
+                    'by_name' => self::str(),
+                    'at' => self::str(),
+                ], ['text', 'by_profile_id', 'by_name', 'at'])],
+                // The first admin's approval; a second, different admin clears it.
+                'first_approval' => ['allOf' => [self::object([
+                    'profile_id' => self::int(),
+                    'display_name' => self::str(),
+                    'at' => self::str(),
+                    'method' => self::str(),
+                ], ['profile_id', 'display_name', 'at', 'method'])], 'nullable' => true],
+            ], ['id', 'profile_id', 'email', 'display_name', 'created_at', 'requested_from', 'last_signed_in_at', 'checks', 'first_approval']),
             'PendingTwoFactorRecoveryListResponse' => self::paginatedListEnvelope('PendingTwoFactorRecoveryItem'),
+            // AG.1: the first approval waits for a second admin; the second clears the two-step.
+            'TwoFactorRecoveryApprovalResponse' => self::dataEnvelope(self::object([
+                'id' => self::int(),
+                'status' => ['type' => 'string', 'enum' => ['waiting_for_second_admin', 'approved', 'rejected', 'pending']],
+            ], ['id', 'status'])),
+            'TwoFactorRecoveryApproveRequest' => self::object([
+                'code' => ['type' => 'string', 'description' => 'The approving admin\'s authenticator code, or the code emailed to them'],
+            ], ['code']),
+            'TwoFactorRecoveryCheckRequest' => self::object([
+                'text' => ['type' => 'string', 'maxLength' => 300, 'description' => 'What was checked: "Called him on the number on file"'],
+            ], ['text']),
+            'IdentityCheckRequest' => self::object([
+                'request_id' => ['type' => 'integer', 'description' => 'The two-step reset request about to be approved'],
+                'profile_id' => ['type' => 'integer', 'description' => 'The person a reset is about to be started for, when there is no request'],
+            ], []),
+            'IdentityCheckResponse' => self::dataEnvelope(self::object([
+                'method' => ['type' => 'string', 'enum' => ['totp', 'email_code']],
+                'email_hint' => self::str(true),
+            ], ['method', 'email_hint'])),
+            // OR.1: "I'm away".
+            'AwayPeriod' => self::object([
+                'id' => self::int(),
+                'profile' => self::object(['id' => self::int(), 'name' => self::str(true)], ['id', 'name']),
+                'delegate' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']),
+                'startsOn' => ['type' => 'string', 'format' => 'date'],
+                'backOn' => ['type' => 'string', 'format' => 'date'],
+                'covers' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['flows', 'proposals', 'documents']]],
+                'message' => self::str(true),
+                'status' => ['type' => 'string', 'enum' => ['starting', 'in_force', 'ended']],
+                'endedAt' => self::str(true),
+                'createdAt' => self::str(),
+            ], ['id', 'profile', 'delegate', 'startsOn', 'backOn', 'covers', 'message', 'status', 'endedAt', 'createdAt']),
+            'AwayPeriodResponse' => self::dataEnvelope(['allOf' => [SchemaBuilder::ref('AwayPeriod')], 'nullable' => true]),
+            'AwayPeriodListResponse' => self::listEnvelope('AwayPeriod'),
+            'AwayPeriodRequest' => self::object([
+                'delegateProfileId' => self::int(),
+                'startsOn' => ['type' => 'string', 'format' => 'date'],
+                'backOn' => ['type' => 'string', 'format' => 'date', 'description' => 'The day you are back; it ends at the start of that day'],
+                'covers' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['flows', 'proposals', 'documents']], 'minItems' => 1],
+                'message' => self::str(true),
+            ], ['delegateProfileId', 'startsOn', 'backOn', 'covers']),
 
             // Shared 200 response for every id-based approve/reject action across
             // both queues (password-resets and 2fa-recovery).
@@ -11051,11 +11224,17 @@ final class CoreApiSchemas
 
             // POST /api/2fa-recovery/force-reset — the secondary admin-direct
             // fallback (no prior request): request body + 200 response.
-            'ForceResetRequest' => self::object(['profile_id' => self::int()], ['profile_id']),
-            'ForceResetResponse' => self::dataEnvelope(self::object([
+            // Since AG.1 this is the first approval; a second admin clears it.
+            'ForceResetRequest' => self::object([
                 'profile_id' => self::int(),
-                'status' => ['type' => 'string', 'enum' => ['forced']],
-            ], ['profile_id', 'status'])),
+                'code' => ['type' => 'string', 'description' => 'The admin\'s authenticator code, or the code emailed to them'],
+                'reason' => ['type' => 'string', 'nullable' => true, 'description' => 'Why the reset is needed, shown to the second admin'],
+            ], ['profile_id', 'code']),
+            'ForceResetResponse' => self::dataEnvelope(self::object([
+                'id' => self::int(),
+                'profile_id' => self::int(),
+                'status' => ['type' => 'string', 'enum' => ['waiting_for_second_admin']],
+            ], ['id', 'profile_id', 'status'])),
 
             // ── Plugin-declared data types (WC-723, Door 2) ───────────────────
             // `actions` is the honest-degradation contract: it lists ONLY the
@@ -12708,11 +12887,34 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/2fa-recovery/{id:\d+}/approve', 'two_factor_recovery:approve', [
-                'summary' => 'Clear the target profile\'s 2FA and send a fresh password-reset link (tenant-scoped)',
+                'summary' => 'Approve a two-step reset: the first admin\'s approval is recorded, a second admin\'s clears the two-step and sends a reset link',
+                'description' => 'Two different admins must approve, and the person asking can never approve their own (AG.1). Each approval first confirms the admin is who they say with a code.',
                 'tags' => ['auth'],
+                'request' => 'TwoFactorRecoveryApproveRequest',
                 'responses' => [
-                    200 => self::jsonResponse('Approved', 'ApprovalStatusResponse'),
+                    200 => self::jsonResponse('Recorded, or cleared', 'TwoFactorRecoveryApprovalResponse'),
                     404 => self::errorResponse('No pending 2FA-recovery request found for that id'),
+                    409 => self::errorResponse('This admin gave the first approval; a different admin has to give the second'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/2fa-recovery/{id:\d+}/checks', 'two_factor_recovery:approve', [
+                'summary' => 'Record a check that it is really the person asking',
+                'tags' => ['auth'],
+                'request' => 'TwoFactorRecoveryCheckRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Recorded', 'TwoFactorRecoveryApprovalResponse'),
+                    404 => self::errorResponse('No pending 2FA-recovery request found for that id'),
+                    422 => self::errorResponse('No text, or more than 300 characters'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/2fa-recovery/identity-check', 'two_factor_recovery:approve', [
+                'summary' => 'Start the admin\'s "confirm it\'s you" check: names it, and sends a code by email when that is the check',
+                'tags' => ['auth'],
+                'request' => 'IdentityCheckRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                    422 => self::errorResponse('A request_id or profile_id is required'),
+                    429 => self::errorResponse('Too many codes were sent lately'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/2fa-recovery/{id:\d+}/reject', 'two_factor_recovery:approve', [
@@ -12724,7 +12926,7 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/2fa-recovery/force-reset', 'two_factor_recovery:approve', [
-                'summary' => 'Secondary fallback: force-clear a named profile\'s 2FA with no prior request (tenant-scoped)',
+                'summary' => 'Start a two-step reset for a named profile with no prior request; it counts as the first approval (tenant-scoped)',
                 'tags' => ['auth'],
                 'request' => 'ForceResetRequest',
                 'responses' => [
@@ -16215,6 +16417,158 @@ final class CoreApiSchemas
     }
 
     /**
+     * Agents in the editor (editor M6; E.30, E.31; IMPLEMENTATION-NOTES 3.4,
+     * owner's answers Q3, Q4, Q9). A person asks; the request waits until the
+     * person's own agent picks it up over MCP. The agent's tools are named by
+     * their operationId and write only suggestions and comments, recording the
+     * agent and the person it acts for. The person's three routes are
+     * `refuse` for agents.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function documentAgentRoutes(): array
+    {
+        $refuse = ['agentPolicy' => 'refuse'];
+        // The agent's tools change nothing a person hasn't decided: a suggestion
+        // waits for a person to accept it, and the suggestion is the approval
+        // (Q9). Without this, a write with no undo is always Ask first, which
+        // would wrap a proposal around every suggestion and make the agent ask
+        // before it could even pick up the request it was asked to do.
+        $suggestsOnly = ['readOnlyHint' => true];
+        $hidden = self::errorResponse('Document not found or not visible to the caller');
+
+        return [
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/agent-requests', 'documents:suggest', [
+                'summary' => 'Ask an agent to work on an editor document',
+                'description' =>
+                    'The request waits until the agent, connected over MCP for this person, picks it up with '
+                    . 'document_agent_requests_next. Whatever it does arrives as suggestions and comments a person '
+                    . 'decides on. People only: an agent never asks an agent.',
+                'tags' => ['documents'],
+                'mcp' => $refuse,
+                'request' => 'DocumentAgentRequestCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The request, queued', 'DocumentAgentRequestResponse'),
+                    404 => $hidden,
+                    422 => self::errorResponse('Empty request, or an agent you are not using (details.code agent_not_connected)'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/document-sources/{id:\d+}/agent-requests', 'documents:read', [
+                'summary' => 'My agent requests on an editor document',
+                'description' => 'The latest 20, newest first, with what each agent is doing now. The editor polls it while one runs.',
+                'tags' => ['documents'],
+                'mcp' => $refuse,
+                'responses' => [
+                    200 => self::jsonResponse('The requests', 'DocumentAgentRequestListResponse'),
+                    404 => $hidden,
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-agent-requests/{rid:\d+}/stop', 'documents:read', [
+                'summary' => 'Stop an agent request',
+                'description' => 'One nobody picked up stops at once; a running one is told on its agent\'s next update. Only the person who asked.',
+                'tags' => ['documents'],
+                'mcp' => $refuse,
+                'responses' => [
+                    200 => self::jsonResponse('The request', 'DocumentAgentRequestResponse'),
+                    404 => self::errorResponse('Not a request of yours'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-agent-requests/next', 'documents:read', [
+                'operationId' => 'document_agent_requests_next',
+                'mcp_annotations' => $suggestsOnly,
+                'summary' => 'Pick up the next document request your person asked of you',
+                'description' =>
+                    'For agents. Returns the oldest waiting request (now running) with document_id and what to do '
+                    . 'next, or null. Then read with document_read (pass request_id), suggest, and report with '
+                    . 'document_agent_request_update.',
+                'tags' => ['documents'],
+                'responses' => [
+                    200 => self::jsonResponse('The request, or null', 'DocumentAgentRequestNextResponse'),
+                    403 => self::errorResponse('Not an agent (details.code agents_only)'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-agent-requests/{rid:\d+}/progress', 'documents:read', [
+                'operationId' => 'document_agent_request_update',
+                'mcp_annotations' => $suggestsOnly,
+                'summary' => 'Report how a document request is going',
+                'description' =>
+                    'For the agent working on it. Say what you are doing now in plain words, with done and total '
+                    . 'when known; finish with done, failed (say what went wrong) or stopped. When the answer has '
+                    . 'stop: true, the person pressed Stop: report stopped and end.',
+                'tags' => ['documents'],
+                'request' => 'DocumentAgentRequestUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Whether to stop, and the request', 'DocumentAgentRequestUpdateResponse'),
+                    403 => self::errorResponse('Not an agent (details.code agents_only)'),
+                    404 => self::errorResponse('Not a request you are working on'),
+                    422 => self::errorResponse('Invalid status, title, counts or detail'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/document-sources/{id:\d+}/agent-view', 'documents:read', [
+                'operationId' => 'document_read',
+                'summary' => 'Read an editor document as blocks, with its open comments and suggestions',
+                'description' =>
+                    'Every block carries its id, which document_suggest_rewrite and document_suggest_blocks anchor to. '
+                    . 'An agent reads the draft when it passes the request_id it is working on, and the published '
+                    . 'version otherwise (409 not_published when there is none).',
+                'tags' => ['documents'],
+                'parameters' => [
+                    self::queryParam('request_id', 'string', 'The request from document_agent_requests_next you are working on'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The document', 'DocumentAgentViewResponse'),
+                    404 => $hidden,
+                    409 => self::errorResponse('Not published, and no request_id (details.code not_published)'),
+                    422 => self::errorResponse('request_id is not yours for this document'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/agent-suggestions/blocks', 'documents:suggest', [
+                'operationId' => 'document_suggest_blocks',
+                'mcp_annotations' => $suggestsOnly,
+                'summary' => 'Suggest new blocks after a block of an editor document',
+                'description' =>
+                    'A suggestion a person accepts or rejects; the draft is not changed. Records you and the '
+                    . 'person you act for. Blocks need ids the document does not use.',
+                'tags' => ['documents'],
+                'request' => 'DocumentSuggestBlocksRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The suggestion', 'DocumentSuggestionResponse'),
+                    404 => $hidden,
+                    422 => self::errorResponse('Invalid blocks or summary, or the patch does not apply'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/agent-suggestions/rewrite', 'documents:suggest', [
+                'operationId' => 'document_suggest_rewrite',
+                'mcp_annotations' => $suggestsOnly,
+                'summary' => 'Suggest replacing text in a block of an editor document',
+                'description' =>
+                    'The text is found by what it says (delete_text, its occurrence), not by position. A '
+                    . 'suggestion a person accepts or rejects; the draft is not changed.',
+                'tags' => ['documents'],
+                'request' => 'DocumentSuggestRewriteRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The suggestion', 'DocumentSuggestionResponse'),
+                    404 => $hidden,
+                    422 => self::errorResponse('Invalid block, text or summary, or the text is not in the block'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/reply', 'documents:comment', [
+                'operationId' => 'document_comment_reply',
+                'mcp_annotations' => $suggestsOnly,
+                'summary' => 'Reply in a comment thread on an editor document',
+                'description' => 'Plain text, optionally naming the suggestions the reply made. Records you and the person you act for.',
+                'tags' => ['documents'],
+                'request' => 'DocumentCommentReplyRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The message', 'DocumentCommentMessageResponse'),
+                    404 => self::errorResponse('Document or thread not found, or not visible to the caller'),
+                    422 => self::errorResponse('Empty text or invalid suggestion_ids'),
+                ] + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
      * Comments and suggestions on an editor document (editor M5; E.4, E.6,
      * E.10, E.29, E.37). Suggesting needs documents:suggest, commenting
      * documents:comment, and accepting or rejecting documents:write. The two
@@ -16585,6 +16939,11 @@ final class CoreApiSchemas
             $properties['accentUse'] = ['type' => 'string', 'enum' => ['title', 'title-and-headings'], 'description' => 'Where the print colour is used: `title` only, or `title-and-headings` (H1 to H3 too).'];
         }
         $properties['letterhead'] = $letterhead;
+        if (!$overridesOnly) {
+            // E.46 and E.47 (editor M8).
+            $properties['titleFace'] = ['type' => 'string', 'enum' => ['readex', 'noto'], 'description' => 'The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).'];
+            $properties['largePrint'] = ['type' => 'boolean', 'description' => 'Large print: an 11pt body in print, with headings scaled by the same steps.'];
+        }
 
         $schema = ['type' => 'object', 'additionalProperties' => false, 'properties' => $properties];
         if ($complete) {

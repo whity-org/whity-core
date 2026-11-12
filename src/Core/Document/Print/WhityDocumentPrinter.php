@@ -115,6 +115,13 @@ final class WhityDocumentPrinter
                 $payload['theme']['accentUse'] = 'title-and-headings';
             }
         }
+        // E.46 and E.47: the title face and large print, whatever the accent.
+        if (($theme['titleFace'] ?? null) === 'noto') {
+            $payload['theme'] = ($payload['theme'] ?? []) + ['titleFace' => 'noto'];
+        }
+        if (($theme['largePrint'] ?? false) === true) {
+            $payload['theme'] = ($payload['theme'] ?? []) + ['largePrint' => true];
+        }
 
         return $payload;
     }
