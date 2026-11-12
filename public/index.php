@@ -5747,6 +5747,28 @@ $mcpListChangedNotifier = new ListChangedNotifier(
 // ONE registry — a second instance would answer tools/list from a different set
 // than tools/call dispatches from.
 $authoredMcpTools = new AuthoredToolRegistry();
+// A10 (WHIT-962): tasks and boards live in the workspace's Taskaat (T.3). The
+// connection per workspace, the routes that make it, and Taskaat's tools in the
+// workspace MCP, registered ahead of the plugins' tools and again on every refresh.
+$taskaatConnection = new \Whity\Core\Taskaat\TaskaatConnection(
+    new \Whity\Core\Settings\TenantSettingsRepository($db->getPdo()),
+    $secretStore,
+    \Whity\Core\Taskaat\TaskaatConnection::originFromEnv(),
+    $frontendUrls->link(\Whity\Core\Http\FrontendUrls::TASKAAT_CONNECT),
+    'Whity (' . ((string) parse_url($frontendUrls->base(), PHP_URL_HOST) ?: 'installation') . ')',
+    static fn (string $url, array $headers = []): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url, $headers),
+    static fn (string $url, array $params): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postForm($url, $params),
+    static fn (string $url, array $payload): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postJson($url, $payload),
+);
+$taskaatTools = new \Whity\Core\Taskaat\TaskaatTools(new \Whity\Core\Taskaat\TaskaatClient(
+    $taskaatConnection,
+    static fn (string $url, array $payload, array $headers): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 30, maxBytes: 4194304))->postJson($url, $payload, $headers),
+));
+$taskaatHandler = new \Whity\Api\TaskaatApiHandler($taskaatConnection, $auditLogger);
+$router->register('GET',    '/api/taskaat/connection',       [$taskaatHandler, 'status'],     null, null, CorePermissions::TASKS_READ);
+$router->register('POST',   '/api/taskaat/connect',          [$taskaatHandler, 'connect'],    null, null, CorePermissions::TASKS_MANAGE);
+$router->register('POST',   '/api/taskaat/connect/complete', [$taskaatHandler, 'complete'],   null, null, CorePermissions::TASKS_MANAGE);
+$router->register('DELETE', '/api/taskaat/connection',       [$taskaatHandler, 'disconnect'], null, null, CorePermissions::TASKS_MANAGE);
 // WHIT-754: the plugin MCP tools a workspace turned on as always-on.
 $mcpEnabledPluginAlwaysOn = static function (int $tenantId) use ($settingsService): array {
     $raw = (string) ($settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::MCP_ALWAYS_ON_PLUGIN_TOOLS] ?? '');
@@ -6163,6 +6185,9 @@ $pluginLoader->collectMcpResources($pluginResources, $agentContextGrantedNow());
 // SDK 1.43. Collect FIRST, then hand the deriver the suppressions: a plugin
 // that authors its own tools may ask for its routes not to be derived, and the
 // deriver has to know that before anything asks it for a tool list.
+foreach ($taskaatTools->register($authoredMcpTools) as $taskaatRefused) {
+    error_log('[Taskaat] tool refused: ' . $taskaatRefused);
+}
 $pluginLoader->collectMcpTools($authoredMcpTools);
 $toolDeriver->suppressNamespaces($authoredMcpTools->suppressedPlugins());
 
@@ -6185,7 +6210,8 @@ $refreshMcpCatalog = static function (string $trigger) use (
     $authoredMcpTools,
     $toolDeriver,
     $pluginResources,
-    $agentContextGrantedNow
+    $agentContextGrantedNow,
+    $taskaatTools
 ): void {
     ToolDeriver::clearCache();
     $promptRegistry->reset();
@@ -6200,6 +6226,7 @@ $refreshMcpCatalog = static function (string $trigger) use (
     // included — a suppression from a plugin that is no longer active must stop
     // hiding derived tools.
     $authoredMcpTools->reset();
+    $taskaatTools->register($authoredMcpTools);
     $pluginLoader->collectMcpTools($authoredMcpTools);
     $toolDeriver->suppressNamespaces($authoredMcpTools->suppressedPlugins());
     // Last: the signature must be computed from the refreshed catalogue, not the

@@ -117,6 +117,7 @@ final class CoreApiSchemas
             self::formRoutes(),
             self::conveningRoutes(),
             self::calendarRoutes(),
+            self::taskaatRoutes(),
             self::publicBookingRoutes(),
             self::delegationRoutes(),
             self::auditRoutes(),
@@ -4737,6 +4738,25 @@ final class CoreApiSchemas
                 'state' => array_merge(self::str(), [
                     'description' => 'The state Whity ID sent back with the code; it must match the connect this operator started.',
                 ]),
+            ], ['code', 'state']),
+
+            // WHIT-962 (A10): the workspace's connection to Taskaat.
+            'TaskaatConnection' => self::object([
+                'connected' => self::bool(),
+                'taskaat_url' => array_merge(self::str(), ['description' => 'Taskaat\'s web address, for "Open in Taskaat" links: /dashboard/{project-slug}?task={task-id}.']),
+                'connected_at' => self::str(),
+                'connected_by' => self::int(true),
+                'needs_reconnect' => self::bool(),
+            ], ['connected', 'taskaat_url']),
+            'TaskaatConnectionResponse' => self::object([
+                'data' => ['$ref' => '#/components/schemas/TaskaatConnection'],
+            ], ['data']),
+            'TaskaatConnectResponse' => self::object([
+                'data' => self::object(['authorize_url' => self::str()], ['authorize_url']),
+            ], ['data']),
+            'TaskaatConnectCompleteRequest' => self::object([
+                'code' => array_merge(self::str(), ['description' => 'The authorization code Taskaat sent back to /tasks/connect.']),
+                'state' => array_merge(self::str(), ['description' => 'The state Taskaat sent back with the code.']),
             ], ['code', 'state']),
 
             // GET /api/plugins/store/catalog — a store's public catalogue entry.
@@ -16901,6 +16921,60 @@ final class CoreApiSchemas
                     200 => ['description' => 'iCalendar', 'content' => ['text/calendar' => ['schema' => ['type' => 'string']]]],
                     404 => self::errorResponse('Not found'),
                 ] + $limits,
+            ]),
+        ];
+    }
+
+    /**
+     * The workspace's connection to Taskaat (WHIT-962, A10). Not MCP tools: agents reach
+     * Taskaat through the taskaat_* tools, and connecting is a person's act.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function taskaatRoutes(): array
+    {
+        return [
+            self::permissionRoute('GET', '/api/taskaat/connection', 'tasks:read', [
+                'summary' => 'Whether this workspace is connected to Taskaat',
+                'description' => 'Tasks and boards live in the workspace\'s Taskaat (T.3). Never returns a token.',
+                'tags' => ['tasks'],
+                // Agents reach Taskaat through the taskaat_* tools; connecting is a person's act.
+                'mcp' => ['expose' => false],
+                'responses' => [200 => self::jsonResponse('The connection', 'TaskaatConnectionResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/taskaat/connect', 'tasks:manage', [
+                'summary' => 'Begin connecting this workspace to Taskaat',
+                'description' => 'People only, never an agent. Registers Whity with Taskaat (OAuth dynamic client registration, PKCE) '
+                    . 'and returns Taskaat\'s consent page to send the person to. Taskaat returns them to /tasks/connect.',
+                'tags' => ['tasks'],
+                // Agents reach Taskaat through the taskaat_* tools; connecting is a person's act.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => self::jsonResponse('Where to sign in', 'TaskaatConnectResponse'),
+                    502 => self::errorResponse('Taskaat could not be reached'),
+                    503 => self::errorResponse('Whity does not know its own web address (FRONTEND_URL)'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/taskaat/connect/complete', 'tasks:manage', [
+                'summary' => 'Finish connecting with the code Taskaat sent back',
+                'description' => 'Single use, by the person who started it. The tokens are kept encrypted and never returned.',
+                'tags' => ['tasks'],
+                // Agents reach Taskaat through the taskaat_* tools; connecting is a person's act.
+                'mcp' => ['expose' => false],
+                'request' => 'TaskaatConnectCompleteRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The connection', 'TaskaatConnectionResponse'),
+                    422 => self::errorResponse('Expired, not started here, or refused by Taskaat'),
+                    502 => self::errorResponse('Taskaat could not be reached'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/taskaat/connection', 'tasks:manage', [
+                'summary' => 'Disconnect this workspace from Taskaat',
+                'description' => 'Forgets the tokens. To revoke them in Taskaat too, remove Whity from Taskaat\'s connected apps.',
+                'tags' => ['tasks'],
+                // Agents reach Taskaat through the taskaat_* tools; connecting is a person's act.
+                'mcp' => ['expose' => false],
+                'responses' => [200 => self::jsonResponse('The connection', 'TaskaatConnectionResponse')] + self::authErrors(),
             ]),
         ];
     }
