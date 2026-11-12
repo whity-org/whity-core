@@ -68,7 +68,7 @@ export function PageHeader({
             )}
             <div className="flex flex-col gap-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground truncate">
+                <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground break-words md:truncate">
                   {title}
                 </h1>
                 {badge && <div className="shrink-0">{badge}</div>}
@@ -80,7 +80,7 @@ export function PageHeader({
               )}
             </div>
           </div>
-          {action && <div className="flex items-center gap-2 shrink-0 self-start md:self-center">{action}</div>}
+          {action && <div className="flex min-w-0 flex-wrap items-center gap-2 self-start md:shrink-0 md:self-center">{action}</div>}
         </div>
         {children && <div className="pt-2 border-t border-border/50">{children}</div>}
       </div>
@@ -102,7 +102,7 @@ export function PageHeader({
           )}
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground truncate">
+              <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground break-words md:truncate">
                 {title}
               </h1>
               {badge && <div className="shrink-0">{badge}</div>}
@@ -114,7 +114,7 @@ export function PageHeader({
             )}
           </div>
         </div>
-        {action && <div className="flex items-center gap-2 shrink-0 self-start md:self-center">{action}</div>}
+        {action && <div className="flex min-w-0 flex-wrap items-center gap-2 self-start md:shrink-0 md:self-center">{action}</div>}
       </div>
       {children && <div className="pt-2">{children}</div>}
     </div>
