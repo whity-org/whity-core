@@ -217,6 +217,7 @@ final class TasksApiRealEngineTest extends TestCase
         $review = $this->call('submit_task_review')['arguments'];
         self::assertSame('human', $review['validator']);
         self::assertSame([['rule_id' => 'r1', 'status' => 'pass'], ['rule_id' => 'r2', 'status' => 'pass']], $review['results']);
+        self::assertSame(['task_id' => 'BAKE-3'], $this->call('complete_task')['arguments']);
     }
 
     public function testSendingBackNeedsAReasonAndFailsWhatIsNotMet(): void
@@ -231,6 +232,7 @@ final class TasksApiRealEngineTest extends TestCase
             ['rule_id' => 'r1', 'status' => 'pass', 'note' => 'No photo of the shelf'],
             ['rule_id' => 'r2', 'status' => 'fail', 'note' => 'No photo of the shelf'],
         ], $this->call('submit_task_review')['arguments']['results']);
+        self::assertNotContains('complete_task', array_column($this->calls, 'name'));
     }
 
     public function testAnOlderTaskaatSaysItNeedsAnUpdate(): void

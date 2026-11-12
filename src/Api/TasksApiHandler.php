@@ -258,6 +258,10 @@ final class TasksApiHandler
             }
 
             $this->write($tenantId, 'submit_task_review', ['task_id' => $task, 'validator' => 'human', 'results' => $results]);
+            if ($decision === 'accept') {
+                // A passing verdict leaves the task open in Taskaat; accepting is also closing it.
+                $this->write($tenantId, 'complete_task', ['task_id' => $task]);
+            }
 
             return Response::json(['data' => $this->client->callJson($tenantId, 'get_task_record', ['task_id' => $task])]);
         });
