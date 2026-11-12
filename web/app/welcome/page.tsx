@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@whity/ui/button';
 import { Alert, AlertDescription } from '@whity/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { Input } from '@/components/ui/input';
 import { AuthShell } from '@/components/auth-shell';
 import { MAIN_COLOUR_SWATCHES } from '@/components/branding-main-colour';
@@ -339,18 +340,17 @@ export default function WelcomePage() {
           <label htmlFor="workspace-language" className="font-medium text-foreground">
             {t('welcome.language.label', 'Main language')}
           </label>
-          <select
-            id="workspace-language"
-            value={locale}
-            onChange={(e) => setChosenLocale(e.target.value)}
-            disabled={submitting}
-            className="h-10 w-full cursor-pointer rounded-control border border-input bg-card px-3 text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <option value="en">English</option>
-            <option value="ar" lang="ar">
-              العربية
-            </option>
-          </select>
+          <Select value={locale} onValueChange={setChosenLocale} disabled={submitting}>
+            <SelectTrigger id="workspace-language" className="w-full" data-testid="welcome-language">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="en">English</SelectItem>
+              <SelectItem value="ar" lang="ar">
+                العربية
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <fieldset className="space-y-2">
