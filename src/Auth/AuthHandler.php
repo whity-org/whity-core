@@ -161,6 +161,14 @@ class AuthHandler
         $this->settingsService = $settingsService;
     }
 
+    /** EM.1 `new-sign-in`: set at boot once mail is wired. */
+    private ?\Whity\Core\Mail\AccountSecurityMailer $securityMailer = null;
+
+    public function setSecurityMailer(\Whity\Core\Mail\AccountSecurityMailer $mailer): void
+    {
+        $this->securityMailer = $mailer;
+    }
+
     /**
      * Record a security audit entry when an audit logger is configured.
      *
@@ -1732,6 +1740,17 @@ class AuthHandler
                     $request->getHeader('User-Agent'),
                     $this->clientIp($request)
                 );
+                // A browser this account hasn't used before gets the new
+                // sign-in email. Never lets a mail problem touch the sign-in.
+                try {
+                    $this->securityMailer?->signedIn(
+                        $profileId,
+                        $activeTenantId,
+                        $request->getHeader('User-Agent'),
+                        $this->clientIp($request),
+                    );
+                } catch (\Throwable) {
+                }
             } elseif ($rotateFromJti !== null) {
                 $sessions->rotate($rotateFromJti, $accessJti, $refreshJti, $expiresAt);
             }
