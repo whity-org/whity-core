@@ -221,12 +221,15 @@ export default function DelegationsPage() {
       accessorKey: 'permission',
       header: t('delegations.table.permission', 'What'),
       enableSorting: true,
+      size: 200,
+      className: 'whitespace-normal',
       cell: (row) => (
         row.away ? (
           <p className="text-foreground">{row.permission}</p>
         ) : (
           <div>
             <p className="text-foreground">{permissionInWords(row.permission)}</p>
+            <p className="text-sm text-muted-foreground">{row.scope}</p>
             <TechnicalDetails>
               <p className="font-mono text-xs text-muted-foreground">{row.permission}</p>
             </TechnicalDetails>
@@ -234,16 +237,7 @@ export default function DelegationsPage() {
         )
       ),
     },
-    { accessorKey: 'scope', header: t('delegations.table.scope', 'Where'), enableSorting: true },
-    { accessorKey: 'until', header: t('delegations.table.until', 'Until'), enableSorting: true },
-    ...dates.dateColumns<DelegationRow>([
-      {
-        id: 'grantedAt',
-        header: t('delegations.table.grantedAt', 'Since'),
-        value: (row) => row.grantedAt,
-        enableSorting: true,
-      },
-    ]),
+    { accessorKey: 'until', header: t('delegations.table.when', 'When'), enableSorting: true },
     {
       accessorKey: 'status',
       header: t('delegations.table.status', 'Status'),
@@ -337,7 +331,7 @@ export default function DelegationsPage() {
         }
       />
 
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,520px)_minmax(0,1fr)]">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)]">
       <AwayCard people={people} onChanged={() => void fetchAway()} />
       <div className="min-w-0 space-y-4">
       {!isForbidden && (

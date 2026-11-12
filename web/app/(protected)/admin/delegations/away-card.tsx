@@ -173,7 +173,7 @@ export function AwayCard({ people, onChanged }: { people: AwayPerson[]; onChange
               {t('away.who', 'Who decides for you')}
             </label>
             <Select value={delegateId} onValueChange={setDelegateId}>
-              <SelectTrigger id="away-delegate">
+              <SelectTrigger id="away-delegate" className="w-full">
                 <SelectValue placeholder={t('away.who.placeholder', 'Choose someone')} />
               </SelectTrigger>
               <SelectContent>

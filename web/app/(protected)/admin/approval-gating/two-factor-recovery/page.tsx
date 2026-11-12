@@ -334,13 +334,13 @@ export default function TwoFactorRecoveryApprovalsPage() {
 
               <section className="border-t border-border p-5">
                 <h3 className="mb-2 text-sm font-semibold">{t('twoStep.checks', 'Checks')}</h3>
-                {selected.checks.length === 0 ? (
+                {(selected.checks ?? []).length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     {t('twoStep.checks.none', 'No checks yet. Say what you did to make sure it is really them.')}
                   </p>
                 ) : (
                   <ul className="grid gap-3">
-                    {selected.checks.map((check, index) => (
+                    {(selected.checks ?? []).map((check, index) => (
                       <li key={index} className="flex gap-3">
                         <Icon name="success" size={16} className="mt-1 text-success-text" aria-hidden />
                         <div>
@@ -374,7 +374,7 @@ export default function TwoFactorRecoveryApprovalsPage() {
               <section className="space-y-4 border-t border-border p-5">
                 <h3 className="text-sm font-semibold">{t('twoStep.twoAdmins', 'Two admins approve')}</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {selected.first_approval !== null ? (
+                  {selected.first_approval ? (
                     <ApproverSlot
                       done
                       name={selected.first_approval.display_name}
@@ -387,6 +387,7 @@ export default function TwoFactorRecoveryApprovalsPage() {
                     <ApproverSlot name={t('twoStep.slot.first', 'First admin')} line={t('twoStep.slot.waiting', 'Waiting')} />
                   )}
                   <ApproverSlot
+                    avatar={gaveFirst ? undefined : (user?.display_name ?? user?.email)}
                     name={gaveFirst ? t('twoStep.slot.another', 'Another admin') : t('twoStep.slot.you', 'You')}
                     line={
                       isRequester
@@ -463,7 +464,7 @@ export default function TwoFactorRecoveryApprovalsPage() {
   );
 }
 
-function ApproverSlot({ name, line, done = false }: { name: string; line: string; done?: boolean }) {
+function ApproverSlot({ name, line, done = false, avatar }: { name: string; line: string; done?: boolean; avatar?: string }) {
   return (
     <div
       className={cn(
@@ -472,7 +473,7 @@ function ApproverSlot({ name, line, done = false }: { name: string; line: string
       )}
     >
       <div className="flex items-center gap-2">
-        <Avatar name={name} size={28} />
+        <Avatar name={avatar ?? name} size={28} />
         <span>{name}</span>
       </div>
       <div className="mt-2 text-sm">{line}</div>

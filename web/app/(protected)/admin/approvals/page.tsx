@@ -271,21 +271,26 @@ export default function ApprovalsPage() {
       }
       const { approved, refused } = body.data;
       const failed = approved.filter((p) => (p.result as { isError?: boolean } | null)?.isError);
-      addToast(
-        t('approvals.toast.approvedN', 'Approved {count}. Each can be undone on its own in Decided.').replace(
-          '{count}',
-          String(approved.length - failed.length),
-        ),
-        'success',
-        10000,
-        approved.length > 0 ? { label: t('approvals.toast.seeDecided', 'See them'), onClick: () => setTab('decided') } : undefined,
-      );
-      if (failed.length > 0 || refused.length > 0) {
+      const ran = approved.length - failed.length;
+      if (ran > 0) {
         addToast(
-          t('approvals.toast.someLeft', '{count} did not go through and are still here to open one by one.').replace(
-            '{count}',
-            String(failed.length + refused.length),
-          ),
+          t('approvals.toast.approvedN', 'Approved {count}. Each can be undone on its own in Decided.').replace('{count}', String(ran)),
+          'success',
+          10000,
+          { label: t('approvals.toast.seeDecided', 'See them'), onClick: () => setTab('decided') },
+        );
+      }
+      if (failed.length > 0) {
+        addToast(
+          t('approvals.toast.approvedNotRun', '{count} approved but did not run. Decided says why.').replace('{count}', String(failed.length)),
+          'error',
+          8000,
+          { label: t('approvals.toast.seeDecided', 'See them'), onClick: () => setTab('decided') },
+        );
+      }
+      if (refused.length > 0) {
+        addToast(
+          t('approvals.toast.someLeft', '{count} did not go through and are still here to open one by one.').replace('{count}', String(refused.length)),
           'error',
           8000,
         );
