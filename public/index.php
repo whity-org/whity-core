@@ -5846,7 +5846,8 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     ),
     $settingsService,
     (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
-    // Off unless the operator sets auth.sso_self_provision_workspace.
+    // Where a sign-in with no workspace lands (WHIT-994): the create step only
+    // when the operator sets auth.sso_self_provision_workspace.
     new \Whity\Core\Tenant\FederatedWorkspaceProvisioner($db->getPdo(), $settingsService, $hookManager),
     // Announces each verified federated sign-in (auth.federated.signed_in).
     $hookManager,
@@ -5865,6 +5866,19 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
 $router->register('GET', '/api/auth/sso/providers',                      [$ssoAuthHandler, 'providers'], null);
 $router->register('GET', '/api/auth/sso/{provider:[a-z0-9_]+}/start',    [$ssoAuthHandler, 'start'],    null);
 $router->register('GET', '/api/auth/sso/{provider:[a-z0-9_]+}/callback', [$ssoAuthHandler, 'callback'], null);
+// WHIT-994: after a sign-in that found no workspace. Public like select-tenant:
+// the caller holds only the short-lived workspace_setup cookie the callback
+// set (no session). The POST creates their workspace only when every gate in
+// FederatedWorkspaceProvisioner still holds, then signs them into it.
+$ssoWorkspaceSetupHandler = new \Whity\Api\SsoWorkspaceSetupHandler(
+    $jwtParser,
+    new \Whity\Core\Identity\IdentityProviderRepository($db->getPdo()),
+    new \Whity\Core\Tenant\FederatedWorkspaceProvisioner($db->getPdo(), $settingsService, $hookManager),
+    $authHandler,
+    $settingsService,
+);
+$router->register('GET', '/api/auth/sso/workspace', [$ssoWorkspaceSetupHandler, 'show'], null);
+$router->register('POST', '/api/auth/sso/workspace', [$ssoWorkspaceSetupHandler, 'create'], null);
 
 // 13g. Authenticated "connected accounts" management (WC-f3b17bd2): the caller
 // lists / unlinks their own federated identities. Self-authenticating via the

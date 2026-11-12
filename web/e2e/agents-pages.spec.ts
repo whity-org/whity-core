@@ -38,7 +38,8 @@ test.describe('Agents pages', () => {
     await page.getByRole('tab', { name: 'Instructions' }).click();
     await page.locator('#agent-name').fill(name);
     await page.getByRole('button', { name: 'Save changes' }).click();
-    await expect(page.getByText('Saved').first()).toBeVisible();
+    // Exactly the toast: the sidebar's "Saved blocks" also contains "Saved".
+    await expect(page.getByText('Saved', { exact: true }).first()).toBeVisible();
 
     await page.goto('/admin/agents');
     await expect(page.getByText(name).first()).toBeVisible();
