@@ -15,6 +15,7 @@
 
 import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
 import { LanguageProvider } from '@whity/features/i18n';
 
 jest.mock('next/navigation', () => ({
@@ -96,6 +97,11 @@ function renderSidebar() {
   );
 }
 
+/** Opens the account menu at the sidebar's foot. */
+async function openAccountMenu() {
+  await userEvent.click(await screen.findByTestId('account-menu'));
+}
+
 describe('sidebar language affordance follows the i18n feature flag', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -108,8 +114,10 @@ describe('sidebar language affordance follows the i18n feature flag', () => {
 
     renderSidebar();
 
+    // The language choice is in the account menu at the foot (3.3 cards).
+    await openAccountMenu();
     await waitFor(() => expect(screen.getByTestId('language-switcher')).toBeInTheDocument());
-    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(screen.getAllByRole('menuitemradio').length).toBeGreaterThan(1);
   });
 
   it('shows no language row at all when the flag is off', async () => {
@@ -119,12 +127,12 @@ describe('sidebar language affordance follows the i18n feature flag', () => {
 
     // Wait for something the sidebar renders unconditionally, so this is an
     // assertion about the settled tree rather than about an unrendered one.
+    await openAccountMenu();
     await waitFor(() => expect(screen.getByTestId('theme-toggle')).toBeInTheDocument());
 
     expect(screen.queryByTestId('language-switcher')).not.toBeInTheDocument();
-    // Not merely the <select>: the frame and its globe icon go too, so no empty
-    // box is left where the control used to be.
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    // No language heading or choices are left in the menu either.
+    expect(screen.queryByRole('menuitemradio')).not.toBeInTheDocument();
   });
 
   /**

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { AppShell } from './support/pages';
 
 /**
  * The document library, in a real browser against the live stack.
@@ -322,7 +323,7 @@ test.describe('the document library', () => {
   test('the whole browser mirrors under Arabic', async ({ page }) => {
     await openLibrary(page);
     const html = page.locator('html');
-    const switcher = page.getByTestId('language-switcher').locator('select');
+    const shell = new AppShell(page);
 
     // BY TEST ID, NOT BY ACCESSIBLE NAME — this is the test that changes the
     // language, and the rail's `aria-label` is translated with everything else.
@@ -339,7 +340,7 @@ test.describe('the document library', () => {
     await expect(html).toHaveAttribute('dir', 'ltr');
     const railBoxLtr = await rail.boundingBox();
 
-    await switcher.selectOption('ar');
+    await shell.chooseLanguage('العربية');
     await expect(html).toHaveAttribute('dir', 'rtl');
 
     // The rail is a layout-heavy pane and it must MOVE, not merely re-label: a
@@ -349,7 +350,7 @@ test.describe('the document library', () => {
     expect(railBoxRtl!.x).toBeGreaterThan(railBoxLtr!.x);
 
     // Leave the shared account in English, as rtl-direction.spec.ts does.
-    await switcher.selectOption('en');
+    await shell.chooseLanguage('English');
     await expect(html).toHaveAttribute('dir', 'ltr');
   });
 });

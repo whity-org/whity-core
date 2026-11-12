@@ -745,10 +745,11 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Calendar',
         'href' => '/calendar',
         'icon' => 'calendar',
-        'group' => 'overview',
-        // After Dashboard (1), Inbox (2), Approvals (3) and the form entries (4, 5):
-        // a surface opened daily, about the team's own time (WHIT-944, ADR 0017).
-        'order' => 6,
+        // The Work group (register, section 27: Tasks, Boards, then the
+        // team's meetings and appointments), after Tasks and Boards
+        // (WHIT-944, ADR 0017).
+        'group' => 'work',
+        'order' => 3,
         // Mirrors GET /api/calendar/settings and the rest of the read routes.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CALENDAR_READ,
     ];
@@ -757,9 +758,10 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Tasks',
         'href' => '/tasks',
         'icon' => 'list-todo',
-        'group' => 'overview',
-        // After Calendar (6) and Messages (7, 8): tasks and boards on Taskaat (A10, WHIT-962).
-        'order' => 11,
+        // First in the Work group (register, section 27): tasks and boards on
+        // Taskaat (A10, WHIT-962).
+        'group' => 'work',
+        'order' => 1,
         // Mirrors GET /api/taskaat/connection.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::TASKS_READ,
     ];
@@ -768,9 +770,9 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Boards',
         'href' => '/boards',
         'icon' => 'columns',
-        'group' => 'overview',
+        'group' => 'work',
         // Right after Tasks: the same tasks as columns (T.2).
-        'order' => 12,
+        'order' => 2,
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::TASKS_READ,
     ];
     $items[] = [
@@ -778,9 +780,10 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Contacts',
         'href' => '/contacts',
         'icon' => 'customer',
-        'group' => 'people',
-        // Customers and suppliers (WHIT-955, design 3.3 A8), after the team's own pages.
-        'order' => 8,
+        // Customers and suppliers (WHIT-955, design 3.3 A8): the Operations
+        // group holds Contacts first (register, section 28 N1).
+        'group' => 'operations',
+        'order' => 1,
         // Mirrors GET /api/contacts.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CONTACTS_READ,
     ];
