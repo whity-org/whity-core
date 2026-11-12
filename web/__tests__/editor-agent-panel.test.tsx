@@ -88,3 +88,17 @@ it('shows a queued request as waiting for the agent', () => {
   expect(screen.getByText(EDITOR_LABELS.agentWaiting)).toBeInTheDocument();
   expect(screen.getAllByText(EDITOR_LABELS.agentAny).length).toBeGreaterThan(0);
 });
+
+it('works from the keyboard: Ctrl+Enter asks, Escape closes', async () => {
+  const a = agents();
+  const onClose = jest.fn();
+  render(<AgentPanel agents={a} labels={EDITOR_LABELS} start={{ request: 'Check the totals' }} onClose={onClose} />);
+
+  const field = screen.getByLabelText(EDITOR_LABELS.agentRequest);
+  expect(field).toHaveFocus();
+  fireEvent.keyDown(field, { key: 'Enter', ctrlKey: true });
+  await waitFor(() => expect(a.onAsk).toHaveBeenCalledWith(expect.objectContaining({ request: 'Check the totals' })));
+
+  fireEvent.keyDown(field, { key: 'Escape' });
+  expect(onClose).toHaveBeenCalled();
+});
