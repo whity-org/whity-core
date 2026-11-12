@@ -265,21 +265,54 @@ class ResourceRoleAssignmentRepository
     /**
      * Every grant at one resource, tenant scoped.
      *
-     * @return list<array{id: int, role_id: int, profile_id: int|null}>
+     * @return list<array{id: int, resource_id: int, role_id: int, profile_id: int|null}>
      */
     public function listFor(int $tenantId, string $resourceType, int $resourceId): array
     {
         $statement = $this->db->prepare(
-            'SELECT id, role_id, profile_id FROM resource_role_assignments
+            'SELECT id, resource_id, role_id, profile_id FROM resource_role_assignments
              WHERE tenant_id = ? AND resource_type = ? AND resource_id = ?
              ORDER BY id'
         );
         $statement->execute([$tenantId, $resourceType, $resourceId]);
 
+        return self::grantRows($statement->fetchAll(PDO::FETCH_ASSOC) ?: []);
+    }
+
+    /**
+     * Every grant of one resource TYPE made to one profile by name, tenant
+     * scoped (#1074). The row form of {@see resourceIdsForProfile()}: which
+     * records this person stands at, and through which role.
+     *
+     * Everyone-grants (`profile_id IS NULL`) are not included, for the reason
+     * {@see resourceIdsForProfile()} records: they do not give this person
+     * access to anything.
+     *
+     * @return list<array{id: int, resource_id: int, role_id: int, profile_id: int|null}>
+     */
+    public function listForProfile(int $tenantId, string $resourceType, int $profileId): array
+    {
+        $statement = $this->db->prepare(
+            'SELECT id, resource_id, role_id, profile_id FROM resource_role_assignments
+             WHERE tenant_id = ? AND resource_type = ? AND profile_id = ?
+             ORDER BY resource_id, id'
+        );
+        $statement->execute([$tenantId, $resourceType, $profileId]);
+
+        return self::grantRows($statement->fetchAll(PDO::FETCH_ASSOC) ?: []);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @return list<array{id: int, resource_id: int, role_id: int, profile_id: int|null}>
+     */
+    private static function grantRows(array $rows): array
+    {
         $out = [];
-        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        foreach ($rows as $row) {
             $out[] = [
                 'id' => (int) $row['id'],
+                'resource_id' => (int) $row['resource_id'],
                 'role_id' => (int) $row['role_id'],
                 'profile_id' => $row['profile_id'] === null ? null : (int) $row['profile_id'],
             ];

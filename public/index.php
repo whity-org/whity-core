@@ -4897,7 +4897,10 @@ $resourceRoleGrantsHandler = new \Whity\Api\ResourceRoleGrantsApiHandler(
     $roleChecker,
     $hookManager
 );
-$router->register('GET',    '/api/resource-role-grants',          [$resourceRoleGrantsHandler, 'list'],   null, null, CorePermissions::ROLES_READ);
+// No route-level permission on the list: a caller may read their OWN grants
+// (?profile_id=<self>, #1074) without roles:read. The handler requires
+// roles:read for every other read, in the caller's tenant.
+$router->register('GET',    '/api/resource-role-grants',          [$resourceRoleGrantsHandler, 'list'],   null);
 $router->register('POST',   '/api/resource-role-grants',          [$resourceRoleGrantsHandler, 'create'], null, null, CorePermissions::ROLES_MANAGE);
 $router->register('DELETE', '/api/resource-role-grants/{id:\d+}', [$resourceRoleGrantsHandler, 'revoke'], null, null, CorePermissions::ROLES_MANAGE);
 // WC-712 §4: the record-delete cleanup an owner runs when it deletes the record

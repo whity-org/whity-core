@@ -22,6 +22,7 @@ use Whity\Http\JsonBody;
  *
  *  - POST   /api/resource-role-grants   {resource_type, resource_id, role_id, profile_id?}
  *  - GET    /api/resource-role-grants?resource_type=T&resource_id=N
+ *  - GET    /api/resource-role-grants?resource_type=T&profile_id=P
  *  - DELETE /api/resource-role-grants/{id}
  *  - DELETE /api/resource-role-grants/all?resource_type=T&resource_id=N
  *
@@ -222,6 +223,17 @@ final class ResourceRoleGrantsApiHandler
      * GET /api/resource-role-grants?resource_type=T&resource_id=N — the grants
      * at one resource.
      *
+     * GET /api/resource-role-grants?resource_type=T&profile_id=P — the grants of
+     * that type made to one person by name (#1074): which records they stand at.
+     * Everyone-grants are not included, because they give nobody access on their
+     * own. Pass resource_id or profile_id, not both.
+     *
+     * Who may ask: anyone may list their OWN grants; listing another person's,
+     * or the grants at a resource, needs `roles:read`. The route therefore has
+     * no route-level permission, and this method decides, always in the
+     * caller's tenant. A plugin acting for the signed-in person can then learn
+     * where that person stands without the person holding an RBAC permission.
+     *
      * Both shapes come back in one list, told apart by `profile_id` being null
      * or set, because "who has authority here?" is one question and answering it
      * in two calls invites a caller to check only one.
@@ -235,13 +247,26 @@ final class ResourceRoleGrantsApiHandler
      */
     public function list(Request $request): Response
     {
-        $auth = $this->authorize($request, CorePermissions::ROLES_READ);
-        if ($auth instanceof Response) {
-            return $auth;
-        }
-        $tenantId = $auth;
-
         $query = self::queryParams($request);
+
+        // Reading one's own grants needs no RBAC permission; anything else
+        // does. Decided before any validation so a refused caller learns
+        // nothing about which types or profiles exist.
+        $actor = self::actorProfileId($request);
+        $ownProfile = isset($query['profile_id']) && !isset($query['resource_id'])
+            && $actor !== null && self::positiveInt($query['profile_id']) === $actor;
+        if ($ownProfile) {
+            $tenantId = TenantContext::getTenantId();
+            if ($tenantId === null) {
+                return Response::error('Tenant context is required', 403);
+            }
+        } else {
+            $auth = $this->authorize($request, CorePermissions::ROLES_READ);
+            if ($auth instanceof Response) {
+                return $auth;
+            }
+            $tenantId = $auth;
+        }
 
         $resourceType = trim((string) ($query['resource_type'] ?? ''));
         if ($resourceType === '' || !$this->resourceTypes->exists($resourceType)) {
@@ -252,9 +277,26 @@ final class ResourceRoleGrantsApiHandler
             );
         }
 
+        $hasResource = isset($query['resource_id']);
+        $hasProfile = isset($query['profile_id']);
+        if ($hasResource && $hasProfile) {
+            return Response::error('Pass resource_id or profile_id, not both', 422);
+        }
+
+        if ($hasProfile) {
+            $profileId = self::positiveInt($query['profile_id']);
+            if ($profileId === null) {
+                return Response::error('profile_id must be a positive integer', 422);
+            }
+
+            return Response::json([
+                'data' => $this->repository->listForProfile($tenantId, $resourceType, $profileId),
+            ]);
+        }
+
         $resourceId = self::positiveInt($query['resource_id'] ?? null);
         if ($resourceId === null) {
-            return Response::error('resource_id is required and must be a positive integer', 422);
+            return Response::error('resource_id or profile_id is required and must be a positive integer', 422);
         }
 
         return Response::json([
@@ -488,10 +530,7 @@ final class ResourceRoleGrantsApiHandler
             return Response::error('Tenant context is required', 403);
         }
 
-        $actor = $request->user;
-        $profileId = is_object($actor) && isset($actor->profile_id) && is_int($actor->profile_id)
-            ? $actor->profile_id
-            : null;
+        $profileId = self::actorProfileId($request);
 
         if ($profileId === null
             || !$this->roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId)
@@ -500,6 +539,15 @@ final class ResourceRoleGrantsApiHandler
         }
 
         return $tenantId;
+    }
+
+    private static function actorProfileId(Request $request): ?int
+    {
+        $actor = $request->user;
+
+        return is_object($actor) && isset($actor->profile_id) && is_int($actor->profile_id)
+            ? $actor->profile_id
+            : null;
     }
 
     /**

@@ -8233,8 +8233,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List the role grants addressed at one resource
-         * @description Returns both grant shapes: a null `profile_id` is the "everyone at this resource" grant, a set `profile_id` grants to that one profile. Always scoped to the caller's tenant, so a resource belonging to another tenant yields an empty list rather than an error.
+         * List the role grants at one resource, or made to one profile
+         * @description With `resource_id`: the grants at that record, in both shapes: a null `profile_id` is the "everyone at this resource" grant, a set `profile_id` grants to that one profile. With `profile_id` instead: the grants of this type made to that profile by name, which are the records they stand at. Everyone-grants are left out there, because on their own they give nobody access. Pass one of the two, not both. Anyone may list their own grants (`profile_id` = their own profile); listing another person's, or the grants at a resource, needs `roles:read`. Always scoped to the caller's tenant, so another tenant's resource or profile yields an empty list rather than an error.
          */
         get: operations["get_api_v1_resource_role_grants"];
         put?: never;
@@ -16363,6 +16363,7 @@ export interface components {
         };
         ResourceRoleGrant: {
             id: number;
+            resource_id: number;
             role_id: number;
             profile_id: number | null;
         };
@@ -61394,8 +61395,10 @@ export interface operations {
             query: {
                 /** @description A registered resource type (e.g. `ou`, `acme:record`) */
                 resource_type: string;
-                /** @description The record the grants are addressed at */
-                resource_id: number;
+                /** @description The record the grants are addressed at. Required unless profile_id is given */
+                resource_id?: number;
+                /** @description List the grants made to this profile by name instead */
+                profile_id?: number;
             };
             header?: never;
             path?: never;
@@ -61403,7 +61406,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The grants at this resource */
+            /** @description The grants */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -61421,7 +61424,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Insufficient permissions */
+            /** @description Listing another person's grants, or the grants at a resource, without roles:read */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -61448,7 +61451,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description resource_type is unregistered, or resource_id is missing/invalid */
+            /** @description resource_type is unregistered, neither or both of resource_id and profile_id were given, or one is invalid */
             422: {
                 headers: {
                     [name: string]: unknown;
