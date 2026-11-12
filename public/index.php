@@ -753,6 +753,17 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CALENDAR_READ,
     ];
     $items[] = [
+        'id' => 'tasks',
+        'label' => 'Tasks',
+        'href' => '/tasks',
+        'icon' => 'list-todo',
+        'group' => 'overview',
+        // After Calendar (6) and Messages (7, 8): tasks and boards on Taskaat (A10, WHIT-962).
+        'order' => 9,
+        // Mirrors GET /api/taskaat/connection.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::TASKS_READ,
+    ];
+    $items[] = [
         'id' => 'users',
         'label' => 'Users',
         'href' => '/admin/users',
