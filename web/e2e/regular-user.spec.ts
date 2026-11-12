@@ -50,9 +50,10 @@ test.describe('Regular user (non-admin)', () => {
     // The workspace Settings area is gated, so a plain user has no Settings
     // entry; their own account is always reachable from the user row.
     await expect(userPage.shell.navLink('Settings')).toHaveCount(0);
+    await userPage.shell.openAccountMenu();
     await expect(userPage.shell.accountLink).toBeVisible();
     await expect(userPage.shell.logoutButton).toBeVisible();
-    await expect(userPage.shell.sidebar.getByText('Logged in as')).toBeVisible();
+    await page.keyboard.press('Escape');
   });
 
   test('an admin data page reached by direct URL degrades safely (data-layer 403)', async ({

@@ -129,15 +129,16 @@ export class LoginPage {
 export class AppShell {
   readonly page: Page;
   readonly sidebar: Locator;
-  readonly logoutButton: Locator;
-  readonly loggedInEmail: Locator;
+  /** The person's row at the foot of the sidebar; it opens the account menu. */
+  readonly accountMenuButton: Locator;
+  /** The name under the avatar, shown only while the sidebar is expanded. */
+  readonly accountName: Locator;
 
   constructor(page: Page) {
     this.page = page;
     this.sidebar = page.getByRole('complementary');
-    this.logoutButton = page.getByRole('button', { name: 'Logout' });
-    // The footer renders "Logged in as" above the email paragraph.
-    this.loggedInEmail = this.sidebar.locator('p', { hasText: '@' }).last();
+    this.accountMenuButton = this.sidebar.getByTestId('account-menu');
+    this.accountName = this.sidebar.getByTestId('account-name');
   }
 
   navLink(label: string): Locator {
@@ -219,11 +220,31 @@ export class AppShell {
    * the user menu).
    */
   get accountLink(): Locator {
-    return this.sidebar.getByRole('link', { name: 'Account settings' });
+    return this.page.getByRole('menuitem', { name: 'Account settings' });
+  }
+
+  /** "Logout", inside the account menu (open it first). */
+  get logoutButton(): Locator {
+    return this.page.getByRole('menuitem', { name: 'Logout' });
+  }
+
+  /** Opens the account menu from the person's row, if it isn't open already. */
+  async openAccountMenu(): Promise<void> {
+    if ((await this.accountMenuButton.getAttribute('aria-expanded')) !== 'true') {
+      await this.accountMenuButton.click();
+    }
+    await expect(this.page.getByRole('menu')).toBeVisible();
   }
 
   async openAccountSettings(): Promise<void> {
+    await this.openAccountMenu();
     await this.accountLink.click();
+  }
+
+  /** Chooses an interface language in the account menu, by its own name ("English", "العربية"). */
+  async chooseLanguage(name: string): Promise<void> {
+    await this.openAccountMenu();
+    await this.page.getByRole('menuitemradio', { name }).click();
   }
 
   /** The desktop collapse/expand toggle in the sidebar header (title attr). */
@@ -239,8 +260,10 @@ export class AppShell {
   }
 
   async expectLoggedInAs(email: string): Promise<void> {
-    await expect(this.sidebar.getByText('Logged in as')).toBeVisible();
-    await expect(this.sidebar.getByText(email, { exact: true })).toBeVisible();
+    await this.openAccountMenu();
+    await expect(this.page.getByRole('menu').getByText(email, { exact: true })).toBeVisible();
+    await this.page.keyboard.press('Escape');
+    await expect(this.page.getByRole('menu')).toBeHidden();
   }
 
   async clickNav(label: string): Promise<void> {
@@ -268,6 +291,7 @@ export class AppShell {
         res.url().includes('/api/v1/auth/logout') &&
         res.request().method() === 'POST'
     );
+    await this.openAccountMenu();
     await this.logoutButton.click();
     await this.page.waitForURL('**/login');
     await logoutResponse;

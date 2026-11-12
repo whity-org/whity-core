@@ -56,7 +56,7 @@ test.describe('Auth transitions', () => {
     // delegation:manage, so the gated Delegations link is hidden outright —
     // the account link in the user row survives the identity swap.
     await expect(shell.navLink('Delegations')).toHaveCount(0);
-    await expect(shell.accountLink).toBeVisible();
+    await expect(shell.accountMenuButton).toBeVisible();
   });
 
   test('the sidebar re-filters on identity switch: Delegations link hidden for user, restored for admin', async ({

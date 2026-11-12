@@ -14,8 +14,7 @@ test.describe('Sidebar navigation (admin)', () => {
       // (both end in "Settings") don't collide under strict mode.
       await expect(adminPage.shell.navLink(section.label)).toBeVisible();
     }
-    await expect(adminPage.shell.logoutButton).toBeVisible();
-    await expect(adminPage.shell.sidebar.getByText('Logged in as')).toBeVisible();
+    await expect(adminPage.shell.accountMenuButton).toBeVisible();
   });
 
   test('Users section loads its page with heading and table', async ({ adminPage, page }) => {
@@ -109,21 +108,21 @@ test.describe('Sidebar navigation (admin)', () => {
 
   test('sidebar collapses and expands via the header toggle', async ({ adminPage }) => {
     const shell = adminPage.shell;
-    // Expanded by default: brand heading + "Logged in as" footer are visible.
+    // Expanded by default: brand heading + the person's name in the foot are visible.
     await expect(shell.brandHeading).toBeVisible();
-    await expect(shell.sidebar.getByText('Logged in as')).toBeVisible();
+    await expect(shell.accountName).toBeVisible();
 
     // Collapse: the "Whity" heading and the footer email block are hidden, but
     // the nav links remain reachable (icon-only mode).
     await shell.collapseToggle.click();
     await expect(shell.brandHeading).toBeHidden();
-    await expect(shell.sidebar.getByText('Logged in as')).toBeHidden();
+    await expect(shell.accountName).toBeHidden();
     await expect(shell.collapseToggle).toBeVisible();
 
     // Expand again: brand + footer return.
     await shell.collapseToggle.click();
     await expect(shell.brandHeading).toBeVisible();
-    await expect(shell.sidebar.getByText('Logged in as')).toBeVisible();
+    await expect(shell.accountName).toBeVisible();
   });
 
   test('footer shows "logged in as" the admin and the logout button works', async ({
@@ -142,7 +141,6 @@ test.describe('Sidebar navigation (admin)', () => {
 
     const shell = new AppShell(page);
     await shell.expectLoggedInAs(ADMIN.email);
-    await expect(shell.logoutButton).toBeVisible();
     await shell.logout();
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();

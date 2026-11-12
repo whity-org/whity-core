@@ -8,11 +8,25 @@ import { useNavigation } from '@/lib/navigation-context';
 import { useBranding } from '@/lib/branding-context';
 import { useThemeMode } from '@/lib/theme-mode-context';
 import { useToast } from '@/lib/toast-context';
-import { Button } from '@whity/ui/button';
+import { Avatar } from '@whity/ui/avatar';
+import { Lockup } from '@whity/ui/lockup';
+import { Mark } from '@whity/ui/mark';
+import { ICONS } from '@whity/ui/icon-map';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@whity/ui/dropdown-menu';
 import { TenantSwitcher as WorkspaceSwitcher } from '@whity/ui/tenant-switcher';
 import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
 import { navGroupsFromServerItems } from '@whity/features/nav';
-import { LanguageSwitcher, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
+import { useCurrentLanguage, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
+import { roleLabel } from '@whity/features/roles/role-label';
 import { localizedName } from '@/lib/localized-name';
 import * as TablerIcons from '@tabler/icons-react';
 import {
@@ -20,7 +34,7 @@ import {
   IconDashboard,
   IconUserCog,
   IconSettings,
-  IconWorld,
+  IconSelector,
   IconSun,
   IconMoon,
 } from '@tabler/icons-react';
@@ -51,6 +65,15 @@ function resolveIcon(name: string | undefined): Icon {
     return IconDashboard;
   }
 
+  // Whity's own names first (decision 5.1, `handoff/icons/icons.json`): core
+  // registers `comment`, `customer`, `list-todo` and `dashboard`, which are
+  // curated names, not Tabler's. Read as Tabler names they were missing (Chat,
+  // Contacts and Tasks fell back to the dashboard gauge) or the wrong glyph.
+  const curated = (ICONS as Record<string, { icon: Icon } | undefined>)[name.trim()];
+  if (curated) {
+    return curated.icon;
+  }
+
   // Split on hyphen/underscore/whitespace, capitalize each segment, join.
   const pascal = name
     .trim()
@@ -79,6 +102,9 @@ function resolveIcon(name: string | undefined): Icon {
  */
 const NAV_GROUP_ORDER = [
   'overview',
+  // Register, section 27: Work follows the top items, then Operations.
+  'work',
+  'operations',
   'people',
   'ai',
   'documents',
@@ -102,6 +128,9 @@ const LEGACY_NAV_GROUPS: Readonly<Record<string, string>> = {
 
 /** The personal account page's nav item; the footer's user row opens it instead. */
 const ACCOUNT_SETTINGS_ITEM_ID = 'settings';
+
+/** The installation's name when nobody has renamed it: the header shows the lockup. */
+const DEFAULT_SITE_NAME = 'Whity';
 
 /** The system tenant: the only one that runs the platform itself. */
 const SYSTEM_TENANT_ID = 0;
@@ -260,6 +289,7 @@ export function Sidebar() {
   const t = useTranslation('common');
   // Whether this instance offers a language choice at all (`i18n.enabled`).
   const isI18nEnabled = useI18nEnabled();
+  const { currentLanguage, availableLanguages, setLanguage } = useCurrentLanguage();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -285,6 +315,8 @@ export function Sidebar() {
   const groupLabels = useMemo<Record<string, string | undefined>>(
     () => ({
       overview: undefined,
+      work: t('sidebar.group.work', 'Work'),
+      operations: t('sidebar.group.operations', 'Operations'),
       people: t('sidebar.group.people', 'People'),
       ai: t('sidebar.group.ai', 'AI'),
       documents: t('sidebar.group.documents', 'Documents'),
@@ -380,9 +412,15 @@ export function Sidebar() {
         className="mx-auto h-8 w-8 object-contain"
       />
     ) : (
-      <div className="text-center text-xl font-semibold">
-        {branding.siteName.charAt(0).toUpperCase()}
-      </div>
+      branding.siteName === DEFAULT_SITE_NAME ? (
+        <div className="flex justify-center">
+          <Mark size={24} />
+        </div>
+      ) : (
+        <div className="text-center text-xl font-semibold">
+          {branding.siteName.charAt(0).toUpperCase()}
+        </div>
+      )
     )
   ) : (
     <>
@@ -392,109 +430,97 @@ export function Sidebar() {
           alt={branding.siteName}
           className="h-8 w-auto max-w-[180px] object-contain"
         />
+      ) : branding.siteName === DEFAULT_SITE_NAME ? (
+        // The Whity lockup, as on every 3.3 card; a renamed installation keeps
+        // its own name in text.
+        <h1 className="m-0">
+          <Lockup size={24} />
+        </h1>
       ) : (
         <h1 className="text-xl font-semibold">{branding.siteName}</h1>
       )}
     </>
   );
 
+  // The foot is the person, as on every 3.3 card: avatar, name and role in one
+  // row that opens the account menu (account settings, language, light or
+  // dark, sign out). The user menu has no card of its own yet (WHIT-827), so
+  // it is built to the nearest one: the row is the cards', and the menu holds
+  // what the old foot showed as four stacked controls.
+  const displayName = user?.display_name || user?.email || '';
+  const activeRole =
+    memberships.find((membership) => membership.tenant_id === user?.tenant_id)?.role ?? user?.role ?? '';
   const footer = (
-    <div className="space-y-2">
-      {/*
-        User menu: the "logged in as" footer doubles as the entry point to the
-        self-service profile page (WC-64), which was previously orphaned (no
-        nav link pointed to /settings). Linking it here guarantees the page is
-        reachable regardless of the dynamic navigation set.
-      */}
-      {!collapsed ? (
-        <Link
-          href="/settings"
-          onClick={() => setIsMobileOpen(false)}
-          aria-label={t('sidebar.accountSettings', 'Account settings')}
-          className="flex items-center gap-2 rounded-lg bg-background px-2 py-2 text-center transition-colors hover:bg-background/70 md:text-start"
-          title={t('sidebar.accountSettings', 'Account settings')}
-        >
-          <IconUserCog size={20} className="shrink-0 text-muted-foreground" />
-          <span className="min-w-0">
-            <span className="block truncate text-xs text-muted-foreground">
-              {t('sidebar.loggedInAs', 'Logged in as')}
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className={`flex min-h-12 w-full items-center gap-3 rounded-lg px-2 py-2 text-start transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring ${collapsed ? 'justify-center' : ''}`}
+        aria-label={t('sidebar.accountMenu', 'Account menu')}
+        title={collapsed ? displayName : undefined}
+        data-testid="account-menu"
+      >
+        <Avatar name={displayName} size={32} />
+        {!collapsed && (
+          <>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium" data-testid="account-name">
+                {displayName}
+              </span>
+              {activeRole && (
+                <span className="block truncate text-xs text-muted-foreground">{roleLabel(activeRole)}</span>
+              )}
             </span>
-            <span className="block truncate text-sm font-medium">{user?.email}</span>
-          </span>
-        </Link>
-      ) : (
-        <Link
-          href="/settings"
-          aria-label={t('sidebar.accountSettings', 'Account settings')}
-          className="flex justify-center rounded-lg bg-background px-2 py-2 transition-colors hover:bg-background/70"
-          title={t('sidebar.accountSettings', 'Account settings')}
-        >
-          <IconUserCog size={20} className="shrink-0 text-muted-foreground" />
-        </Link>
-      )}
-      {/*
-        Interface language. This is ALSO the direction control: each
-        language carries its own writing direction, so choosing Arabic
-        mirrors the interface and choosing English un-mirrors it (see
-        lib/direction-context.tsx). There is deliberately no separate
-        direction toggle — a language and a direction that disagree is not
-        a state a user can usefully be in, and the pair used to drift
-        apart. The choice is stored on the profile, so it follows the user
-        across devices.
-
-        The WHOLE ROW — frame, globe icon and control — is gated on
-        `i18n.enabled`. The switcher self-suppresses too, but this wrapper
-        has to ask as well: otherwise an instance with i18n off would show
-        an empty bordered box with a globe in it, which is a worse
-        affordance than the switcher was.
-      */}
-      {isI18nEnabled && !collapsed && (
-        <div
-          className="flex h-10 w-full items-center gap-2 rounded-lg border border-input bg-input/20 px-3"
-          data-testid="language-switcher"
-        >
-          <IconWorld size={20} className="shrink-0 text-muted-foreground" />
-          <LanguageSwitcher
-            variant="dropdown"
-            className="h-full min-w-0 flex-1 cursor-pointer border-0 bg-transparent text-sm font-medium text-foreground outline-none"
-          />
-        </div>
-      )}
-      {/* Light / dark color scheme (see lib/theme-mode-context.tsx). */}
-      <Button
-        onClick={toggleTheme}
-        variant="outline"
-        size={collapsed ? 'icon' : 'default'}
-        className={`w-full ${collapsed ? 'justify-center' : 'justify-start'}`}
-        title={
-          resolvedTheme === 'dark'
-            ? t('sidebar.theme.switchToLight', 'Switch to light mode')
-            : t('sidebar.theme.switchToDark', 'Switch to dark mode')
-        }
-        aria-label={t('sidebar.theme.toggle', 'Toggle color scheme')}
-        data-testid="theme-toggle"
-      >
-        {resolvedTheme === 'dark' ? (
-          <IconSun size={20} className={collapsed ? '' : 'me-3 shrink-0'} />
-        ) : (
-          <IconMoon size={20} className={collapsed ? '' : 'me-3 shrink-0'} />
+            <IconSelector size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+          </>
         )}
-        {!collapsed &&
-          (resolvedTheme === 'dark'
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" className="w-60">
+        <DropdownMenuLabel className="font-normal text-muted-foreground">
+          <span className="block text-xs">{t('sidebar.loggedInAs', 'Logged in as')}</span>
+          <span className="block truncate text-sm text-foreground">{user?.email}</span>
+        </DropdownMenuLabel>
+        <DropdownMenuItem asChild>
+          <Link href="/settings" onClick={() => setIsMobileOpen(false)}>
+            <IconUserCog />
+            {t('sidebar.accountSettings', 'Account settings')}
+          </Link>
+        </DropdownMenuItem>
+        {isI18nEnabled && availableLanguages.length > 1 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+              {t('sidebar.language', 'Language')}
+            </DropdownMenuLabel>
+            {/*
+              The language is also the direction (lib/direction-context.tsx):
+              choosing Arabic mirrors the interface. Stored on the profile, so
+              it follows the person across devices.
+            */}
+            <DropdownMenuRadioGroup
+              value={currentLanguage || 'en'}
+              onValueChange={(code) => void setLanguage(code)}
+              data-testid="language-switcher"
+            >
+              {availableLanguages.map((language) => (
+                <DropdownMenuRadioItem key={language.code} value={language.code} lang={language.code}>
+                  {language.name}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={toggleTheme} data-testid="theme-toggle">
+          {resolvedTheme === 'dark' ? <IconSun /> : <IconMoon />}
+          {resolvedTheme === 'dark'
             ? t('sidebar.theme.light', 'Light mode')
-            : t('sidebar.theme.dark', 'Dark mode'))}
-      </Button>
-      <Button
-        onClick={handleLogout}
-        variant="outline"
-        size={collapsed ? 'icon' : 'default'}
-        className={`w-full ${collapsed ? 'justify-center' : 'justify-start'}`}
-        title={collapsed ? t('sidebar.logout', 'Logout') : undefined}
-      >
-        <IconLogout size={20} className={collapsed ? '' : 'me-3 shrink-0'} />
-        {!collapsed && t('sidebar.logout', 'Logout')}
-      </Button>
-    </div>
+            : t('sidebar.theme.dark', 'Dark mode')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={handleLogout}>
+          <IconLogout className="rtl:-scale-x-100" />
+          {t('sidebar.logout', 'Logout')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 
   return (

@@ -79,7 +79,7 @@ test.describe('Self-service profile management (WC-64)', () => {
   }) => {
     // The "logged in as" footer is the account-settings entry point (it fixes the
     // previously orphaned /settings page). Clicking it lands on Settings.
-    await adminPage.shell.sidebar.getByRole('link', { name: 'Account settings' }).click();
+    await adminPage.shell.openAccountSettings();
     await page.waitForURL('**/settings');
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Profile' })).toBeVisible();
