@@ -152,6 +152,12 @@ export interface DocEditorProps {
    * request over MCP; what it writes arrives as suggestions through `collab`.
    */
   agents?: EditorAgents
+  /**
+   * M7, E.23: this is a saved block's original. The selection bubble offers
+   * "Filled per document", marking text each document using the synced
+   * block fills itself.
+   */
+  perDocumentParts?: boolean
   className?: string
 }
 
@@ -230,6 +236,7 @@ function DocEditor({
   onPrintLabels,
   collab,
   agents,
+  perDocumentParts = false,
   className,
 }: DocEditorProps) {
   const labels = React.useMemo(() => ({ ...EDITOR_LABELS, ...labelProp }), [labelProp])
@@ -1113,6 +1120,7 @@ function DocEditor({
                       onLink={() => openLink()}
                       onComment={showCollab && canComment ? startComment : undefined}
                       onRewrite={canAskAgent ? rewriteWithAgent : undefined}
+                      perDocument={perDocumentParts}
                     />
                   </>
                 )}

@@ -20,6 +20,12 @@ namespace Whity\Core\Document\SavedBlock;
  * a draft preview leaves it out, as the editor says it's no longer available.
  * Only one level is expanded: a saved block inside a saved block's own
  * blocks stays a reference, so a loop can't form.
+ *
+ * Per-document parts (E.23): in the original, each run of consecutive text
+ * or fields marked `perDocument` in a block's line is one part, keyed
+ * `<block id>#<n>` (as the editor's saved-parts.ts finds them). A document's
+ * `overrides` fill parts by key; a part it hasn't filled prints the
+ * original's text.
  */
 final class SavedBlockExpander
 {
@@ -58,7 +64,8 @@ final class SavedBlockExpander
                     $out[] = $block;
                     continue;
                 }
-                array_push($out, ...$this->walk($tenantId, $content, $cache, false));
+                $overrides = is_array($block['overrides'] ?? null) ? $block['overrides'] : [];
+                array_push($out, ...self::fill($this->walk($tenantId, $content, $cache, false), $overrides));
                 continue;
             }
             if ($type === 'toggle' && is_array($block['children'] ?? null)) {
@@ -74,6 +81,90 @@ final class SavedBlockExpander
         }
 
         return $out;
+    }
+
+    /** The blocks whose `content` is a line of text, and so can hold a part. */
+    private const TEXT_TYPES = ['paragraph', 'heading', 'quote', 'bullet', 'number', 'checklist', 'callout'];
+
+    /**
+     * The blocks with each part a document filled replaced by its own text.
+     *
+     * @param list<mixed>          $blocks
+     * @param array<mixed>         $overrides part key => Inline[]
+     * @return list<mixed>
+     */
+    private static function fill(array $blocks, array $overrides): array
+    {
+        if ($overrides === []) {
+            return $blocks;
+        }
+        $out = [];
+        foreach ($blocks as $block) {
+            if (is_array($block)) {
+                $type = $block['type'] ?? null;
+                if (in_array($type, self::TEXT_TYPES, true) && is_array($block['content'] ?? null)) {
+                    $block['content'] = self::fillLine((string) ($block['id'] ?? ''), array_values($block['content']), $overrides);
+                }
+                if ($type === 'toggle' && is_array($block['children'] ?? null)) {
+                    $block['children'] = self::fill(array_values($block['children']), $overrides);
+                }
+                if ($type === 'columns' && is_array($block['columns'] ?? null)) {
+                    $block['columns'] = array_map(
+                        static fn (mixed $c): mixed => is_array($c) ? self::fill(array_values($c), $overrides) : $c,
+                        $block['columns'],
+                    );
+                }
+            }
+            $out[] = $block;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<mixed>  $runs
+     * @param array<mixed> $overrides
+     * @return list<mixed>
+     */
+    private static function fillLine(string $blockId, array $runs, array $overrides): array
+    {
+        $out = [];
+        $n = 0;
+        $inPart = false;
+        $key = null;
+        foreach ($runs as $run) {
+            $part = self::isPerDocument($run);
+            if ($part && !$inPart) {
+                $key = $blockId . '#' . $n++;
+                $own = $overrides[$key] ?? null;
+                if (is_array($own) && $own !== []) {
+                    array_push($out, ...array_values($own));
+                }
+            }
+            $inPart = $part;
+            if ($part && is_array($overrides[$key] ?? null) && $overrides[$key] !== []) {
+                continue; // replaced by the document's own text
+            }
+            $out[] = $run;
+        }
+
+        return $out;
+    }
+
+    private static function isPerDocument(mixed $run): bool
+    {
+        if (!is_array($run)) {
+            return false;
+        }
+        $marked = false;
+        foreach (is_array($run['marks'] ?? null) ? $run['marks'] : [] as $mark) {
+            if (is_array($mark) && ($mark['type'] ?? null) === 'perDocument') {
+                $marked = true;
+            }
+        }
+        $type = $run['type'] ?? null;
+
+        return ($type === 'text' && $marked) || ($type === 'field' && ($marked || ($run['perDocument'] ?? false) === true));
     }
 
     /**

@@ -7,6 +7,7 @@ import { useEditorLabels } from '@whity/features/document-editor';
 import { Button } from '@whity/ui/button';
 import type { Block, WhityDocument } from '@whity/ui/editor/contract';
 import { DocEditor } from '@whity/ui/editor/doc-editor';
+import { perDocumentKeys } from '@whity/ui/editor/saved-parts';
 import { AreaError } from '@whity/ui/page-states';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { DOCUMENTS_WRITE } from '@/lib/capabilities';
@@ -81,7 +82,8 @@ export default function EditSavedBlockPage({ params }: { params: Promise<{ id: s
   const save = async () => {
     if (!block || !doc) return;
     setSaving(true);
-    const result = await updateLibraryBlock(block.id, { blocks: doc.blocks, version: block.version });
+    // E.23: the parts each document fills, found where the original marks them.
+    const result = await updateLibraryBlock(block.id, { blocks: doc.blocks, perDocumentKeys: perDocumentKeys(doc.blocks), version: block.version });
     setSaving(false);
     if (result.ok) {
       setBlock(result.block);
@@ -127,6 +129,7 @@ export default function EditSavedBlockPage({ params }: { params: Promise<{ id: s
             back={{ label: t('savedBlocks.backToLibrary', 'Back to saved blocks'), onClick: back }}
             path={t('savedBlocks.editingOriginal', 'Saved blocks · Original')}
             labels={labels}
+            perDocumentParts={block?.mode === 'synced'}
           />
         )}
       </div>

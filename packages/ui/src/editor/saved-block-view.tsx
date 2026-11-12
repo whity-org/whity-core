@@ -5,8 +5,9 @@ import { NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react"
 
 import { Icon } from "../icon"
 import { cn } from "../utils"
-import type { Block } from "./contract"
+import type { Block, Inline } from "./contract"
 import { freshEditorBlocks } from "./convert"
+import { applyOverrides, partText, segments } from "./saved-parts"
 import { fill, type EditorLabels } from "./labels"
 import { inlineText, useEditorServices } from "./services"
 
@@ -22,16 +23,35 @@ export function SavedBlockView(props: ReactNodeViewProps) {
   const id = String(props.node.attrs.savedBlockId ?? "")
   const saved = services.savedBlocks?.find((b) => b.id === id) ?? null
   const editable = props.editor.isEditable
+  const overrides = (props.node.attrs.overrides ?? {}) as Record<string, Inline[]>
 
   const detach = () => {
     const pos = props.getPos()
     if (!saved || typeof pos !== "number") return
+    // What this document filled in stays; the rest is the library's as it is now.
     props.editor
       .chain()
       .focus()
-      .insertContentAt({ from: pos, to: pos + props.node.nodeSize }, freshEditorBlocks(saved.blocks))
+      .insertContentAt({ from: pos, to: pos + props.node.nodeSize }, freshEditorBlocks(applyOverrides(saved.blocks, overrides)))
       .run()
   }
+
+  /** E.23: this document's own text for one part; empty goes back to the original's. */
+  const fillPart = (key: string, text: string) => {
+    const next = { ...overrides }
+    if (text) next[key] = [{ type: "text", text }]
+    else delete next[key]
+    props.updateAttributes({ overrides: next })
+  }
+
+  const line = (blockId: string, content: Inline[]) =>
+    segments(blockId, content).map((s, i) =>
+      s.part === null ? (
+        <React.Fragment key={i}>{inlineText(s.runs)}</React.Fragment>
+      ) : (
+        <PartField key={s.part} original={partText(s.runs)} value={inlineText(overrides[s.part] ?? [])} editable={editable} labels={labels} onChange={(text) => fillPart(s.part!, text)} />
+      )
+    )
 
   const usedIn = saved?.usedIn ?? 0
   return (
@@ -66,7 +86,7 @@ export function SavedBlockView(props: ReactNodeViewProps) {
         </div>
       )}
       <div className="wy-saved-body" contentEditable={false}>
-        {saved ? <SavedBlocksPreview blocks={saved.blocks} labels={labels} /> : <div className="wy-placeholder">{labels.savedBlockMissing}</div>}
+        {saved ? <SavedBlocksPreview blocks={saved.blocks} labels={labels} line={line} /> : <div className="wy-placeholder">{labels.savedBlockMissing}</div>}
       </div>
     </NodeViewWrapper>
   )
@@ -91,24 +111,24 @@ const TYPE_NAMES: Partial<Record<Block["type"], keyof EditorLabels>> = {
  * The library's blocks, read-only, with the sheet's own type: text as text,
  * other blocks named. The saved block is edited in the original, not here.
  */
-function SavedBlocksPreview({ blocks, labels }: { blocks: Block[]; labels: EditorLabels }) {
+function SavedBlocksPreview({ blocks, labels, line }: { blocks: Block[]; labels: EditorLabels; line: (blockId: string, content: Inline[]) => React.ReactNode }) {
   return (
     <>
       {blocks.map((block) => {
         switch (block.type) {
           case "heading": {
             const H = `h${block.level + 1}` as "h2" | "h3" | "h4"
-            return <H key={block.id}>{inlineText(block.content)}</H>
+            return <H key={block.id}>{line(block.id, block.content)}</H>
           }
           case "paragraph":
-            return <p key={block.id}>{inlineText(block.content)}</p>
+            return <p key={block.id}>{line(block.id, block.content)}</p>
           case "quote":
-            return <blockquote key={block.id}>{inlineText(block.content)}</blockquote>
+            return <blockquote key={block.id}>{line(block.id, block.content)}</blockquote>
           case "callout":
             return (
               <div key={block.id} className="wy-saved-callout" data-kind={block.kind}>
                 <Icon name={block.kind === "important" ? "alert" : "info"} className="wy-callout-icon" />
-                <p>{inlineText(block.content)}</p>
+                <p>{line(block.id, block.content)}</p>
               </div>
             )
           case "bullet":
@@ -117,7 +137,7 @@ function SavedBlocksPreview({ blocks, labels }: { blocks: Block[]; labels: Edito
             return (
               <p key={block.id} style={{ paddingInlineStart: `${(block.level + 1) * 1.25}em` }}>
                 {block.type === "checklist" ? (block.checked ? "☑ " : "☐ ") : block.type === "bullet" ? "• " : ""}
-                {inlineText(block.content)}
+                {line(block.id, block.content)}
               </p>
             )
           case "code":
@@ -128,7 +148,7 @@ function SavedBlocksPreview({ blocks, labels }: { blocks: Block[]; labels: Edito
             return (
               <React.Fragment key={block.id}>
                 <p>{inlineText(block.summary)}</p>
-                <SavedBlocksPreview blocks={block.children} labels={labels} />
+                <SavedBlocksPreview blocks={block.children} labels={labels} line={line} />
               </React.Fragment>
             )
           default: {
@@ -142,5 +162,43 @@ function SavedBlocksPreview({ blocks, labels }: { blocks: Block[]; labels: Edito
         }
       })}
     </>
+  )
+}
+
+/**
+ * One per-document part (E.23): a field this document fills, showing the
+ * original's text until it does. Read-only, it shows what will print.
+ */
+function PartField({
+  original,
+  value,
+  editable,
+  labels,
+  onChange,
+}: {
+  original: string
+  value: string
+  editable: boolean
+  labels: EditorLabels
+  onChange: (text: string) => void
+}) {
+  const [draft, setDraft] = React.useState(value)
+  React.useEffect(() => setDraft(value), [value])
+  if (!editable) return <span className="wy-part">{value || original}</span>
+  return (
+    <input
+      className="wy-part"
+      dir="auto"
+      value={draft}
+      placeholder={original}
+      size={Math.max(4, (draft || original).length)}
+      aria-label={fill(labels.perDocumentFill, { text: original })}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => draft !== value && onChange(draft.trim())}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur()
+        if (e.key === "Escape") setDraft(value)
+      }}
+    />
   )
 }

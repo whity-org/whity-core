@@ -370,5 +370,7 @@ export function useEditorLabels(): EditorLabels {
     savedBlockMissing: t('blockEditor.savedBlockMissing', 'This saved block was deleted or isn\'t shared with you.'),
     savedBlockSyncedHint: t('blockEditor.savedBlockSyncedHint', 'Synced: changes reach every document'),
     savedBlockCopyHint: t('blockEditor.savedBlockCopyHint', 'Inserts a copy you change freely'),
+    perDocumentMark: t('blockEditor.perDocumentMark', 'Filled per document'),
+    perDocumentFill: t('blockEditor.perDocumentFill', 'Filled per document: {text}'),
   };
 }

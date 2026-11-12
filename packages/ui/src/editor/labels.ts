@@ -364,6 +364,8 @@ export const EDITOR_LABELS = {
   savedBlockMissing: "This saved block was deleted or isn't shared with you.",
   savedBlockSyncedHint: "Synced: changes reach every document",
   savedBlockCopyHint: "Inserts a copy you change freely",
+  perDocumentMark: "Filled per document",
+  perDocumentFill: "Filled per document: {text}",
 }
 
 export type EditorLabels = typeof EDITOR_LABELS

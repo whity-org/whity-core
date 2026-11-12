@@ -290,6 +290,30 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
         self::assertSame([['kind' => 'block-without-print-view', 'blockId' => 'r1']], $this->data($this->check(self::OWNER, $id)));
     }
 
+    /**
+     * E.23: a part of a synced block marked "filled per document" prints the
+     * document's own text where the document filled it, and the original's
+     * where it didn't; the rest stays as the library has it.
+     */
+    public function testPerDocumentPartsPrintWhatTheDocumentFilled(): void
+    {
+        $pd = static fn (string $text): array => ['type' => 'text', 'text' => $text, 'marks' => [['type' => 'perDocument']]];
+        $sign = $this->savedBlocks->create(self::TENANT, [
+            'name' => 'Signature line', 'description' => null, 'mode' => 'synced', 'sharing' => 'workspace',
+            'owner_profile_id' => self::OWNER,
+            'blocks' => [['id' => 'a', 'type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Signed by '], $pd('Amro Saleh'), ['type' => 'text', 'text' => ' on '], $pd('12 November')]]],
+            'per_document_keys' => ['a#0', 'a#1'],
+        ]);
+        $id = $this->template(self::OWNER, [
+            ['id' => 'r1', 'type' => 'savedBlock', 'savedBlockId' => (string) $sign, 'version' => 1, 'overrides' => ['a#0' => [['type' => 'text', 'text' => 'Awss Haddad']]]],
+        ]);
+        $doc = $this->issue(self::OWNER, 'Payment reminder');
+
+        self::assertSame(201, $this->publish(self::OWNER, $id, '"1"')->getStatusCode());
+        self::assertSame(200, $this->renderPdf(self::OWNER, $id, ['record' => 'document:' . $doc])->getStatusCode());
+        self::assertSame('Signed by Awss Haddad on 12 November', $this->render->flowCalls[0]['content'][1]['text']);
+    }
+
     public function testATemplateTooLargeToPrintIsBlockedFromPublishing(): void
     {
         $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_FLOW_MAX_BYTES, '4096');

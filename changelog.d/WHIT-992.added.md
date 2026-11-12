@@ -1,0 +1,1 @@
+Synced saved blocks can leave parts to fill per document: mark text "Filled per document" when editing the original, and each document using the block fills its own value, which it prints and keeps if the block is detached.

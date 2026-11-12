@@ -340,6 +340,8 @@
         "blockEditor.pageSetup": "A4 · margins 16 mm",
         "blockEditor.path.templates": "Templates",
         "blockEditor.pdf": "PDF",
+        "blockEditor.perDocumentFill": "Filled per document: {text}",
+        "blockEditor.perDocumentMark": "Filled per document",
         "blockEditor.placeholder": "Type / for blocks, {{ for fields, or just write",
         "blockEditor.preview": "Preview",
         "blockEditor.previewEditingStatus": "Previewing {record}: as it will print",
