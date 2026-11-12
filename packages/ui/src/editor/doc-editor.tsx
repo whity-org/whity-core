@@ -1146,7 +1146,7 @@ function DocEditor({
                 style={themeStyle(theme)}
               >
                 <h1
-                  className="wy-sheet__title m-0 mb-1.5 font-display text-[1.9375rem] leading-[1.15] font-semibold tracking-[-0.01em]"
+                  className="wy-sheet__title m-0 mb-1.5 text-[1.9375rem] leading-[1.15] font-semibold tracking-[-0.01em]"
                   dir="auto"
                 >
                   {doc.title || <span className="text-muted-foreground">{labels.untitled}</span>}

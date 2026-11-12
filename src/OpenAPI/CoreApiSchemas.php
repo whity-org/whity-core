@@ -16302,6 +16302,11 @@ final class CoreApiSchemas
             $properties['accentUse'] = ['type' => 'string', 'enum' => ['title', 'title-and-headings'], 'description' => 'Where the print colour is used: `title` only, or `title-and-headings` (H1 to H3 too).'];
         }
         $properties['letterhead'] = $letterhead;
+        if (!$overridesOnly) {
+            // E.46 and E.47 (editor M8).
+            $properties['titleFace'] = ['type' => 'string', 'enum' => ['readex', 'noto'], 'description' => 'The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).'];
+            $properties['largePrint'] = ['type' => 'boolean', 'description' => 'Large print: an 11pt body in print, with headings scaled by the same steps.'];
+        }
 
         $schema = ['type' => 'object', 'additionalProperties' => false, 'properties' => $properties];
         if ($complete) {

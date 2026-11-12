@@ -75,13 +75,31 @@ export function themedLetterhead(
 }
 
 /**
+ * The type options a resolved theme carries beside the contract's tokens
+ * (E.46, E.47). The server sends them; the contract file follows the design
+ * handoff, which doesn't list them yet.
+ */
+export type ThemeTypeOptions = { titleFace?: "readex" | "noto"; largePrint?: boolean }
+
+/**
  * The theme's colours as the `--doc-*` variables the page view and sheet read
  * (E.11): `--doc-accent` on paper, `--doc-accent-on-dark` for the continuous
- * sheet's title in dark mode.
+ * sheet's title in dark mode, and `--doc-title-font` when the theme sets the
+ * title in the body face (E.46).
  */
 export function themeStyle(theme: ResolvedThemeTokens | null | undefined): React.CSSProperties | undefined {
   if (!theme) return undefined
-  return { "--doc-accent": theme.accent, "--doc-accent-on-dark": theme.accentOnDark } as React.CSSProperties
+  const options = theme as ResolvedThemeTokens & ThemeTypeOptions
+  return {
+    "--doc-accent": theme.accent,
+    "--doc-accent-on-dark": theme.accentOnDark,
+    ...(options.titleFace === "noto" ? { "--doc-title-font": "var(--font-sans)" } : {}),
+  } as React.CSSProperties
+}
+
+/** E.47: whether the theme prints large (the page view scales its print sizes to match). */
+export function largePrint(theme: ResolvedThemeTokens | null | undefined): boolean {
+  return (theme as (ResolvedThemeTokens & ThemeTypeOptions) | null | undefined)?.largePrint === true
 }
 
 /** The letterhead's mark at `size`, as the theme's logo shape asks. */
@@ -289,6 +307,7 @@ function PageView({
       <div
         className="wy-pv__stack light"
         data-accent-use={theme?.accentUse}
+        data-large-print={largePrint(theme) || undefined}
         style={{ ...themeStyle(theme), height: pages * PAGE.height + (pages - 1) * PAGE.gap }}
       >
         {Array.from({ length: pages }, (_, i) => (
