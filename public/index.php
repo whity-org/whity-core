@@ -5786,6 +5786,7 @@ $agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
+$router->register('POST', '/api/me/agent-proposals/bulk-approve',        [$agentProposalsHandler, 'bulkApprove'], null);
 // WHIT-872 (H.2): every inbox source and the caller's proposals in one list, oldest
 // first. Session-gated and self-scoped like the two surfaces it reads.
 $meWaitingHandler = new \Whity\Api\MeWaitingApiHandler($inboxSourceRegistry, $agentProposals, $agentAssignments);
