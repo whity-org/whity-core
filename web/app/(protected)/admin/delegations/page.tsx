@@ -17,7 +17,10 @@ import { useTranslation } from '@whity/features/i18n';
 import { CreateDelegationModal } from './create-modal';
 import { roleLabel } from '@whity/features/roles';
 import { permissionInWords } from './permission-words';
-import type { Delegation } from './types';
+import type { Delegation, UserOption } from './types';
+import { AwayCard, type AwayPeriod, type AwayPerson } from './away-card';
+import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
+import { useAuth } from '@/lib/auth-context';
 
 /**
  * Row view-model for the delegations table. Display strings are precomputed so
@@ -36,7 +39,9 @@ interface DelegationRow {
   grantedAt: string | null;
   until: string;
   status: string;
-  source: Delegation;
+  /** A permission delegation, or an "I'm away" period (OR.1). */
+  source: Delegation | null;
+  away?: AwayPeriod;
 }
 
 export default function DelegationsPage() {
@@ -47,7 +52,11 @@ export default function DelegationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
 
+  const { apiClient } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  // OR.1: "I'm away" periods sit in the same list, in names.
+  const [awayPeriods, setAwayPeriods] = useState<AwayPeriod[]>([]);
+  const [people, setPeople] = useState<AwayPerson[]>([]);
   // Ended delegations stay listed under All, for the record.
   const [showAll, setShowAll] = useState(false);
   const dates = useDateDisplay();
@@ -98,15 +107,29 @@ export default function DelegationsPage() {
     }
   }, [addToast, t, showAll]);
 
+  const fetchAway = useCallback(async () => {
+    const response = await apiClient('/api/v1/away-periods');
+    const body = (await response.json().catch(() => null)) as { data?: AwayPeriod[] } | null;
+    setAwayPeriods(response.ok ? (body?.data ?? []) : []);
+  }, [apiClient]);
+
   useEffect(() => {
     void (async () => {
       await fetchDelegations();
+      await fetchAway();
     })();
-  }, [fetchDelegations]);
+  }, [fetchDelegations, fetchAway]);
+
+  useEffect(() => {
+    void (async () => {
+      const result = await fetchAllPagesTyped<UserOption>((query) => api.GET('/api/v1/users', { params: { query } }));
+      setPeople(result.items.filter((u) => typeof u.name === 'string' && u.name !== '').map((u) => ({ id: u.id, name: u.name })));
+    })();
+  }, []);
 
   const rows: DelegationRow[] = useMemo(
     () =>
-      delegations.map((d) => ({
+      delegations.map((d): DelegationRow => ({
         id: d.id,
         permission: d.permission,
         grantor: d.grantorName ?? t('delegations.grantee.user', 'A person'),
@@ -132,8 +155,37 @@ export default function DelegationsPage() {
               ? t('delegations.status.ended', 'Ended')
               : t('delegations.status.active', 'Active'),
         source: d,
-      })),
-    [delegations, t, dates]
+      })).concat(
+        awayPeriods
+          .filter((a) => showAll || a.status !== 'ended')
+          .map((a): DelegationRow => ({
+            id: -a.id,
+            permission: a.covers
+              .map((cover) =>
+                cover === 'flows'
+                  ? t('away.cover.flows', 'Approvals in flows')
+                  : cover === 'proposals'
+                    ? t('away.cover.proposals', "Your agents' proposals")
+                    : t('away.cover.documents', 'Documents to sign'),
+              )
+              .join(', '),
+            grantor: a.profile.name ?? t('delegations.grantee.user', 'A person'),
+            grantee: a.delegate.name,
+            granteeIsRole: false,
+            scope: t('away.row.scope', 'While away'),
+            grantedAt: a.createdAt,
+            until: [dates.date(a.startsOn), dates.date(a.backOn)].filter(Boolean).join(' – '),
+            status:
+              a.status === 'starting'
+                ? t('away.status.starting', 'Starting')
+                : a.status === 'in_force'
+                  ? t('away.status.inForce', 'In force')
+                  : t('delegations.status.ended', 'Ended'),
+            source: null,
+            away: a,
+          })),
+      ),
+    [delegations, awayPeriods, showAll, t, dates]
   );
 
   const columns: DataTableColumn<DelegationRow>[] = [
@@ -169,31 +221,41 @@ export default function DelegationsPage() {
       accessorKey: 'permission',
       header: t('delegations.table.permission', 'What'),
       enableSorting: true,
+      size: 200,
+      className: 'whitespace-normal',
       cell: (row) => (
-        <div>
-          <p className="text-foreground">{permissionInWords(row.permission)}</p>
-          <TechnicalDetails>
-            <p className="font-mono text-xs text-muted-foreground">{row.permission}</p>
-          </TechnicalDetails>
-        </div>
+        row.away ? (
+          <p className="text-foreground">{row.permission}</p>
+        ) : (
+          <div>
+            <p className="text-foreground">{permissionInWords(row.permission)}</p>
+            <p className="text-sm text-muted-foreground">{row.scope}</p>
+            <TechnicalDetails>
+              <p className="font-mono text-xs text-muted-foreground">{row.permission}</p>
+            </TechnicalDetails>
+          </div>
+        )
       ),
     },
-    { accessorKey: 'scope', header: t('delegations.table.scope', 'Where'), enableSorting: true },
-    { accessorKey: 'until', header: t('delegations.table.until', 'Until'), enableSorting: true },
-    ...dates.dateColumns<DelegationRow>([
-      {
-        id: 'grantedAt',
-        header: t('delegations.table.grantedAt', 'Since'),
-        value: (row) => row.grantedAt,
-        enableSorting: true,
-      },
-    ]),
+    { accessorKey: 'until', header: t('delegations.table.when', 'When'), enableSorting: true },
     {
       accessorKey: 'status',
       header: t('delegations.table.status', 'Status'),
       enableSorting: true,
       cell: (row) => (
-        <Badge variant={row.source.status === 'active' ? 'success' : 'secondary'}>{row.status}</Badge>
+        <Badge
+          variant={
+            row.away
+              ? row.away.status === 'in_force'
+                ? 'success'
+                : 'outline'
+              : row.source?.status === 'active'
+                ? 'success'
+                : 'secondary'
+          }
+        >
+          {row.status}
+        </Badge>
       ),
     },
   ];
@@ -234,9 +296,10 @@ export default function DelegationsPage() {
 
   const rowActions = (row: DelegationRow) => {
     // Ended delegations stay listed, for the record, with nothing left to do.
-    if (row.source.status !== 'active') return null;
+    const source = row.source;
+    if (source === null || source.status !== 'active') return null;
     return (
-      <Button variant="outline" size="sm" onClick={() => void handleRevoke(row.source)}>
+      <Button variant="outline" size="sm" onClick={() => void handleRevoke(source)}>
         {t('delegations.action.revoke', 'Revoke')}
       </Button>
     );
@@ -257,27 +320,20 @@ export default function DelegationsPage() {
     <div className="space-y-8">
       <AdminHeader
         title={t('delegations.title', 'Delegations')}
-        description={
-          isForbidden
-            ? t(
-                'delegations.description.short',
-                'Delegate a subset of your permissions to roles or users.'
-              )
-            : t(
-                'delegations.description.unit',
-                'Delegate a subset of your permissions to roles or users, across the workspace or in one unit.'
-              )
-        }
+        description={t('delegations.description.names', 'Who decides for whom, for how long.')}
         action={
           isForbidden ? undefined : (
-            <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
+            <Button variant="outline" onClick={() => setIsCreateOpen(true)} className="gap-2">
               <IconPlus size={18} />
-              {t('delegations.header.create', 'Delegate')}
+              {t('delegations.header.new', 'New delegation')}
             </Button>
           )
         }
       />
 
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)]">
+      <AwayCard people={people} onChanged={() => void fetchAway()} />
+      <div className="min-w-0 space-y-4">
       {!isForbidden && (
         <ToggleGroup
           required
@@ -320,6 +376,8 @@ export default function DelegationsPage() {
           ),
         }}
       />
+      </div>
+      </div>
 
       <CreateDelegationModal
         // Remount on each open so the form resets to its defaults without a
