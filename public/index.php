@@ -753,6 +753,17 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CALENDAR_READ,
     ];
     $items[] = [
+        'id' => 'contacts',
+        'label' => 'Contacts',
+        'href' => '/contacts',
+        'icon' => 'customer',
+        'group' => 'people',
+        // Customers and suppliers (WHIT-955, design 3.3 A8), after the team's own pages.
+        'order' => 8,
+        // Mirrors GET /api/contacts.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CONTACTS_READ,
+    ];
+    $items[] = [
         'id' => 'users',
         'label' => 'Users',
         'href' => '/admin/users',
