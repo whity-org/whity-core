@@ -12,6 +12,7 @@ import type {
 } from '@whity/features/document-editor';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
+import { agentsAdapter } from './agents';
 import { collabAdapter } from './collab';
 
 /**
@@ -189,6 +190,8 @@ export const documentSourcesAdapter: DocumentEditorAdapter = {
   loadServices,
   // M5: comments and suggestions.
   ...collabAdapter,
+  // M6: Ask an agent.
+  ...agentsAdapter,
 
   async loadTemplate(recordType): Promise<TemplateSetup> {
     const [{ data, response }, logos] = await Promise.all([
