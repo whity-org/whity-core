@@ -3700,6 +3700,8 @@ $documentIssuing = new \Whity\Core\Document\Issuing\DocumentIssuing(
     $hookManager,
     $documentRepository,
     $documentArtifactRepository,
+    // Editor M7 (E.38): a one-off document freezes its synced blocks when issued.
+    new \Whity\Core\Document\SavedBlock\SavedBlockExpander(new \Whity\Core\Document\SavedBlock\SavedBlockRepository($db->getPdo())),
 );
 $documentPublishingHandler = new \Whity\Api\DocumentPublishingApiHandler(
     $documentSourcesHandler,
@@ -3719,6 +3721,8 @@ $documentPublishingHandler = new \Whity\Api\DocumentPublishingApiHandler(
     $documentThemeRepository,
     $documentCollab,
     new \Whity\Core\Document\Print\WorkspaceName($db->getPdo()),
+    // Editor M7 (E.38): drafts print synced blocks as the library has them; publishing freezes them.
+    new \Whity\Core\Document\SavedBlock\SavedBlockRepository($db->getPdo()),
 );
 $router->register('GET',  '/api/document-fields',                         [$documentPublishingHandler, 'fields'],       null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/document-fields/records',                 [$documentPublishingHandler, 'records'],      null, null, CorePermissions::DOCUMENTS_READ);

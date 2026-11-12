@@ -37,6 +37,8 @@ use Whity\Storage\StorageDriverInterface;
 use Whity\Storage\TenantRoutingStorageDriver;
 use Whity\Storage\TenantStorageConfigRepository;
 use Whity\Storage\TenantStorageResolver;
+use Whity\Core\Document\SavedBlock\SavedBlockExpander;
+use Whity\Core\Document\SavedBlock\SavedBlockRepository;
 
 /**
  * The document stack of a process with no request (#1151): `queue:work` and
@@ -154,6 +156,8 @@ final class WorkerDocumentParts
                 $this->hooks,
                 $this->documents(),
                 $this->artifacts(),
+                // Editor M7 (E.38): synced saved blocks frozen when a one-off document is issued.
+                new SavedBlockExpander(new SavedBlockRepository($this->pdo)),
             );
         }
 
