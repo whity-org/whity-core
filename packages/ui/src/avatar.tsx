@@ -1,7 +1,36 @@
-import { avatarPattern } from "./avatar-pattern"
+import { avatarPatternShapes } from "./avatar-pattern"
 import { Icon } from "./icon"
 import { Mark } from "./mark"
 import { cn } from "./utils"
+
+/** The seeded pattern (M.34) as SVG elements: no markup is ever injected. */
+function AvatarPattern({ seed, hue }: { seed: string; hue?: number }) {
+  const { background, rotate, shapes } = avatarPatternShapes(seed, hue)
+  return (
+    <svg data-slot="avatar-pattern" viewBox="0 0 40 40" aria-hidden="true" className="block size-full rounded-full">
+      <rect width="40" height="40" fill={background} />
+      <g transform={`rotate(${rotate} 20 20)`}>
+        {shapes.map((shape, index) =>
+          shape.kind === "circle" ? (
+            <circle key={index} cx={shape.cx} cy={shape.cy} r={shape.r} fill={shape.fill} />
+          ) : (
+            <rect
+              key={index}
+              x={shape.x}
+              y={shape.y}
+              width={shape.width}
+              height={shape.height}
+              rx={shape.rx}
+              fill={shape.fill}
+              {...(shape.dash ? { stroke: shape.stroke, strokeWidth: 2.6, strokeDasharray: "4.5 3" } : {})}
+              {...(shape.rotate != null ? { transform: `rotate(${shape.rotate} 20 24)` } : {})}
+            />
+          )
+        )}
+      </g>
+    </svg>
+  )
+}
 
 export type ActorKind = "person" | "agent" | "system"
 
@@ -76,12 +105,7 @@ function Avatar({
       ) : src ? (
         <img src={src} alt="" className="size-full rounded-full object-cover" />
       ) : pattern != null ? (
-        <span
-          data-slot="avatar-pattern"
-          className="block size-full overflow-hidden rounded-full [&>svg]:block [&>svg]:size-full"
-          // Built only from numbers derived from the seed (avatar-pattern.ts), never from text.
-          dangerouslySetInnerHTML={{ __html: avatarPattern(pattern, hue) }}
-        />
+        <AvatarPattern seed={pattern} hue={hue} />
       ) : (
         initials(name)
       )}

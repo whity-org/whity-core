@@ -31,7 +31,7 @@ describe('avatar pattern (M.34)', () => {
   it('shows the pattern for a person without a photo, and keeps the name for assistive technology', () => {
     render(<Avatar name="Awss Haddad" pattern="awss" hue={255} />);
     const avatar = screen.getByRole('img', { name: 'Awss Haddad' });
-    expect(avatar.querySelector('[data-slot="avatar-pattern"] svg')).not.toBeNull();
+    expect(avatar.querySelector('svg[data-slot="avatar-pattern"]')).not.toBeNull();
     expect(avatar).not.toHaveTextContent('AH');
   });
 
