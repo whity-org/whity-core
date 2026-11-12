@@ -168,7 +168,7 @@ Each lane owns its files. The columns say what each one may touch, so lanes that
 
 ### Size
 
-About 63 pull requests: 4 foundation, 43 in whity-core lanes (with team chat and the calendar extras), 8+ for Operations in the Front Office plugin, 3 for subscriptions in Whity Pay, 7 in whity-web and 2 in whity-id. With eleven lanes at once after the foundation, the longest chains are Operations (8+, serial) and Contacts (6, serial). **0.2.29 is released when every lane is green, with no fixed date (owner, 12 Nov).**
+About 63 pull requests: 4 foundation, 43 in whity-core lanes (with team chat and the calendar extras), 8+ for Operations in the Front Office plugin, 3 for subscriptions in Whity Pay, 7 in whity-web and 2 in whity-id. With eleven lanes at once after the foundation, the longest chains are Operations (8+, serial) and Contacts (6, serial). **0.2.29 is released when every lane is green, with no fixed date (owner, 12 Nov).** **No switch: the redesign ships as it lands** (owner, 12 Nov); every develop merge deploys to app.whity.dev within minutes (#1832), so each merge must leave the app working. **Taskaat is changed directly** by pull requests on its repository (owner, 12 Nov), so A10 adds the structured results, members and Board statuses it needs there.
 
 ## Milestones
 

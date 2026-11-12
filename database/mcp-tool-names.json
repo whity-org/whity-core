@@ -15,6 +15,10 @@
     "en": "Remove the default logo or brand image for all workspaces",
     "ar": "إزالة شعار أو صورة افتراضية لكل المساحات"
   },
+  "delete_api_calendar_bookings_id_check_in": {
+    "en": "Undo a check-in",
+    "ar": "إلغاء تسجيل الوصول"
+  },
   "delete_api_calendar_events_id": {
     "en": "Remove a calendar event",
     "ar": "حذف حدث من التقويم"
@@ -190,6 +194,30 @@
   "delete_api_users_id_memberships_membershipid": {
     "ar": "سحب دور إضافي من مستخدم"
   },
+  "document_agent_request_update": {
+    "en": "Report how a document request is going",
+    "ar": "الإبلاغ عن سير طلب مستند"
+  },
+  "document_agent_requests_next": {
+    "en": "Pick up the next document request your person asked of you",
+    "ar": "استلام طلب المستند التالي الذي طلبه منك صاحبك"
+  },
+  "document_comment_reply": {
+    "en": "Reply in a comment thread on a document",
+    "ar": "الرد في سلسلة تعليقات على مستند"
+  },
+  "document_read": {
+    "en": "Read a document as blocks, with its open comments and suggestions",
+    "ar": "قراءة مستند كتلًا مع تعليقاته واقتراحاته المفتوحة"
+  },
+  "document_suggest_blocks": {
+    "en": "Suggest new blocks in a document",
+    "ar": "اقتراح كتل جديدة في مستند"
+  },
+  "document_suggest_rewrite": {
+    "en": "Suggest replacing text in a document",
+    "ar": "اقتراح استبدال نص في مستند"
+  },
   "get_api_2fa_policies": {
     "en": "List your workspace's two-step sign-in rules",
     "ar": "عرض قواعد التحقق بخطوتين"
@@ -235,6 +263,10 @@
     "en": "See the audit log of your workspace",
     "ar": "عرض سجل التدقيق"
   },
+  "get_api_away_periods": {
+    "en": "List who is away and who decides for them",
+    "ar": "عرض الغائبين ومن يقرر نيابةً عنهم"
+  },
   "get_api_billing_invoices": {
     "en": "List your workspace's invoices",
     "ar": "عرض الفواتير"
@@ -279,6 +311,10 @@
     "en": "List calendar events",
     "ar": "عرض أحداث التقويم"
   },
+  "get_api_calendar_rooms": {
+    "en": "List rooms",
+    "ar": "عرض الغرف"
+  },
   "get_api_calendar_services": {
     "en": "List services",
     "ar": "عرض الخدمات"
@@ -302,6 +338,46 @@
   "get_api_calendar_time_off": {
     "en": "List time off and extra hours",
     "ar": "عرض الإجازات والساعات الإضافية"
+  },
+  "get_api_calendar_today": {
+    "en": "Today at a glance",
+    "ar": "نظرة على اليوم"
+  },
+  "get_api_chat_chats": {
+    "en": "List the team chats you are in",
+    "ar": "عرض محادثات الفريق التي أنت فيها"
+  },
+  "get_api_chat_chats_id": {
+    "en": "Read a team chat and who is in it",
+    "ar": "قراءة محادثة فريق ومن فيها"
+  },
+  "get_api_chat_chats_id_messages": {
+    "en": "Read a team chat's messages",
+    "ar": "قراءة رسائل محادثة فريق"
+  },
+  "get_api_chat_directory": {
+    "en": "Find people and agents to mention",
+    "ar": "البحث عن أشخاص ووكلاء للإشارة إليهم"
+  },
+  "get_api_contacts": {
+    "en": "List customers and suppliers",
+    "ar": "عرض العملاء والموردين"
+  },
+  "get_api_contacts_id": {
+    "en": "Get a customer or supplier",
+    "ar": "عرض عميل أو مورد"
+  },
+  "get_api_contacts_imports": {
+    "en": "List contact imports",
+    "ar": "عرض عمليات استيراد جهات الاتصال"
+  },
+  "get_api_contacts_imports_id": {
+    "en": "Get a contact import",
+    "ar": "عرض عملية استيراد"
+  },
+  "get_api_contacts_tags": {
+    "en": "List the tags on contacts",
+    "ar": "عرض وسوم جهات الاتصال"
   },
   "get_api_convening_bodies": {
     "en": "List the bodies that hold meetings",
@@ -369,6 +445,10 @@
   "get_api_document_sources_id": {
     "en": "Open a document in the editor",
     "ar": "فتح مستند في المحرر"
+  },
+  "get_api_document_sources_id_agent_requests": {
+    "en": "Your agent requests on a document",
+    "ar": "طلباتك من الوكلاء على مستند"
   },
   "get_api_document_sources_id_changes": {
     "en": "See what changed in a document",
@@ -906,9 +986,17 @@
     "en": "Change a calendar event",
     "ar": "تعديل حدث في التقويم"
   },
+  "patch_api_calendar_rooms_id": {
+    "en": "Change a room",
+    "ar": "تعديل غرفة"
+  },
   "patch_api_calendar_services_id": {
     "en": "Change a service",
     "ar": "تعديل خدمة"
+  },
+  "patch_api_contacts_id": {
+    "en": "Change a customer or supplier",
+    "ar": "تعديل عميل أو مورد"
   },
   "patch_api_convening_bodies_id": {
     "en": "Rename a body, move it, retire it or bring it back",
@@ -1015,16 +1103,24 @@
     "ar": "إلزام التحقق بخطوتين"
   },
   "post_api_2fa_recovery_force_reset": {
-    "en": "Turn off a user's two-step sign-in without a request",
-    "ar": "إلغاء التحقق بخطوتين لمستخدم مباشرة"
+    "en": "Start a two-step reset for a user, which a second admin then approves",
+    "ar": "بدء إعادة تعيين التحقق بخطوتين لمستخدم ليوافق عليها مسؤول ثانٍ"
   },
   "post_api_2fa_recovery_id_approve": {
     "en": "Approve recovery: turn off the user's two-step sign-in and send a password reset link",
     "ar": "الموافقة على استعادة التحقق بخطوتين"
   },
+  "post_api_2fa_recovery_id_checks": {
+    "en": "Record a check that a two-step reset is really from the person",
+    "ar": "تسجيل تحقق من أن طلب إعادة تعيين التحقق بخطوتين من صاحبه فعلاً"
+  },
   "post_api_2fa_recovery_id_reject": {
     "en": "Reject a two-step sign-in recovery request",
     "ar": "رفض طلب استعادة التحقق بخطوتين"
+  },
+  "post_api_2fa_recovery_identity_check": {
+    "en": "Start an admin's check that it's them before approving a two-step reset",
+    "ar": "بدء تحقق المسؤول من هويته قبل الموافقة على إعادة تعيين التحقق بخطوتين"
   },
   "post_api_affiliates": {
     "en": "Create an affiliate",
@@ -1077,17 +1173,33 @@
     "en": "Book a service for a customer",
     "ar": "حجز خدمة لعميل"
   },
+  "post_api_calendar_bookings_id_accept": {
+    "en": "Accept a booking request",
+    "ar": "قبول طلب حجز"
+  },
   "post_api_calendar_bookings_id_cancel": {
     "en": "Cancel a booking",
     "ar": "إلغاء حجز"
+  },
+  "post_api_calendar_bookings_id_check_in": {
+    "en": "Check a customer in",
+    "ar": "تسجيل وصول عميل"
   },
   "post_api_calendar_bookings_id_move": {
     "en": "Move a booking",
     "ar": "تغيير موعد حجز"
   },
+  "post_api_calendar_bookings_id_suggest": {
+    "en": "Suggest another time for a request",
+    "ar": "اقتراح موعد آخر لطلب"
+  },
   "post_api_calendar_events": {
     "en": "Add a calendar event",
     "ar": "إضافة حدث إلى التقويم"
+  },
+  "post_api_calendar_rooms": {
+    "en": "Add a room",
+    "ar": "إضافة غرفة"
   },
   "post_api_calendar_services": {
     "en": "Add a service",
@@ -1100,6 +1212,46 @@
   "post_api_calendar_time_off": {
     "en": "Add time off or extra hours",
     "ar": "إضافة إجازة أو ساعات إضافية"
+  },
+  "post_api_chat_chats_id_messages": {
+    "en": "Write in a team chat",
+    "ar": "الكتابة في محادثة فريق"
+  },
+  "post_api_chat_chats_id_proposals": {
+    "en": "Put your proposal in a team chat",
+    "ar": "وضع اقتراحك في محادثة فريق"
+  },
+  "post_api_chat_chats_id_read": {
+    "en": "Mark a team chat read",
+    "ar": "تعليم محادثة فريق كمقروءة"
+  },
+  "post_api_contacts": {
+    "en": "Add a customer or supplier",
+    "ar": "إضافة عميل أو مورد"
+  },
+  "post_api_contacts_id_archive": {
+    "en": "Archive a customer or supplier",
+    "ar": "أرشفة عميل أو مورد"
+  },
+  "post_api_contacts_id_restore": {
+    "en": "Restore an archived contact",
+    "ar": "استعادة جهة اتصال مؤرشفة"
+  },
+  "post_api_contacts_imports": {
+    "en": "Upload a spreadsheet of contacts",
+    "ar": "رفع جدول جهات اتصال"
+  },
+  "post_api_contacts_imports_id_check": {
+    "en": "Check what an import will do",
+    "ar": "التحقق مما سيفعله الاستيراد"
+  },
+  "post_api_contacts_imports_id_run": {
+    "en": "Run a contact import",
+    "ar": "تنفيذ استيراد جهات الاتصال"
+  },
+  "post_api_contacts_imports_id_undo": {
+    "en": "Undo a contact import",
+    "ar": "التراجع عن استيراد جهات الاتصال"
   },
   "post_api_convening_bodies": {
     "en": "Set up a body that holds meetings",
@@ -1129,6 +1281,10 @@
     "en": "Delegate some of your permissions to someone",
     "ar": "تفويض بعض صلاحياتك لشخص آخر"
   },
+  "post_api_document_agent_requests_rid_stop": {
+    "en": "Stop an agent request",
+    "ar": "إيقاف طلب من وكيل"
+  },
   "post_api_document_collections": {
     "en": "Create a document collection of your own",
     "ar": "إنشاء مجموعة مستندات خاصة بك"
@@ -1139,6 +1295,10 @@
   "post_api_document_sources": {
     "en": "Create a document in the editor",
     "ar": "إنشاء مستند في المحرر"
+  },
+  "post_api_document_sources_id_agent_requests": {
+    "en": "Ask an agent to work on a document",
+    "ar": "طلب العمل على مستند من وكيل"
   },
   "post_api_document_sources_id_comments": {
     "en": "Start a comment on a document",
@@ -1633,5 +1793,73 @@
   "put_api_tenants_id_subscription": {
     "en": "Set a workspace's subscription or apply a plan",
     "ar": "تعيين اشتراك مساحة عمل أو باقتها"
+  },
+  "taskaat_add_milestone": {
+    "en": "Add a milestone to a task",
+    "ar": "إضافة مرحلة إلى مهمة"
+  },
+  "taskaat_complete_milestone": {
+    "en": "Tick a task's milestone",
+    "ar": "تعليم مرحلة من مهمة كمنجزة"
+  },
+  "taskaat_complete_task": {
+    "en": "Mark a task done",
+    "ar": "تعليم مهمة كمنجزة"
+  },
+  "taskaat_create_kb_entry": {
+    "en": "Record a decision",
+    "ar": "تسجيل قرار"
+  },
+  "taskaat_create_task": {
+    "en": "Create a task in Taskaat",
+    "ar": "إنشاء مهمة في Taskaat"
+  },
+  "taskaat_get_project": {
+    "en": "Read a Taskaat board",
+    "ar": "قراءة لوحة في Taskaat"
+  },
+  "taskaat_get_task": {
+    "en": "Read a task in Taskaat",
+    "ar": "قراءة مهمة في Taskaat"
+  },
+  "taskaat_get_task_activity": {
+    "en": "See what happened on a task",
+    "ar": "عرض ما جرى على مهمة"
+  },
+  "taskaat_get_task_gate_history": {
+    "en": "See a task's review verdicts",
+    "ar": "عرض قرارات مراجعة مهمة"
+  },
+  "taskaat_list_kb_entries": {
+    "en": "List a board's decisions",
+    "ar": "عرض قرارات لوحة"
+  },
+  "taskaat_list_projects": {
+    "en": "List the Taskaat boards",
+    "ar": "عرض لوحات Taskaat"
+  },
+  "taskaat_list_tasks": {
+    "en": "List tasks in Taskaat",
+    "ar": "عرض المهام في Taskaat"
+  },
+  "taskaat_set_output_contract": {
+    "en": "Write a task's done-when check",
+    "ar": "كتابة شرط إنجاز مهمة"
+  },
+  "taskaat_store_artifact": {
+    "en": "Attach evidence to a task",
+    "ar": "إرفاق دليل بمهمة"
+  },
+  "taskaat_submit_task_review": {
+    "en": "Accept a task or send it back",
+    "ar": "قبول مهمة أو إعادتها"
+  },
+  "taskaat_uncomplete_task": {
+    "en": "Reopen a done task",
+    "ar": "إعادة فتح مهمة منجزة"
+  },
+  "taskaat_update_task": {
+    "en": "Change a task in Taskaat",
+    "ar": "تعديل مهمة في Taskaat"
   }
 }

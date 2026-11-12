@@ -116,6 +116,14 @@ it('the label sheet takes the same theme', () => {
   expect(stack.dataset.accentUse).toBe('title-and-headings');
 });
 
+it('sets the title in the body face only when the theme asks (E.46)', () => {
+  const base = { accent: '#B74C05', accentOnDark: '#F0A070', accentUse: 'title' as const, letterhead: { logo: 'wide' as const, lines: [] } };
+  const noto = themeStyle({ ...base, titleFace: 'noto' } as typeof base) as Record<string, string>;
+  expect(noto['--doc-title-font']).toBe('var(--font-sans)');
+  const readex = themeStyle({ ...base, titleFace: 'readex' } as typeof base) as Record<string, string>;
+  expect(readex['--doc-title-font']).toBeUndefined();
+});
+
 it('themeStyle is nothing without a theme', () => {
   expect(themeStyle(null)).toBeUndefined();
 });
@@ -125,6 +133,12 @@ describe('editor.css', () => {
 
   it('gives H1-H3 the print colour in the page view with title-and-headings (E.45)', () => {
     expect(css).toMatch(/\.wy-pv__stack\[data-accent-use="title-and-headings"\] \.wy-doc :is\(h2, h3, h4\) \{ color: var\(--doc-accent, var\(--brand\)\); \}/);
+  });
+
+  it('reads the title face and scales the print sizes for large print (E.46, E.47)', () => {
+    expect(css).toContain('.wy-pv__title { margin: 0 0 4px; font-family: var(--doc-title-font, var(--font-display));');
+    expect(css).toContain('.wy-sheet__title { font-family: var(--doc-title-font, var(--font-display)); }');
+    expect(css).toContain('.wy-pv__stack[data-large-print] .wy-doc { font-size: calc(var(--doc-text-print-body) * 11 / 9.5); }');
   });
 
   it('keeps the continuous title the text colour in light mode and uses accentOnDark in dark (E.11)', () => {

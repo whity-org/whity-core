@@ -198,4 +198,22 @@ describe('PublicBookingScreen', () => {
     await waitFor(() => expect(asked).toHaveLength(2));
     expect(new URL(asked[1], 'http://x').searchParams.get('from')).not.toBe(new URL(asked[0], 'http://x').searchParams.get('from'));
   });
+  it('sends a request for a service that needs approval, and says the time is held (design 3.3)', async () => {
+    const requestPage = { ...page, services: [{ ...page.services[0], sends_request: true }] };
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === '/api/v1/public/booking/example-bakery') return respond(200, { data: requestPage });
+      if (url.startsWith('/api/v1/public/booking/example-bakery/slots')) return respond(200, { data: slots });
+      if (url === '/api/v1/public/booking/example-bakery/bookings' && init?.method === 'POST') {
+        return respond(201, { data: { ...booked, status: 'requested' } });
+      }
+      return respond(404, {});
+    });
+    render(<PublicBookingScreen workspace="example-bakery" />);
+    expect(await screen.findByTestId('book-service-request')).toBeInTheDocument();
+    await chooseTimeAndFill('09:30');
+    expect(screen.getByTestId('book-submit')).toHaveTextContent('Send request');
+    clock = 9_000;
+    fireEvent.click(screen.getByTestId('book-submit'));
+    expect(await screen.findByTestId('book-done')).toHaveTextContent('Request sent');
+  });
 });

@@ -137,8 +137,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Secondary fallback: force-clear a named profile's 2FA with no prior request (tenant-scoped) */
+        /** Start a two-step reset for a named profile with no prior request; it counts as the first approval (tenant-scoped) */
         post: operations["post_api_v1_2fa_recovery_force_reset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/2fa-recovery/identity-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start the admin's "confirm it's you" check: names it, and sends a code by email when that is the check */
+        post: operations["post_api_v1_2fa_recovery_identity_check"];
         delete?: never;
         options?: never;
         head?: never;
@@ -171,8 +188,28 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Clear the target profile's 2FA and send a fresh password-reset link (tenant-scoped) */
+        /**
+         * Approve a two-step reset: the first admin's approval is recorded, a second admin's clears the two-step and sends a reset link
+         * @description Two different admins must approve, and the person asking can never approve their own (AG.1). Each approval first confirms the admin is who they say with a code.
+         */
         post: operations["post_api_v1_2fa_recovery_id_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/2fa-recovery/{id}/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a check that it is really the person asking */
+        post: operations["post_api_v1_2fa_recovery_id_checks"];
         delete?: never;
         options?: never;
         head?: never;
@@ -785,6 +822,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/away-periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Everyone's "I'm away" periods, newest first */
+        get: operations["get_api_v1_away_periods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/change-plan": {
         parameters: {
             query?: never;
@@ -1233,6 +1287,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/bookings/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a customer's request; it becomes a confirmed booking */
+        post: operations["post_api_v1_calendar_bookings_id_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/bookings/{id}/cancel": {
         parameters: {
             query?: never;
@@ -1250,6 +1321,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/bookings/{id}/check-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check the customer in: they arrived */
+        post: operations["post_api_v1_calendar_bookings_id_check_in"];
+        /** Undo a check-in */
+        delete: operations["delete_api_v1_calendar_bookings_id_check_in"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/bookings/{id}/move": {
         parameters: {
             query?: never;
@@ -1261,6 +1350,26 @@ export interface paths {
         put?: never;
         /** Move a booking to another time, or another person */
         post: operations["post_api_v1_calendar_bookings_id_move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/bookings/{id}/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest another time for a customer's request
+         * @description The request moves to the new time and stays a request; the customer is emailed and takes it from their link.
+         */
+        post: operations["post_api_v1_calendar_bookings_id_suggest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1304,6 +1413,41 @@ export interface paths {
         head?: never;
         /** Change an event; fields left out keep their value */
         patch: operations["patch_api_v1_calendar_events_id"];
+        trace?: never;
+    };
+    "/api/v1/calendar/rooms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List rooms */
+        get: operations["get_api_v1_calendar_rooms"];
+        put?: never;
+        /** Add a room a service can need */
+        post: operations["post_api_v1_calendar_rooms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/rooms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a room; fields left out keep their value */
+        patch: operations["patch_api_v1_calendar_rooms_id"];
         trace?: never;
     };
     "/api/v1/calendar/services": {
@@ -1472,6 +1616,428 @@ export interface paths {
         post?: never;
         /** Remove time off or extra hours */
         delete: operations["delete_api_v1_calendar_time_off_id"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Today at a glance: booked, checked in, open requests and reminders sent */
+        get: operations["get_api_v1_calendar_today"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the team chats you are in
+         * @description Newest activity first, with unread counts and the last message. An agent sees only the chats it was added to for its person; mentions_me counts the unread lines that mention it.
+         */
+        get: operations["get_api_v1_chat_chats"];
+        put?: never;
+        /** Start a group chat, or open a direct chat with a person or one of your agents */
+        post: operations["post_api_v1_chat_chats"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/chats/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a chat: its members, what each agent may do, and its latest messages
+         * @description An agent reads only the messages from when it joined (or what the person who added it allowed).
+         */
+        get: operations["get_api_v1_chat_chats_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename a group chat or link the chat to a board, a meeting or a record */
+        patch: operations["patch_api_v1_chat_chats_id"];
+        trace?: never;
+    };
+    "/api/v1/chat/chats/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a person or an agent to a chat
+         * @description For an agent, say who it works for here, what it can read (from now on by default) and what it may do. A line in the chat tells everyone.
+         */
+        post: operations["post_api_v1_chat_chats_id_members"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/chats/{id}/members/{member}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an agent, leave a chat, or remove a person from a group you started */
+        delete: operations["delete_api_v1_chat_chats_id_members_member"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/chats/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a chat's messages
+         * @description Oldest first: those after `after` (a message id), or the page before `before`.
+         */
+        get: operations["get_api_v1_chat_chats_id_messages"];
+        put?: never;
+        /**
+         * Write in a team chat
+         * @description Mention people and agents in the chat with `mentions`. An agent writes only when it may post there; on Ask first its message waits for the person it works for.
+         */
+        post: operations["post_api_v1_chat_chats_id_messages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/chats/{id}/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put one of your waiting proposals in a chat (agents)
+         * @description Shows it as a card that only the person it waits for can approve.
+         */
+        post: operations["post_api_v1_chat_chats_id_proposals"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/chats/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a chat read up to a message */
+        post: operations["post_api_v1_chat_chats_id_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Find people and agents to add to a chat or mention */
+        get: operations["get_api_v1_chat_directory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/messages/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Let an agent's held message through (the person it works for) */
+        post: operations["post_api_v1_chat_messages_id_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/messages/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline an agent's held message (the person it works for) */
+        post: operations["post_api_v1_chat_messages_id_decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List customers and suppliers
+         * @description Sorted by name. Filter by kind, tag or a search over name, contact person, email, mobile and tax number.
+         */
+        get: operations["get_api_v1_contacts"];
+        put?: never;
+        /**
+         * Add a customer or supplier
+         * @description Needs a name. A customer unless said otherwise; it can be both. Tags are names, made on first use. When the email is the verified email of someone in the workspace, the contact is linked to them.
+         */
+        post: operations["post_api_v1_contacts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List recent contact imports */
+        get: operations["get_api_v1_contacts_imports"];
+        put?: never;
+        /**
+         * Upload a spreadsheet of contacts (Excel or CSV)
+         * @description Send `file` as multipart, or JSON with `file_name` and either `text` (a CSV's text) or `content_base64`. Whity finds the header row and suggests where each column goes. Nothing changes yet.
+         */
+        post: operations["post_api_v1_contacts_imports"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/imports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get an import: its columns, what it will do or did, and whether it can be undone */
+        get: operations["get_api_v1_contacts_imports_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/imports/{id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check an import: what will be created, updated and skipped. Nothing changes
+         * @description Rows are matched to existing contacts by `match_by` (default: tax number, then mobile, then email, whichever has a column). An update fills in what the row has and never empties a field.
+         */
+        post: operations["post_api_v1_contacts_imports_id_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/imports/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a checked import
+         * @description Works the rows out again against the contacts as they are now, and applies them in one go. Can be undone for 24 hours.
+         */
+        post: operations["post_api_v1_contacts_imports_id_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/imports/{id}/skipped.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download the rows an import skips, each with its reason */
+        get: operations["get_api_v1_contacts_imports_id_skipped_csv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/imports/{id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo an import, within 24 hours of it running
+         * @description Contacts it added are removed, contacts it changed get their earlier values back, and the tags it added come off.
+         */
+        post: operations["post_api_v1_contacts_imports_id_undo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the tags used on contacts, with how many contacts have each */
+        get: operations["get_api_v1_contacts_tags"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one customer or supplier */
+        get: operations["get_api_v1_contacts_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a customer or supplier; fields left out keep their value
+         * @description `tags`, when sent, replaces the contact's tags.
+         */
+        patch: operations["patch_api_v1_contacts_id"];
+        trace?: never;
+    };
+    "/api/v1/contacts/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive a customer or supplier
+         * @description Archived contacts leave the lists and can be restored.
+         */
+        post: operations["post_api_v1_contacts_id_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contacts/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring an archived customer or supplier back */
+        post: operations["post_api_v1_contacts_id_restore"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1760,6 +2326,66 @@ export interface paths {
         head?: never;
         /** Update an item; If-Match/baseVersion enables optimistic concurrency */
         patch: operations["patch_api_v1_demo_catalog_items_id"];
+        trace?: never;
+    };
+    "/api/v1/document-agent-requests/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pick up the next document request your person asked of you
+         * @description For agents. Returns the oldest waiting request (now running) with document_id and what to do next, or null. Then read with document_read (pass request_id), suggest, and report with document_agent_request_update.
+         */
+        post: operations["document_agent_requests_next"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-agent-requests/{rid}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report how a document request is going
+         * @description For the agent working on it. Say what you are doing now in plain words, with done and total when known; finish with done, failed (say what went wrong) or stopped. When the answer has stop: true, the person pressed Stop: report stopped and end.
+         */
+        post: operations["document_agent_request_update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-agent-requests/{rid}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop an agent request
+         * @description One nobody picked up stops at once; a running one is told on its agent's next update. Only the person who asked.
+         */
+        post: operations["post_api_v1_document_agent_requests_rid_stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/document-background-issuing": {
@@ -2059,6 +2685,90 @@ export interface paths {
         patch: operations["patch_api_v1_document_sources_id"];
         trace?: never;
     };
+    "/api/v1/document-sources/{id}/agent-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My agent requests on an editor document
+         * @description The latest 20, newest first, with what each agent is doing now. The editor polls it while one runs.
+         */
+        get: operations["get_api_v1_document_sources_id_agent_requests"];
+        put?: never;
+        /**
+         * Ask an agent to work on an editor document
+         * @description The request waits until the agent, connected over MCP for this person, picks it up with document_agent_requests_next. Whatever it does arrives as suggestions and comments a person decides on. People only: an agent never asks an agent.
+         */
+        post: operations["post_api_v1_document_sources_id_agent_requests"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-sources/{id}/agent-suggestions/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest new blocks after a block of an editor document
+         * @description A suggestion a person accepts or rejects; the draft is not changed. Records you and the person you act for. Blocks need ids the document does not use.
+         */
+        post: operations["document_suggest_blocks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-sources/{id}/agent-suggestions/rewrite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest replacing text in a block of an editor document
+         * @description The text is found by what it says (delete_text, its occurrence), not by position. A suggestion a person accepts or rejects; the draft is not changed.
+         */
+        post: operations["document_suggest_rewrite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-sources/{id}/agent-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read an editor document as blocks, with its open comments and suggestions
+         * @description Every block carries its id, which document_suggest_rewrite and document_suggest_blocks anchor to. An agent reads the draft when it passes the request_id it is working on, and the published version otherwise (409 not_published when there is none).
+         */
+        get: operations["document_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/document-sources/{id}/changes": {
         parameters: {
             query?: never;
@@ -2137,6 +2847,26 @@ export interface paths {
          * @description Recorded in the audit log. Reopening an open thread changes nothing.
          */
         post: operations["post_api_v1_document_sources_id_comments_tid_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-sources/{id}/comments/{tid}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reply in a comment thread on an editor document
+         * @description Plain text, optionally naming the suggestions the reply made. Records you and the person you act for.
+         */
+        post: operations["document_comment_reply"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4287,6 +5017,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/agent-proposals/bulk-approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve several ordinary proposals together
+         * @description Only Ordinary (tier 1) proposals are approved; each runs, is recorded and can be undone on its own. Check first and Needs verifying ones are never approved here and come back under refused.
+         */
+        post: operations["post_api_v1_me_agent_proposals_bulk_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/agent-proposals/{id}/approve": {
         parameters: {
             query?: never;
@@ -4438,6 +5188,28 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/away": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your "I'm away", or null */
+        get: operations["get_api_v1_me_away"];
+        /**
+         * Hand your decisions to someone while you're away
+         * @description Replaces any away period you had. In force from startsOn up to backOn.
+         */
+        put: operations["put_api_v1_me_away"];
+        post?: never;
+        /** Back early: end your away period at once */
+        delete: operations["delete_api_v1_me_away"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6854,6 +7626,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/bookings/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take the time the business suggested for a request (public); the link changes and the new one is emailed */
+        post: operations["post_api_v1_public_bookings_token_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/bookings/{token}/cancel": {
         parameters: {
             query?: never;
@@ -7895,6 +8684,70 @@ export interface paths {
         head?: never;
         /** Rename a tag */
         patch: operations["patch_api_v1_tags_id"];
+        trace?: never;
+    };
+    "/api/v1/taskaat/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Begin connecting this workspace to Taskaat
+         * @description People only, never an agent. Registers Whity with Taskaat (OAuth dynamic client registration, PKCE) and returns Taskaat's consent page to send the person to. Taskaat returns them to /tasks/connect.
+         */
+        post: operations["post_api_v1_taskaat_connect"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/taskaat/connect/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish connecting with the code Taskaat sent back
+         * @description Single use, by the person who started it. The tokens are kept encrypted and never returned.
+         */
+        post: operations["post_api_v1_taskaat_connect_complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/taskaat/connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether this workspace is connected to Taskaat
+         * @description Tasks and boards live in the workspace's Taskaat (T.3). Never returns a token.
+         */
+        get: operations["get_api_v1_taskaat_connection"];
+        put?: never;
+        post?: never;
+        /**
+         * Disconnect this workspace from Taskaat
+         * @description Forgets the tokens. To revoke them in Taskaat too, remove Whity from Taskaat's connected apps.
+         */
+        delete: operations["delete_api_v1_taskaat_connection"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/tenants": {
@@ -9155,6 +10008,8 @@ export interface components {
                 /** @description False when you cannot read this document yourself, so its name is withheld */
                 readable: boolean;
             }[];
+            /** @description Whether the person it acts for hears by email when something waits for them (A12) */
+            notifyByEmail: boolean;
         };
         AgentAction: {
             id: number;
@@ -9265,6 +10120,8 @@ export interface components {
             };
             /** @description Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access. */
             mayRead?: number[];
+            /** @description Email the person it acts for when something waits for them: at most one an hour, and the email only opens Whity */
+            notifyByEmail?: boolean;
             /** @description Start from this preset; fields sent override its own */
             presetKey?: string;
         };
@@ -9338,6 +10195,8 @@ export interface components {
             };
             /** @description Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access. */
             mayRead?: number[];
+            /** @description Email the person it acts for when something waits for them: at most one an hour, and the email only opens Whity */
+            notifyByEmail?: boolean;
         };
         AgentPreset: {
             key: string;
@@ -9377,6 +10236,8 @@ export interface components {
             /** @enum {string} */
             status: "waiting" | "approved" | "declined" | "expired" | "undone";
             tool: string;
+            /** @enum {integer} */
+            tier: 1 | 2 | 3;
             summary: string;
             arguments: {
                 [key: string]: unknown;
@@ -9395,6 +10256,16 @@ export interface components {
             agentPaused?: boolean;
             /** @description What it would run, in plain words */
             toolInfo?: components["schemas"]["AgentToolInfo"] | null;
+        };
+        AgentProposalBulkApproveResponse: {
+            data: {
+                approved: components["schemas"]["AgentProposal"][];
+                refused: {
+                    id: number;
+                    /** @enum {string} */
+                    reason: "not_found" | "open_on_its_own" | "not_waiting";
+                }[];
+            };
         };
         AgentProposalListResponse: {
             data: components["schemas"]["AgentProposal"][];
@@ -9545,6 +10416,45 @@ export interface components {
                 automationsEnabled: boolean;
             };
         };
+        AwayPeriod: {
+            id: number;
+            profile: {
+                id: number;
+                name: string | null;
+            };
+            delegate: {
+                id: number;
+                name: string;
+            };
+            /** Format: date */
+            startsOn: string;
+            /** Format: date */
+            backOn: string;
+            covers: ("flows" | "proposals" | "documents")[];
+            message: string | null;
+            /** @enum {string} */
+            status: "starting" | "in_force" | "ended";
+            endedAt: string | null;
+            createdAt: string;
+        };
+        AwayPeriodListResponse: {
+            data: components["schemas"]["AwayPeriod"][];
+        };
+        AwayPeriodRequest: {
+            delegateProfileId: number;
+            /** Format: date */
+            startsOn: string;
+            /**
+             * Format: date
+             * @description The day you are back; it ends at the start of that day
+             */
+            backOn: string;
+            covers: ("flows" | "proposals" | "documents")[];
+            message?: string | null;
+        };
+        AwayPeriodResponse: {
+            data: components["schemas"]["AwayPeriod"] | null;
+        };
         BillingAccessResponse: {
             data: {
                 has_access: boolean;
@@ -9649,8 +10559,11 @@ export interface components {
             blocks_from?: string;
             /** @description End including the buffer after. */
             blocks_until?: string;
-            /** @enum {string} */
-            status: "pending_payment" | "confirmed" | "cancelled" | "expired";
+            /**
+             * @description `requested`: the customer asked for this time and staff accept it first.
+             * @enum {string}
+             */
+            status: "pending_payment" | "requested" | "confirmed" | "cancelled" | "expired";
             hold_expires_at?: string | null;
             /** @enum {string} */
             source: "staff" | "public" | "agent";
@@ -9661,6 +10574,17 @@ export interface components {
             /** @description The reference from the payment plugin, once paid (SDK 1.98). */
             payment_ref?: string | null;
             created_at?: string | null;
+            /** @description The room it holds. */
+            room_id?: number | null;
+            /** @description When the customer arrived. */
+            checked_in_at?: string | null;
+            /** @description When staff suggested this time for a request. */
+            suggested_at?: string | null;
+            reminder_sent_at?: string | null;
+            /** @description In lists: the room's name, language code => text. */
+            room_name?: {
+                [key: string]: string;
+            } | null;
         };
         CalendarBookingCancelRequest: {
             /** @description Why, in a few words; shown to the customer. */
@@ -9693,6 +10617,12 @@ export interface components {
             profile_id?: number;
             /** @description Refuse a time outside working hours. Always on for agents. */
             keep_to_hours?: boolean;
+        };
+        CalendarBookingSuggestRequest: {
+            /** @description The time to suggest, ISO 8601 with an offset. */
+            starts_at: string;
+            /** @description Suggest another person. Default: the same one. */
+            profile_id?: number;
         };
         CalendarEvent: {
             id: number;
@@ -9738,6 +10668,24 @@ export interface components {
             /** @description Every working-hours row for the week; the list replaces what is there. */
             hours: components["schemas"]["CalendarHours"][];
         };
+        CalendarRoom: {
+            id: number;
+            name: components["schemas"]["LocalizedLabel"];
+            /** @description The branch (organisational unit) it is in. */
+            unit_id: number | null;
+            active: boolean;
+            sort_order: number;
+        };
+        CalendarRoomRequest: {
+            /** @description Text, or a `{ar, en}` map. */
+            name?: string | components["schemas"]["LocalizedLabel"];
+            /** @description The branch it is in; null for none. */
+            unit_id?: number | null;
+            /** @description Inactive rooms are not shown as columns. */
+            active?: boolean;
+            /** @description Position in lists; lower comes first. */
+            sort_order?: number;
+        };
         CalendarService: {
             id: number;
             name: components["schemas"]["LocalizedLabel"];
@@ -9752,6 +10700,10 @@ export interface components {
             active: boolean;
             sort_order: number;
             staff_profile_ids: number[];
+            /** @description The room it needs; booked with the person. */
+            room_id?: number | null;
+            /** @description A customer's booking is a request staff accept first. */
+            needs_approval?: boolean;
         };
         CalendarServiceRequest: {
             /** @description Text, or a `{ar, en}` map. */
@@ -9776,6 +10728,10 @@ export interface components {
             sort_order?: number;
             /** @description The staff who provide it; the list replaces what is there. */
             staff_profile_ids?: number[];
+            /** @description The room it needs; null for none. */
+            room_id?: number | null;
+            /** @description Customers send a request instead of booking. */
+            needs_approval?: boolean;
         };
         CalendarSettings: {
             /** @description The workspace time zone (IANA). */
@@ -9790,6 +10746,8 @@ export interface components {
             week_start: string;
             weekend_days: string[];
             currency: string;
+            /** @description Off: every booking from the booking page is a request. */
+            instant_booking?: boolean;
         };
         CalendarSettingsRequest: {
             /** @description Turn the public booking page on or off. */
@@ -9811,6 +10769,8 @@ export interface components {
             week_start?: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
             /** @description Days shown as the weekend. */
             weekend_days?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[];
+            /** @description Off turns every booking from the booking page into a request staff accept. */
+            instant_booking?: boolean;
         };
         CalendarSlot: {
             starts_at: string;
@@ -9825,8 +10785,12 @@ export interface components {
             bookable: boolean;
             sort_order: number;
             feed_enabled: boolean;
+            /** @description The branch (organisational unit) they work in. */
+            unit_id?: number | null;
         };
         CalendarStaffRequest: {
+            /** @description The branch they work in; null for none. */
+            unit_id?: number | null;
             /** @description Offer this person on the public booking page. */
             bookable?: boolean;
             /** @description Position in lists and in "anyone" order; lower comes first. */
@@ -9856,11 +10820,224 @@ export interface components {
             /** @description A short note for the team. */
             note?: string;
         };
+        CalendarToday: {
+            /** @description The local day, `YYYY-MM-DD`. */
+            date: string;
+            /** @description Confirmed bookings that start that day. */
+            booked: number;
+            /** @description Of those, the customers who arrived. */
+            checked_in: number;
+            /** @description Open requests from now on, any day. */
+            requests: number;
+            /** @description Reminders sent that day. */
+            reminders_sent: number;
+        };
         CapabilityDenial: {
             /** @enum {string} */
             code: "no-resource" | "no-route" | "forbidden";
             reason: string;
             detail: string | null;
+        };
+        Chat: {
+            id: number;
+            /** @enum {string} */
+            type: "group" | "direct";
+            title: string;
+            with?: components["schemas"]["ChatMember"] | null;
+            people_count: number;
+            agents_count: number;
+            link?: components["schemas"]["ChatLink"] | null;
+            unread?: number;
+            /** @description For an agent: unread lines that mention it. */
+            mentions_me?: number;
+            last_message?: components["schemas"]["ChatMessage"] | null;
+            last_message_at?: string | null;
+            created_at?: string | null;
+        };
+        ChatAddMemberRequest: {
+            /** @description A person to add (user id). */
+            profile_id?: number;
+            /** @description An agent to add. */
+            agent_id?: number;
+            /** @description The person in the chat the agent works for here; its proposals go to them. Defaults to you. */
+            works_for?: number;
+            /**
+             * @description What the agent can read: from now on (the default), the last 7 days, or everything.
+             * @enum {string}
+             */
+            reads?: "now" | "week" | "all";
+            /** @description What the agent may do here, per action; post is allowed unless said otherwise. */
+            actions?: {
+                [key: string]: "off" | "ask" | "allowed";
+            };
+        };
+        ChatAuthor: {
+            /** @enum {string} */
+            type: "person" | "agent";
+            profile_id?: number;
+            agent_id?: number;
+            name: string;
+            works_for?: components["schemas"]["ChatPerson"];
+        };
+        ChatCreateRequest: {
+            /**
+             * @description group (the default) or direct.
+             * @enum {string}
+             */
+            type?: "group" | "direct";
+            /** @description The group's name, at most 120 characters. */
+            title?: string;
+            /** @description For a group: the people to add (user ids), besides you. */
+            people?: number[];
+            /** @description For a direct chat with a person: their user id. */
+            profile_id?: number;
+            /** @description For a direct chat with one of your agents. */
+            agent_id?: number;
+            link?: components["schemas"]["ChatLink"];
+        };
+        ChatDetailResponse: {
+            data: components["schemas"]["Chat"] & {
+                members: components["schemas"]["ChatMember"][];
+                messages: components["schemas"]["ChatMessage"][];
+                has_earlier?: boolean;
+                my_member_id?: number;
+                last_read_message_id?: number;
+            };
+        };
+        ChatDirectoryResponse: {
+            data: {
+                people: {
+                    type: string;
+                    id: number;
+                    name: string;
+                }[];
+                agents: {
+                    type: string;
+                    id: number;
+                    name: string;
+                    name_ar?: string;
+                    role?: string;
+                    role_ar?: string;
+                }[];
+            };
+        };
+        ChatDoneResponse: {
+            data: {
+                [key: string]: boolean;
+            };
+        };
+        ChatLink: {
+            /** @enum {string} */
+            type: "board" | "meeting" | "record";
+            id: string;
+            label: string;
+        };
+        ChatListResponse: {
+            data: components["schemas"]["Chat"][];
+        };
+        ChatMember: {
+            member_id: number;
+            /** @enum {string} */
+            type: "person" | "agent";
+            /** @description A person's user id (people only). */
+            profile_id?: number;
+            /** @description The agent (agents only). */
+            agent_id?: number;
+            name: string;
+            name_ar?: string;
+            role?: string;
+            role_ar?: string;
+            works_for?: components["schemas"]["ChatPerson"];
+            /**
+             * @description What the agent can read: from when it joined, the 7 days before that too, or everything.
+             * @enum {string}
+             */
+            reads?: "now" | "week" | "all";
+            reads_from?: string | null;
+            /** @description What the agent may do here, per action. */
+            actions?: {
+                [key: string]: "off" | "ask" | "allowed";
+            };
+            added_by?: components["schemas"]["ChatPerson"] | null;
+            joined_at?: string | null;
+        };
+        ChatMessage: {
+            id: number;
+            chat_id: number;
+            /**
+             * @description system: who joined, left or changed the chat; line: an agent's status or hand-off; proposal: an agent's proposal waiting for a decision.
+             * @enum {string}
+             */
+            kind: "message" | "system" | "line" | "proposal";
+            body: string;
+            author?: components["schemas"]["ChatAuthor"] | null;
+            mentions?: {
+                /** @enum {string} */
+                type: "person" | "agent";
+                id: number;
+                name: string;
+            }[];
+            /**
+             * @description held: an agent's line waiting for the person it works for.
+             * @enum {string}
+             */
+            status: "posted" | "held" | "declined";
+            waiting_for?: components["schemas"]["ChatPerson"] | null;
+            can_decide?: boolean;
+            proposal?: {
+                id: number;
+                tool?: string;
+                summary: string;
+                status: string;
+                waiting_for: components["schemas"]["ChatPerson"];
+                can_decide: boolean;
+                expires_at?: string | null;
+            } | null;
+            event?: {
+                [key: string]: unknown;
+            } | null;
+            created_at: string | null;
+        };
+        ChatMessageListResponse: {
+            data: components["schemas"]["ChatMessage"][];
+        };
+        ChatMessageResponse: {
+            data: components["schemas"]["ChatMessage"];
+        };
+        ChatPerson: {
+            id: number;
+            name: string;
+        };
+        ChatPostRequest: {
+            /** @description The message, in plain words, at most 4000 characters. */
+            body: string;
+            /** @description People (user id) and agents (agent id) in the chat this message mentions. */
+            mentions?: {
+                /** @enum {string} */
+                type: "person" | "agent";
+                id: number;
+            }[];
+            /**
+             * @description Agents: line for a short status or hand-off line.
+             * @enum {string}
+             */
+            style?: "message" | "line";
+        };
+        ChatReadRequest: {
+            /** @description The newest message you have read. */
+            message_id: number;
+        };
+        ChatShareProposalRequest: {
+            /** @description One of your waiting proposals (from an Ask-first call). */
+            proposal_id: number;
+            /** @description What to say with it; the proposal's summary when empty. */
+            body?: string;
+        };
+        ChatUpdateRequest: {
+            /** @description A group's new name. */
+            title?: string;
+            /** @description What the chat is about, or null to remove the link. */
+            link?: components["schemas"]["ChatLink"] | null;
         };
         CheckoutStartRequest: {
             plan_key: string;
@@ -9871,6 +11048,157 @@ export interface components {
             data: {
                 url: string;
             };
+        };
+        Contact: {
+            id: number;
+            name: string;
+            contact_person: string;
+            email: string;
+            mobile: string;
+            phone: string;
+            tax_number: string;
+            /** @description How they pay, in the workspace's words. */
+            payment_terms: string;
+            address: string;
+            notes: string;
+            is_customer: boolean;
+            is_supplier: boolean;
+            /** @description The person in Whity this contact is, when known. */
+            profile_id: number | null;
+            /** @description Only on a single contact. */
+            profile?: {
+                id?: number;
+                display_name?: string;
+            } | null;
+            tags: {
+                id: number;
+                name: string;
+            }[];
+            archived: boolean;
+            created_at: string;
+            updated_at: string;
+        };
+        ContactImport: {
+            id: number;
+            file_name: string;
+            /** @enum {string} */
+            status: "uploaded" | "checked" | "imported" | "undone";
+            row_count: number;
+            columns: {
+                index: number;
+                header: string;
+                examples: string[];
+                empty: boolean;
+                suggestion: {
+                    target?: string;
+                    /** @enum {string} */
+                    confidence?: "sure" | "doubtful";
+                } | null;
+            }[];
+            targets: {
+                key: string;
+                label: string;
+            }[];
+            options: {
+                [key: string]: unknown;
+            } | null;
+            summary: {
+                create?: number;
+                update?: number;
+                skip?: number;
+                rows?: {
+                    row: number;
+                    /** @enum {string} */
+                    action: "create" | "update" | "skip";
+                    name: string;
+                    contact_id?: number;
+                    reason?: string;
+                    changes?: string[];
+                }[];
+                fixes?: {
+                    row: number;
+                    column: string;
+                    from: string;
+                    to: string;
+                }[];
+                tags?: string[];
+            } | null;
+            imported_at: string | null;
+            undone_at: string | null;
+            undo_until: string | null;
+            can_undo: boolean;
+            created_at: string;
+        };
+        ContactImportCheckRequest: {
+            /** @description Column index (from 0) => target key from `targets`. Columns left out are skipped. */
+            mapping: {
+                [key: string]: string | null;
+            };
+            /**
+             * @description How a row finds an existing contact.
+             * @enum {string|null}
+             */
+            match_by?: "tax_number" | "mobile" | "email" | "name" | null;
+            /** @description Added to local mobile and phone numbers, such as `+962`. */
+            country_code?: string | null;
+            /**
+             * @description For rows with no customer-or-supplier column. Default customer.
+             * @enum {string}
+             */
+            default_kind?: "customer" | "supplier" | "both";
+            /** @description Tags added to every imported contact. */
+            add_tags?: string[];
+        };
+        ContactImportListItem: {
+            id: number;
+            file_name: string;
+            status: string;
+            summary: {
+                create: number;
+                update: number;
+                skip: number;
+            } | null;
+            created_by_profile_id?: number | null;
+            imported_at: string | null;
+            undo_until: string | null;
+            can_undo: boolean;
+            created_at: string;
+        };
+        ContactImportUploadRequest: {
+            /** @description The file's name, such as `customers.xlsx`. */
+            file_name?: string;
+            /** @description A CSV file's text. */
+            text?: string;
+            /** @description An Excel (.xlsx) or CSV file, base64. */
+            content_base64?: string;
+        };
+        ContactRequest: {
+            /** @description The name of the customer or supplier, such as a company. */
+            name?: string;
+            /** @description Who to talk to there. */
+            contact_person?: string;
+            /** @description Email address. */
+            email?: string;
+            /** @description Tidied: spaces and dashes go, `00` becomes `+`. */
+            mobile?: string;
+            /** @description Landline or office phone, tidied like mobile. */
+            phone?: string;
+            /** @description Tax number, as on their invoices. */
+            tax_number?: string;
+            /** @description How they pay, in your own words, such as "CliQ, within 14 days". */
+            payment_terms?: string;
+            /** @description Postal or delivery address. */
+            address?: string;
+            /** @description Anything else worth knowing. */
+            notes?: string;
+            /** @description They buy from the workspace. Default true on a new contact. */
+            is_customer?: boolean;
+            /** @description The workspace buys from them. A contact can be both. */
+            is_supplier?: boolean;
+            /** @description Link to a person in the workspace; null unlinks. */
+            profile_id?: number | null;
+            /** @description Tag names; the list replaces the contact's tags. */
+            tags?: string[];
         };
         ConveningBody: {
             id: number;
@@ -10175,6 +11503,8 @@ export interface components {
             /** @enum {string} */
             textSize: "standard" | "larger";
             showTechnicalDetails: boolean;
+            /** @enum {string} */
+            animations: "full" | "calm" | "off";
         };
         DisplayPreferencesResponse: {
             data: components["schemas"]["DisplayPreferences"];
@@ -10183,6 +11513,8 @@ export interface components {
             /** @enum {string} */
             textSize?: "standard" | "larger";
             showTechnicalDetails?: boolean;
+            /** @enum {string} */
+            animations?: "full" | "calm" | "off";
         };
         Document: {
             id: number;
@@ -10253,6 +11585,114 @@ export interface components {
                 id: number;
                 name: string;
             };
+        };
+        DocumentAgentRequest: {
+            id: number;
+            document_id: number;
+            /** @description What the person asked */
+            request: string;
+            /** @description The block the person had selected, if any */
+            anchor_block_id?: string | null;
+            /** @description The text the person had selected, if any */
+            quote?: string | null;
+            /**
+             * @description queued until the agent picks it up
+             * @enum {string}
+             */
+            status: "queued" | "running" | "done" | "failed" | "stopped";
+            /** @description The agent asked or working on it; null for any of the person's agents */
+            agent: {
+                id?: string;
+                name?: string;
+            } | null;
+            /** @description The person who asked */
+            for: {
+                id: number;
+                name: string;
+            };
+            /** @description What the agent is doing now, in plain words */
+            title: string | null;
+            /** @description When the agent knows the count */
+            progress: {
+                done?: number;
+                total?: number;
+            } | null;
+            /** @description What it did, or what went wrong */
+            detail: string | null;
+            /** @description The person pressed Stop and the agent has not stopped yet */
+            stopping: boolean;
+            /** @description When it was asked, ISO 8601 UTC */
+            at: string;
+            /** @description ISO 8601 UTC */
+            updated_at: string;
+        };
+        DocumentAgentRequestCreateRequest: {
+            /** @description What to do, at most 4000 characters */
+            request: string;
+            /** @description One of your workspace agents (GET /api/me/agents); null for any agent you have connected */
+            agent_id?: number | null;
+            /** @description The selected block, if any */
+            anchor_block_id?: string | null;
+            /** @description The selected text, if any */
+            quote?: string | null;
+        };
+        DocumentAgentRequestListResponse: {
+            data: components["schemas"]["DocumentAgentRequest"][];
+        };
+        DocumentAgentRequestNextResponse: {
+            /** @description A DocumentAgentRequest with document_id and next (what to do), or null when nothing waits */
+            data: {
+                [key: string]: unknown;
+            } | null;
+        };
+        DocumentAgentRequestResponse: {
+            data: components["schemas"]["DocumentAgentRequest"];
+        };
+        DocumentAgentRequestUpdateRequest: {
+            /**
+             * @description running while working; done, failed or stopped to finish
+             * @enum {string}
+             */
+            status: "running" | "done" | "failed" | "stopped";
+            /** @description What you are doing now, in plain words, for example Reading the payment terms */
+            title?: string | null;
+            /** @description How many of total are done */
+            done?: number | null;
+            /** @description How many there are, when known */
+            total?: number | null;
+            /** @description When finishing: what you did, or what went wrong and what to do next */
+            detail?: string | null;
+        };
+        DocumentAgentRequestUpdateResponse: {
+            data: {
+                /** @description true: the person pressed Stop; report stopped and end */
+                stop: boolean;
+                request: components["schemas"]["DocumentAgentRequest"];
+            };
+        };
+        DocumentAgentView: {
+            id: number;
+            kind: string;
+            title: string;
+            lang: string;
+            /**
+             * @description Which version these blocks are
+             * @enum {string}
+             */
+            reading: "draft" | "published";
+            draft_version: number;
+            published_version: number | null;
+            /** @description The contract Block[], each with its id */
+            blocks: {
+                [key: string]: unknown;
+            }[];
+            /** @description Open suggestions */
+            suggestions: components["schemas"]["DocumentSuggestion"][];
+            /** @description Open comment threads */
+            comments: components["schemas"]["DocumentCommentThread"][];
+        };
+        DocumentAgentViewResponse: {
+            data: components["schemas"]["DocumentAgentView"];
         };
         DocumentArtifact: {
             id: number;
@@ -10367,6 +11807,12 @@ export interface components {
         };
         DocumentCommentMessageResponse: {
             data: components["schemas"]["DocumentCommentMessage"];
+        };
+        DocumentCommentReplyRequest: {
+            /** @description The reply, in plain text */
+            text: string;
+            /** @description The suggestions this reply made, if any */
+            suggestion_ids?: number[];
         };
         DocumentCommentThread: {
             id: number;
@@ -11035,6 +12481,32 @@ export interface components {
             description: string;
             provenance?: string | null;
         };
+        DocumentSuggestBlocksRequest: {
+            /** @description The block to go after; null for the start of the document */
+            after_block_id?: string | null;
+            /** @description The contract Block[] to insert, with new ids */
+            blocks: {
+                [key: string]: unknown;
+            }[];
+            /** @description What the change does, in a few words */
+            summary: string;
+            /** @description The request you are working on, if any */
+            request_id?: number | null;
+        };
+        DocumentSuggestRewriteRequest: {
+            /** @description The block, from document_read */
+            block_id: string;
+            /** @description The exact text to replace; "" to insert */
+            delete_text: string;
+            /** @description The new text; "" to delete */
+            insert: string;
+            /** @description Which match of delete_text in the block, from 0 (default 0) */
+            occurrence?: number;
+            /** @description What the change does, for example Replace 30 days with 14 days */
+            summary: string;
+            /** @description The request you are working on, if any */
+            request_id?: number | null;
+        };
         DocumentSuggestion: {
             id: number;
             /** @enum {string} */
@@ -11265,6 +12737,13 @@ export interface components {
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines?: ("address" | "taxId" | "phone" | "email")[];
                 };
+                /**
+                 * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
+                 * @enum {string}
+                 */
+                titleFace?: "readex" | "noto";
+                /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
+                largePrint?: boolean;
             };
         };
         DocumentThemeListResponse: {
@@ -11315,6 +12794,13 @@ export interface components {
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines?: ("address" | "taxId" | "phone" | "email")[];
                 };
+                /**
+                 * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
+                 * @enum {string}
+                 */
+                titleFace?: "readex" | "noto";
+                /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
+                largePrint?: boolean;
             };
         };
         DocumentThemeRef: {
@@ -11393,6 +12879,13 @@ export interface components {
                 /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                 lines?: ("address" | "taxId" | "phone" | "email")[];
             };
+            /**
+             * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
+             * @enum {string}
+             */
+            titleFace?: "readex" | "noto";
+            /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
+            largePrint?: boolean;
         };
         DocumentThemeUsage: {
             /** @description Documents whose draft names the theme */
@@ -11537,12 +13030,17 @@ export interface components {
         };
         ForceResetRequest: {
             profile_id: number;
+            /** @description The admin's authenticator code, or the code emailed to them */
+            code: string;
+            /** @description Why the reset is needed, shown to the second admin */
+            reason?: string | null;
         };
         ForceResetResponse: {
             data: {
+                id: number;
                 profile_id: number;
                 /** @enum {string} */
-                status: "forced";
+                status: "waiting_for_second_admin";
             };
         };
         Form: {
@@ -12238,6 +13736,19 @@ export interface components {
         };
         HomeCardListResponse: {
             data: components["schemas"]["HomeCard"][];
+        };
+        IdentityCheckRequest: {
+            /** @description The two-step reset request about to be approved */
+            request_id?: number;
+            /** @description The person a reset is about to be started for, when there is no request */
+            profile_id?: number;
+        };
+        IdentityCheckResponse: {
+            data: {
+                /** @enum {string} */
+                method: "totp" | "email_code";
+                email_hint: string | null;
+            };
         };
         IdentityProvider: {
             id: number;
@@ -13466,6 +14977,20 @@ export interface components {
             display_name: string;
             reason?: string | null;
             created_at: string;
+            requested_from: string | null;
+            last_signed_in_at: string | null;
+            checks: {
+                text: string;
+                by_profile_id: number;
+                by_name: string;
+                at: string;
+            }[];
+            first_approval: {
+                profile_id: number;
+                display_name: string;
+                at: string;
+                method: string;
+            } | null;
         };
         PendingTwoFactorRecoveryListResponse: {
             data: components["schemas"]["PendingTwoFactorRecoveryItem"][];
@@ -13840,8 +15365,13 @@ export interface components {
         };
         PublicBooking: {
             id: number;
-            /** @enum {string} */
-            status: "pending_payment" | "confirmed" | "cancelled" | "expired";
+            /**
+             * @description `requested`: the customer asked for this time and staff accept it first.
+             * @enum {string}
+             */
+            status: "pending_payment" | "requested" | "confirmed" | "cancelled" | "expired";
+            /** @description The business suggested this time for the request; the customer can take it. */
+            suggested?: boolean;
             starts_at: string;
             ends_at: string;
             service: {
@@ -13895,6 +15425,8 @@ export interface components {
                 price_minor: number | null;
                 currency: string;
                 staff_profile_ids: number[];
+                /** @description Booking it sends a request the business accepts first. */
+                sends_request?: boolean;
             }[];
             staff: {
                 profile_id: number;
@@ -14331,6 +15863,13 @@ export interface components {
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines: ("address" | "taxId" | "phone" | "email")[];
                 };
+                /**
+                 * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
+                 * @enum {string}
+                 */
+                titleFace: "readex" | "noto";
+                /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
+                largePrint: boolean;
             };
             /** @description Where each token came from, by its path (`accent`, `letterhead.lines`…): a theme ref, `document` for an override, or `branding.main_color` */
             sources: {
@@ -15147,6 +16686,28 @@ export interface components {
         TagUpdateRequest: {
             name: string;
         };
+        TaskaatConnectCompleteRequest: {
+            /** @description The authorization code Taskaat sent back to /tasks/connect. */
+            code: string;
+            /** @description The state Taskaat sent back with the code. */
+            state: string;
+        };
+        TaskaatConnectResponse: {
+            data: {
+                authorize_url: string;
+            };
+        };
+        TaskaatConnection: {
+            connected: boolean;
+            /** @description Taskaat's web address, for "Open in Taskaat" links: /dashboard/{project-slug}?task={task-id}. */
+            taskaat_url: string;
+            connected_at?: string;
+            connected_by?: number | null;
+            needs_reconnect?: boolean;
+        };
+        TaskaatConnectionResponse: {
+            data: components["schemas"]["TaskaatConnection"];
+        };
         Tenant: {
             id: number;
             /** @description The original name, in `nameLanguage`. */
@@ -15589,6 +17150,21 @@ export interface components {
         };
         TwoFactorPolicyUpdateRequest: {
             grace_period_days: number;
+        };
+        TwoFactorRecoveryApprovalResponse: {
+            data: {
+                id: number;
+                /** @enum {string} */
+                status: "waiting_for_second_admin" | "approved" | "rejected" | "pending";
+            };
+        };
+        TwoFactorRecoveryApproveRequest: {
+            /** @description The approving admin's authenticator code, or the code emailed to them */
+            code: string;
+        };
+        TwoFactorRecoveryCheckRequest: {
+            /** @description What was checked: "Called him on the number on file" */
+            text: string;
         };
         TwoFactorRecoveryConfirmRequest: {
             token: string;
@@ -16739,6 +18315,102 @@ export interface operations {
             };
         };
     };
+    post_api_v1_2fa_recovery_identity_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description The check to make */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityCheckResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A request_id or profile_id is required */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many codes were sent lately */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_2fa_recovery_pending: {
         parameters: {
             query?: never;
@@ -16813,15 +18485,28 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorRecoveryApproveRequest"];
+            };
+        };
         responses: {
-            /** @description Approved */
+            /** @description Recorded, or cleared */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApprovalStatusResponse"];
+                    "application/json": components["schemas"]["TwoFactorRecoveryApprovalResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Missing or invalid authentication */
@@ -16853,6 +18538,104 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This admin gave the first approval; a different admin has to give the second */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_2fa_recovery_id_checks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorRecoveryCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorRecoveryApprovalResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No pending 2FA-recovery request found for that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No text, or more than 300 characters */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -19742,6 +21525,71 @@ export interface operations {
             };
         };
     };
+    get_api_v1_away_periods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Away periods */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwayPeriodListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_billing_change_plan: {
         parameters: {
             query?: never;
@@ -21586,8 +23434,10 @@ export interface operations {
                 to: string;
                 /** @description Only this member of staff. */
                 profile_id?: number;
-                /** @description Comma-separated statuses. Default: `confirmed,pending_payment`. */
+                /** @description Comma-separated statuses. Default: `confirmed,pending_payment,requested`. */
                 status?: string;
+                /** @description Only this branch: bookings whose person or room is in it. */
+                unit_id?: number;
             };
             header?: never;
             path?: never;
@@ -21820,6 +23670,84 @@ export interface operations {
             };
         };
     };
+    post_api_v1_calendar_bookings_id_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a request */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_calendar_bookings_id_cancel: {
         parameters: {
             query?: never;
@@ -21892,6 +23820,162 @@ export interface operations {
                 };
             };
             /** @description Already cancelled */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_bookings_id_check_in: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a confirmed booking */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_calendar_bookings_id_check_in: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a confirmed booking */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -21992,6 +24076,106 @@ export interface operations {
                 };
             };
             /** @description A cancelled booking, or outside the booking window */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_bookings_id_suggest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarBookingSuggestRequest"];
+            };
+        };
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description That time was just taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a request */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -22257,6 +24441,244 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CalendarEventResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_rooms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rooms */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarRoom"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_rooms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarRoomRequest"];
+            };
+        };
+        responses: {
+            /** @description The room */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarRoom"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such branch */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A missing name */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_calendar_rooms_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarRoomRequest"];
+            };
+        };
+        responses: {
+            /** @description The room */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarRoom"];
+                    };
                 };
             };
             /** @description Invalid request body */
@@ -23405,6 +25827,2182 @@ export interface operations {
                             id: number;
                             deleted: boolean;
                         };
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_today: {
+        parameters: {
+            query?: {
+                /** @description A local day, `YYYY-MM-DD`. Default: today. */
+                date?: string;
+                /** @description Only this branch. */
+                unit_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Today */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarToday"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_chats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your chats */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_chats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The chat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDetailResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No name, someone who is not in this workspace, or an agent that does not work for you */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_chats_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The chat */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDetailResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_chat_chats_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The chat */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDetailResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The name or the link is not valid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_chats_id_members: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatAddMemberRequest"];
+            };
+        };
+        responses: {
+            /** @description The chat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDetailResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already in the chat, not in this workspace, or the agent does not work for that person */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_chat_chats_id_members_member: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                member: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDoneResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Only the person who started the chat removes people */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_chats_id_messages: {
+        parameters: {
+            query?: {
+                /** @description Messages after this id */
+                after?: number;
+                /** @description The page before this id */
+                before?: number;
+                /** @description Page size (default 50, max 100) */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Messages */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_chats_id_messages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatPostRequest"];
+            };
+        };
+        responses: {
+            /** @description The message */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The agent may not post in this chat */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The message is empty or too long */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_chats_id_proposals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatShareProposalRequest"];
+            };
+        };
+        responses: {
+            /** @description The message */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Only an agent that may post here shares its proposals */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_chats_id_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDoneResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_directory: {
+        parameters: {
+            query?: {
+                /** @description Part of a name */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description People and agents */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDirectoryResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_messages_id_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The message */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Someone else decides this message */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The message is not waiting */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_messages_id_decline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The message */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Someone else decides this message */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The message is not waiting */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_contacts: {
+        parameters: {
+            query?: {
+                /** @description `customer` or `supplier`. Leave out for everyone; a contact can be both. */
+                kind?: string;
+                /** @description Only contacts with this tag. */
+                tag_id?: number;
+                /** @description Search text. */
+                q?: string;
+                /** @description `true` for archived contacts instead. */
+                archived?: string;
+                /** @description Page, from 1. */
+                page?: number;
+                /** @description Rows per page, at most 200. Default 50. */
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Contacts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Contact"][];
+                        pagination: components["schemas"]["Pagination"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_contacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactRequest"];
+            };
+        };
+        responses: {
+            /** @description The contact */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Contact"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing name or a value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_contacts_imports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Imports */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ContactImportListItem"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_contacts_imports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactImportUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description The import */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ContactImport"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A file Whity can't read */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_contacts_imports_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ContactImport"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_contacts_imports_id_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactImportCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description The import */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ContactImport"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already ran */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A column match Whity can't use */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_contacts_imports_id_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ContactImport"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not checked, or already ran */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_contacts_imports_id_skipped_csv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not checked yet */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_contacts_imports_id_undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ContactImport"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not run, already undone, or more than 24 hours ago */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_contacts_tags: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tags */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: number;
+                            name: string;
+                            count: number;
+                        }[];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_contacts_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The contact */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Contact"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_contacts_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactRequest"];
+            };
+        };
+        responses: {
+            /** @description The contact */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Contact"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_contacts_id_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The contact */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Contact"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_contacts_id_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The contact */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Contact"];
                     };
                 };
             };
@@ -25294,6 +29892,227 @@ export interface operations {
             };
         };
     };
+    document_agent_requests_next: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request, or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentAgentRequestNextResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not an agent (details.code agents_only) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    document_agent_request_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentAgentRequestUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Whether to stop, and the request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentAgentRequestUpdateResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not an agent (details.code agents_only) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a request you are working on */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid status, title, counts or detail */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_document_agent_requests_rid_stop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentAgentRequestResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a request of yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_document_background_issuing: {
         parameters: {
             query?: never;
@@ -27138,6 +31957,428 @@ export interface operations {
             };
         };
     };
+    get_api_v1_document_sources_id_agent_requests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The requests */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentAgentRequestListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_document_sources_id_agent_requests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentAgentRequestCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The request, queued */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentAgentRequestResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Empty request, or an agent you are not using (details.code agent_not_connected) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    document_suggest_blocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentSuggestBlocksRequest"];
+            };
+        };
+        responses: {
+            /** @description The suggestion */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSuggestionResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid blocks or summary, or the patch does not apply */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    document_suggest_rewrite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentSuggestRewriteRequest"];
+            };
+        };
+        responses: {
+            /** @description The suggestion */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSuggestionResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid block, text or summary, or the text is not in the block */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    document_read: {
+        parameters: {
+            query?: {
+                /** @description The request from document_agent_requests_next you are working on */
+                request_id?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The document */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentAgentViewResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not published, and no request_id (details.code not_published) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description request_id is not yours for this document */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_document_sources_id_changes: {
         parameters: {
             query?: {
@@ -27525,6 +32766,96 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    document_comment_reply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                tid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentCommentReplyRequest"];
+            };
+        };
+        responses: {
+            /** @description The message */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentCommentMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document or thread not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Empty text or invalid suggestion_ids */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -39023,6 +44354,96 @@ export interface operations {
             };
         };
     };
+    post_api_v1_me_agent_proposals_bulk_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The proposals to approve. */
+                    ids: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description What was approved and what has to be opened on its own */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentProposalBulkApproveResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No ids, or more than 50 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_me_agent_proposals_id_approve: {
         parameters: {
             query?: never;
@@ -39775,6 +45196,223 @@ export interface operations {
                 };
             };
             /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_away: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your away period */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwayPeriodResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_me_away: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AwayPeriodRequest"];
+            };
+        };
+        responses: {
+            /** @description Your away period */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwayPeriodResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Yourself as the delegate, someone outside the workspace, bad dates, or nothing to hand over */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_me_away: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ended */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwayPeriodResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description You aren't away */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -52108,6 +57746,76 @@ export interface operations {
             };
         };
     };
+    post_api_v1_public_bookings_token_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The 64-character token from the customer's email. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Booked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicBooking"];
+                    };
+                };
+            };
+            /** @description This link is invalid or has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No suggested time to take */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_public_bookings_token_cancel: {
         parameters: {
             query?: never;
@@ -58037,6 +63745,315 @@ export interface operations {
             };
             /** @description Validation failed */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_taskaat_connect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Where to sign in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskaatConnectResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Taskaat could not be reached */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Whity does not know its own web address (FRONTEND_URL) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_taskaat_connect_complete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskaatConnectCompleteRequest"];
+            };
+        };
+        responses: {
+            /** @description The connection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskaatConnectionResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Expired, not started here, or refused by Taskaat */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Taskaat could not be reached */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_taskaat_connection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The connection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskaatConnectionResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_taskaat_connection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The connection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskaatConnectionResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

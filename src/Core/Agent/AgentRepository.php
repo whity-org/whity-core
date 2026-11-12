@@ -25,7 +25,7 @@ final class AgentRepository
     ];
 
     private const COLUMNS = 'id, tenant_id, slug, name, name_ar, role, role_ar, instructions, instructions_ar, tone,
-                             language, toolsets, grant_template, preset_key, preset_version, status, paused_at, paused_by_profile_id, may_read, features,
+                             language, toolsets, grant_template, preset_key, preset_version, status, paused_at, paused_by_profile_id, may_read, features, notify_by_email,
                              created_by_profile_id, updated_by_profile_id, created_at, updated_at';
 
     public function __construct(private readonly PDO $db)
@@ -149,6 +149,10 @@ final class AgentRepository
             $sets[]              = 'may_read = :may_read';
             $params[':may_read'] = self::encode(array_values((array) $fields['may_read']));
         }
+        if (array_key_exists('notify_by_email', $fields)) {
+            // A literal, so it types the same on PostgreSQL and SQLite.
+            $sets[] = 'notify_by_email = ' . ($fields['notify_by_email'] === true ? 'TRUE' : 'FALSE');
+        }
         if (array_key_exists('grant', $fields)) {
             $sets[]                    = 'grant_template = :grant_template';
             $params[':grant_template'] = self::encode(self::object((array) $fields['grant']));
@@ -233,6 +237,7 @@ final class AgentRepository
             'paused_at'             => $row['paused_at'] === null ? null : (string) $row['paused_at'],
             'paused_by_profile_id'  => $row['paused_by_profile_id'] === null ? null : (int) $row['paused_by_profile_id'],
             'may_read'              => array_values(array_filter($json($row['may_read']), 'is_int')),
+            'notify_by_email'       => ($row['notify_by_email'] ?? null) === null ? true : \Whity\Core\Db\DbBool::of($row['notify_by_email']),
             'features'              => array_filter($json($row['features'] ?? null), 'is_bool'),
             'created_by_profile_id' => $row['created_by_profile_id'] === null ? null : (int) $row['created_by_profile_id'],
             'updated_by_profile_id' => $row['updated_by_profile_id'] === null ? null : (int) $row['updated_by_profile_id'],

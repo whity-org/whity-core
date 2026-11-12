@@ -52,9 +52,11 @@ final class TwoFactorRecoveryMailer
                     'We received a request to recover your account because you may have lost access to your password and your two-factor device.',
                     'Confirm this request to submit it for administrator review. This link expires in 1 hour.',
                 ],
-                ctaLabel: 'Confirm recovery request',
+                ctaLabel: 'Confirm the request',
                 ctaUrl: $link,
-                footnote: "If you didn't request this, you can safely ignore this message.",
+                footnote: "If you didn't ask for this, ignore this email: nothing changes without this link.",
+                preheader: 'Confirm it so an administrator can review it. The link works for 1 hour.',
+                notice: 'Sent to ' . $email . '.',
             ),
             EmailBranding::fromSettings($this->settings),
         );
@@ -78,6 +80,7 @@ final class TwoFactorRecoveryMailer
                     'Your account-recovery request has been submitted for administrator review. You will receive another email once it has been reviewed.',
                     "If you didn't request this, contact an administrator.",
                 ],
+                notice: 'Sent to ' . $email . '.',
             ),
             EmailBranding::fromSettings($this->settings),
         );

@@ -177,21 +177,28 @@ final class EmailNotifications
             return $data;
         }
         $name = trim((string) ($data['name'] ?? ''));
-        $branding = EmailBranding::fromSettings($this->settings);
+        $base = EmailBranding::fromSettings($this->settings);
+        $workspace = trim((string) ($data['tenant_name'] ?? '')) ?: $base->siteName;
+        // EM.1 `workspace-ready`: from the new workspace, in its name.
+        $branding = new EmailBranding($workspace, $base->brandColor, $base->supportEmail, $base->footerText, $base->whiteLabel);
+        $ar = $this->instanceLanguage() === 'ar';
 
-        $greeting = 'Welcome to ' . $branding->siteName . ($name !== '' ? ', ' . $name : '');
         $this->trySend(
             $email,
-            'Welcome to ' . $branding->siteName,
+            $ar ? $workspace . ' جاهزة' : $workspace . ' is ready',
             new EmailContent(
-                heading: $greeting,
-                paragraphs: [
-                    'Your workspace is ready — ' . $branding->siteName
-                        . ' is your self-hosted home for teams and tools, fully under your control.',
-                    'Sign in to invite your team, set up single sign-on, and make it yours.',
-                ],
-                ctaLabel: $this->appUrl !== '' ? 'Open your workspace' : null,
+                heading: $ar
+                    ? ($name !== '' ? 'أهلاً ' . $name . '. ' : '') . $workspace . ' جاهزة.'
+                    : 'Welcome' . ($name !== '' ? ', ' . $name : '') . '. ' . $workspace . ' is ready.',
+                paragraphs: [$ar ? 'هذا ما تبدأ به معظم الفرق:' : 'Here is what most teams do first:'],
+                ctaLabel: $this->appUrl !== '' ? ($ar ? 'افتح ' . $workspace : 'Open ' . $workspace) : null,
                 ctaUrl: $this->appUrl !== '' ? $this->appUrl : null,
+                preheader: $ar ? 'ثلاثة أشياء تبدأ بها، نحو عشر دقائق في المجموع.' : 'Three things to do first, about ten minutes in all.',
+                checklist: $ar
+                    ? ['ادعُ فريقك (دقيقتان)', 'أدخل عملاءك من جدول بيانات (5 دقائق)', 'أنشئ مستندك الأول (دقيقة واحدة)']
+                    : ['Invite your team (2 minutes)', 'Bring in your customers from a spreadsheet (5 minutes)', 'Make your first document (1 minute)'],
+                notice: $ar ? 'أُرسلت إلى ' . $email . '، مالك ' . $workspace . '.' : 'Sent to ' . $email . ', the owner of ' . $workspace . '.',
+                language: $ar ? 'ar' : 'en',
             ),
             $branding,
         );
@@ -278,6 +285,18 @@ final class EmailNotifications
         );
 
         return $data;
+    }
+
+    /** 'ar' when the instance's default language is Arabic, else 'en'. */
+    private function instanceLanguage(): string
+    {
+        try {
+            $locale = (string) ($this->settings->getGlobal()[SettingsRegistry::LOCALE] ?? 'en');
+        } catch (\Throwable) {
+            return 'en';
+        }
+
+        return str_starts_with(strtolower($locale), 'ar') ? 'ar' : 'en';
     }
 
     /**

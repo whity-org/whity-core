@@ -32,6 +32,7 @@ export function SystemErrorState({ digest: givenDigest, onRetry }: { digest?: st
   return (
     <SystemState
       icon="alert"
+      moment="went-wrong"
       code="500"
       title={t('system.error.title', 'Something went wrong on our side')}
       description={

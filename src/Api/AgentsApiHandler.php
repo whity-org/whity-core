@@ -150,6 +150,9 @@ final class AgentsApiHandler
         ]);
         $this->announce(Events::AGENT_CREATED, $tenantId, $id, $profileId);
 
+        if (($fields['notify_by_email'] ?? true) === false) {
+            $this->agents->update($id, $tenantId, ['notify_by_email' => false], $profileId);
+        }
         if (($fields['may_read'] ?? []) !== []) {
             $this->agents->update($id, $tenantId, ['may_read' => $fields['may_read']], $profileId);
         }
@@ -376,7 +379,7 @@ final class AgentsApiHandler
      */
     private static function input(array $body): array
     {
-        foreach (['nameAr' => 'name_ar', 'roleAr' => 'role_ar', 'instructionsAr' => 'instructions_ar', 'mayRead' => 'may_read'] as $camel => $column) {
+        foreach (['nameAr' => 'name_ar', 'roleAr' => 'role_ar', 'instructionsAr' => 'instructions_ar', 'mayRead' => 'may_read', 'notifyByEmail' => 'notify_by_email'] as $camel => $column) {
             unset($body[$column]);
             if (array_key_exists($camel, $body)) {
                 $body[$column] = $body[$camel];
@@ -422,6 +425,7 @@ final class AgentsApiHandler
             'status'         => $agent['status'],
             'createdAt'      => $agent['created_at'],
             'updatedAt'      => $agent['updated_at'],
+            'notifyByEmail'  => $agent['notify_by_email'] ?? true,
         ];
     }
 
