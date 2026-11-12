@@ -1247,6 +1247,15 @@ namespace Whity\Sdk;
  *
  * Purely additive.)
  *
+ * 1.102 (WHITY'S OWN BILLING EMAILS: the host service {@see Mail\BillingEmails} sends a
+ * {@see Mail\WorkspaceEmail} in the INSTANCE's brand to a workspace's members who hold
+ * `billing:pay`, in the workspace's language (EM.1 `payment-failed`, `whity-receipt`). Only a
+ * plugin that declares {@see PluginBillingEmailsInterface} and that the operator granted
+ * (`plugins.billing_email_senders`, empty by default) may send, a few a day per workspace at
+ * most (WHIT-985).
+ *
+ * Purely additive.)
+ *
  * 1.103 (DOCUMENT BLOCKS: a plugin adds blocks to the document editor (editor M7, E.17–E.20).
  * A code plugin implements {@see PluginDocumentBlocksInterface} with {@see Documents\DocumentBlock}
  * declarations; a workspace plugin lists the same shape under `documents.blocks` in its manifest

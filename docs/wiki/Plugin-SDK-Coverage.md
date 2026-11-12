@@ -605,6 +605,7 @@ Planned: 0.2.28.
 - A Notifier service: send to a person, role or unit in the current workspace (SDK 1.90)
 - Declared notification types with English and Arabic labels (SDK 1.90)
 - WorkspaceEmails host service: send an email as the workspace (its brand, language and the EM.1 layout) to anyone, such as a customer's invoice; plain text only, one button, best effort (SDK 1.100)
+- BillingEmails host service: Whity's own email about a workspace's plan, in the instance's brand to its billing:pay members; only for a plugin that declares PluginBillingEmailsInterface and the operator granted, capped per workspace a day (SDK 1.102)
 
 **Missing**
 
