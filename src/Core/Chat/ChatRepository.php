@@ -8,7 +8,7 @@ use PDO;
 use Whity\Core\Db\DbBool;
 
 /**
- * Storage for team chats (migration 250): `conversations` and `messages` rows
+ * Storage for team chats (migration 251): `conversations` and `messages` rows
  * of kind `team`, with `chats` and `chat_members` beside them.
  *
  * Every statement binds `tenant_id`. Chat lines are written here, not through
