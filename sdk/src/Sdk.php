@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.104).
+ * SDK identity (v1.105).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1264,12 +1264,20 @@ namespace Whity\Sdk;
  * another plugin also declares, and forgets the list when the plugin is disabled (#1872, WHIT-995).
  *
  * Purely additive.)
+ *
+ * 1.105 (CUSTOMERS INVITE THEIR TEAM: {@see Hooks\Events::MEMBERSHIP_CUSTOMER_INVITING} runs
+ * before a customer's team invitation is written; a listener may refuse it with
+ * {@see Hooks\HookVetoException} or attach `annotations`. {@see Hooks\Events::MEMBERSHIP_CUSTOMER_JOINED}
+ * also fires when such an invitation is accepted, with `via` `invitation`, `invitation_id`,
+ * `invited_by` and the `annotations` (#1872, WHIT-996).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.104.0';
+    public const VERSION = '1.105.0';
 
     /**
      * Static identity only — never instantiated.

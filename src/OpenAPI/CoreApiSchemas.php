@@ -11271,6 +11271,7 @@ final class CoreApiSchemas
                 'expires_at' => self::str(),
                 'created_at' => self::str(),
                 'invited_by' => self::int(true),
+                'kind' => ['type' => 'string', 'enum' => ['member', 'customer'], 'description' => '`customer` when a customer invited a colleague (team invitations).'],
             ], ['id', 'email', 'role_id', 'role_name', 'status', 'expires_at', 'created_at']),
             'InvitationListResponse' => self::listEnvelope('InvitationItem'),
             'InvitationItemResponse' => self::dataEnvelope(SchemaBuilder::ref('InvitationItem')),
@@ -11365,6 +11366,7 @@ final class CoreApiSchemas
                 'role_name' => self::str(true),
                 'role_customer_safe' => self::bool(true),
                 'allowed_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'customer_invites' => self::bool(),
                 'eligible_roles' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupEligibleRole')],
                 'pending_count' => self::int(),
                 'workspace_slug' => self::str(true),
@@ -11373,7 +11375,7 @@ final class CoreApiSchemas
                 'join_providers' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupJoinProvider')],
                 'updated_at' => self::str(true),
             ], [
-                'mode', 'role_id', 'role_name', 'role_customer_safe', 'allowed_domains',
+                'mode', 'role_id', 'role_name', 'role_customer_safe', 'allowed_domains', 'customer_invites',
                 'eligible_roles', 'pending_count', 'workspace_slug', 'bot_check_ready',
                 'email_signup_ready', 'join_providers', 'updated_at',
             ]),
@@ -11392,7 +11394,32 @@ final class CoreApiSchemas
                     'items' => ['type' => 'string'],
                     'description' => 'Email domains that may sign up, like `example-bakery.com`. Empty means any address.',
                 ],
+                'customer_invites' => self::bool() + [
+                    'description' => 'Whether customers may invite colleagues into their own role, as customers (POST /api/v1/team-invitations). Off by default.',
+                ],
             ], []),
+            'TeamInvitationItem' => self::object([
+                'id' => self::int(),
+                'email' => self::str(),
+                'status' => ['type' => 'string', 'enum' => ['pending', 'accepted', 'revoked', 'superseded', 'expired']],
+                'expires_at' => self::str(),
+                'created_at' => self::str(),
+            ], ['id', 'email', 'status', 'expires_at', 'created_at']),
+            'TeamInvitationListResponse' => self::dataEnvelope(self::object([
+                'enabled' => self::bool(),
+                'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('TeamInvitationItem')],
+            ], ['enabled', 'items'])),
+            'TeamInvitationCreateRequest' => self::object([
+                'email' => self::str() + ['description' => 'The colleague\'s email address. They join in your own role, as a customer.'],
+            ], ['email']),
+            'TeamInvitationCreateResponse' => self::dataEnvelope(self::object([
+                'status' => ['type' => 'string', 'enum' => ['sent_if_possible']],
+                'message' => self::str(),
+            ], ['status', 'message'])),
+            'TeamInvitationRevokeResponse' => self::dataEnvelope(self::object([
+                'id' => self::int(),
+                'status' => ['type' => 'string', 'enum' => ['revoked']],
+            ], ['id', 'status'])),
             'SignupRequestItem' => self::object([
                 'id' => self::int(),
                 'email' => self::str(),
@@ -13115,6 +13142,39 @@ final class CoreApiSchemas
                     ],
                 ],
             ],
+            self::ungatedRoute('GET', '/api/team-invitations', [
+                'summary' => 'Whether I may invite my team, and the invitations I sent',
+                'description' => 'For a person who is only a customer in this workspace (#1872). '
+                    . '`enabled` mirrors Settings > Sign-up > customer invites.',
+                'tags' => ['invitations'],
+                'responses' => [
+                    200 => self::jsonResponse('My team invitations, newest first', 'TeamInvitationListResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/team-invitations', [
+                'summary' => 'Invite a colleague into my own role, as a customer',
+                'description' => 'Only for a person who is only a customer here, when the workspace turned customer '
+                    . 'invites on. The colleague joins in the inviter\'s own role as a customer, never as staff. '
+                    . 'The answer is the same whether or not an invitation went out, so it reveals nobody. '
+                    . 'Plugins may refuse (409) or annotate the invitation through `membership.customer_inviting`. '
+                    . 'The email needs the instance\'s mail transport.',
+                'tags' => ['invitations'],
+                'request' => 'TeamInvitationCreateRequest',
+                'responses' => [
+                    202 => self::jsonResponse('Sent if the address can join', 'TeamInvitationCreateResponse'),
+                    409 => self::errorResponse('The inviter\'s role cannot be passed on, or a plugin refused the invitation'),
+                    422 => self::errorResponse('Invalid email address, or a domain the workspace does not accept'),
+                    429 => self::errorResponse('Too many invitations sent'),
+                ] + self::authErrors(),
+            ]),
+            self::ungatedRoute('DELETE', '/api/team-invitations/{id:\d+}', [
+                'summary' => 'Withdraw an invitation I sent',
+                'tags' => ['invitations'],
+                'responses' => [
+                    200 => self::jsonResponse('Withdrawn', 'TeamInvitationRevokeResponse'),
+                    404 => self::errorResponse('You have no open invitation with that id'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/invitations', 'users:read', [
                 'summary' => "List the caller's own tenant's invitations",
                 'tags' => ['invitations'],

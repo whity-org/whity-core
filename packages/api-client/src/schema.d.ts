@@ -9039,6 +9039,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/team-invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether I may invite my team, and the invitations I sent
+         * @description For a person who is only a customer in this workspace (#1872). `enabled` mirrors Settings > Sign-up > customer invites.
+         */
+        get: operations["get_api_v1_team_invitations"];
+        put?: never;
+        /**
+         * Invite a colleague into my own role, as a customer
+         * @description Only for a person who is only a customer here, when the workspace turned customer invites on. The colleague joins in the inviter's own role as a customer, never as staff. The answer is the same whether or not an invitation went out, so it reveals nobody. Plugins may refuse (409) or annotate the invitation through `membership.customer_inviting`. The email needs the instance's mail transport.
+         */
+        post: operations["post_api_v1_team_invitations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team-invitations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Withdraw an invitation I sent */
+        delete: operations["delete_api_v1_team_invitations_id"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenants": {
         parameters: {
             query?: never;
@@ -14244,6 +14285,11 @@ export interface components {
             expires_at: string;
             created_at: string;
             invited_by?: number | null;
+            /**
+             * @description `customer` when a customer invited a colleague (team invitations).
+             * @enum {string}
+             */
+            kind?: "member" | "customer";
         };
         InvitationItemResponse: {
             data: components["schemas"]["InvitationItem"];
@@ -16890,6 +16936,7 @@ export interface components {
             role_name: string | null;
             role_customer_safe: boolean | null;
             allowed_domains: string[];
+            customer_invites: boolean;
             eligible_roles: components["schemas"]["SignupEligibleRole"][];
             pending_count: number;
             workspace_slug: string | null;
@@ -16911,6 +16958,8 @@ export interface components {
             role_id?: number | null;
             /** @description Email domains that may sign up, like `example-bakery.com`. Empty means any address. */
             allowed_domains?: string[];
+            /** @description Whether customers may invite colleagues into their own role, as customers (POST /api/v1/team-invitations). Off by default. */
+            customer_invites?: boolean;
         };
         SimpleMessageResponse: {
             message: string;
@@ -17357,6 +17406,38 @@ export interface components {
         };
         TaskaatConnectionResponse: {
             data: components["schemas"]["TaskaatConnection"];
+        };
+        TeamInvitationCreateRequest: {
+            /** @description The colleague's email address. They join in your own role, as a customer. */
+            email: string;
+        };
+        TeamInvitationCreateResponse: {
+            data: {
+                /** @enum {string} */
+                status: "sent_if_possible";
+                message: string;
+            };
+        };
+        TeamInvitationItem: {
+            id: number;
+            email: string;
+            /** @enum {string} */
+            status: "pending" | "accepted" | "revoked" | "superseded" | "expired";
+            expires_at: string;
+            created_at: string;
+        };
+        TeamInvitationListResponse: {
+            data: {
+                enabled: boolean;
+                items: components["schemas"]["TeamInvitationItem"][];
+            };
+        };
+        TeamInvitationRevokeResponse: {
+            data: {
+                id: number;
+                /** @enum {string} */
+                status: "revoked";
+            };
         };
         Tenant: {
             id: number;
@@ -66457,6 +66538,243 @@ export interface operations {
             };
             /** @description Taskaat could not be reached */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_team_invitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description My team invitations, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamInvitationListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_team_invitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamInvitationCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Sent if the address can join */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamInvitationCreateResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The inviter's role cannot be passed on, or a plugin refused the invitation */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid email address, or a domain the workspace does not accept */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many invitations sent */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_team_invitations_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Withdrawn */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamInvitationRevokeResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description You have no open invitation with that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

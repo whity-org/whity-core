@@ -28,19 +28,23 @@ final class WorkspaceSignupSettings
     }
 
     /**
-     * @return array{mode: string, role_id: int|null, allowed_domains: list<string>, updated_at: string|null}
+     * `customer_invites` (#1872, migration 266): whether this workspace's
+     * customers may invite colleagues into their own role. Off unless an admin
+     * turned it on.
+     *
+     * @return array{mode: string, role_id: int|null, allowed_domains: list<string>, customer_invites: bool, updated_at: string|null}
      */
     public function get(int $tenantId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT mode, role_id, allowed_domains, updated_at
+            'SELECT mode, role_id, allowed_domains, customer_invites, updated_at
                FROM workspace_signup_settings WHERE tenant_id = :tid'
         );
         $stmt->execute([':tid' => $tenantId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!is_array($row)) {
-            return ['mode' => self::MODE_OFF, 'role_id' => null, 'allowed_domains' => [], 'updated_at' => null];
+            return ['mode' => self::MODE_OFF, 'role_id' => null, 'allowed_domains' => [], 'customer_invites' => false, 'updated_at' => null];
         }
 
         $mode = in_array($row['mode'], self::MODES, true) ? (string) $row['mode'] : self::MODE_OFF;
@@ -50,26 +54,33 @@ final class WorkspaceSignupSettings
             'mode' => $mode,
             'role_id' => $row['role_id'] !== null ? (int) $row['role_id'] : null,
             'allowed_domains' => is_array($domains) ? array_values(array_filter($domains, 'is_string')) : [],
+            // PDO hands booleans back as bool, int or '0'/'1'/'t'/'f' depending on the driver.
+            'customer_invites' => in_array($row['customer_invites'], [true, 1, '1', 't', 'true'], true),
             'updated_at' => $row['updated_at'] !== null ? (string) $row['updated_at'] : null,
         ];
     }
 
     /**
      * @param list<string> $allowedDomains Already normalised by {@see self::normaliseDomains()}.
+     * @param bool|null    $customerInvites Null keeps what is saved (off for a new row).
      */
-    public function save(int $tenantId, string $mode, ?int $roleId, array $allowedDomains, ?int $actorId): void
+    public function save(int $tenantId, string $mode, ?int $roleId, array $allowedDomains, ?int $actorId, ?bool $customerInvites = null): void
     {
+        $customerInvites ??= $this->get($tenantId)['customer_invites'];
         $params = [
             ':tid' => $tenantId,
             ':mode' => $mode,
             ':role_id' => $roleId,
             ':domains' => (string) json_encode($allowedDomains),
             ':actor' => $actorId,
+            ':invites' => $customerInvites ? 'on' : 'off',
+            ':on' => 'on',
         ];
 
         $update = $this->db->prepare(
             'UPDATE workspace_signup_settings
                 SET mode = :mode, role_id = :role_id, allowed_domains = :domains,
+                    customer_invites = (CASE WHEN CAST(:invites AS VARCHAR(3)) = CAST(:on AS VARCHAR(3)) THEN TRUE ELSE FALSE END),
                     updated_by = :actor, updated_at = NOW()
               WHERE tenant_id = :tid'
         );
@@ -79,11 +90,12 @@ final class WorkspaceSignupSettings
         }
 
         $this->db->prepare(
-            'INSERT INTO workspace_signup_settings (tenant_id, mode, role_id, allowed_domains, updated_by, updated_at)
-             VALUES (:tid, :mode, :role_id, :domains, :actor, NOW())
+            'INSERT INTO workspace_signup_settings (tenant_id, mode, role_id, allowed_domains, customer_invites, updated_by, updated_at)
+             VALUES (:tid, :mode, :role_id, :domains, (CASE WHEN CAST(:invites AS VARCHAR(3)) = CAST(:on AS VARCHAR(3)) THEN TRUE ELSE FALSE END), :actor, NOW())
              ON CONFLICT (tenant_id) DO UPDATE
                 SET mode = EXCLUDED.mode, role_id = EXCLUDED.role_id,
                     allowed_domains = EXCLUDED.allowed_domains,
+                    customer_invites = EXCLUDED.customer_invites,
                     updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at'
         )->execute($params);
     }

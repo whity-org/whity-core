@@ -74,6 +74,18 @@ final class InvitationService
     /** {@see self::invite()} outcomes. */
     public const INVITE_CREATED = 'created';
     public const INVITE_ALREADY_MEMBER = 'already_member';
+    /**
+     * {@see self::inviteCustomer()}: nothing sent, and the caller is told the
+     * same as for a sent one, so a customer can't learn who is here (#1872).
+     */
+    public const INVITE_NOT_SENT = 'not_sent';
+
+    /** `invitations.kind` (migration 266). */
+    public const KIND_MEMBER = 'member';
+    public const KIND_CUSTOMER = 'customer';
+
+    /** Most bytes of plugin annotations kept on one customer invitation (#1872). */
+    public const MAX_ANNOTATIONS_BYTES = 4096;
 
     /** {@see self::accept()} outcomes. */
     public const ACCEPT_INVALID = 'invalid';
@@ -168,6 +180,149 @@ final class InvitationService
             }
             throw $e;
         }
+    }
+
+    /**
+     * A customer invites a colleague into their own role, as a customer (#1872).
+     *
+     * The caller (the customer API) has already checked that customer invites
+     * are on, that the inviter is a customer here, and chosen the role: the
+     * inviter's own. What this decides is whether sending would step on anyone,
+     * and it answers the same for every refusal, because a customer cannot list
+     * the workspace's people and must not learn from this who is here. Nothing
+     * is sent when the address:
+     *  - already holds any membership here (active, staged or suspended);
+     *  - was turned away from this workspace's sign-up;
+     *  - has a pending invitation somebody else sent, so a customer can never
+     *    cancel an admin's invitation or another customer's by inviting over it.
+     * An invitation this same inviter sent is replaced (a resend).
+     *
+     * @param array<string, mixed> $annotations What plugins attached, kept as JSON
+     *        and handed back when the invitation is accepted.
+     * @return array{result: string, id: int, token: string}
+     */
+    public function inviteCustomer(
+        int $tenantId,
+        string $email,
+        int $roleId,
+        int $inviterProfileId,
+        array $annotations = [],
+        int $ttlDays = self::DEFAULT_TTL_DAYS,
+    ): array {
+        $notSent = ['result' => self::INVITE_NOT_SENT, 'id' => 0, 'token' => ''];
+        $rawToken = bin2hex(random_bytes(self::TOKEN_BYTES));
+        $expiresAt = gmdate('Y-m-d H:i:s', time() + $this->clampTtlDays($ttlDays) * 86400);
+
+        $ownTx = !$this->db->inTransaction();
+        if ($ownTx) {
+            $this->db->beginTransaction();
+        }
+
+        try {
+            $profileId = $this->profileIdForEmail($email);
+            $statuses = $profileId === null
+                ? ['active' => false, 'invited' => false, 'suspended' => false]
+                : $this->membershipStatuses($profileId, $tenantId);
+
+            if (in_array(true, $statuses, true)
+                || $this->wasTurnedAway($tenantId, $email)
+                || $this->hasPendingFromSomeoneElse($tenantId, $email, $inviterProfileId)
+            ) {
+                if ($ownTx) {
+                    $this->db->commit();
+                }
+
+                return $notSent;
+            }
+
+            $this->supersedeOutstanding($tenantId, $email);
+
+            $this->db->prepare(
+                'INSERT INTO invitations
+                     (tenant_id, email, role_id, ou_id, token_hash, status, invited_by, kind, annotations,
+                      expires_at, created_at, updated_at)
+                 VALUES (:tenant_id, :email, :role_id, NULL, :hash, :status, :invited_by, :kind, :annotations,
+                         :expires_at, NOW(), NOW())'
+            )->execute([
+                ':tenant_id' => $tenantId,
+                ':email' => $email,
+                ':role_id' => $roleId,
+                ':hash' => hash('sha256', $rawToken),
+                ':status' => self::STATUS_PENDING,
+                ':invited_by' => $inviterProfileId,
+                ':kind' => self::KIND_CUSTOMER,
+                ':annotations' => $annotations === [] ? null : (string) json_encode($annotations),
+                ':expires_at' => $expiresAt,
+            ]);
+            $id = (int) $this->db->lastInsertId();
+
+            if ($ownTx) {
+                $this->db->commit();
+            }
+
+            return ['result' => self::INVITE_CREATED, 'id' => $id, 'token' => $rawToken];
+        } catch (\Throwable $e) {
+            if ($ownTx && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * The invitations one customer sent here, newest first: only what they
+     * typed and what became of it.
+     *
+     * @return list<array{id: int, email: string, status: string, expires_at: string, created_at: string}>
+     */
+    public function listSentBy(int $tenantId, int $inviterProfileId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT id, email, status, expires_at, created_at FROM invitations
+              WHERE tenant_id = :tenant_id AND invited_by = :inviter AND kind = :kind
+              ORDER BY created_at DESC, id DESC
+              LIMIT 200'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':inviter' => $inviterProfileId, ':kind' => self::KIND_CUSTOMER]);
+
+        $now = gmdate('Y-m-d H:i:s');
+        $items = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $status = (string) $row['status'];
+            if ($status === self::STATUS_PENDING && (string) $row['expires_at'] <= $now) {
+                $status = 'expired';
+            }
+            $items[] = [
+                'id' => (int) $row['id'],
+                'email' => (string) $row['email'],
+                'status' => $status,
+                'expires_at' => (string) $row['expires_at'],
+                'created_at' => (string) $row['created_at'],
+            ];
+        }
+
+        return $items;
+    }
+
+    /** Withdraw a pending invitation, only when this customer sent it. */
+    public function revokeSentBy(int $invitationId, int $tenantId, int $inviterProfileId): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE invitations
+                SET status = :revoked, revoked_at = NOW(), updated_at = NOW()
+              WHERE id = :id AND tenant_id = :tenant_id AND invited_by = :inviter
+                AND kind = :kind AND status = :pending'
+        );
+        $stmt->execute([
+            ':revoked' => self::STATUS_REVOKED,
+            ':id' => $invitationId,
+            ':tenant_id' => $tenantId,
+            ':inviter' => $inviterProfileId,
+            ':kind' => self::KIND_CUSTOMER,
+            ':pending' => self::STATUS_PENDING,
+        ]);
+
+        return $stmt->rowCount() > 0;
     }
 
     /**
@@ -274,13 +429,13 @@ final class InvitationService
      * reported as `expired` here rather than in every caller.
      *
      * @return list<array{id: int, email: string, role_id: int, role_name: string, ou_id: int|null,
-     *                    status: string, expires_at: string, created_at: string, invited_by: int|null}>
+     *                    status: string, expires_at: string, created_at: string, invited_by: int|null, kind: string}>
      */
     public function listForTenant(int $tenantId): array
     {
         $stmt = $this->db->prepare(
             'SELECT i.id, i.email, i.role_id, i.ou_id, i.status, i.expires_at, i.created_at, i.invited_by,
-                    r.name AS role_name
+                    i.kind, r.name AS role_name
                FROM invitations i
                LEFT JOIN roles r ON r.id = i.role_id AND (r.tenant_id IS NULL OR r.tenant_id = i.tenant_id)
               WHERE i.tenant_id = :tenant_id
@@ -307,6 +462,8 @@ final class InvitationService
                 'expires_at' => $expiresAt,
                 'created_at' => (string) $row['created_at'],
                 'invited_by' => $row['invited_by'] !== null ? (int) $row['invited_by'] : null,
+                // `customer` when a customer invited a colleague (#1872).
+                'kind' => (string) ($row['kind'] ?? self::KIND_MEMBER),
             ];
         }
 
@@ -371,6 +528,7 @@ final class InvitationService
             $tenantId = (int) $invitation['tenant_id'];
             $email = (string) $invitation['email'];
             $profileId = $this->profileIdForEmail($email);
+            $isCustomer = ($invitation['kind'] ?? self::KIND_MEMBER) === self::KIND_CUSTOMER;
 
             if ($profileId === null && ($passwordHash === null || $passwordHash === '')) {
                 // Nothing has been written yet, so the invitation survives and
@@ -396,6 +554,11 @@ final class InvitationService
                 // Already here — burn the invitation so the link cannot be
                 // replayed, but add nothing.
                 $outcome = self::ACCEPT_ALREADY_MEMBER;
+            } elseif ($isCustomer && ($statuses['invited'] || $this->wasTurnedAway($tenantId, $email))) {
+                // A customer's invitation never completes a membership an admin
+                // staged, and never lets in somebody the workspace's sign-up
+                // turned away (#1872). The link stays as it is; the admin decides.
+                return $this->finish($ownTx, ['result' => self::ACCEPT_INVALID, 'tenant_id' => null, 'profile_id' => null]);
             } elseif ($statuses['suspended']) {
                 // A suspension is an administrator's decision; an invitation
                 // is not a way around it. The invitation stays live so it can
@@ -424,15 +587,17 @@ final class InvitationService
                 $granted = $this->membershipGrantPayload($profileId, $tenantId);
                 $outcome = self::ACCEPT_JOINED;
             } else {
+                // A customer's invitation makes a customer, never staff (#1872).
                 $this->db->prepare(
-                    'INSERT INTO memberships (profile_id, tenant_id, role_id, ou_id, status, created_at)
-                     VALUES (:profile_id, :tenant_id, :role_id, :ou_id, :status, NOW())'
+                    'INSERT INTO memberships (profile_id, tenant_id, role_id, ou_id, status, kind, created_at)
+                     VALUES (:profile_id, :tenant_id, :role_id, :ou_id, :status, :kind, NOW())'
                 )->execute([
                     ':profile_id' => $profileId,
                     ':tenant_id' => $tenantId,
                     ':role_id' => (int) $invitation['role_id'],
-                    ':ou_id' => $invitation['ou_id'] !== null ? (int) $invitation['ou_id'] : null,
+                    ':ou_id' => $isCustomer || $invitation['ou_id'] === null ? null : (int) $invitation['ou_id'],
                     ':status' => MembershipRepository::STATUS_ACTIVE,
+                    ':kind' => $isCustomer ? self::KIND_CUSTOMER : self::KIND_MEMBER,
                 ]);
                 $granted = $this->membershipGrantPayload($profileId, $tenantId);
                 $outcome = self::ACCEPT_JOINED;
@@ -473,7 +638,28 @@ final class InvitationService
             // database then discarded, and an append-only trail has no way to
             // take it back.
             if ($granted !== null) {
+                if ($isCustomer) {
+                    $granted['kind'] = self::KIND_CUSTOMER;
+                    $granted['invited_by'] = $invitation['invited_by'] !== null ? (int) $invitation['invited_by'] : null;
+                }
                 $this->announce('user.membership.added', $granted);
+                if ($isCustomer) {
+                    // The same event a sign-up raises, so a plugin hears of every
+                    // customer joining in one place; `via` says how, and the
+                    // inviter and annotations let it bind the newcomer (#1872).
+                    $this->announce('membership.customer_joined', [
+                        'tenant_id' => $tenantId,
+                        'profile_id' => $profileId,
+                        'membership_id' => $granted['membership_id'],
+                        'role_id' => $granted['role_id'],
+                        'role_name' => $granted['role_name'],
+                        'via' => 'invitation',
+                        'approved_by' => null,
+                        'invitation_id' => (int) $invitation['id'],
+                        'invited_by' => $granted['invited_by'],
+                        'annotations' => $this->decodeAnnotations($invitation['annotations'] ?? null),
+                    ]);
+                }
             }
 
             return $result;
@@ -486,6 +672,17 @@ final class InvitationService
     }
 
     // ── internals ────────────────────────────────────────────────────────────
+
+    /** @return array<string, mixed> */
+    private function decodeAnnotations(mixed $raw): array
+    {
+        if (!is_string($raw) || $raw === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
 
     /**
      * Commit (when we opened the transaction) and hand the outcome back.
@@ -519,7 +716,8 @@ final class InvitationService
 
         // Reached from the PUBLIC accept endpoint, which has no tenant context by construction — the 256-bit single-use token is the authority, and the row's own tenant_id is what the membership is then created in
         $stmt = $this->db->prepare(
-            'SELECT i.id, i.tenant_id, i.email, i.role_id, i.ou_id, t.name AS tenant_name,
+            'SELECT i.id, i.tenant_id, i.email, i.role_id, i.ou_id, i.kind, i.annotations, i.invited_by,
+                    t.name AS tenant_name,
                     p.display_name AS inviter_name, r.name AS role_name
                FROM invitations i
                LEFT JOIN tenants t ON t.id = i.tenant_id
@@ -557,6 +755,40 @@ final class InvitationService
             ':email' => $email,
             ':pending' => self::STATUS_PENDING,
         ]);
+    }
+
+    /** Whether this workspace's sign-up turned the address away (#1872). */
+    private function wasTurnedAway(int $tenantId, string $email): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT 1 FROM customer_signups
+              WHERE tenant_id = :tenant_id AND email = :email AND status = :rejected
+              LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':email' => $email, ':rejected' => 'rejected']);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /** Whether a live invitation for the address was sent by anyone but this customer. */
+    private function hasPendingFromSomeoneElse(int $tenantId, string $email, int $inviterProfileId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT 1 FROM invitations
+              WHERE tenant_id = :tenant_id AND email = :email AND status = :pending AND expires_at > :now
+                AND (kind <> :kind OR invited_by IS NULL OR invited_by <> :inviter)
+              LIMIT 1'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':email' => $email,
+            ':pending' => self::STATUS_PENDING,
+            ':now' => gmdate('Y-m-d H:i:s'),
+            ':kind' => self::KIND_CUSTOMER,
+            ':inviter' => $inviterProfileId,
+        ]);
+
+        return $stmt->fetchColumn() !== false;
     }
 
     /** The profile owning an address, or null when the address is unknown. */

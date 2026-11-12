@@ -61569,6 +61569,279 @@
                 ]
             }
         },
+        "/api/v1/team-invitations": {
+            "get": {
+                "operationId": "get_api_v1_team_invitations",
+                "summary": "Whether I may invite my team, and the invitations I sent",
+                "tags": [
+                    "invitations"
+                ],
+                "description": "For a person who is only a customer in this workspace (#1872). `enabled` mirrors Settings > Sign-up > customer invites.",
+                "responses": {
+                    "200": {
+                        "description": "My team invitations, newest first",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TeamInvitationListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "operationId": "post_api_v1_team_invitations",
+                "summary": "Invite a colleague into my own role, as a customer",
+                "tags": [
+                    "invitations"
+                ],
+                "description": "Only for a person who is only a customer here, when the workspace turned customer invites on. The colleague joins in the inviter's own role as a customer, never as staff. The answer is the same whether or not an invitation went out, so it reveals nobody. Plugins may refuse (409) or annotate the invitation through `membership.customer_inviting`. The email needs the instance's mail transport.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TeamInvitationCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Sent if the address can join",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TeamInvitationCreateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The inviter's role cannot be passed on, or a plugin refused the invitation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid email address, or a domain the workspace does not accept",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many invitations sent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/team-invitations/{id}": {
+            "delete": {
+                "operationId": "delete_api_v1_team_invitations_id",
+                "summary": "Withdraw an invitation I sent",
+                "tags": [
+                    "invitations"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Withdrawn",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TeamInvitationRevokeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "You have no open invitation with that id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/tenants": {
             "get": {
                 "operationId": "get_api_v1_tenants",
@@ -83723,6 +83996,14 @@
                     "invited_by": {
                         "type": "integer",
                         "nullable": true
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "member",
+                            "customer"
+                        ],
+                        "description": "`customer` when a customer invited a colleague (team invitations)."
                     }
                 },
                 "required": [
@@ -93754,6 +94035,9 @@
                             "type": "string"
                         }
                     },
+                    "customer_invites": {
+                        "type": "boolean"
+                    },
                     "eligible_roles": {
                         "type": "array",
                         "items": {
@@ -93790,6 +94074,7 @@
                     "role_name",
                     "role_customer_safe",
                     "allowed_domains",
+                    "customer_invites",
                     "eligible_roles",
                     "pending_count",
                     "workspace_slug",
@@ -93833,6 +94118,10 @@
                             "type": "string"
                         },
                         "description": "Email domains that may sign up, like `example-bakery.com`. Empty means any address."
+                    },
+                    "customer_invites": {
+                        "type": "boolean",
+                        "description": "Whether customers may invite colleagues into their own role, as customers (POST /api/v1/team-invitations). Off by default."
                     }
                 }
             },
@@ -95528,6 +95817,130 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/TaskaatConnection"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "TeamInvitationCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "description": "The colleague's email address. They join in your own role, as a customer."
+                    }
+                },
+                "required": [
+                    "email"
+                ]
+            },
+            "TeamInvitationCreateResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "sent_if_possible"
+                                ]
+                            },
+                            "message": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "status",
+                            "message"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "TeamInvitationItem": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "accepted",
+                            "revoked",
+                            "superseded",
+                            "expired"
+                        ]
+                    },
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "email",
+                    "status",
+                    "expires_at",
+                    "created_at"
+                ]
+            },
+            "TeamInvitationListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/TeamInvitationItem"
+                                }
+                            }
+                        },
+                        "required": [
+                            "enabled",
+                            "items"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "TeamInvitationRevokeResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "revoked"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "status"
+                        ]
                     }
                 },
                 "required": [
