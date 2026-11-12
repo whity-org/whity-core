@@ -20,7 +20,11 @@ use Whity\Sdk\PluginInterface;
  * name, which also matches any plugin channel ending in `:<name>`, so
  * `whatsapp` reaches whichever WhatsApp channel is installed. A channel that
  * is unknown, off for the workspace, or has no address for the person is
- * skipped. The message lands in the customer's conversation on that channel,
+ * skipped. Until channels say what address they need and can send templates,
+ * a channel other than email is used only in a conversation the customer
+ * already has open on it, and only when free text is allowed there now (a
+ * WhatsApp channel outside its window needs a template); otherwise the next
+ * channel in your order is tried, so list `email` last as the fallback. The message lands in the customer's conversation on that channel,
  * so staff see it in Messages, marked as sent by the plugin.
  *
  * The person must be a member (staff or customer) of the workspace. The host

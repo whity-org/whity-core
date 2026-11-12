@@ -14,6 +14,17 @@ use Whity\Sdk\PluginNamespace;
  * in the plugin's order that is on for the workspace and can reach the person
  * takes the message, in the customer's own conversation, with the source
  * `plugin.<slug>`.
+ *
+ * Until the channel contract says what kind of address a channel needs and
+ * can send templates (WHIT-980), a channel other than email is used only when
+ * BOTH hold:
+ *  - the customer already has an open conversation with the workspace on it
+ *    (the only proof the contract gives that their address is reachable
+ *    there), and
+ *  - a free-text message is allowed in it now (a WhatsApp-style channel that
+ *    requires a template outside its window refuses one).
+ * Otherwise it is skipped, and the next channel (email) takes the message, so
+ * a refused WhatsApp send never drops it.
  */
 final class HostCustomerMessages implements CustomerMessages
 {
@@ -35,16 +46,26 @@ final class HostCustomerMessages implements CustomerMessages
 
         foreach ($this->candidates($messaging->channels()->keys(), $channels) as $key) {
             try {
-                $messaging->send(
-                    $tenantId,
-                    Recipient::person($profileId),
-                    $body,
-                    new SendOptions(channel: $key, subject: $subject, source: $source),
-                );
+                if ($key === 'email') {
+                    $messaging->send(
+                        $tenantId,
+                        Recipient::person($profileId),
+                        $body,
+                        new SendOptions(channel: $key, subject: $subject, source: $source),
+                    );
+
+                    return $key;
+                }
+                $conversation = $messaging->conversations()->findOpenForCustomer($tenantId, $key, $profileId);
+                if ($conversation === null) {
+                    continue; // No address we know reaches them here.
+                }
+                // reply() refuses free text when the channel needs a template now.
+                $messaging->reply($tenantId, (int) $conversation['id'], null, $body, false, $source);
 
                 return $key;
             } catch (MessagingException) {
-                // Off, unknown, or no address for this person here: try the next.
+                // Off, unknown, no address, or only a template allowed now: try the next.
                 continue;
             }
         }
