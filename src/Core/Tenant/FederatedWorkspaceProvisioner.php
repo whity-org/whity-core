@@ -162,7 +162,7 @@ final class FederatedWorkspaceProvisioner
      */
     public function waitingWorkspaces(int $profileId): array
     {
-        // @tenant-guard-ignore: the person's OWN memberships across every tenant, as at sign-in (ADR 0005 §6)
+        // The person's OWN memberships across every tenant, as at sign-in (ADR 0005 §6)
         $stmt = $this->db->prepare(
             "SELECT t.name, m.status
                FROM memberships m
