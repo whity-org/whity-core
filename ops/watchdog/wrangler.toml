@@ -56,20 +56,12 @@ custom_domain = true
 # custom domain takes a single hostname down while everything else stays green,
 # and that is precisely the outage nobody is watching for.
 #
-# `pay` GREW A REAL HEALTH ENDPOINT on 2026-09-14, so it is no longer the weak
-# `/` probe this file used to warn about. `https://pay.whity.dev/health` answers
-# 200 while billing actually works and 503 the moment it does not, checking the
-# database, the queue, the scheduler and webhook deliveries. Because probeOnce()
-# puts the first 200 characters of a non-200 body into the failure detail, the
-# alert and the status page name WHICH of those failed rather than just saying
-# "pay is down".
-#
-# THE LIVE VALUE WAS CHANGED FIRST AND THIS FILE SECOND, which is the wrong
-# order and nearly cost the repoint: PROBE_TARGETS was edited in the dashboard
-# on 2026-09-14 while this block still said `/`, so the next `wrangler deploy`
-# would have silently reverted pay to the weaker probe. `[vars]` here REPLACES
-# the deployed vars on every deploy — it is the source of truth, not a copy of
-# it. Change it here, deploy, and verify; do not leave the two disagreeing.
+# `pay` IS NOT PROBED ANY MORE (2026-11-13). pay.whity.dev was retired when
+# Whity Pay became a plugin, and the hostname no longer resolves. The live
+# Worker had already dropped it in the dashboard; this file followed, because
+# `[vars]` here REPLACES the deployed vars on every deploy and would have put
+# back a probe that fails forever. Change it here, deploy, and verify; do not
+# leave the two disagreeing.
 # COMPONENTS, READ FROM THE APPLICATION rather than probed from here.
 #
 # The edge can only reach what has a public hostname, which is exactly the
@@ -97,7 +89,6 @@ PROBE_TARGETS = '''[
   {"name":"web",  "url":"https://app.whity.dev/"},
   {"name":"site", "url":"https://whity.dev/"},
   {"name":"docs", "url":"https://docs.whity.dev/"},
-  {"name":"pay",  "url":"https://pay.whity.dev/health"},
 
   {"name":"database",  "component":"database"},
   {"name":"queue",     "component":"queue"},
