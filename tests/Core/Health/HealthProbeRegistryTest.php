@@ -93,6 +93,9 @@ final class HealthProbeRegistryTest extends TestCase
         $pdo->exec('CREATE TABLE jobs (id INTEGER PRIMARY KEY, status TEXT, available_at TEXT)');
         $pdo->exec('CREATE TABLE scheduled_jobs (id INTEGER PRIMARY KEY, enabled INTEGER, last_run_at TEXT)');
         $pdo->exec("INSERT INTO scheduled_jobs (enabled, last_run_at) VALUES (1, datetime('now'))");
+        // The scheduler is judged by its own tick heartbeat (WHIT-1013).
+        $pdo->exec('CREATE TABLE app_settings (setting_key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT)');
+        $pdo->exec("INSERT INTO app_settings (setting_key, value) VALUES ('scheduler.last_tick_at', '" . time() . "')");
 
         $registry = new HealthProbeRegistry();
         $registry->register('Acme', [
