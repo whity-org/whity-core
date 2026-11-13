@@ -477,20 +477,68 @@ final class SchemaFromMigrations
      *
      * @var list<string>
      */
-    private const PG_TEMPLATE_ENV_INPUTS = [
+    public const PG_TEMPLATE_ENV_INPUTS = [
         'INITIAL_SYSTEM_ADMIN_PASSWORD',
         'INITIAL_ADMIN_PASSWORD',
         'INITIAL_USER_PASSWORD',
         'INITIAL_SUPERUSER_PASSWORD',
         'INITIAL_SYSTEM_ADMIN_EMAIL',
+        // Migration 238 reads these to decide whether rendering stays off.
+        'RENDER_SERVICE_URL',
+        'RENDER_SHARED_SECRET',
+        'COMPOSE_PROFILES',
     ];
 
-    /** Content hash of database/migrations, computed once per process. */
+    /** Content hash of every file the migrations read, computed once per process. */
     private static ?string $migrationsHash = null;
 
     /**
+     * Every file a migration run reads, sorted, as paths from the repository root.
+     *
+     * The migrations themselves; the translation catalogues migrations 121 and
+     * 124 seed from (database/i18n); and the source file of every Whity class a
+     * migration names, such as TranslationSync and CorePermissionDescriptions,
+     * which write rows of their own (WHIT-949). A change to any of them changes
+     * what a migration run produces, so it has to change the key: otherwise a
+     * PostgreSQL server keeps handing out a template built from the old copy.
+     *
+     * @return list<string>
+     */
+    public static function fingerprintFiles(): array
+    {
+        $root       = dirname(__DIR__, 2);
+        $migrations = glob($root . '/database/migrations/*.php') ?: [];
+
+        $files = $migrations;
+        $files = array_merge($files, glob($root . '/database/i18n/*.json') ?: []);
+        $files = array_merge($files, glob($root . '/database/i18n/*/*.json') ?: []);
+
+        foreach ($migrations as $migration) {
+            $code = (string) file_get_contents($migration);
+            if (preg_match_all('/\\\\?\bWhity\\\\([A-Za-z0-9_\\\\]+)/', $code, $m) === 0) {
+                continue;
+            }
+            foreach ($m[1] as $class) {
+                $file = $root . '/src/' . str_replace('\\', '/', $class) . '.php';
+                if (is_file($file)) {
+                    $files[] = $file;
+                }
+            }
+        }
+
+        $files = array_map(
+            static fn(string $file): string => substr(str_replace('\\', '/', $file), strlen(str_replace('\\', '/', $root)) + 1),
+            $files
+        );
+        $files = array_values(array_unique($files));
+        sort($files);
+
+        return $files;
+    }
+
+    /**
      * A stable fingerprint of everything the built schema depends on: the
-     * migration set, and the environment the migrations read.
+     * files a migration run reads, and the environment the migrations read.
      *
      * File CONTENTS, not mtimes: a fresh CI checkout rewrites every mtime but
      * must still hit the template another shard built moments earlier, while a
@@ -501,14 +549,12 @@ final class SchemaFromMigrations
     private static function migrationsFingerprint(): string
     {
         if (self::$migrationsHash === null) {
-            $dir   = dirname(__DIR__, 2) . '/database/migrations';
-            $files = glob($dir . '/*.php') ?: [];
-            sort($files);
+            $root = dirname(__DIR__, 2);
 
             $hash = hash_init('sha256');
-            foreach ($files as $file) {
-                hash_update($hash, basename($file));
-                hash_update_file($hash, $file);
+            foreach (self::fingerprintFiles() as $file) {
+                hash_update($hash, $file);
+                hash_update_file($hash, $root . '/' . $file);
             }
             self::$migrationsHash = hash_final($hash);
         }
@@ -1169,7 +1215,38 @@ final class SchemaFromMigrations
                 // bare NOW() in DEFAULT clauses (not already translated)
                 $sql = preg_replace('/\bDEFAULT\s+NOW\s*\(\)/i', "DEFAULT (datetime('now'))", $sql) ?? $sql;
 
-                return $sql;
+                return self::stableNow($sql);
+            }
+
+            /**
+             * Every other NOW() becomes SQLite's own clock, which holds still
+             * for a whole statement (WHIT-949).
+             *
+             * PostgreSQL's NOW() is the time the transaction started, so
+             * `INSERT ... SELECT ..., NOW(), NOW()` always writes created_at
+             * equal to updated_at. The PHP function NOW() used to call read the
+             * clock once per call instead. When a second ticked over between
+             * the two calls, the row got an updated_at one second after its
+             * created_at, and migration 124 (which claims only rows with
+             * updated_at <= created_at) left its source_managed at 0. Under CI
+             * load that happened in about one SQLite migration run in thirty,
+             * so the template and a real run could disagree on one random row.
+             * SQLite reads datetime('now') once per statement step, the same
+             * clock `DEFAULT (datetime('now'))` above already uses, in UTC.
+             *
+             * Quoted strings are left alone: text that says NOW() is not a call.
+             */
+            public static function stableNow(string $sql): string
+            {
+                if (stripos($sql, 'now') === false) {
+                    return $sql;
+                }
+
+                return preg_replace_callback(
+                    "/'(?:[^']|'')*'|(?<![\\w.])NOW\\s*\\(\\s*\\)/i",
+                    static fn(array $m): string => $m[0][0] === "'" ? $m[0] : "datetime('now')",
+                    $sql
+                ) ?? $sql;
             }
 
             /**
