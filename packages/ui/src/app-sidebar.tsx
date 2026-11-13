@@ -287,11 +287,15 @@ export function AppSidebar({
     searching ||
     expanded.includes(group.id)
 
+  // The list scrolls on its own but keeps at least 8rem. On a window too short
+  // for the logo, switchers, search and footer, the sidebar itself scrolls
+  // instead (overflow-y-auto on the aside), so the footer (the account menu:
+  // language, theme, sign out) is always reachable.
   const nav = (
     <nav
       data-slot="app-sidebar-nav"
       aria-label={navLabel}
-      className={cn("flex-1 space-y-3 overflow-x-hidden overflow-y-auto px-3 py-3", collapsed && "px-2")}
+      className={cn("min-h-32 flex-1 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3", collapsed && "px-2")}
     >
       {rendered.map(({ group, items }, index) => {
         const open = isGroupOpen(group)
@@ -399,7 +403,7 @@ export function AppSidebar({
   // Hidden in the icon rail: a 4rem-wide column has nowhere to put a text
   // field, and the collapse toggle is right there to widen it again.
   const search = searchable && !collapsed && (
-    <div className="px-2.5 pt-2.5">
+    <div className="shrink-0 px-2.5 pt-2.5">
       <div className="relative flex items-center">
         <IconSearch className="pointer-events-none absolute start-2 size-3.5 text-muted-foreground" />
         <input
@@ -453,7 +457,7 @@ export function AppSidebar({
         data-slot="app-sidebar"
         data-collapsed={collapsed || undefined}
         className={cn(
-          "fixed inset-y-0 start-0 z-50 flex h-dvh w-[min(85vw,20rem)] -translate-x-full flex-col border-e border-sidebar-border bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-sidebar-foreground transition-all duration-200 rtl:translate-x-full md:w-60 md:pt-0 md:pb-0",
+          "fixed inset-y-0 start-0 z-50 flex h-dvh overflow-y-auto overscroll-contain w-[min(85vw,20rem)] -translate-x-full flex-col border-e border-sidebar-border bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-sidebar-foreground transition-all duration-200 rtl:translate-x-full md:w-60 md:pt-0 md:pb-0",
           mobileOpen && "translate-x-0 rtl:translate-x-0",
           "md:sticky md:top-0 md:z-auto md:h-screen md:shrink-0 md:translate-x-0 rtl:md:translate-x-0",
           collapsed && "md:w-14",
@@ -470,7 +474,7 @@ export function AppSidebar({
         </button>
 
         {(header || tenantSwitcher || teamSwitcher) && (
-          <div className={cn("flex flex-col gap-3 px-3 pt-4 pe-14 md:pe-3", collapsed && "items-center md:px-2")}>
+          <div className={cn("flex shrink-0 flex-col gap-3 px-3 pt-4 pe-14 md:pe-3", collapsed && "items-center md:px-2")}>
             {header && <div className="px-1.5 pt-0.5 pb-1.5">{header}</div>}
             {(tenantSwitcher || teamSwitcher) && (
               <div className="flex flex-col gap-1.5">
@@ -490,7 +494,7 @@ export function AppSidebar({
           aria-label={collapsed ? expandAriaLabel : collapseAriaLabel}
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "hidden items-center justify-center gap-1.5 border-t border-sidebar-border px-3 py-2 text-xs text-muted-foreground outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring",
+            "hidden shrink-0 items-center justify-center gap-1.5 border-t border-sidebar-border px-3 py-2 text-xs text-muted-foreground outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring",
             !forcedRail && "md:flex"
           )}
         >
@@ -504,7 +508,7 @@ export function AppSidebar({
           )}
         </button>
 
-        {footer && <div className="border-t border-sidebar-border px-3 py-3">{footer}</div>}
+        {footer && <div className="shrink-0 border-t border-sidebar-border px-3 py-3">{footer}</div>}
       </aside>
     </>
   )
