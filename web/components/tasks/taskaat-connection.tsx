@@ -73,7 +73,7 @@ export function TaskaatConnection() {
   const lapsed = connection?.connected === true && connection.needs_reconnect === true;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 pb-16 md:px-0">
+    <div className="mx-auto max-w-3xl space-y-6 pb-16">
       <AdminHeader
         title={t('title', 'Tasks')}
         description={t('description', 'Tasks and boards live in Taskaat. Whity works with them through your workspace\'s Taskaat.')}

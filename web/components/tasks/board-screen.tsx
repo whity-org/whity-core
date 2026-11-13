@@ -37,7 +37,7 @@ export function BoardsScreen() {
   if (loaded.data?.gap === 'connect') return <TaskaatConnection />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 pb-16 md:px-0">
+    <div className="mx-auto max-w-5xl space-y-6 pb-16">
       <AdminHeader
         title={t('boards.title', 'Boards')}
         description={t('boards.description', 'Each board is a Taskaat project. The same tasks show in Tasks and on the board.')}
@@ -97,7 +97,7 @@ export function BoardScreen({ board }: { board: string }) {
   const columns: TaskColumn[] = ['todo', 'doing', 'review', 'done'];
 
   return (
-    <div className="space-y-6 px-4 pb-16">
+    <div className="space-y-6 pb-16 sm:px-4">
       <AdminHeader
         title={value?.project.name ?? t('boards.title', 'Boards')}
         breadcrumb={<Link href="/boards" className="hover:underline">{t('boards.title', 'Boards')}</Link>}
@@ -113,11 +113,28 @@ export function BoardScreen({ board }: { board: string }) {
       {loaded.loading && !loaded.data && <div className="space-y-2" role="status" aria-live="polite">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>}
 
       {value && (
+        <>
+        {/* On a phone the board shows one column at a time (TmBoards): these
+            pills jump to a column, and swiping moves between them. */}
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:hidden" role="group" aria-label={t('board.columns', 'Columns')}>
+          {columns.map((column) => (
+            <Button
+              key={column}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => document.querySelector(`[data-board-column="${column}"]`)?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })}
+            >
+              {titles[column]}
+              <span className="text-muted-foreground tabular-nums">{value.tasks.filter((task) => task.column === column).length}</span>
+            </Button>
+          ))}
+        </div>
         <Board aria-label={value.project.name}>
           {columns.map((column) => {
             const tasks = value.tasks.filter((task) => task.column === column);
             return (
-              <BoardColumn key={column} title={titles[column]} count={tasks.length} gate={column === 'review'}>
+              <BoardColumn key={column} data-board-column={column} title={titles[column]} count={tasks.length} gate={column === 'review'}>
                 {tasks.map((task) => (
                   <BoardCard
                     key={task.id}
@@ -134,6 +151,7 @@ export function BoardScreen({ board }: { board: string }) {
             );
           })}
         </Board>
+        </>
       )}
 
       <TaskPanel taskId={open} onClose={() => setOpen(null)} onChanged={loaded.refetch} />

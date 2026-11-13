@@ -161,6 +161,24 @@ export function useForcedRail(): boolean {
 }
 
 /** Case-insensitive substring match, tolerant of surrounding whitespace. */
+/**
+ * True below 768px, where the sidebar is an off-canvas drawer. A closed
+ * drawer is only moved off the screen, so it must also be made inert or its
+ * links stay in the tab order and in a screen reader's reading order.
+ */
+function usePhoneDrawer(): boolean {
+  const [phone, setPhone] = React.useState(false)
+  React.useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
+    const query = window.matchMedia("(max-width: 767.98px)")
+    const update = () => setPhone(query.matches)
+    update()
+    query.addEventListener?.("change", update)
+    return () => query.removeEventListener?.("change", update)
+  }, [])
+  return phone
+}
+
 function matches(label: string, normalizedQuery: string): boolean {
   return label.toLocaleLowerCase().includes(normalizedQuery)
 }
@@ -203,6 +221,7 @@ export function AppSidebar({
 
   const [mobileOpenState, setMobileOpenState] = React.useState(false)
   const mobileOpen = mobileOpenProp ?? mobileOpenState
+  const phoneDrawer = usePhoneDrawer()
   const setMobileOpen = (next: boolean) => {
     setMobileOpenState(next)
     onMobileOpenChange?.(next)
@@ -456,6 +475,7 @@ export function AppSidebar({
       <aside
         data-slot="app-sidebar"
         data-collapsed={collapsed || undefined}
+        inert={phoneDrawer && !mobileOpen ? true : undefined}
         className={cn(
           "fixed inset-y-0 start-0 z-50 flex h-dvh overflow-y-auto overscroll-contain w-[min(85vw,20rem)] -translate-x-full flex-col border-e border-sidebar-border bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-sidebar-foreground transition-all duration-200 rtl:translate-x-full md:w-60 md:pt-0 md:pb-0",
           mobileOpen && "translate-x-0 rtl:translate-x-0",

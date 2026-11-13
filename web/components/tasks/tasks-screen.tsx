@@ -95,7 +95,7 @@ export function TasksScreen() {
   const empty = loaded.data?.value !== null && loaded.data?.value !== undefined && groups.size === 0;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 pb-16 md:px-0">
+    <div className="mx-auto max-w-5xl space-y-6 pb-16">
       <AdminHeader
         title={t('title', 'Tasks')}
         description={t('list.description', 'Tasks live in Taskaat. Whity shows them with your people, agents and approvals.')}
@@ -150,8 +150,10 @@ export function TasksScreen() {
                     onClick={() => setOpen(task.id)}
                     className="flex min-h-12 w-full flex-wrap items-center gap-3 px-4 py-2 text-start outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/30"
                   >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-foreground">{task.title}</span>
+                    {/* On a phone the title takes its own line and the badges wrap
+                        under it; as a flex-1 item it shrank to a letter or two. */}
+                    <span className="min-w-0 flex-1 max-sm:basis-full">
+                      <span dir="auto" className="block truncate font-medium text-foreground">{task.title}</span>
                       {task.assignee && (
                         <span className="block truncate text-sm text-muted-foreground">
                           {task.assignee.for ? t('row.for', '{name} · for {for}', { name: task.assignee.name, for: task.assignee.for.name }) : task.assignee.name}
