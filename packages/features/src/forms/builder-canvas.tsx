@@ -283,7 +283,9 @@ export function BuilderCanvas({
                   <div className="flex flex-wrap items-center gap-2">
                     {!readOnly && <Icon name="drag" size={16} className="cursor-grab text-muted-foreground" aria-hidden />}
                     <span className="text-sm text-muted-foreground">{index + 1}.</span>
-                    <span className="text-sm font-medium">
+                    {/* dir="auto": a question typed in one language reads right in a
+                        workspace shown in the other (its full stop and question mark stay at its end). */}
+                    <span dir="auto" className="text-sm font-medium">
                       {label || t("builder.question.untitled", "Untitled question")}
                       {field.is_required && (
                         <span className="ms-1 text-destructive" aria-label={t("builder.required", "required")}>

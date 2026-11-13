@@ -21,7 +21,12 @@ function Board({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="board"
-      className={cn("grid auto-cols-[minmax(240px,1fr)] grid-flow-col items-start gap-3.5 overflow-x-auto pb-2", className)}
+      className={cn(
+        "grid auto-cols-[minmax(240px,1fr)] grid-flow-col items-start gap-3.5 overflow-x-auto pb-2",
+        // A phone shows one column at a time and swipes between them (TmBoards).
+        "max-sm:snap-x max-sm:snap-mandatory max-sm:auto-cols-[100%]",
+        className
+      )}
       {...props}
     />
   )
@@ -58,7 +63,7 @@ function BoardColumn({
       data-slot="board-column"
       data-gate={gate ? "" : undefined}
       aria-labelledby={headingId}
-      className={cn("grid gap-2 rounded-card p-2.5", gate ? "bg-warning-tint" : "bg-muted", className)}
+      className={cn("grid gap-2 rounded-card p-2.5 max-sm:snap-start", gate ? "bg-warning-tint" : "bg-muted", className)}
       {...props}
     >
       <header className="flex items-center gap-2 px-1 pt-0.5 pb-1 text-sm font-semibold">

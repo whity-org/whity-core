@@ -32,7 +32,9 @@ export function CalendarNav({ active }: { active: CalendarSection }) {
     <nav
       aria-label={t('nav.label', 'Calendar sections')}
       data-testid="calendar-nav"
-      className={cn(tabsListVariants({ variant: 'default' }), 'mb-6 h-auto w-full flex-wrap md:w-fit')}
+      // One row that scrolls sideways on a phone, like every tab strip, rather
+      // than three ragged rows; it wraps from 768px as before.
+      className={cn(tabsListVariants({ variant: 'default' }), 'mb-6 h-auto w-full md:w-fit md:flex-wrap')}
     >
       {tabs
         .filter((tab) => tab.show)
@@ -45,7 +47,7 @@ export function CalendarNav({ active }: { active: CalendarSection }) {
               data-testid={`calendar-nav-${tab.id}`}
               aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'relative inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-3 py-1 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring',
+                'relative inline-flex min-h-8 max-md:min-h-11 flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-3 py-1 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring',
                 isActive && 'bg-background text-foreground shadow-sm dark:border-input dark:bg-input/30'
               )}
             >

@@ -94,9 +94,9 @@ export function FormHeader({
     return (
       <CardHeader>
         <CardTitle>
-          <Heading className="text-lg font-semibold">{title}</Heading>
+          <Heading dir="auto" className="text-lg font-semibold">{title}</Heading>
         </CardTitle>
-        {hasDescription && <CardDescription className="text-sm">{description}</CardDescription>}
+        {hasDescription && <CardDescription dir="auto" className="text-sm">{description}</CardDescription>}
       </CardHeader>
     )
   }
@@ -116,13 +116,13 @@ export function FormHeader({
             style={{ backgroundImage: "linear-gradient(to bottom, rgb(0 0 0 / 0.2), rgb(0 0 0 / 0.55) 40%, rgb(0 0 0 / 0.75))" }}
           />
         )}
-        <Heading className="relative px-4 pt-8 pb-4 text-xl font-semibold text-balance sm:text-2xl" style={{ color: look.text }}>
+        <Heading dir="auto" className="relative px-4 pt-8 pb-4 text-xl font-semibold text-balance sm:text-2xl" style={{ color: look.text }}>
           {title}
         </Heading>
       </div>
       {hasDescription && (
         <CardHeader>
-          <CardDescription className={cn("text-sm")}>{description}</CardDescription>
+          <CardDescription dir="auto" className={cn("text-sm")}>{description}</CardDescription>
         </CardHeader>
       )}
     </>

@@ -4,6 +4,7 @@
     "notice": "Hand-written translations. Unlike the English catalogue one directory up, this file is NOT generated — it is the source of truth for this language and is edited by hand. Every key must also exist in the English catalogue (CI fails on one that does not); a key absent from here falls back to English at runtime. Seed it with `whity-cli i18n:sync --language=<code>`.",
     "keys": {
         "action.cancel": "إلغاء",
+        "board.columns": "الأعمدة",
         "boards.counts": "{open} مفتوحة · {done} منجزة",
         "boards.description": "كل لوحة مشروع في Taskaat. تظهر المهام نفسها في المهام وعلى اللوحة.",
         "boards.empty": "لا توجد لوحات بعد",
