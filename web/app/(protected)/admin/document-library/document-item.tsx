@@ -166,7 +166,7 @@ export function DocumentTitle({ row, lines = 1 }: { row: DocumentRow; lines?: 1 
         // Written as two whole literals, not `line-clamp-${lines}`: Tailwind
         // scans source text for class names, so an interpolated one is never
         // emitted and the card would silently fall back to no clamping at all.
-        lines === 2 ? 'line-clamp-2 break-words' : 'truncate',
+        lines === 2 ? 'line-clamp-2 break-words' : 'block truncate',
       ].join(' ')}
     >
       {row.title}
