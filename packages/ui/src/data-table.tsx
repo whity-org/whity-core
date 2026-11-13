@@ -1340,7 +1340,7 @@ type PhoneCellRole = "select" | "title" | "actions" | "line"
 
 const PHONE_CELL: Record<PhoneCellRole, string> = {
   select: "max-sm:order-1 max-sm:h-auto max-sm:p-0 max-sm:pt-0.5",
-  title: "max-sm:order-2 max-sm:h-auto max-sm:min-w-0 max-sm:flex-1 max-sm:p-0 max-sm:whitespace-normal max-sm:font-medium",
+  title: "max-sm:order-2 max-sm:h-auto max-sm:min-w-0 max-sm:flex-1 max-sm:overflow-hidden max-sm:p-0 max-sm:whitespace-normal max-sm:font-medium",
   actions: "max-sm:order-3 max-sm:ms-auto max-sm:h-auto max-sm:p-0",
   line:
     "max-sm:order-4 max-sm:flex max-sm:h-auto max-sm:min-w-0 max-sm:basis-full max-sm:items-baseline max-sm:justify-between max-sm:gap-3 max-sm:p-0 max-sm:pt-1.5 max-sm:text-end max-sm:whitespace-normal max-sm:break-words max-sm:before:shrink-0 max-sm:before:text-start max-sm:before:text-muted-foreground max-sm:before:content-[attr(data-label)]",
