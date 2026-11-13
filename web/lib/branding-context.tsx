@@ -98,6 +98,45 @@ export function BrandingProvider({
 }
 
 /**
+ * A workspace's public brand as a public page's API sends it (WHIT-1014): the
+ * booking page and the manage link carry the brand of the workspace they are
+ * for, because on a shared host the layout's branding is the instance's.
+ */
+export interface WorkspaceBrand {
+  name: string;
+  logo_wide_url: string | null;
+  logo_square_url: string | null;
+  /** The token sets derived from the main colour (TenantTheme), or null for the default. */
+  theme?: unknown;
+}
+
+/**
+ * Shows `children` in a workspace's own brand (WHIT-1014): the same branding
+ * context and theme `<style>` as the app-wide BrandingProvider, nested, so
+ * TenantLogo and every `primary` token below read the workspace's. Its style
+ * comes after the app's in the document, so it wins in both modes; the label
+ * colours on the brand colour are the server's (TenantTheme, 4.5:1). Without
+ * a brand, the app's branding stays as it is.
+ */
+export function WorkspaceBrandProvider({ brand, children }: { brand: WorkspaceBrand | null | undefined; children: React.ReactNode }) {
+  const outer = useBranding();
+  if (!brand) return <>{children}</>;
+  const branding: Branding = {
+    ...outer,
+    siteName: brand.name || outer.siteName,
+    logoWideUrl: brand.logo_wide_url,
+    logoSquareUrl: brand.logo_square_url,
+  };
+  const themeCss = brandThemeCss(brand.theme);
+  // Keyed: BrandingProvider takes `initial` once, so a different brand starts afresh.
+  return (
+    <BrandingProvider key={`${branding.siteName}|${branding.logoWideUrl}|${branding.logoSquareUrl}|${themeCss}`} initial={branding} initialThemeCss={themeCss}>
+      {children}
+    </BrandingProvider>
+  );
+}
+
+/**
  * Re-reads branding whenever the signed-in identity changes (sign-in, sign-out,
  * tenant switch). Renders nothing; sits inside AuthProvider.
  */

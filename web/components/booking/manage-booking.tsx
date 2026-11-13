@@ -65,6 +65,8 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
   const [attempt, setAttempt] = useState(0);
   const [taking, setTaking] = useState(false);
   const [takeProblem, setTakeProblem] = useState<string | null>(null);
+  // WHIT-1014: the workspace's brand, from the first answer (later answers leave it out).
+  const [brand, setBrand] = useState<PublicBooking['brand']>(null);
 
   useEffect(() => {
     if (!isManageToken(initialToken)) return;
@@ -74,6 +76,7 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
       .then((found) => {
         if (cancelled) return;
         setBooking(found);
+        setBrand(found.brand ?? null);
         setPhase('ready');
       })
       .catch((error: unknown) => {
@@ -169,7 +172,7 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
   };
 
   return (
-    <PublicShell wide>
+    <PublicShell wide brand={brand}>
       <Card className="border-t-4 border-t-primary text-sm" data-testid="manage-card">
         <CardHeader>
           <CardTitle className="text-xl font-semibold">
