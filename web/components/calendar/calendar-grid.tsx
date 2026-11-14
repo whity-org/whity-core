@@ -289,7 +289,7 @@ export function AgendaList({ days, items, timeZone, weekendDays, today, showPers
   const itemLabel = useItemLabel();
 
   return (
-    <ol className="divide-y divide-divider rounded-card border border-border bg-card" data-testid="calendar-agenda">
+    <ol className="space-y-3" data-testid="calendar-agenda">
       {days.map((date) => {
         const onDay = items
           .filter((item) => overlapsDay(item, date, timeZone))
@@ -298,11 +298,15 @@ export function AgendaList({ days, items, timeZone, weekendDays, today, showPers
         return (
           <li
             key={dateKey(date)}
-            className={cn('px-4 py-3', isWeekend(date, weekendDays) && 'bg-muted')}
+            className={cn(
+              'rounded-card border border-border bg-card px-4 py-3',
+              isWeekend(date, weekendDays) && 'bg-muted',
+              onDay.length === 0 && 'py-2'
+            )}
             data-testid="calendar-agenda-day"
             data-date={dateKey(date)}
           >
-            <h3 className="mb-2 flex items-baseline gap-2 text-sm font-medium text-foreground">
+            <h3 className={cn('flex items-baseline gap-2 text-sm font-medium text-foreground', onDay.length > 0 && 'mb-2')}>
               <button
                 type="button"
                 className="rounded-control outline-none hover:underline focus-visible:outline-2 focus-visible:outline-ring"
@@ -313,10 +317,13 @@ export function AgendaList({ days, items, timeZone, weekendDays, today, showPers
                 <span>{dates.calendarLabel(labelInstant(date, timeZone), 'dayMonth') ?? ''}</span>
               </button>
               {isToday && <span className="text-xs text-primary">{t('grid.today', 'Today')}</span>}
+              <span className="ms-auto text-sm font-normal text-muted-foreground" data-testid="calendar-agenda-count">
+                {onDay.length === 0
+                  ? t('grid.nothingBooked', 'Nothing booked')
+                  : t('grid.bookingCount', '{count} bookings', { count: onDay.length })}
+              </span>
             </h3>
-            {onDay.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('grid.nothing', 'Nothing on')}</p>
-            ) : (
+            {onDay.length === 0 ? null : (
               <ul className="space-y-2">
                 {onDay.map((item) => {
                   const from = item.allDay ? null : dates.time(item.starts_at);
@@ -366,11 +373,27 @@ export function MonthGrid({
   today,
   onOpen,
   onPickDay,
-}: Omit<GridProps, 'days' | 'showPerson'> & { weeks: CalendarDate[][]; month: number }) {
+  selected,
+  onSelectDay,
+}: Omit<GridProps, 'days' | 'showPerson'> & {
+  weeks: CalendarDate[][];
+  month: number;
+  /** Phone: the day whose list sits under the grid, and how a tap chooses one. */
+  selected?: CalendarDate | null;
+  onSelectDay?: (date: CalendarDate) => void;
+}) {
   const t = useTranslation('calendar');
   const dates = useDateDisplay({ timeZone });
   const words = useCalendarWords();
   const itemLabel = useItemLabel();
+  // Under 768px a tap chooses the day and its list opens under the grid; wider,
+  // it opens the Day view as before.
+  const pick = (date: CalendarDate) => {
+    const narrow =
+      typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 767px)').matches;
+    if (onSelectDay && narrow) onSelectDay(date);
+    else onPickDay?.(date);
+  };
 
   return (
     <div className="overflow-hidden rounded-card border border-border bg-card" data-testid="calendar-month-grid">
@@ -394,19 +417,22 @@ export function MonthGrid({
             const outside = date.month !== month;
             const isToday = sameDate(date, today);
             const shown = onDay.slice(0, 3);
+            const isSelected = selected !== undefined && selected !== null && sameDate(date, selected);
             return (
               <div
                 key={dateKey(date)}
                 className={cn(
-                  'min-h-16 border-s border-divider p-1 first:border-s-0 md:min-h-28',
-                  isWeekend(date, weekendDays) && 'bg-muted'
+                  'min-h-14 border-s border-divider p-1 first:border-s-0 md:min-h-28',
+                  isWeekend(date, weekendDays) && 'bg-muted',
+                  isSelected && 'max-md:bg-primary-tint'
                 )}
                 data-testid="calendar-month-day"
+                data-selected={isSelected ? '' : undefined}
                 data-date={dateKey(date)}
               >
                 <button
                   type="button"
-                  onClick={() => onPickDay?.(date)}
+                  onClick={() => pick(date)}
                   className={cn(
                     'grid size-8 place-items-center rounded-full text-sm tabular-nums outline-none hover:bg-card focus-visible:outline-2 focus-visible:outline-ring',
                     outside && 'text-muted-foreground',
@@ -424,7 +450,7 @@ export function MonthGrid({
                 {onDay.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => onPickDay?.(date)}
+                    onClick={() => pick(date)}
                     className="mt-1 block w-full rounded-md bg-primary-tint px-1 text-center text-xs font-medium text-primary-tint-foreground md:hidden"
                   >
                     {onDay.length}

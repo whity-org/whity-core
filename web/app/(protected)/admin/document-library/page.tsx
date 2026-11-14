@@ -12,7 +12,15 @@ import { labelRequestKey, resolveLabels } from '@/lib/api/resolve-labels';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
-import { IconChevronDown, IconFilePlus } from '@tabler/icons-react';
+import { IconChevronDown, IconFilePlus, IconFolder, IconStar } from '@tabler/icons-react';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@whity/ui/sheet';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@whity/ui/select';
 import { useTranslation } from '@whity/features/i18n';
 import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
 import { formNameFrom } from '@/lib/documents/template-name';
@@ -168,6 +176,37 @@ function storedLayout(): LibraryLayout {
   }
 }
 
+/** A collection as a chip under the Folder button (phone, PwLibrary). */
+function CollectionChip({
+  selected,
+  disabled,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={selected}
+      className={[
+        'flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm transition-colors',
+        selected
+          ? 'border-primary bg-primary-tint text-primary'
+          : 'border-border bg-background text-foreground hover:bg-muted',
+        disabled ? 'cursor-not-allowed opacity-50' : '',
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function DocumentLibraryPage() {
   const { apiClient, user } = useAuth();
   const { addToast } = useToast();
@@ -180,8 +219,9 @@ export default function DocumentLibraryPage() {
   const { has: hasCapability } = useCapabilities();
 
   const [viewKey, setViewKey] = useState(DEFAULT_VIEW);
-  // On a phone the folder rail folds behind a "Folders" button above the list,
-  // so the documents come first; choosing a folder folds it again.
+  // On a phone the folder rail is a bottom sheet behind the Folder button above
+  // the list (PwLibrary), so the documents come first; choosing a folder closes
+  // it.
   const [railOpen, setRailOpen] = useState(false);
   const [collectionId, setCollectionId] = useState<number | null>(null);
   const [anchorOuId, setAnchorOuId] = useState<number | null>(null);
@@ -298,6 +338,17 @@ export default function DocumentLibraryPage() {
   // invalidate the two useMemos below (which the lint rule catches, and which
   // would recompute the rail's props on every keystroke in the search box).
   const collectionList = useMemo(() => collections.data ?? [], [collections.data]);
+
+  // The phone's chips: Starred first (it is a folder), then the person's own
+  // collections.
+  const starredView = useMemo(
+    () => (views.data?.data ?? []).find((v) => v.key === 'starred') ?? null,
+    [views.data]
+  );
+  const phoneCollections = useMemo(
+    () => collectionList.filter((c) => c.system_key === null),
+    [collectionList]
+  );
 
   const starredCollection = useMemo(
     () => collectionList.find((c) => c.system_key === 'starred') ?? null,
@@ -720,26 +771,70 @@ export default function DocumentLibraryPage() {
 
       {!(views.forbidden || documents.forbidden) && (
       <div className="flex flex-col gap-4 md:flex-row md:gap-8">
-        <Button
-          type="button"
-          variant="outline"
-          className="justify-between md:hidden"
-          aria-expanded={railOpen}
-          aria-controls="document-rail-phone"
-          onClick={() => setRailOpen((open) => !open)}
-        >
-          <span className="min-w-0 truncate">
-            {t('organizer.rail.folders', 'Folders')}
-            {selectedView && (
-              <span className="text-muted-foreground">
-                {' · '}
-                {openCollection !== null ? openCollection.name : viewLabel(t, selectedView)}
+        <div className="flex flex-col gap-3 md:hidden">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 w-full justify-between"
+            aria-haspopup="dialog"
+            data-testid="folders-trigger"
+            aria-expanded={railOpen}
+            onClick={() => setRailOpen(true)}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <IconFolder size={20} aria-hidden className="shrink-0 text-primary" />
+              <span className="flex min-w-0 flex-col items-start text-start leading-tight">
+                <span className="text-xs text-muted-foreground">
+                  {t('organizer.rail.folder', 'Folder')}
+                </span>
+                <span className="w-full truncate" dir="auto">
+                  {openCollection !== null
+                    ? openCollection.name
+                    : selectedView
+                      ? viewLabel(t, selectedView)
+                      : t('organizer.view.all', 'All documents')}
+                </span>
               </span>
-            )}
-          </span>
-          <IconChevronDown size={16} aria-hidden className={railOpen ? 'rotate-180' : undefined} />
-        </Button>
-        <div id="document-rail-phone" className={railOpen ? 'block' : 'hidden md:block'}>
+            </span>
+            <IconChevronDown size={16} aria-hidden className="shrink-0" />
+          </Button>
+          {(starredView !== null || phoneCollections.length > 0) && (
+            <ul
+              className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+              aria-label={t('organizer.chips.label', 'Collections')}
+            >
+              {starredView !== null && (
+                <li className="shrink-0">
+                  <CollectionChip
+                    selected={viewKey === 'starred' && collectionId === null}
+                    disabled={!starredView.available}
+                    onClick={() =>
+                      viewKey === 'starred' ? selectView(DEFAULT_VIEW) : selectView('starred')
+                    }
+                  >
+                    <IconStar size={14} aria-hidden />
+                    {viewLabel(t, starredView)}
+                  </CollectionChip>
+                </li>
+              )}
+              {phoneCollections.map((collection) => (
+                <li key={collection.id} className="shrink-0">
+                  <CollectionChip
+                    selected={collectionId === collection.id}
+                    onClick={() =>
+                      collectionId === collection.id
+                        ? selectView(DEFAULT_VIEW)
+                        : selectCollection(collection.id)
+                    }
+                  >
+                    <span dir="auto">{collection.name}</span>
+                  </CollectionChip>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="hidden md:block">
         <ViewRail
           views={views.data?.data ?? []}
           groups={views.data?.groups ?? []}
@@ -753,6 +848,73 @@ export default function DocumentLibraryPage() {
           createDisabledReason={filingDisabledReason}
         />
         </div>
+        <Sheet open={railOpen} onOpenChange={setRailOpen}>
+          <SheetContent
+            side="bottom"
+            closeLabel={t('organizer.rail.close', 'Close')}
+            className="max-h-[85dvh] gap-3 overflow-y-auto rounded-t-2xl pb-[calc(1.25rem+env(safe-area-inset-bottom))] text-sm md:hidden"
+            data-testid="folders-sheet"
+          >
+            <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-border" />
+            <SheetHeader>
+              <SheetTitle className="text-lg font-semibold">
+                {t('organizer.rail.sheetTitle', 'Folders')}
+              </SheetTitle>
+              <SheetDescription className="sr-only">
+                {t('organizer.rail.sheetDescription', 'Choose which folder of documents to show')}
+              </SheetDescription>
+            </SheetHeader>
+            {units.length > 0 && (
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="text-xs text-muted-foreground">
+                  {t('organizer.anchor.label', 'Unit')}
+                </span>
+                <Select
+                  value={anchorOuId === null ? '__mine__' : String(anchorOuId)}
+                  onValueChange={(value) =>
+                    selectAnchor(value === '__mine__' ? null : Number(value))
+                  }
+                >
+                  <SelectTrigger
+                    className="h-12 w-full"
+                    aria-label={t('organizer.anchor.label', 'Unit')}
+                  >
+                    <SelectValue placeholder={t('organizer.anchor.mine', 'My own unit')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__mine__">
+                      {t('organizer.anchor.mine', 'My own unit')}
+                    </SelectItem>
+                    {units.map((ou) => (
+                      <SelectItem key={ou.id} value={String(ou.id)}>
+                        {ou.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t('organizer.anchor.sheetHint', 'The unit applies to the folders that work by unit.')}
+                </p>
+              </div>
+            )}
+            <ViewRail
+              roomy
+              views={views.data?.data ?? []}
+              groups={views.data?.groups ?? []}
+              collections={collectionList}
+              unavailableSubstrates={views.data?.unavailable_substrates ?? []}
+              selectedViewKey={viewKey}
+              selectedCollectionId={collectionId}
+              onSelectView={selectView}
+              onSelectCollection={selectCollection}
+              onCreateCollection={() => {
+                setRailOpen(false);
+                setCreatingCollection(true);
+              }}
+              createDisabledReason={filingDisabledReason}
+            />
+          </SheetContent>
+        </Sheet>
 
         <div className="min-w-0 flex-1">
           {/* The browser's chrome is offered only when there ARE folders.
@@ -830,6 +992,38 @@ export default function DocumentLibraryPage() {
               {' — '}
               {viewDescription(t, selectedView)}
             </p>
+          )}
+
+          {appliedSearch !== '' && !listError && !documents.loading && pagination !== null && (
+            // Search on a phone (PwLibrary): what was found and where. The API
+            // searches titles and numbers only (`?q=`) and sends no text matches
+            // or snippets, so there is one group, "In the title", and no "In the
+            // text" group to fill.
+            <div className="mb-3 md:hidden" data-testid="search-summary">
+              <p className="text-sm text-muted-foreground">
+                {t('organizer.search.results', '{count} results in {folder}')
+                  .replace('{count}', String(pagination.total))
+                  .replace(
+                    '{folder}',
+                    openCollection !== null
+                      ? openCollection.name
+                      : selectedView
+                        ? viewLabel(t, selectedView)
+                        : t('organizer.view.all', 'All documents')
+                  )}
+              </p>
+              <p className="mt-2 text-sm font-semibold">
+                {t('organizer.search.inTitle', 'In the title')}
+                {' · '}
+                {pagination.total}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t(
+                  'organizer.search.noText',
+                  'Searching inside the text of documents is not available yet.'
+                )}
+              </p>
+            </div>
           )}
 
           {listError ? (
