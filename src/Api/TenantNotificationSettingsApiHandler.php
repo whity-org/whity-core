@@ -93,6 +93,9 @@ final class TenantNotificationSettingsApiHandler
             ]);
 
             return Response::json(['data' => $this->repo->findForChannel($auth['tenantId'], $channel)], 200);
+        } catch (\InvalidArgumentException $e) {
+            // A value the settings registry refuses (WHIT-1036): the caller's to fix.
+            return Response::error('Validation failed', 422, ['_' => $e->getMessage()]);
         } catch (\Throwable $e) {
             $this->logger->error('[TenantNotificationSettings] update failed: ' . $e->getMessage());
             return Response::error('Failed to save sender configuration', 500);
