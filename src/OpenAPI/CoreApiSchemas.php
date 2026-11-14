@@ -8423,7 +8423,7 @@ final class CoreApiSchemas
                         'labelAr' => self::str(),
                     ], ['value', 'label', 'labelAr'])],
                 ], ['key', 'type', 'overridable', 'label', 'labelAr'])],
-                'form' => ['type' => 'object', 'description' => 'The Form printouts tab (design 3.4): the entitlement that unlocks it, each option with its standard value and English and Arabic labels, the footer parts and the marks limit.'],
+                'form' => ['type' => 'object', 'description' => 'The Form printouts tab (design 3.4): the entitlement that unlocks it, whether this workspace holds it (allowed), each option with its standard value and English and Arabic labels, the footer parts and the marks limit.'],
             ], ['tokens']),
             'FormPrintoutPreviewRequest' => self::object([
                 'form' => ['type' => 'object', 'description' => 'Unsaved `form` options (FormPrintoutStyle) to preview.'],

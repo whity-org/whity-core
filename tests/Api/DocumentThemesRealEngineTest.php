@@ -20,6 +20,9 @@ use Whity\Core\Document\Fields\DocumentFieldRegistry;
 use Whity\Core\Document\Print\SourceDocumentPrinter;
 use Whity\Core\Document\Theme\DocumentThemeRepository;
 use Whity\Core\Document\Theme\DocumentThemeResolver;
+use Whity\Core\Entitlement\EntitlementRegistry;
+use Whity\Core\Entitlement\EntitlementService;
+use Whity\Core\Entitlement\TenantEntitlementRepository;
 use Whity\Core\Ou\OuReachResolver;
 use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\RBAC\ResourceRoleAssignmentRepository;
@@ -291,6 +294,24 @@ final class DocumentThemesRealEngineTest extends TestCase
         self::assertSame(409, $this->call('create', 'POST', '/api/document-themes', [
             'key' => 'bakery', 'name' => 'Again', 'name_ar' => 'مرة أخرى',
         ])->getStatusCode(), 'a key is unique in its workspace');
+    }
+
+    /**
+     * WHIT-1024: the schema says whether this workspace may customise its form
+     * printouts, so the Form printouts tab shows a free plan's options locked.
+     */
+    public function testTheSchemaSaysWhetherFormPrintoutsMayBeCustomised(): void
+    {
+        $entitlements = new EntitlementService(new TenantEntitlementRepository($this->pdo));
+        $this->handler = new DocumentThemesApiHandler($this->themes, $this->resolver, $this->settings, $entitlements);
+
+        $paid = $this->data($this->call('schema', 'GET', '/api/document-themes/schema'));
+        self::assertTrue($paid['form']['allowed']);
+        self::assertSame('documents.form_printouts', $paid['form']['entitlement']);
+
+        $entitlements->set(self::TENANT, EntitlementRegistry::DOCUMENTS_FORM_PRINTOUTS, 'false');
+        $free = $this->data($this->call('schema', 'GET', '/api/document-themes/schema'));
+        self::assertFalse($free['form']['allowed']);
     }
 
     public function testAThemeNeedsBothNamesAndOnlyTheClosedTokens(): void
