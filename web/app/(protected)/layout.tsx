@@ -7,6 +7,7 @@ import { AppCommandPalette } from '@/components/shell/app-command-palette';
 import { MaintenanceNotice } from '@/components/shell/maintenance-notice';
 import { PlanLimitBanner } from '@/components/billing/plan-limit-banner';
 import { PhoneNav } from '@/components/shell/phone-nav';
+import { DataTableLabels } from '@/components/shell/data-table-labels';
 
 /**
  * The standard app shell: sidebar + a padded, max-width content column; on a
@@ -50,7 +51,9 @@ export default function ProtectedLayout({
           {/* TplPlanLimit (BM.11): past a plan limit, for people who can change the plan. */}
           <PlanLimitBanner />
           {/* Gutters 16px on phones, 24 from 640, 32 from 768 (register 4.5). */}
-          <div className="p-4 sm:p-6 md:p-8 max-w-7xl">{children}</div>
+          <div className="p-4 sm:p-6 md:p-8 max-w-7xl">
+            <DataTableLabels>{children}</DataTableLabels>
+          </div>
         </main>
         <AppCommandPalette />
         <PhoneNav />

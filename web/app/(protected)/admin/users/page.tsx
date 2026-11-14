@@ -419,6 +419,87 @@ export default function UsersPage() {
 
   const firstLoadFailed = error !== null && data === null;
 
+
+  // The list's filters: a row above the table on a computer, a sheet on a phone.
+  const filterControls = (
+    <>
+    {(roleOptions.data?.length ?? 0) > 0 && (
+      <FilterMenu
+        testId="users-filter-role"
+        label={t('users.filter.role', 'Role')}
+        options={(roleOptions.data ?? []).map((role) => ({ value: String(role.id), label: roleLabel(role.name) }))}
+        selected={roleFilter}
+        onChange={changeFilter(setRoleFilter)}
+      />
+    )}
+    {units.length > 0 && (
+      <FilterMenu
+        testId="users-filter-unit"
+        label={t('users.filter.unit', 'Unit')}
+        options={units.map((unit) => ({ value: String(unit.id), label: unit.name }))}
+        selected={unitFilter}
+        onChange={changeFilter(setUnitFilter)}
+      />
+    )}
+    <FilterMenu
+      testId="users-filter-two-step"
+      single
+      label={t('users.filter.twoStep', 'Two-step')}
+      options={[
+        { value: 'on', label: t('users.twoStep.on', 'On') },
+        { value: 'off', label: t('users.twoStep.off', 'Off') },
+      ]}
+      selected={twoStepFilter}
+      onChange={changeFilter(setTwoStepFilter)}
+    />
+    <ToggleGroup
+      required
+      label={t('users.filter.status', 'Status')}
+      value={statusFilter}
+      options={[
+        { value: 'active', label: t('users.filter.status.active', 'Active') },
+        { value: 'inactive', label: t('users.filter.status.inactive', 'Deactivated') },
+        { value: 'all', label: t('users.filter.status.all', 'All') },
+      ]}
+      onChange={(value) => changeFilter(setStatusFilter)(String(value))}
+    />
+    </>
+  );
+  const roleName = (id: string) => {
+    const role = (roleOptions.data ?? []).find((r) => String(r.id) === id);
+    return role ? roleLabel(role.name) : id;
+  };
+  const unitName = (id: string) => units.find((unit) => String(unit.id) === id)?.name ?? id;
+  const filterChips = [
+    ...roleFilter.map((id) => ({
+      id: `role-${id}`,
+      label: roleName(id),
+      onRemove: () => changeFilter(setRoleFilter)(roleFilter.filter((value) => value !== id)),
+    })),
+    ...unitFilter.map((id) => ({
+      id: `unit-${id}`,
+      label: unitName(id),
+      onRemove: () => changeFilter(setUnitFilter)(unitFilter.filter((value) => value !== id)),
+    })),
+    ...twoStepFilter.map((value) => ({
+      id: `two-step-${value}`,
+      label: `${t('users.filter.twoStep', 'Two-step')}: ${value === 'on' ? t('users.twoStep.on', 'On') : t('users.twoStep.off', 'Off')}`,
+      onRemove: () => changeFilter(setTwoStepFilter)([]),
+    })),
+    ...(statusFilter !== 'active'
+      ? [
+          {
+            id: 'status',
+            label:
+              statusFilter === 'inactive'
+                ? t('users.filter.status.inactive', 'Deactivated')
+                : t('users.filter.status.all', 'All'),
+            onRemove: () => changeFilter(setStatusFilter)('active'),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="space-y-6">
       <AdminHeader
@@ -432,7 +513,8 @@ export default function UsersPage() {
                   setTab('invitations');
                   setIsInviteOpen(true);
                 }}
-                className="gap-2"
+                // On a phone the list's bottom bar holds it (PwLists): one main button per view.
+                className="gap-2 max-sm:hidden"
               >
                 <IconPlus />
                 {t('users.invitePeople', 'Invite people')}
@@ -474,47 +556,9 @@ export default function UsersPage() {
             />
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2" data-testid="users-filters">
-                {(roleOptions.data?.length ?? 0) > 0 && (
-                  <FilterMenu
-                    testId="users-filter-role"
-                    label={t('users.filter.role', 'Role')}
-                    options={(roleOptions.data ?? []).map((role) => ({ value: String(role.id), label: roleLabel(role.name) }))}
-                    selected={roleFilter}
-                    onChange={changeFilter(setRoleFilter)}
-                  />
-                )}
-                {units.length > 0 && (
-                  <FilterMenu
-                    testId="users-filter-unit"
-                    label={t('users.filter.unit', 'Unit')}
-                    options={units.map((unit) => ({ value: String(unit.id), label: unit.name }))}
-                    selected={unitFilter}
-                    onChange={changeFilter(setUnitFilter)}
-                  />
-                )}
-                <FilterMenu
-                  testId="users-filter-two-step"
-                  single
-                  label={t('users.filter.twoStep', 'Two-step')}
-                  options={[
-                    { value: 'on', label: t('users.twoStep.on', 'On') },
-                    { value: 'off', label: t('users.twoStep.off', 'Off') },
-                  ]}
-                  selected={twoStepFilter}
-                  onChange={changeFilter(setTwoStepFilter)}
-                />
-                <ToggleGroup
-                  required
-                  label={t('users.filter.status', 'Status')}
-                  value={statusFilter}
-                  options={[
-                    { value: 'active', label: t('users.filter.status.active', 'Active') },
-                    { value: 'inactive', label: t('users.filter.status.inactive', 'Deactivated') },
-                    { value: 'all', label: t('users.filter.status.all', 'All') },
-                  ]}
-                  onChange={(value) => changeFilter(setStatusFilter)(String(value))}
-                />
+              {/* On a phone the same filters open from Filter in the list's bottom bar (PwLists). */}
+              <div className="flex flex-wrap items-center gap-2 max-sm:hidden" data-testid="users-filters">
+                {filterControls}
               </div>
             <DataTable
               ariaLabel={t('users.table.label', 'Users')}
@@ -569,6 +613,19 @@ export default function UsersPage() {
                   : undefined
               }
               rowActions={rowActions}
+              phone={{
+                filters: { content: filterControls, chips: filterChips, onClear: clearFilters },
+                mainAction:
+                  canCreate && !forbidden
+                    ? {
+                        label: t('users.invitePeople', 'Invite people'),
+                        onClick: () => {
+                          setTab('invitations');
+                          setIsInviteOpen(true);
+                        },
+                      }
+                    : undefined,
+              }}
               isLoading={isLoading}
               emptyState={
                 query.search.value !== ''
