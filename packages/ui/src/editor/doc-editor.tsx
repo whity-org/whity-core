@@ -142,6 +142,8 @@ export interface DocEditorProps {
   onExportPdf?: () => Promise<void> | void
   /** Label sheets: Print fills one label per record or CSV row (E.43); the screen asks which. */
   onPrintLabels?: () => void
+  /** More header controls from the host, before Preview (the theme picker, E.44). */
+  headerActions?: React.ReactNode
   /**
    * Comments and suggestions (M5): the margin rail, Suggesting mode and
    * Comment. Without it the editor offers Editing and Viewing only.
@@ -234,6 +236,7 @@ function DocEditor({
   publish,
   onExportPdf,
   onPrintLabels,
+  headerActions,
   collab,
   agents,
   perDocumentParts = false,
@@ -971,6 +974,7 @@ function DocEditor({
               )}
             </span>
           )}
+          {headerActions}
           {onPreview && !preview && (
             <Button variant="outline" size="sm" icon="view" onClick={onPreview}>
               {labels.preview}
