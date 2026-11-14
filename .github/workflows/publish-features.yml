@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "packages/features/**"
+      - ".github/actions/publish-npm-package/**"
 
 jobs:
   publish:
@@ -12,6 +13,7 @@ jobs:
     # Trusted publishing (WHIT-834): npm exchanges this job's GitHub OIDC
     # token for a short-lived publish credential, so there is no npm token
     # secret anywhere. id-token: write is what lets the job request it.
+    # npmjs.com trusts this file by name, so keep the file name as it is.
     permissions:
       contents: read
       id-token: write
@@ -19,43 +21,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v7
+      # Shared steps (WHIT-1027); they run inside this job.
+      - uses: ./.github/actions/publish-npm-package
         with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
-
-      # Trusted publishing needs npm 11.5.1 or newer; the npm bundled with
-      # Node may be older.
-      - name: Use a current npm
-        run: npm install -g npm@latest
-
-      - name: Install dependencies
-        working-directory: packages/features
-        run: npm install
-
-      # Mirrors packages/ui's guard (publish-ui.yml): this package is the
-      # extraction target for web/'s feature UI onto non-Next clients
-      # (Tauri/Vite SPA, Flutter) — a Next-only import here would silently
-      # break that promise for every consumer.
-      - name: Guard against Next.js-only imports
-        working-directory: packages/features
-        run: |
-          if grep -rEn "from ['\"]next/" src --include="*.tsx" --include="*.ts"; then
-            echo "::error::A packages/features component imports a Next.js-only module (next/*). This package must stay usable from a plain Vite/Tauri SPA — remove the Next-specific dependency (inject as a prop/adapter instead)."
-            exit 1
-          fi
-          echo "No Next.js-only imports found."
-
-      # Idempotent publish, same rationale as publish-ui.yml: a push touching
-      # packages/features without a version bump must not fail the build.
-      - name: Publish if the version is new
-        working-directory: packages/features
-        run: |
-          NAME=$(node -p "require('./package.json').name")
-          VERSION=$(node -p "require('./package.json').version")
-          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
-            echo "::notice::$NAME@$VERSION is already published — skipping. Bump the version in packages/features/package.json to publish a new release."
-          else
-            echo "Publishing $NAME@$VERSION"
-            npm publish --provenance --access public
-          fi
+          package: features
+          forbid-next-imports: "true"
