@@ -604,8 +604,8 @@ final class DocumentRoutingApiHandler
         // asks for them, and whether this act carries them, in the engine.
         try {
             $values = RouteStepInputs::parseValues($body['values'] ?? null);
-        } catch (\InvalidArgumentException $e) {
-            return Response::error($e->getMessage(), 422);
+        } catch (\InvalidArgumentException) {
+            return Response::error("'values' must be an object of one-line text values, by key", 422);
         }
 
         return [
