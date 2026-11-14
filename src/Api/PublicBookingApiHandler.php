@@ -303,11 +303,14 @@ final class PublicBookingApiHandler
             $service = is_array($booking['service'] ?? null) ? LocalizedLabel::preferred($booking['service']['name']) : '';
             $workspace = $this->tenants->findNameById($tenantId) ?? '';
             $body = Ics::calendar([[
-                'uid' => 'booking-' . $bookingId . '-' . $tenantId . '@whity',
+                'uid' => \Whity\Core\Calendar\EmailBookingMessenger::uid($tenantId, $bookingId),
                 'start' => Interval::fromApi($booking['starts_at']) ?? $this->booking->now(),
                 'end' => Interval::fromApi($booking['ends_at']) ?? $this->booking->now(),
                 'summary' => trim($service . ($workspace !== '' ? ' · ' . $workspace : '')),
                 'description' => (string) $booking['staff_name'],
+                // E2: the same revision as the emails' files, so opening this
+                // one never rolls a calendar back to an older time.
+                'sequence' => (int) ($booking['ics_sequence'] ?? 0),
             ]]);
 
             return new Response(200, $body, [

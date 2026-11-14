@@ -36,7 +36,7 @@ final class BookingRepository
         b.customer_phone, b.customer_note, b.starts_at, b.ends_at, b.blocks_from, b.blocks_until, b.status,
         b.hold_expires_at, b.source, b.price_minor, b.currency, b.payment_ref, b.reminder_due_at, b.reminder_sent_at,
         b.created_by_profile_id, b.cancelled_by, b.cancel_reason, b.cancelled_at, b.created_at, b.tenant_id,
-        b.room_id, b.checked_in_at, b.suggested_at';
+        b.room_id, b.checked_in_at, b.suggested_at, b.ics_sequence';
 
     public function __construct(private readonly PDO $db)
     {
@@ -142,7 +142,7 @@ final class BookingRepository
             'UPDATE calendar_bookings
                 SET profile_id = :profile_id, starts_at = :starts_at, ends_at = :ends_at, blocks_from = :blocks_from,
                     blocks_until = :blocks_until, reminder_due_at = :reminder_due_at, reminder_sent_at = NULL,
-                    updated_at = :now
+                    ics_sequence = ics_sequence + 1, updated_at = :now
               WHERE tenant_id = :tenant_id AND id = :id'
         )->execute([
             ':profile_id' => $profileId,
@@ -176,6 +176,8 @@ final class BookingRepository
         }
         if ($to === self::STATUS_CANCELLED) {
             $set[] = 'cancelled_at = :now';
+            // E2: the calendar file's cancel must outrank every file sent before it.
+            $set[] = 'ics_sequence = ics_sequence + 1';
         }
         if ($to === self::STATUS_CONFIRMED) {
             $set[] = 'hold_expires_at = NULL';
@@ -328,6 +330,8 @@ final class BookingRepository
             'checked_in_at' => $at($r['checked_in_at'] ?? null),
             'suggested_at' => $at($r['suggested_at'] ?? null),
             'reminder_sent_at' => $at($r['reminder_sent_at'] ?? null),
+            // The calendar file's revision (E2): raised by every move and the cancel.
+            'ics_sequence' => (int) ($r['ics_sequence'] ?? 0),
         ];
         if (array_key_exists('service_name', $r)) {
             $out['service_name'] = \Whity\Core\Form\LocalizedLabel::decode((string) $r['service_name']);

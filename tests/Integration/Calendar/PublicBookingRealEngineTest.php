@@ -101,7 +101,9 @@ final class PublicBookingRealEngineTest extends TestCase
             }
         };
         $tenants = new TenantHostRepository($this->pdo);
-        $this->service->setMessenger(new EmailBookingMessenger(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $this->settings), $this->settings, $tenants, 'https://app.example.com/booking'));
+        $messenger = new EmailBookingMessenger(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $this->settings), $this->settings, $tenants, 'https://app.example.com/booking');
+        $messenger->setClock(static fn (): DateTimeImmutable => new DateTimeImmutable(self::NOW, new DateTimeZone('UTC')));
+        $this->service->setMessenger($messenger);
         $this->feed = new CalendarFeed($this->pdo, $calendar, $bookings);
 
         $this->cake = $services->insert(1, [
@@ -242,8 +244,9 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertCount(1, $this->sent);
         self::assertSame('lina@example.com', $this->sent[0]['to']);
         self::assertStringContainsString('Booked: Cake tasting', $this->sent[0]['subject']);
-        self::assertStringContainsString('Monday 16 November 2026, 10:00 (Asia/Amman)', $this->sent[0]['text']);
-        self::assertStringContainsString('JOD 12.500', $this->sent[0]['text']);
+        // 3.4 `booking-confirmed`: the short date in the workspace's zone (10:00 in Amman).
+        self::assertMatchesRegularExpression('/When: Mon 16 Nov( 2026)?, 10:00/', $this->sent[0]['text']);
+        self::assertStringContainsString('Hello Lina Haddad, see you soon.', $this->sent[0]['text']);
         self::assertStringContainsString('https://app.example.com/booking/' . $booking['manage_token'], $this->sent[0]['text']);
     }
 
@@ -342,9 +345,27 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertStringContainsString('DTSTART:20261116T070000Z', $ics->content);
         self::assertStringContainsString('UID:booking-' . $made['id'] . '-1@whity', $ics->content);
 
-        // A reminder carries no file.
+        self::assertStringContainsString('METHOD:REQUEST', $ics->content);
+        self::assertStringContainsString('method=REQUEST', $ics->contentType);
+        self::assertStringContainsString('SEQUENCE:0', $ics->content);
+        self::assertStringContainsString('ATTENDEE;CN="Lina Haddad"', $ics->content);
+
+        // A move updates the same entry: same UID, a higher SEQUENCE.
+        $this->service->move(1, (int) $made['id'], new DateTimeImmutable('2026-11-16 08:00:00', new DateTimeZone('UTC')), null, false);
+        $moved = $captured[1]->attachments[0];
+        self::assertStringContainsString('METHOD:REQUEST', $moved->content);
+        self::assertStringContainsString('UID:booking-' . $made['id'] . '-1@whity', $moved->content);
+        self::assertStringContainsString('SEQUENCE:1', $moved->content);
+        self::assertStringContainsString('DTSTART:20261116T080000Z', $moved->content);
+
+        // The cancel removes it: METHOD:CANCEL, same UID, higher again.
         $this->service->cancel(1, (int) $made['id'], 'staff', '');
-        self::assertSame([], $captured[1]->attachments);
+        $cancel = $captured[2]->attachments[0];
+        self::assertStringContainsString('METHOD:CANCEL', $cancel->content);
+        self::assertStringContainsString('method=CANCEL', $cancel->contentType);
+        self::assertStringContainsString('STATUS:CANCELLED', $cancel->content);
+        self::assertStringContainsString('UID:booking-' . $made['id'] . '-1@whity', $cancel->content);
+        self::assertStringContainsString('SEQUENCE:2', $cancel->content);
     }
 
     public function testTheReminderIsQueuedSentOnceAndSkippedAfterAMove(): void
@@ -362,7 +383,7 @@ final class PublicBookingRealEngineTest extends TestCase
         $this->pdo->exec("UPDATE calendar_bookings SET reminder_due_at = '2026-11-15 03:00:00' WHERE tenant_id = 1");
         $before = count($this->sent);
         self::assertSame(['result' => 'sent'], $reminders->handle($payload));
-        self::assertStringContainsString('Reminder: Cake tasting', $this->sent[$before]['subject']);
+        self::assertStringContainsString('Tomorrow: Cake tasting', $this->sent[$before]['subject']);
         self::assertSame(['result' => 'nothing due'], $reminders->handle($payload), 'a second run sends nothing');
         self::assertCount($before + 1, $this->sent);
 
