@@ -20,8 +20,14 @@ use Whity\Core\Settings\SettingsService;
  * The language is the workspace's `locale` setting: Arabic when it starts with
  * `ar`, English otherwise. Whity keeps no per-person language on the server yet.
  *
- * Best-effort: {@see send()} reports false and logs instead of throwing, because
- * an email is a side channel and must never break the request that caused it.
+ * Every email core sends goes through here (E2), including the instance's own
+ * account emails (tenant 0, the instance's brand) and those that need a brand,
+ * a file or a thread of their own ({@see EmailOptions}).
+ *
+ * {@see send()} is best-effort: it reports false and logs instead of throwing,
+ * because an email is a side channel and must never break the request that
+ * caused it. {@see deliver()} lets the failure through for the few callers that
+ * have to report it.
  */
 final class BrandedEmailSender
 {
@@ -68,30 +74,25 @@ final class BrandedEmailSender
     }
 
     /**
-     * Render and send. True when the transport accepted it.
+     * The email as it would be sent, without sending it.
      */
-    public function send(int $tenantId, string $to, string $subject, EmailContent $content): bool
+    public function render(int $tenantId, EmailContent $content, ?EmailOptions $options = null): RenderedEmail
     {
-        $to = trim($to);
-        if ($to === '') {
+        return $this->layout->render($content, $options->branding ?? $this->branding($tenantId));
+    }
+
+    /**
+     * Render and send. True when the transport accepted it; a failure is
+     * logged and reported as false.
+     */
+    public function send(int $tenantId, string $to, string $subject, EmailContent $content, ?EmailOptions $options = null): bool
+    {
+        if (trim($to) === '') {
             return false;
         }
 
         try {
-            $branding = $this->branding($tenantId);
-            $rendered = $this->layout->render($content, $branding);
-            if ($tenantId > 0 && $this->mailer instanceof ThreadedMailer) {
-                // EM.1: from "the workspace, via Whity"; a white-label plan drops "via Whity".
-                $this->mailer->sendThreaded(new OutgoingEmail(
-                    to: $to,
-                    subject: $subject,
-                    textBody: $rendered->text,
-                    htmlBody: $rendered->html,
-                    fromName: self::fromName($branding, $content->language),
-                ));
-            } else {
-                $this->mailer->send($to, $subject, $rendered->text, $rendered->html);
-            }
+            $this->deliver($tenantId, $to, $subject, $content, $options);
 
             return true;
         } catch (\Throwable $e) {
@@ -99,6 +100,47 @@ final class BrandedEmailSender
 
             return false;
         }
+    }
+
+    /**
+     * Render and send, letting a failure through for the caller that has to
+     * tell someone the email didn't go (an administrator sending a reset link).
+     *
+     * A workspace's email (tenant above 0) comes from "the workspace, via
+     * Whity"; tenant 0 is the instance's own email and keeps the transport's
+     * from name. Attachments, Reply-To and the thread need a {@see ThreadedMailer};
+     * a mailer that can't send them sends the same email without them.
+     *
+     * @throws \Throwable when rendering or the transport fails
+     */
+    public function deliver(int $tenantId, string $to, string $subject, EmailContent $content, ?EmailOptions $options = null): void
+    {
+        $to = trim($to);
+        if ($to === '') {
+            return;
+        }
+        $branding = $options->branding ?? $this->branding($tenantId);
+        $rendered = $this->layout->render($content, $branding);
+        // EM.1: from "the workspace, via Whity"; a white-label plan drops "via Whity".
+        $fromName = $tenantId > 0 ? self::fromName($branding, $content->language) : null;
+
+        if ($this->mailer instanceof ThreadedMailer && ($fromName !== null || ($options?->needsHeaders() ?? false))) {
+            $this->mailer->sendThreaded(new OutgoingEmail(
+                to: $to,
+                subject: $subject,
+                textBody: $rendered->text,
+                htmlBody: $rendered->html,
+                fromName: $fromName,
+                messageId: $options?->messageId,
+                inReplyTo: $options?->inReplyTo,
+                references: $options->references ?? [],
+                replyTo: $options?->replyTo,
+                attachments: $options->attachments ?? [],
+            ));
+
+            return;
+        }
+        $this->mailer->send($to, $subject, $rendered->text, $rendered->html);
     }
 
     /**

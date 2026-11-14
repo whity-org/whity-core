@@ -123,7 +123,7 @@ final class TeamInvitationsRealEngineTest extends TestCase
             new DatabaseSharedStore($this->pdo),
             $settings,
             $this->hooks,
-            new InvitationMailer($mailer, 'https://app.test/invite', new EmailLayout(), $settings),
+            new InvitationMailer(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $settings), 'https://app.test/invite', $settings),
         );
         $this->admin = new WorkspaceSignupApiHandler(
             $this->pdo,

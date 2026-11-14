@@ -103,7 +103,7 @@ final class InvitationsApiRealEngineTest extends TestCase
             $audit,
             new DatabaseSharedStore($this->pdo),
             $this->settings,
-            new InvitationMailer($this->mailer, 'https://app.test/accept-invitation', new EmailLayout(), $this->settings)
+            new InvitationMailer(new \Whity\Core\Mail\BrandedEmailSender($this->mailer, new EmailLayout(), $this->settings), 'https://app.test/accept-invitation', $this->settings)
         );
         $this->acceptHandler = new InvitationAcceptHandler(
             $this->service,

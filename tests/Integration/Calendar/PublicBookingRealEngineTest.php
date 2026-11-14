@@ -101,7 +101,7 @@ final class PublicBookingRealEngineTest extends TestCase
             }
         };
         $tenants = new TenantHostRepository($this->pdo);
-        $this->service->setMessenger(new EmailBookingMessenger($mailer, new EmailLayout(), $this->settings, $tenants, 'https://app.example.com/booking'));
+        $this->service->setMessenger(new EmailBookingMessenger(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $this->settings), $this->settings, $tenants, 'https://app.example.com/booking'));
         $this->feed = new CalendarFeed($this->pdo, $calendar, $bookings);
 
         $this->cake = $services->insert(1, [
@@ -332,7 +332,7 @@ final class PublicBookingRealEngineTest extends TestCase
                 ($this->record)($email);
             }
         };
-        $this->service->setMessenger(new EmailBookingMessenger($mailer, new EmailLayout(), $this->settings, new TenantHostRepository($this->pdo), 'https://app.example.com/booking'));
+        $this->service->setMessenger(new EmailBookingMessenger(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $this->settings), $this->settings, new TenantHostRepository($this->pdo), 'https://app.example.com/booking'));
 
         $made = self::data($this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']))['data'];
         self::assertCount(1, $captured);

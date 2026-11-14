@@ -171,7 +171,7 @@ final class AwayAndIdentityCheckRealEngineTest extends TestCase
         };
         $settings = new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo));
 
-        return new IdentityCheck($this->pdo, new SigningChallengeRepository($this->pdo), null, new IdentityCheckMailer($mailer, new EmailLayout(), $settings));
+        return new IdentityCheck($this->pdo, new SigningChallengeRepository($this->pdo), null, new IdentityCheckMailer(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $settings)));
     }
 
     /** @param array<string, mixed> $body */

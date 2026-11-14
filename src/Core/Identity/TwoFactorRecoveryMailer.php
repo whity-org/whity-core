@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Identity;
 
-use Whity\Core\Mail\EmailBranding;
+use Whity\Core\Mail\BrandedEmailSender;
 use Whity\Core\Mail\EmailContent;
-use Whity\Core\Mail\EmailLayout;
-use Whity\Core\Mail\Mailer;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 
@@ -27,9 +25,8 @@ use Whity\Core\Settings\SettingsService;
 final class TwoFactorRecoveryMailer
 {
     public function __construct(
-        private readonly Mailer $mailer,
+        private readonly BrandedEmailSender $sender,
         private readonly string $confirmUrlBase,
-        private readonly EmailLayout $layout,
         private readonly SettingsService $settings,
     ) {}
 
@@ -45,7 +42,10 @@ final class TwoFactorRecoveryMailer
 
         $link = $this->buildLink($rawToken);
 
-        $rendered = $this->layout->render(
+        $this->sender->deliver(
+            0,
+            $email,
+            'Confirm your account-recovery request',
             new EmailContent(
                 heading: 'Confirm your account-recovery request',
                 paragraphs: [
@@ -58,9 +58,7 @@ final class TwoFactorRecoveryMailer
                 preheader: 'Confirm it so an administrator can review it. The link works for 1 hour.',
                 notice: 'Sent to ' . $email . '.',
             ),
-            EmailBranding::fromSettings($this->settings),
         );
-        $this->mailer->send($email, 'Confirm your account-recovery request', $rendered->text, $rendered->html);
     }
 
     /**
@@ -73,7 +71,10 @@ final class TwoFactorRecoveryMailer
             return;
         }
 
-        $rendered = $this->layout->render(
+        $this->sender->deliver(
+            0,
+            $email,
+            'Your account-recovery request was submitted',
             new EmailContent(
                 heading: 'Your account-recovery request was submitted',
                 paragraphs: [
@@ -82,9 +83,7 @@ final class TwoFactorRecoveryMailer
                 ],
                 notice: 'Sent to ' . $email . '.',
             ),
-            EmailBranding::fromSettings($this->settings),
         );
-        $this->mailer->send($email, 'Your account-recovery request was submitted', $rendered->text, $rendered->html);
     }
 
     private function eventEnabled(): bool

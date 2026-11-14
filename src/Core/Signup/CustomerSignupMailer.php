@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Whity\Core\Signup;
 
+use Whity\Core\Mail\BrandedEmailSender;
 use Whity\Core\Mail\EmailBranding;
 use Whity\Core\Mail\EmailContent;
-use Whity\Core\Mail\EmailLayout;
-use Whity\Core\Mail\Mailer;
-use Whity\Core\Settings\SettingsService;
+use Whity\Core\Mail\EmailOptions;
 
 /**
  * Sends the "confirm your email to join" link for a customer sign-up (WHIT-915).
@@ -26,22 +25,23 @@ use Whity\Core\Settings\SettingsService;
 final class CustomerSignupMailer
 {
     public function __construct(
-        private readonly Mailer $mailer,
+        private readonly BrandedEmailSender $sender,
         private readonly string $confirmUrlBase,
-        private readonly EmailLayout $layout,
-        private readonly SettingsService $settings,
     ) {
     }
 
     public function send(string $email, string $workspaceName, string $rawToken): void
     {
-        $branding = EmailBranding::fromSettings($this->settings);
+        $branding = $this->sender->branding(0);
         $workspace = trim($workspaceName) !== '' ? trim($workspaceName) : $branding->siteName;
 
         $base = rtrim($this->confirmUrlBase, '?&');
         $link = $base . (str_contains($base, '?') ? '&' : '?') . 'token=' . urlencode($rawToken);
 
-        $rendered = $this->layout->render(
+        $this->sender->deliver(
+            0,
+            $email,
+            'Confirm your email to join ' . $workspace,
             new EmailContent(
                 heading: 'Confirm your email to join ' . $workspace,
                 paragraphs: [
@@ -54,9 +54,7 @@ final class CustomerSignupMailer
                 preheader: 'The link works for 24 hours.',
                 notice: 'Sent because someone asked to join ' . $workspace . ' with this address.',
             ),
-            new EmailBranding($workspace, $branding->brandColor, $branding->supportEmail, $branding->footerText, $branding->whiteLabel),
+            new EmailOptions(branding: new EmailBranding($workspace, $branding->brandColor, $branding->supportEmail, $branding->footerText, $branding->whiteLabel)),
         );
-
-        $this->mailer->send($email, 'Confirm your email to join ' . $workspace, $rendered->text, $rendered->html);
     }
 }

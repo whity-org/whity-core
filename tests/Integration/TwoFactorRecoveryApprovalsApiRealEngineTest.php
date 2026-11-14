@@ -487,7 +487,7 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
         $noopMailer = new class implements Mailer {
             public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void {}
         };
-        $resetMailer = new PasswordResetMailer($noopMailer, 'https://app.test/reset-password', new EmailLayout(), $settings);
+        $resetMailer = new PasswordResetMailer(new \Whity\Core\Mail\BrandedEmailSender($noopMailer, new EmailLayout(), $settings), 'https://app.test/reset-password', $settings);
 
         return new TwoFactorRecoveryApprovalsApiHandler(
             $this->service,

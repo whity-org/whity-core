@@ -84,7 +84,7 @@ final class AdminPasswordResetApiHandlerRealEngineTest extends TestCase
         $this->handler = new AdminPasswordResetApiHandler(
             $this->pdo,
             $this->service,
-            new PasswordResetMailer($this->mailer, 'https://app.test/reset-password', new EmailLayout(), $this->settings),
+            new PasswordResetMailer(new \Whity\Core\Mail\BrandedEmailSender($this->mailer, new EmailLayout(), $this->settings), 'https://app.test/reset-password', $this->settings),
             new ProfileEmailRepository($this->pdo),
             new AuditLogger($this->pdo, new NullLogger()),
             $this->settings,

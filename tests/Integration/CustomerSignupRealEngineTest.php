@@ -121,7 +121,7 @@ final class CustomerSignupRealEngineTest extends TestCase
             $hostRepo,
             new HostResolver($hostRepo, 'whity.test'),
             $bot,
-            new CustomerSignupMailer($mailer, 'https://app.test/join/confirm', new EmailLayout(), $settingsService),
+            new CustomerSignupMailer(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $settingsService), 'https://app.test/join/confirm'),
             new DatabaseSharedStore($this->pdo),
             $audit
         );
