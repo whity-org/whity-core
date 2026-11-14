@@ -176,6 +176,27 @@ final class DocumentThemesRealEngineTest extends TestCase
         self::assertSame('document', $theme['sources']['letterhead.lines']);
     }
 
+    /** Design 3.4: the letterhead layout and the form printout options ride on the theme. */
+    public function testFormPrintoutOptionsAndTheLetterheadLayoutAreThemeOptions(): void
+    {
+        $this->themes->create(self::TENANT, 'irb', 'IRB', 'لجنة', 'whity.standard', ['accent' => '#7a1f3d'], self::OWNER);
+        $before = $this->resolver->resolve(self::TENANT, ['ref' => 'tenant.irb']);
+        self::assertArrayNotHasKey('form', $before['tokens'], 'only when a theme sets it');
+        self::assertArrayNotHasKey('layout', $before['tokens']['letterhead'], 'the start layout is the default and adds nothing');
+
+        $this->themes->update(self::TENANT, 'irb', 1, ['tokens' => [
+            'accent' => '#7a1f3d',
+            'letterhead' => ['layout' => 'centred'],
+            'form' => ['sectionStyle' => 'number', 'marks' => [['src' => '/api/files/7/content', 'alt' => 'ISO 9001:2015']]],
+        ]], self::OWNER);
+        $theme = $this->resolver->resolve(self::TENANT, ['ref' => 'tenant.irb', 'overrides' => ['letterhead' => ['layout' => 'bilingual']]]);
+
+        self::assertSame('bilingual', $theme['tokens']['letterhead']['layout'], 'a document may override the layout');
+        self::assertSame('number', $theme['tokens']['form']['sectionStyle']);
+        self::assertSame('tenant.irb', $theme['sources']['form']);
+        self::assertNotSame($before['hash'], $theme['hash']);
+    }
+
     public function testTheTitleFaceAndLargePrintAreThemeOptions(): void
     {
         $standard = $this->resolver->resolve(self::TENANT);

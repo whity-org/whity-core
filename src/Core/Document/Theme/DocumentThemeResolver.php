@@ -181,7 +181,7 @@ final class DocumentThemeResolver
         /** @var array<string, mixed> $letterhead */
         $letterhead = is_array($tokens['letterhead'] ?? null) ? $tokens['letterhead'] : [];
 
-        return [
+        $ordered = [
             'accent' => $tokens['accent'],
             'accentOnDark' => $tokens['accentOnDark'],
             'accentUse' => $tokens['accentUse'],
@@ -192,5 +192,18 @@ final class DocumentThemeResolver
             'titleFace' => in_array($tokens['titleFace'] ?? null, DocumentThemeTokens::TITLE_FACES, true) ? $tokens['titleFace'] : 'readex',
             'largePrint' => ($tokens['largePrint'] ?? false) === true,
         ];
+        // 3.4 keys only when set, so the hash of a theme that sets neither stays
+        // what it was before they existed (a published template compares it).
+        $layout = $letterhead['layout'] ?? 'start';
+        if (in_array($layout, DocumentThemeTokens::LAYOUTS, true) && $layout !== 'start') {
+            $ordered['letterhead']['layout'] = $layout;
+        }
+        if (is_array($tokens['form'] ?? null) && $tokens['form'] !== []) {
+            $form = $tokens['form'];
+            ksort($form);
+            $ordered['form'] = $form;
+        }
+
+        return $ordered;
     }
 }

@@ -12886,6 +12886,11 @@ export interface components {
                         logo?: "wide" | "square" | "none";
                         /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                         lines?: ("address" | "taxId" | "phone" | "email")[];
+                        /**
+                         * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                         * @enum {string}
+                         */
+                        layout?: "start" | "centred" | "bilingual";
                     };
                 } | null;
             } | null;
@@ -13221,6 +13226,11 @@ export interface components {
                     logo?: "wide" | "square" | "none";
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines?: ("address" | "taxId" | "phone" | "email")[];
+                    /**
+                     * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                     * @enum {string}
+                     */
+                    layout?: "start" | "centred" | "bilingual";
                 };
                 /**
                  * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
@@ -13229,6 +13239,77 @@ export interface components {
                 titleFace?: "readex" | "noto";
                 /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
                 largePrint?: boolean;
+                /** @description How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout. */
+                form?: {
+                    /**
+                     * @description Standard: `letterhead`.
+                     * @enum {string}
+                     */
+                    header?: "letterhead" | "centred" | "bilingual";
+                    /**
+                     * @description Standard: `decisionLine`.
+                     * @enum {string}
+                     */
+                    officeDetails?: "decisionLine" | "strip";
+                    /**
+                     * @description Standard: `topAndEnd`.
+                     * @enum {string}
+                     */
+                    decision?: "topAndEnd" | "top" | "end";
+                    /**
+                     * @description Standard: `mark`.
+                     * @enum {string}
+                     */
+                    sectionStyle?: "mark" | "number" | "eyebrow" | "rail" | "tab" | "plane";
+                    /**
+                     * @description Standard: `stacked`.
+                     * @enum {string}
+                     */
+                    questions?: "stacked" | "twoColumns";
+                    /**
+                     * @description Standard: `countAndContinued`.
+                     * @enum {string}
+                     */
+                    longAnswers?: "countAndContinued" | "plain";
+                    /**
+                     * @description Standard: `allOptions`.
+                     * @enum {string}
+                     */
+                    choices?: "allOptions" | "chosenOnly";
+                    /**
+                     * @description Standard: `word`.
+                     * @enum {string}
+                     */
+                    yesNo?: "word" | "threeColumns";
+                    /**
+                     * @description Standard: `collapseAndMark`.
+                     * @enum {string}
+                     */
+                    empty?: "collapseAndMark" | "hide" | "printAll";
+                    /**
+                     * @description Standard: `confirmedAndDrawn`.
+                     * @enum {string}
+                     */
+                    signatures?: "confirmedAndDrawn" | "confirmedOnly" | "withPaperLines";
+                    /**
+                     * @description Standard: `list`.
+                     * @enum {string}
+                     */
+                    approvals?: "list" | "cards";
+                    /** @description What the footer prints beside "Page x of y", which always prints. */
+                    footer?: {
+                        reference?: boolean;
+                        /** @enum {boolean} */
+                        pageCount?: true;
+                        marks?: boolean;
+                        qrEveryPage?: boolean;
+                    };
+                    /** @description Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan. */
+                    marks?: {
+                        src: string;
+                        alt?: string;
+                    }[];
+                };
             };
         };
         DocumentThemeListResponse: {
@@ -13249,6 +13330,11 @@ export interface components {
                 logo?: "wide" | "square" | "none";
                 /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                 lines?: ("address" | "taxId" | "phone" | "email")[];
+                /**
+                 * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                 * @enum {string}
+                 */
+                layout?: "start" | "centred" | "bilingual";
             };
         };
         DocumentThemePatch: {
@@ -13278,6 +13364,11 @@ export interface components {
                     logo?: "wide" | "square" | "none";
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines?: ("address" | "taxId" | "phone" | "email")[];
+                    /**
+                     * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                     * @enum {string}
+                     */
+                    layout?: "start" | "centred" | "bilingual";
                 };
                 /**
                  * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
@@ -13286,6 +13377,77 @@ export interface components {
                 titleFace?: "readex" | "noto";
                 /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
                 largePrint?: boolean;
+                /** @description How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout. */
+                form?: {
+                    /**
+                     * @description Standard: `letterhead`.
+                     * @enum {string}
+                     */
+                    header?: "letterhead" | "centred" | "bilingual";
+                    /**
+                     * @description Standard: `decisionLine`.
+                     * @enum {string}
+                     */
+                    officeDetails?: "decisionLine" | "strip";
+                    /**
+                     * @description Standard: `topAndEnd`.
+                     * @enum {string}
+                     */
+                    decision?: "topAndEnd" | "top" | "end";
+                    /**
+                     * @description Standard: `mark`.
+                     * @enum {string}
+                     */
+                    sectionStyle?: "mark" | "number" | "eyebrow" | "rail" | "tab" | "plane";
+                    /**
+                     * @description Standard: `stacked`.
+                     * @enum {string}
+                     */
+                    questions?: "stacked" | "twoColumns";
+                    /**
+                     * @description Standard: `countAndContinued`.
+                     * @enum {string}
+                     */
+                    longAnswers?: "countAndContinued" | "plain";
+                    /**
+                     * @description Standard: `allOptions`.
+                     * @enum {string}
+                     */
+                    choices?: "allOptions" | "chosenOnly";
+                    /**
+                     * @description Standard: `word`.
+                     * @enum {string}
+                     */
+                    yesNo?: "word" | "threeColumns";
+                    /**
+                     * @description Standard: `collapseAndMark`.
+                     * @enum {string}
+                     */
+                    empty?: "collapseAndMark" | "hide" | "printAll";
+                    /**
+                     * @description Standard: `confirmedAndDrawn`.
+                     * @enum {string}
+                     */
+                    signatures?: "confirmedAndDrawn" | "confirmedOnly" | "withPaperLines";
+                    /**
+                     * @description Standard: `list`.
+                     * @enum {string}
+                     */
+                    approvals?: "list" | "cards";
+                    /** @description What the footer prints beside "Page x of y", which always prints. */
+                    footer?: {
+                        reference?: boolean;
+                        /** @enum {boolean} */
+                        pageCount?: true;
+                        marks?: boolean;
+                        qrEveryPage?: boolean;
+                    };
+                    /** @description Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan. */
+                    marks?: {
+                        src: string;
+                        alt?: string;
+                    }[];
+                };
             };
         };
         DocumentThemeRef: {
@@ -13309,6 +13471,11 @@ export interface components {
                     logo?: "wide" | "square" | "none";
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines?: ("address" | "taxId" | "phone" | "email")[];
+                    /**
+                     * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                     * @enum {string}
+                     */
+                    layout?: "start" | "centred" | "bilingual";
                 };
             } | null;
             /**
@@ -13363,6 +13530,11 @@ export interface components {
                 logo?: "wide" | "square" | "none";
                 /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                 lines?: ("address" | "taxId" | "phone" | "email")[];
+                /**
+                 * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                 * @enum {string}
+                 */
+                layout?: "start" | "centred" | "bilingual";
             };
             /**
              * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
@@ -13371,6 +13543,77 @@ export interface components {
             titleFace?: "readex" | "noto";
             /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
             largePrint?: boolean;
+            /** @description How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout. */
+            form?: {
+                /**
+                 * @description Standard: `letterhead`.
+                 * @enum {string}
+                 */
+                header?: "letterhead" | "centred" | "bilingual";
+                /**
+                 * @description Standard: `decisionLine`.
+                 * @enum {string}
+                 */
+                officeDetails?: "decisionLine" | "strip";
+                /**
+                 * @description Standard: `topAndEnd`.
+                 * @enum {string}
+                 */
+                decision?: "topAndEnd" | "top" | "end";
+                /**
+                 * @description Standard: `mark`.
+                 * @enum {string}
+                 */
+                sectionStyle?: "mark" | "number" | "eyebrow" | "rail" | "tab" | "plane";
+                /**
+                 * @description Standard: `stacked`.
+                 * @enum {string}
+                 */
+                questions?: "stacked" | "twoColumns";
+                /**
+                 * @description Standard: `countAndContinued`.
+                 * @enum {string}
+                 */
+                longAnswers?: "countAndContinued" | "plain";
+                /**
+                 * @description Standard: `allOptions`.
+                 * @enum {string}
+                 */
+                choices?: "allOptions" | "chosenOnly";
+                /**
+                 * @description Standard: `word`.
+                 * @enum {string}
+                 */
+                yesNo?: "word" | "threeColumns";
+                /**
+                 * @description Standard: `collapseAndMark`.
+                 * @enum {string}
+                 */
+                empty?: "collapseAndMark" | "hide" | "printAll";
+                /**
+                 * @description Standard: `confirmedAndDrawn`.
+                 * @enum {string}
+                 */
+                signatures?: "confirmedAndDrawn" | "confirmedOnly" | "withPaperLines";
+                /**
+                 * @description Standard: `list`.
+                 * @enum {string}
+                 */
+                approvals?: "list" | "cards";
+                /** @description What the footer prints beside "Page x of y", which always prints. */
+                footer?: {
+                    reference?: boolean;
+                    /** @enum {boolean} */
+                    pageCount?: true;
+                    marks?: boolean;
+                    qrEveryPage?: boolean;
+                };
+                /** @description Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan. */
+                marks?: {
+                    src: string;
+                    alt?: string;
+                }[];
+            };
         };
         DocumentThemeUsage: {
             /** @description Documents whose draft names the theme */
@@ -16383,6 +16626,11 @@ export interface components {
                     logo: "wide" | "square" | "none";
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines: ("address" | "taxId" | "phone" | "email")[];
+                    /**
+                     * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                     * @enum {string}
+                     */
+                    layout?: "start" | "centred" | "bilingual";
                 };
                 /**
                  * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
@@ -16391,6 +16639,77 @@ export interface components {
                 titleFace: "readex" | "noto";
                 /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
                 largePrint: boolean;
+                /** @description How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout. */
+                form?: {
+                    /**
+                     * @description Standard: `letterhead`.
+                     * @enum {string}
+                     */
+                    header?: "letterhead" | "centred" | "bilingual";
+                    /**
+                     * @description Standard: `decisionLine`.
+                     * @enum {string}
+                     */
+                    officeDetails?: "decisionLine" | "strip";
+                    /**
+                     * @description Standard: `topAndEnd`.
+                     * @enum {string}
+                     */
+                    decision?: "topAndEnd" | "top" | "end";
+                    /**
+                     * @description Standard: `mark`.
+                     * @enum {string}
+                     */
+                    sectionStyle?: "mark" | "number" | "eyebrow" | "rail" | "tab" | "plane";
+                    /**
+                     * @description Standard: `stacked`.
+                     * @enum {string}
+                     */
+                    questions?: "stacked" | "twoColumns";
+                    /**
+                     * @description Standard: `countAndContinued`.
+                     * @enum {string}
+                     */
+                    longAnswers?: "countAndContinued" | "plain";
+                    /**
+                     * @description Standard: `allOptions`.
+                     * @enum {string}
+                     */
+                    choices?: "allOptions" | "chosenOnly";
+                    /**
+                     * @description Standard: `word`.
+                     * @enum {string}
+                     */
+                    yesNo?: "word" | "threeColumns";
+                    /**
+                     * @description Standard: `collapseAndMark`.
+                     * @enum {string}
+                     */
+                    empty?: "collapseAndMark" | "hide" | "printAll";
+                    /**
+                     * @description Standard: `confirmedAndDrawn`.
+                     * @enum {string}
+                     */
+                    signatures?: "confirmedAndDrawn" | "confirmedOnly" | "withPaperLines";
+                    /**
+                     * @description Standard: `list`.
+                     * @enum {string}
+                     */
+                    approvals?: "list" | "cards";
+                    /** @description What the footer prints beside "Page x of y", which always prints. */
+                    footer?: {
+                        reference?: boolean;
+                        /** @enum {boolean} */
+                        pageCount?: true;
+                        marks?: boolean;
+                        qrEveryPage?: boolean;
+                    };
+                    /** @description Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan. */
+                    marks?: {
+                        src: string;
+                        alt?: string;
+                    }[];
+                };
             };
             /** @description Where each token came from, by its path (`accent`, `letterhead.lines`…): a theme ref, `document` for an override, or `branding.main_color` */
             sources: {
