@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@whity/ui/card';
 import { Checkbox } from '@whity/ui/checkbox';
 import { ColorPicker } from '@whity/ui/color-picker';
@@ -21,6 +22,7 @@ export function DocumentsTab({
   resolved,
   readOnly,
   ar,
+  colourNote,
   onChange,
 }: {
   tokens: ThemeTokens;
@@ -29,6 +31,8 @@ export function DocumentsTab({
   resolved: ThemeTokens;
   readOnly: boolean;
   ar: boolean;
+  /** Under the print colour: how it reads on paper. */
+  colourNote?: ReactNode;
   onChange: (tokens: ThemeTokens) => void;
 }) {
   const t = useTranslation('documents');
@@ -139,7 +143,10 @@ export function DocumentsTab({
             </CardHeader>
             <CardContent className="grid gap-5">
               {group.tokens.map((token) => (
-                <div key={token.key}>{control(token)}</div>
+                <div key={token.key} className="grid gap-2">
+                  {control(token)}
+                  {token.key === 'accent' && colourNote}
+                </div>
               ))}
             </CardContent>
           </Card>

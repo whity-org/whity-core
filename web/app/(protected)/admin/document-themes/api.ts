@@ -26,20 +26,20 @@ export interface Trial {
 
 export interface ThemeScreen {
   schema: ThemeSchema;
-  /** The workspace's own theme, or null while it uses Whity's standard. */
-  theme: ThemeRow | null;
-  /** The workspace's other themes, to pick one as the workspace's instead of making one. */
-  others: ThemeRow[];
+  /** Every theme the workspace can use: Whity's standard first, then its own (not archived). */
+  themes: ThemeRow[];
+  /** The ref `documents.theme` points at: the workspace default. */
+  workspaceRef: string;
   /** The trial this workspace is on, or null. */
   trial: Trial | null;
 }
 
 /**
- * Everything the screen needs: the schema (with whether form printouts may be
- * customised), which theme is the workspace's (`default_for` holds
- * `workspace`), that theme with its resolution, and whether the workspace is
- * on a trial. The subscription is read for the trial alert only: a person who
- * can't see it (no settings:read) gets the screen without the alert.
+ * The list side of the screen: the schema (with whether form printouts may be
+ * customised), every theme with which one is the workspace's (`default_for`
+ * holds `workspace`), and whether the workspace is on a trial. The
+ * subscription is read for the trial alert only: a person who can't see it
+ * (no settings:read) gets the screen without the alert.
  */
 export async function loadThemeScreen(apiClient: ApiClient, fallback: string): Promise<ThemeScreen> {
   const [schema, list, subscription] = await Promise.all([
@@ -49,14 +49,67 @@ export async function loadThemeScreen(apiClient: ApiClient, fallback: string): P
       .then(async (r) => (r.ok ? ((await r.json()) as { data?: { status?: string | null; current_period_end?: string | null } }).data : null))
       .catch(() => null),
   ]);
-  const current = list.find((row) => row.default_for.includes('workspace'));
-  const others = list.filter((row) => row.scope === 'tenant' && !row.archived && row.ref !== current?.ref);
+  const themes = list.filter((row) => !row.archived).map((row) => ({ ...row, tokens: normaliseTokens(row.tokens) }));
+  const workspaceRef = themes.find((row) => row.default_for.includes('workspace'))?.ref ?? STANDARD_REF;
   const trial = subscription?.status === 'trialing' ? { endsAt: subscription.current_period_end ?? null } : null;
-  if (!current || current.ref === STANDARD_REF) {
-    return { schema, theme: null, others, trial };
-  }
-  const theme = await json<ThemeRow>(apiClient, `${BASE}/${encodeURIComponent(current.ref)}`, fallback);
-  return { schema, theme: { ...theme, tokens: normaliseTokens(theme.tokens) }, others, trial };
+  return { schema, themes, workspaceRef, trial };
+}
+
+/** One theme with what it prints with in this workspace (`resolved`). */
+export async function loadTheme(apiClient: ApiClient, ref: string, fallback: string): Promise<ThemeRow> {
+  const theme = await json<ThemeRow>(apiClient, `${BASE}/${encodeURIComponent(ref)}`, fallback);
+  return { ...theme, tokens: normaliseTokens(theme.tokens) };
+}
+
+/** How many published templates print with a theme; they change at their next publish. */
+export async function loadPublishedUsage(apiClient: ApiClient, ref: string): Promise<number> {
+  const response = await apiClient(`${BASE}/${encodeURIComponent(ref)}/usage`).catch(() => null);
+  if (!response?.ok) return 0;
+  const body = (await response.json().catch(() => null)) as { data?: { published?: unknown[] } } | null;
+  return Array.isArray(body?.data?.published) ? body.data.published.length : 0;
+}
+
+/** The company details the letterhead can print, for the preview. Empty when they can't be read. */
+export interface CompanyLines {
+  address: string;
+  taxId: string;
+  phone: string;
+  email: string;
+}
+
+export async function loadCompanyLines(apiClient: ApiClient, ar: boolean): Promise<CompanyLines> {
+  const empty = { address: '', taxId: '', phone: '', email: '' };
+  const response = await apiClient('/api/v1/settings').catch(() => null);
+  if (!response?.ok) return empty;
+  const body = (await response.json().catch(() => null)) as { data?: { effective?: Record<string, unknown> } } | null;
+  const s = body?.data?.effective ?? {};
+  const text = (key: string) => (typeof s[key] === 'string' ? (s[key] as string) : '');
+  return {
+    address: (ar && text('company.address_ar')) || text('company.address'),
+    taxId: text('company.tax_id'),
+    phone: text('company.phone'),
+    email: text('company.email'),
+  };
+}
+
+/**
+ * A new theme of the workspace's. Every workspace theme extends Whity's
+ * standard (plugin themes come later), so a new one starts as a copy of the
+ * settings of the theme it is made from. Returns the new theme's ref, or the
+ * message to show.
+ */
+export async function createTheme(
+  apiClient: ApiClient,
+  theme: { key: string; name: string; name_ar: string; tokens: ThemeTokens },
+  fallback: string
+): Promise<{ ref: string } | { problem: string }> {
+  const response = await apiClient(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...theme, extends: STANDARD_REF }),
+  });
+  if (!response.ok) return { problem: await errorOf(response, fallback) };
+  return { ref: `tenant.${theme.key}` };
 }
 
 /** The server answers an empty token set as `{}`; anything else that isn't an object reads as empty. */
