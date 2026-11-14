@@ -2,7 +2,7 @@
  * WC-ac35b6cf — EmailDomainsPage tests.
  *
  * Mocks @/lib/api/client (the page imports the module-level client
- * singleton, like SsoProvidersPage does, rather than useAuth().apiClient),
+ * singleton, like SsoProvidersPage does, rather than a client from the auth context),
  * useCapabilities (for the `email_domains:manage` gate), and useToast.
  */
 
