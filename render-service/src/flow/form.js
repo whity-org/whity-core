@@ -321,11 +321,13 @@ function renderShortAnswer(a, direction) {
     case 'yesNoRows': {
       if (a.style === 'threeColumns') {
         const h = a.headers || {};
-        const head = `<span class="ff-h">${t(h.item || '', direction)}</span><span class="ff-h">${t(h.yes || '', direction)}</span>`
-          + `<span class="ff-h">${t(h.no || '', direction)}</span><span class="ff-h">${t(h.na || '', direction)}</span>`;
+        // Cells built from already-escaped text (t) and fixed markup only.
+        const cell = (cls, inner) => '<span' + (cls ? ' class="' + cls + '"' : '') + '>' + inner + '</span>';
         const dot = (on) => (on ? '<b class="ff-pick" aria-hidden="true"></b>' : '');
-        return `<div class="ff-yn3">${head}${a.rows.map((r) => `<span>${t(r.text, direction)}</span>`
-          + `<span>${dot(r.value === 'yes')}</span><span>${dot(r.value === 'no')}</span><span>${dot(r.value === 'na')}</span>`).join('')}</div>`;
+        const head = ['item', 'yes', 'no', 'na'].map((k) => cell('ff-h', t(h[k] || '', direction))).join('');
+        const rows = a.rows.map((r) => cell('', t(r.text, direction))
+          + cell('', dot(r.value === 'yes')) + cell('', dot(r.value === 'no')) + cell('', dot(r.value === 'na'))).join('');
+        return '<div class="ff-yn3">' + head + rows + '</div>';
       }
       return a.rows.map((r) => `<div class="ff-ynr"><span>${t(r.text, direction)}</span>`
         + `<b>${r.value === null ? `<span class="ff-empty">${t(r.word || '', direction)}</span>` : word(r.value, r.word || '', direction)}</b></div>`).join('');
