@@ -53,6 +53,8 @@ const DEFAULT_MARGIN_MM = { top: 25, right: 20, bottom: 25, left: 20 };
 
 const FRONT_MATTER_KINDS = new Set(['contents', 'tables', 'figures']);
 
+const { FORM_BLOCK_TYPES, validateFormPrintBlock, validateLetterheadLayout } = require('./form');
+
 const BLOCK_TYPES = new Set([
   'heading',
   'paragraph',
@@ -84,6 +86,8 @@ const BLOCK_TYPES = new Set([
   // QR code block (E.41) prints as `qr` with its caption as the reference.
   'barcode',
   'math',
+  // Design 3.4: the blocks a form printout needs (FP.1-FP.12, ./form.js).
+  ...FORM_BLOCK_TYPES,
 ]);
 
 /** E.40: the symbologies the editor offers, as bwip-js names them. */
@@ -105,7 +109,9 @@ const ACCENT_USES = ['title', 'title-and-headings'];
 const HEX_COLOUR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 const RUNNING_SLOTS = ['start', 'center', 'end'];
-const SLOT_KEYS = new Set(['text', 'subtext', 'image', 'badge']);
+const SLOT_KEYS = new Set(['text', 'subtext', 'image', 'badge', 'marks', 'qr']);
+/** FP.10: the client's marks at the footer's end side, at most 3, 8 mm tall. */
+const MAX_SLOT_MARKS = 3;
 
 /* Embedded raster or vector only. `data:text/html` and friends would turn an
  * <img> into something else entirely, and an http(s) src would be an outbound
@@ -422,7 +428,7 @@ function validateRunning(spec, name) {
     if (slot === undefined || slot === null || typeof slot !== 'object' || Array.isArray(slot)) continue;
     for (const k of Object.keys(slot)) {
       if (!SLOT_KEYS.has(k)) {
-        return `"${at}.${k}" is not a slot key; use text, subtext, image or badge`;
+        return `"${at}.${k}" is not a slot key; use text, subtext, image, badge, marks or qr`;
       }
     }
     if (!optionalString(slot.text) || !optionalString(slot.subtext)) {
@@ -436,6 +442,23 @@ function validateRunning(spec, name) {
       if (!isPlainObject(slot.badge) || !isString(slot.badge.value) || !optionalString(slot.badge.label)) {
         return `"${at}.badge" must be {label?, value} strings`;
       }
+    }
+    if (slot.marks !== undefined) {
+      if (!Array.isArray(slot.marks) || slot.marks.length > MAX_SLOT_MARKS) {
+        return `"${at}.marks" must list up to ${MAX_SLOT_MARKS} marks`;
+      }
+      for (const m of slot.marks) {
+        if (!isPlainObject(m) || (m.text === undefined && m.image === undefined) || !optionalString(m.text)) {
+          return `"${at}.marks" entries must be {text} or {image}`;
+        }
+        if (m.image !== undefined) {
+          const err = validateImage(m.image, `${at}.marks[].image`);
+          if (err) return err;
+        }
+      }
+    }
+    if (slot.qr !== undefined && (!isPlainObject(slot.qr) || !isString(slot.qr.value) || slot.qr.value === '' || slot.qr.value.length > MAX_QR_VALUE_LENGTH)) {
+      return `"${at}.qr.value" must be 1-${MAX_QR_VALUE_LENGTH} characters`;
     }
   }
   return null;
@@ -576,8 +599,10 @@ function validateFormBlock(block, i) {
         if (err) return err;
       }
     }
+    const layoutErr = validateLetterheadLayout(block, at, validateImage);
+    if (layoutErr) return layoutErr;
   }
-  return null;
+  return validateFormPrintBlock(block, i);
 }
 
 /** Each block's own checks; `at` names the array in messages ("content"). */
@@ -984,6 +1009,17 @@ function normaliseRunning(spec) {
       }
       if (isPlainObject(slot.badge) && typeof slot.badge.value === 'string') {
         clean.badge = { label: typeof slot.badge.label === 'string' ? slot.badge.label : '', value: slot.badge.value };
+      }
+      if (Array.isArray(slot.marks)) {
+        clean.marks = slot.marks.slice(0, MAX_SLOT_MARKS).map((m) => {
+          if (isPlainObject(m) && isPlainObject(m.image) && typeof m.image.src === 'string' && IMAGE_DATA_URI.test(m.image.src)) {
+            return { image: { src: m.image.src, alt: typeof m.image.alt === 'string' ? m.image.alt : '' } };
+          }
+          return { text: isPlainObject(m) && typeof m.text === 'string' ? m.text : '' };
+        }).filter((m) => m.image || m.text);
+      }
+      if (isPlainObject(slot.qr) && typeof slot.qr.value === 'string' && slot.qr.value !== '') {
+        clean.qr = { value: slot.qr.value.slice(0, MAX_QR_VALUE_LENGTH) };
       }
       out[key] = clean;
     }
