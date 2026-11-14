@@ -78637,6 +78637,14 @@
                                     },
                                     "maxItems": 5
                                 },
+                                "exclude_named_in": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "maxItems": 10,
+                                    "description": "The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this step leaves out: not asked, not counted in the quorum, not printed among the approvals."
+                                },
                                 "kind": {
                                     "type": "string",
                                     "enum": [
@@ -78899,6 +78907,12 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/RouteStepInput"
+                        }
+                    },
+                    "exclude_named_in": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
                         }
                     },
                     "rejection_count": {
@@ -93022,6 +93036,14 @@
                             "$ref": "#/components/schemas/RouteStepInput"
                         },
                         "maxItems": 5
+                    },
+                    "exclude_named_in": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 10,
+                        "description": "The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this stage leaves out: not asked, not counted in the quorum, not printed among the approvals."
                     },
                     "canvas_x": {
                         "type": "integer"

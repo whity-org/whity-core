@@ -933,6 +933,91 @@ function StageValuesEditor({
   );
 }
 
+/** WHIT-1018: the most questions one stage may leave people out by; the server refuses more. */
+const MAX_STAGE_EXCLUSIONS = 10;
+
+/**
+ * The form's people questions whose answers a stage leaves out (WHIT-1018),
+ * such as `supervisor` and `co_supervisor`: those people are not asked, not
+ * counted in what counts as approved, and not printed among the approvals.
+ * Named by the question's key, which the form builder shows under Show
+ * technical details.
+ */
+function StageExclusionsEditor({
+  keys,
+  readOnly,
+  onChange,
+  t,
+}: {
+  keys: string[];
+  readOnly: boolean;
+  onChange: (keys: string[]) => void;
+  t: ReturnType<typeof useTranslation>;
+}) {
+  const [draft, setDraft] = useState('');
+  const key = draft.trim().toLowerCase();
+  const valid = /^[a-z][a-z0-9_]*$/.test(key) && !keys.includes(key);
+  const add = () => {
+    if (!valid) return;
+    onChange([...keys, key]);
+    setDraft('');
+  };
+
+  return (
+    <section className="space-y-2" aria-labelledby="stage-exclusions-heading">
+      <h3 id="stage-exclusions-heading" className="text-sm font-medium">
+        {t('routeTemplates.inspector.exclusions', 'Leave out people named on the form')}
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        {t(
+          'routeTemplates.inspector.exclusionsHelp',
+          'People picked in these questions, such as the supervisor, are not asked here, are not counted towards approval and are not printed among the approvals.'
+        )}
+      </p>
+      {keys.length > 0 && (
+        <ul className="space-y-1">
+          {keys.map((item) => (
+            <li key={item} className="flex items-center justify-between gap-2 rounded-control border border-border px-2 py-1">
+              <span className="font-mono text-sm" dir="ltr">
+                {item}
+              </span>
+              {!readOnly && (
+                <Button type="button" variant="outline" size="sm" onClick={() => onChange(keys.filter((k) => k !== item))}>
+                  {t('routeTemplates.inspector.valueRemove', 'Remove')}
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {!readOnly && keys.length < MAX_STAGE_EXCLUSIONS && (
+        <div className="flex items-end gap-2">
+          <label className="block flex-1 space-y-1">
+            <span className="text-xs font-medium">{t('routeTemplates.inspector.exclusionNew', 'Question key')}</span>
+            <Input
+              dir="ltr"
+              className="font-mono"
+              value={draft}
+              maxLength={128}
+              placeholder="supervisor"
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  add();
+                }
+              }}
+            />
+          </label>
+          <Button type="button" variant="outline" disabled={!valid} onClick={add}>
+            {t('routeTemplates.inspector.valueAdd', 'Add')}
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function StageInspector({
   step,
   graph,
@@ -1204,6 +1289,14 @@ function StageInspector({
 
       {/* WHIT-1016: values the person letting it through fills in, such as a
           committee meeting number. Nobody acts on a stage that only tells. */}
+      {/* WHIT-1018: a committee member who supervises the project does not review it. */}
+      <StageExclusionsEditor
+        keys={step.excludeNamedIn ?? []}
+        readOnly={readOnly}
+        onChange={(excludeNamedIn) => onChange({ excludeNamedIn })}
+        t={t}
+      />
+
       {step.satisfiedBy !== 'delivery' && (
         <StageValuesEditor
           inputs={step.inputs ?? []}

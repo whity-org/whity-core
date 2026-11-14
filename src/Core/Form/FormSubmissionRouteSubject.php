@@ -7,6 +7,7 @@ namespace Whity\Core\Form;
 use PDO;
 use Whity\Core\Document\Routing\RouteSubjectFinaliseInterface;
 use Whity\Core\Document\Routing\RouteSubjectApprovedInterface;
+use Whity\Core\Document\Routing\RouteSubjectPeopleInterface;
 use Whity\Core\Document\Routing\RouteSubjectProviderInterface;
 use Whity\Core\Document\Routing\RoutingRejectedException;
 
@@ -26,8 +27,42 @@ use Whity\Core\Document\Routing\RoutingRejectedException;
  *
  * Stateless apart from the injected handle — worker-safe.
  */
-final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface, RouteSubjectFinaliseInterface, RouteSubjectApprovedInterface
+final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface, RouteSubjectFinaliseInterface, RouteSubjectApprovedInterface, RouteSubjectPeopleInterface
 {
+    /**
+     * WHIT-1018: the people the submission names in these questions (its
+     * people pickers, such as a supervisor), from its answers as they are now.
+     * A key that is not a people question names nobody.
+     *
+     * @param list<string> $keys
+     * @return list<int>
+     */
+    public function peopleNamedIn(int $tenantId, int $subjectId, array $keys): array
+    {
+        if ($keys === []) {
+            return [];
+        }
+        $submission = (new FormSubmissionRepository($this->db))->find($tenantId, $subjectId);
+        if ($submission === null) {
+            return [];
+        }
+        $answers = is_array($submission['data']) ? $submission['data'] : [];
+        $people = [];
+        foreach ((new FormFieldRepository($this->db))->listForForm($tenantId, (int) $submission['form_id']) as $field) {
+            if (($field['field_type'] ?? null) !== 'profile_ref' || !in_array((string) $field['field_key'], $keys, true)) {
+                continue;
+            }
+            $answer = $answers[(string) $field['field_key']] ?? null;
+            foreach (is_array($answer) ? $answer : [$answer] as $id) {
+                if (is_int($id) || (is_string($id) && ctype_digit($id))) {
+                    $people[(int) $id] = (int) $id;
+                }
+            }
+        }
+
+        return array_values($people);
+    }
+
     /**
      * WHIT-1017: a submission whose form gives references on approval takes
      * its reference now, printing its answers and the values entered on the

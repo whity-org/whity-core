@@ -7,6 +7,7 @@ namespace Whity\Core\Document\RouteTemplate;
 use PDO;
 use Whity\Core\Db\DbBool;
 use Whity\Core\Document\Routing\RouteSatisfaction;
+use Whity\Core\Document\Routing\RouteStepExclusions;
 use Whity\Core\Document\Routing\RouteStepInputs;
 use Whity\Core\Document\Routing\RouteStepKind;
 
@@ -188,7 +189,7 @@ final class RouteTemplateRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, template_id, position, rule_kind, rule_config, label,
                     decision, decision_quorum, satisfied_by, allow_send_back, kind, final_template_id,
-                    inputs, canvas_x, canvas_y
+                    inputs, exclude_named_in, canvas_x, canvas_y
                FROM document_route_template_steps
               WHERE tenant_id = :tenant_id AND template_id = :template_id
               ORDER BY position ASC'
@@ -315,7 +316,7 @@ final class RouteTemplateRepository
      * refused BEFORE this is reached — {@see RouteTemplateGraph::validate()} is
      * where that happens, so the transaction here cannot half-apply a graph.
      *
-     * @param list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, kind?: ?string, final_template_id?: ?int, inputs?: list<array<string, mixed>>, canvas_x: int, canvas_y: int}> $steps
+     * @param list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, kind?: ?string, final_template_id?: ?int, inputs?: list<array<string, mixed>>, exclude_named_in?: list<string>, canvas_x: int, canvas_y: int}> $steps
      * @param list<array{from: int, to: int, verdict: string}> $edges
      */
     public function replaceGraph(int $templateId, int $tenantId, array $steps, array $edges): void
@@ -338,10 +339,10 @@ final class RouteTemplateRepository
                 'INSERT INTO document_route_template_steps
                      (tenant_id, template_id, position, rule_kind, rule_config, label,
                       decision, decision_quorum, satisfied_by, allow_send_back, kind, final_template_id,
-                      inputs, canvas_x, canvas_y, created_at)
+                      inputs, exclude_named_in, canvas_x, canvas_y, created_at)
                  VALUES (:tenant_id, :template_id, :position, :rule_kind, :rule_config, :label,
                          :decision, :decision_quorum, :satisfied_by, :allow_send_back, :kind, :final_template_id,
-                         :inputs, :canvas_x, :canvas_y, NOW())'
+                         :inputs, :exclude_named_in, :canvas_x, :canvas_y, NOW())'
             );
 
             /** @var array<int, int> $idByPosition */
@@ -377,6 +378,8 @@ final class RouteTemplateRepository
                     ':final_template_id' => $step['final_template_id'] ?? null,
                     // WHIT-1016: the values this stage asks for, NULL for none.
                     ':inputs' => RouteStepInputs::encode($step['inputs'] ?? []),
+                    // WHIT-1018: people named in these questions are left out here.
+                    ':exclude_named_in' => RouteStepExclusions::encode($step['exclude_named_in'] ?? []),
                     ':canvas_x' => $step['canvas_x'],
                     ':canvas_y' => $step['canvas_y'],
                 ]);
@@ -485,6 +488,8 @@ final class RouteTemplateRepository
             'final_template_id' => isset($row['final_template_id']) ? (int) $row['final_template_id'] : null,
             // WHIT-1016: the values a person letting it through here fills in.
             'inputs' => RouteStepInputs::decode($row['inputs'] ?? null),
+            // WHIT-1018: people named in these questions are left out here.
+            'exclude_named_in' => RouteStepExclusions::decode($row['exclude_named_in'] ?? null),
             'canvas_x' => (int) $row['canvas_x'],
             'canvas_y' => (int) $row['canvas_y'],
         ];

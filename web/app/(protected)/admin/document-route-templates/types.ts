@@ -68,6 +68,8 @@ export interface RouteTemplateStepWire {
   final_template_id?: number | null;
   /** WHIT-1016: values the person letting it through fills in. None when absent. */
   inputs?: RouteTemplateStepInputWire[];
+  /** WHIT-1018: the form's people questions whose answers this stage leaves out. None when absent. */
+  exclude_named_in?: string[];
   canvas_x: number;
   canvas_y: number;
 }
@@ -132,6 +134,7 @@ export function toFlowGraph(wire: RouteTemplateGraphWire): RouteFlowGraph {
           required: input.required !== false,
           maxLength: input.max_length ?? 100,
         })),
+        excludeNamedIn: s.exclude_named_in ?? [],
         canvasX: s.canvas_x,
         canvasY: s.canvas_y,
       })
@@ -183,6 +186,8 @@ export function toGraphRequest(graph: RouteFlowGraph): {
               required: input.required,
               max_length: input.maxLength,
             })),
+      // WHIT-1018: always sent, so a save never stops leaving people out.
+      exclude_named_in: s.kind === 'finalise' ? [] : (s.excludeNamedIn ?? []),
       canvas_x: s.canvasX,
       canvas_y: s.canvasY,
     })),

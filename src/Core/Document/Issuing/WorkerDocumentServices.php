@@ -100,6 +100,7 @@ final class WorkerDocumentServices
         $fields->add(new TodayFieldProvider());
         $fields->add(new \Whity\Core\Document\Fields\IssuedDocumentNumberFieldProvider());
         $fields->add(new \Whity\Core\Document\Fields\RouteValueFieldProvider($pdo));
+        $fields->add(new \Whity\Core\Document\Fields\RouteApprovalFieldProvider($pdo));
         // WHIT-954: contacts and their custom fields, as in public/index.php.
         $fields->add(new \Whity\Core\Contacts\ContactFieldProvider($pdo));
         $fields->addTenantSource(static fn (int $tenantId): array => TenantRecordFieldProvider::forManifests(

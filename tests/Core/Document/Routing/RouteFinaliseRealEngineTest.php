@@ -90,6 +90,9 @@ final class RouteFinaliseRealEngineTest extends TestCase
     private const TENANT = 1;
     private const APPLICANT = 10;
     private const CLERK = 11;
+    /** WHIT-1018: two more committee members; the second supervises the project. */
+    private const MEMBER = 12;
+    private const SUPERVISOR = 13;
 
     private PDO $pdo;
     private SettingsService $settings;
@@ -428,6 +431,94 @@ final class RouteFinaliseRealEngineTest extends TestCase
         $refused = $this->send($formId, ['supplier' => 'Example Mill']);
         $this->router->act(self::TENANT, self::CLERK, $this->routeOf((int) $refused['id']), RouteAction::ACKNOWLEDGED, 'No.', RouteVerdict::REJECTED);
         self::assertNull($this->submissions->find(self::TENANT, (int) $refused['id'])['reference'] ?? null);
+    }
+
+    public function testTheSupervisorIsLeftOutOfTheCommitteeAndTheApprovalsPrintARowEach(): void
+    {
+        // WHIT-1018: the committee is three people; the applicant names one of
+        // them as supervisor, so that one is never asked, never counted and
+        // never printed.
+        $cell = static fn (array ...$runs): array => $runs;
+        $text = static fn (string $t): array => ['type' => 'text', 'text' => $t];
+        $id = $this->editor->sourceRepo->create(self::TENANT, [
+            'kind' => 'template',
+            'title' => 'Approval certificate',
+            'lang' => 'en',
+            'default_view' => 'page',
+            'blocks' => [[
+                'id' => 't1',
+                'type' => 'table',
+                'headerRow' => true,
+                'rows' => [
+                    [$cell($text('Member')), $cell($text('Approved'))],
+                    [$cell($this->editor->field('route.approvals.*.name')), $cell($this->editor->field('route.approvals.*.mark'))],
+                    [$cell($text('Total')), $cell($this->editor->field('route.approvals.count'))],
+                ],
+            ]],
+            'scope' => 'tenant',
+            'created_by' => self::APPLICANT,
+        ]);
+        $this->editor->publish(self::TENANT, $id, self::APPLICANT);
+
+        $design = $this->routeTemplates->create(self::TENANT, 'Ethics review', null, null);
+        $this->routeTemplates->replaceGraph($design, self::TENANT, [
+            [
+                'position' => 1,
+                'rule_kind' => 'explicit',
+                'rule_config' => ['profile_ids' => [self::CLERK, self::MEMBER, self::SUPERVISOR]],
+                'label' => 'Ethics committee',
+                'decision' => true,
+                'decision_quorum' => 'all',
+                'satisfied_by' => 'act',
+                'exclude_named_in' => ['supervisor', 'co_supervisor'],
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+            [
+                'position' => 2,
+                'rule_kind' => RouteStepKind::FINALISE_RULE,
+                'rule_config' => [],
+                'label' => 'Certificate',
+                'decision' => false,
+                'decision_quorum' => null,
+                'satisfied_by' => 'act',
+                'allow_send_back' => false,
+                'kind' => RouteStepKind::FINALISE,
+                'final_template_id' => null,
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+        ], []);
+        self::assertSame(['supervisor', 'co_supervisor'], $this->routeTemplates->stepsFor($design, self::TENANT)[0]['exclude_named_in']);
+
+        $formId = $this->form($design, $id);
+        $this->fields->create(self::TENANT, $formId, 'supervisor', 'profile_ref', ['en' => 'Supervisor'], null, false, [], [], null, null, null);
+        $submission = $this->send($formId, ['supplier' => 'Example Mill', 'supervisor' => self::SUPERVISOR]);
+        $route = $this->routeOf((int) $submission['id']);
+
+        self::assertNull($this->open((int) $route['id'], self::SUPERVISOR), 'the supervisor is not asked');
+        self::assertNotNull($this->open((int) $route['id'], self::MEMBER));
+        self::assertSame(['supervisor', 'co_supervisor'], (new RouteStepRepository($this->pdo))->listForRoute((int) $route['id'], self::TENANT)[0]['exclude_named_in']);
+
+        $first = $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertNull($first['decided'], 'still waiting on the other member');
+        $second = $this->router->act(self::TENANT, self::MEMBER, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertSame('approved', $second['decided'], 'all who were asked approved; the supervisor does not count');
+
+        $table = null;
+        foreach ($this->render->flowCalls[0]['content'] ?? [] as $block) {
+            if (($block['type'] ?? null) === 'table') {
+                $table = $block;
+            }
+        }
+        self::assertNotNull($table);
+        $today = gmdate('Y-m-d');
+        self::assertSame(['Member', 'Approved'], $table['columns']);
+        self::assertSame([
+            ['Clerk Rana', 'Approved ' . $today],
+            ['Awss Haddad', 'Approved ' . $today],
+            ['Total', '2'],
+        ], $table['rows']);
     }
 
     public function testATemplateMadeFromTheFormIssuesACorrectDocumentFromARealSubmission(): void
@@ -1030,7 +1121,7 @@ final class RouteFinaliseRealEngineTest extends TestCase
             'INSERT INTO roles (id, name, description, tenant_id, created_at) VALUES
                 (100, ' . $quote('member') . ', ' . $quote('') . ', 1, ' . $now . ')'
         );
-        foreach ([[self::APPLICANT, 'Applicant Huda'], [self::CLERK, 'Clerk Rana']] as [$id, $name]) {
+        foreach ([[self::APPLICANT, 'Applicant Huda'], [self::CLERK, 'Clerk Rana'], [self::MEMBER, 'Awss Haddad'], [self::SUPERVISOR, 'Ahmad Khalil']] as [$id, $name]) {
             $pdo->exec(
                 'INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled,
                                        two_factor_backup_codes_version, token_epoch, created_at, updated_at)
@@ -1066,5 +1157,11 @@ final class RouteFinaliseRealEngineTest extends TestCase
             static fn (array $f): array => $f[1],
             array_filter($this->fired, static fn (array $f): bool => $f[0] === $event)
         ));
+    }
+
+    /** @return array<string, mixed>|null */
+    private function open(int $routeId, int $profileId): ?array
+    {
+        return $this->recipients->findOpenForProfile(self::TENANT, $routeId, $profileId);
     }
 }

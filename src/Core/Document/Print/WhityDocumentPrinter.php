@@ -325,11 +325,15 @@ final class WhityDocumentPrinter
 
         $rows = [];
         foreach ((is_array($block['rows'] ?? null) ? $block['rows'] : []) as $row) {
-            $cells = [];
-            foreach (is_array($row) ? $row : [] as $cell) {
-                $cells[] = $this->text(is_array($cell) ? $cell : []);
+            // WHIT-1018: a row holding a list field (`route.approvals.*.name`)
+            // prints once per item, and not at all when the list is empty.
+            foreach ($this->repeated(is_array($row) ? $row : []) as $copy) {
+                $cells = [];
+                foreach ($copy as $cell) {
+                    $cells[] = $this->text(is_array($cell) ? $cell : []);
+                }
+                $rows[] = $cells;
             }
-            $rows[] = $cells;
         }
         if ($rows === []) {
             return;
@@ -339,6 +343,58 @@ final class WhityDocumentPrinter
             $columns = array_shift($rows);
         }
         $out[] = ['type' => 'table', 'columns' => $columns, 'rows' => $rows] + (in_array('end', $align, true) ? ['align' => $align] : []);
+    }
+
+    /**
+     * A table row once per item of the list its fields read (WHIT-1018), or
+     * the row itself when it holds no list field. A list field's path has a
+     * `*` for the item number, `route.approvals.*.name`, and the list's length
+     * is the value of `route.approvals.count`; the first list field in the row
+     * decides it.
+     *
+     * @param array<mixed> $row
+     * @return list<array<mixed>>
+     */
+    private function repeated(array $row): array
+    {
+        $list = null;
+        foreach (self::fieldRefs($row) as $ref) {
+            $path = (string) ($ref['path'] ?? '');
+            $star = strpos($path, '.*.');
+            if ($star !== false) {
+                $list = substr($path, 0, $star);
+                break;
+            }
+        }
+        if ($list === null) {
+            return [$row];
+        }
+
+        $count = max(0, min(500, (int) ($this->values[$list . '.count'] ?? 0)));
+        $copies = [];
+        for ($n = 1; $n <= $count; $n++) {
+            $copies[] = self::numbered($row, $list . '.*.', $list . '.' . $n . '.');
+        }
+
+        return $copies;
+    }
+
+    /**
+     * @param array<mixed> $node
+     * @return array<mixed>
+     */
+    private static function numbered(array $node, string $from, string $to): array
+    {
+        foreach ($node as $key => $child) {
+            if (is_array($child)) {
+                $node[$key] = self::numbered($child, $from, $to);
+            }
+        }
+        if (($node['type'] ?? null) === 'field' && is_string($node['path'] ?? null) && str_starts_with($node['path'], $from)) {
+            $node['path'] = $to . substr($node['path'], strlen($from));
+        }
+
+        return $node;
     }
 
     /**
