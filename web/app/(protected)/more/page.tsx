@@ -20,6 +20,7 @@ import { useThemeMode } from '@/lib/theme-mode-context';
 import { useShellNav } from '@/components/shell/use-shell-nav';
 import { TenantSwitcher } from '@/components/sidebar';
 import { localizedName } from '@/lib/localized-name';
+import { SETTINGS_MENU_HREF } from '@/components/settings/settings-area';
 
 /** Nav items the tab bar already holds. */
 const TAB_ITEM_IDS = ['dashboard', 'inbox', 'chat'];
@@ -80,7 +81,7 @@ export default function MorePage() {
           <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
             {group.items.map((item) => (
               <li key={item.id}>
-                <Link href={item.href} className={ROW} aria-current={item.active ? 'page' : undefined}>
+                <Link href={item.id === 'settings-area' ? SETTINGS_MENU_HREF : item.href} className={ROW} aria-current={item.active ? 'page' : undefined}>
                   <span className="text-muted-foreground [&_svg]:size-5">{item.icon}</span>
                   <span className="min-w-0 flex-1 truncate">{item.label}</span>
                   {item.count ? (
