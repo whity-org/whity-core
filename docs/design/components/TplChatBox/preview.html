@@ -1,0 +1,58 @@
+<!-- @dsCard group="Templates · 3.4" height=1520 width=1344 subtitle="WHIT-939: the public chat a visitor or customer uses to write to a workspace, with its states and Arabic" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Customer chat box</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4]]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  function head(ar) { return h('div', { className: 'x4-chat__head' }, h(W.TenantLogo, { name: 'Example Bakery', size: 40, showName: false }), h('div', null, h('b', null, 'Example Bakery'), h('span', { className: 'x4-small' }, ar ? 'نرد خلال ساعات العمل، السبت إلى الخميس' : 'We reply in opening hours, Saturday to Thursday'))); }
+  function msg(t, us, time) { return h('div', { className: 'x4-msg' + (us ? ' is-us' : '') }, h('div', { className: 'x4-msg__b' }, t), time ? h('small', null, time) : null); }
+  var first = h('div', { className: 'x4-chat' }, head(), h('div', { className: 'x4-chat__body' }, msg('Hello! Ask us about orders, cakes or delivery.', true, 'Example Bakery')),
+    h('div', { className: 'x4-chat__foot' }, h(W.Input, { label: 'Your name (optional)', placeholder: 'Ibrahim Mansour' }), h(W.Input, { label: 'Email (optional)', placeholder: 'name@example.com', helperText: 'So we can answer by email if you leave.' }),
+      h(W.Textarea, { label: 'Message', rows: 3, defaultValue: 'Can I order a birthday cake for Saturday?' }), h('div', { className: 'x4-bot' }, I('success', 18), 'You’re a person. Checked by Cloudflare.'), h(W.Button, { icon: 'send' }, 'Send')), h('div', { className: 'x4-powered' }, 'Your messages are kept by Example Bakery.'));
+  var long = h('div', { className: 'x4-chat' }, head(), h('div', { className: 'x4-chat__body' }, msg('Can I order a birthday cake for Saturday?', false, '10:02 · You'), msg('Of course. How many people, and any flavour?', true, '10:05 · Awss Haddad'), msg('About 20 people, chocolate please.', false, '10:06 · You'), msg('A 30 cm chocolate cake serves 20. Pick up from 9:00 at Abdali, or delivery for JOD 3.', true, '10:09 · Awss Haddad'), msg('Pick up is fine. Thank you!', false, '10:10 · You')),
+    h('div', { className: 'x4-chat__foot' }, h('div', { className: 'x4-row' }, h('div', { className: 'x4-compose__box', style: { flex: 1, minHeight: 48 } }, 'Write a message…'), h(W.IconButton, { icon: 'send', label: 'Send' }))), h('div', { className: 'x4-powered' }, 'Signed in as Ibrahim Mansour'));
+  var ar = h('div', { className: 'x4-chat', dir: 'rtl' }, head(true), h('div', { className: 'x4-chat__body' }, msg('هل يمكنني طلب كعكة عيد ميلاد ليوم السبت؟', false, '10:02 · أنت'), msg('بالتأكيد. لكم شخص، وأي نكهة؟', true, '10:05 · أوس حداد'), msg('حوالي 20 شخصاً، شوكولاتة من فضلك.', false, '10:06 · أنت')),
+    h('div', { className: 'x4-chat__foot' }, h('div', { className: 'x4-row' }, h('div', { className: 'x4-compose__box', style: { flex: 1, minHeight: 48 } }, 'اكتب رسالة…'), h(W.IconButton, { icon: 'send', label: 'إرسال' }))));
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    frame('/chat/example-bakery · first message, a long thread, Arabic', h('div', { className: 'x4-public' }, first, long, ar), 900),
+    states([st('Chat is off', h(W.EmptyState, { icon: 'comment', title: 'Chat is closed right now', description: 'Email hello@examplebakery.jo and we’ll answer there.' })),
+      st('The chat ended', h(F, null, h('p', null, 'Example Bakery closed this chat. Your messages are kept.'), h(W.Button, { variant: 'outline' }, 'Start a new chat'))),
+      st('Too many messages', h(W.Alert, { variant: 'warning', title: 'Wait a minute' }, 'You sent a lot of messages quickly. Try again in a minute; nothing you wrote is lost.')),
+      st('Bot check failed', h(F, null, h('div', { className: 'x4-bot', style: { borderColor: 'var(--destructive)' } }, h('span', { style: { color: 'var(--destructive)', display: 'inline-flex' } }, I('alert', 18)), 'We couldn’t check you’re a person.'), h(W.Button, { variant: 'outline', icon: 'sync' }, 'Check again')))], 4),
+    note('Chat box (WHIT-939)', ['A plain card on the workspace’s own page: its logo, its name, when it replies. No Whity branding beyond “kept by Example Bakery”.', 'Name and email are optional and asked once, on the first message, with the reason under the email.', 'The instance’s bot check sits above Send when set up, in words, never a puzzle first.', 'Signed-in customers see only the thread and the box; their name sits at the foot.', 'Off, ended and too many messages each say what to do next. Nothing typed is lost.', 'Same bubbles as the staff inbox: the customer on the start side, the workspace on the end side.'])));
+</script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!-- @dsCard group="Templates · 3.4" height=2477 width=1344 subtitle="/booking/[token]: the booking, add to calendar, move, cancel, Arabic, too late, a time just taken, an old link" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1344px;min-height:2477px}</style><meta charset="utf-8"><title>A customer’s own booking</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'Calendar': 'التقويم', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4], ['calendar', 'Calendar']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Calendar': 'التقويم', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  var DARK = document.documentElement.getAttribute('data-theme') === 'dark';
+  var TT = W.tenantTheme('#b74c05', DARK ? 'dark' : 'light');
+  function brand(ar) { return h('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } }, h('span', { className: 'x4-plogo', style: { '--c': '#b74c05', width: 36, height: 36, borderRadius: 9, fontSize: 14 } }, 'E'), h('div', null, h('b', { style: { display: 'block' } }, 'Example Bakery'), h('span', { className: 'x4-small' }, ar ? 'فرع العبدلي · الحجوزات' : 'Abdali branch · Bookings'))); }
+  function card(kids, o) { o = o || {}; return h('div', { className: 'x5-ver', dir: o.dir, style: Object.assign({ width: o.w || 380 }, TT) }, brand(o.dir === 'rtl'), kids, h('div', { className: 'x5-foot' }, o.dir === 'rtl' ? 'لا حاجة إلى حساب · أُرسلت عبر Whity' : 'No account needed · Sent with Whity')); }
+  function seal(k, ic, t, p) { return h(F, null, h('div', { style: { display: 'flex', gap: 14, alignItems: 'center' } }, h('span', { className: 'x5-seal ' + k }, I(ic, 26)), h('h1', null, t)), p ? h('p', null, p) : null); }
+  function dl(rows) { return h('dl', null, rows.map(function (r, i) { return h(F, { key: i }, h('dt', null, r[0]), h('dd', null, r[1])); })); }
+  function stack(kids) { return h('div', { style: { display: 'grid', gap: 10 } }, kids); }
+  var ROWS = [['What', 'Cake tasting, 45 minutes'], ['When', 'Sunday 15 November, 10:00'], ['Where', 'Abdali branch, Amman'], ['With', 'Awss Haddad'], ['Deposit', h('span', { className: 'x4-mono' }, 'JOD 10.000 paid')]];
+
+  var booked = card(h(F, null, seal('ok', 'success', 'You’re booked', 'Hello Ahmad Khalil. Here is your booking; keep this link to change it.'), dl(ROWS),
+    stack([h(W.Button, { size: 'lg', icon: 'calendar' }, 'Add to my calendar'), h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } }, h(W.Button, { variant: 'outline', icon: 'sync' }, 'Move it'), h(W.Button, { variant: 'outline', icon: 'close' }, 'Cancel it'))]),
+    h('p', { className: 'x4-small', style: { margin: 0 } }, 'You can move or cancel until Saturday 14 November, 10:00. After that, message or call the bakery.')));
+
+  var DAYS = [['Sun', '15'], ['Mon', '16'], ['Tue', '17'], ['Wed', '18'], ['Thu', '19']];
+  var TIMES = ['09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00'];
+  function chip(t, on, off) { return h('span', { key: t, role: 'radio', 'aria-checked': !!on, style: { display: 'grid', placeItems: 'center', height: 44, borderRadius: 10, fontSize: 15, fontVariantNumeric: 'tabular-nums', border: on ? '2px solid var(--primary)' : '1px solid var(--input)', background: on ? 'var(--primary-tint)' : off ? 'var(--muted)' : 'var(--background)', color: off ? 'var(--muted-foreground)' : on ? 'var(--primary-tint-foreground)' : 'var(--foreground)', fontWeight: on ? 600 : 400, textDecoration: off ? 'line-through' : 'none' } }, t); }
+  var move = card(h(F, null, h('h1', null, 'Move your booking'), h('p', null, 'Now: Sunday 15 November, 10:00. Pick a new day and time; everything else stays the same.'),
+    h('div', { className: 'wy-field' }, h('span', { className: 'wy-field__label' }, 'Day'), h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 } }, DAYS.map(function (d, i) { return h('span', { key: i, style: { display: 'grid', placeItems: 'center', padding: '6px 0', borderRadius: 10, border: i === 1 ? '2px solid var(--primary)' : '1px solid var(--input)', background: i === 1 ? 'var(--primary-tint)' : 'var(--background)', color: i === 1 ? 'var(--primary-tint-foreground)' : 'var(--foreground)', lineHeight: 1.3 } }, h('small', { style: { fontSize: 13 } }, d[0]), h('b', { style: { fontSize: 17, fontWeight: i === 1 ? 600 : 500 } }, d[1])); }))),
+    h('div', { className: 'wy-field' }, h('span', { className: 'wy-field__label' }, 'Time on Monday 16 November'), h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 } }, TIMES.map(function (t) { return chip(t, t === '11:00', t === '09:00' || t === '14:00'); })), h('span', { className: 'x4-small' }, 'Crossed out: already taken. Times are Amman time.')),
+    stack([h(W.Button, { size: 'lg' }, 'Move to Monday 16 November, 11:00'), h(W.Button, { variant: 'ghost' }, 'Keep the original time')]),
+    h('p', { className: 'x4-small', style: { margin: 0 } }, 'Your deposit carries over. We’ll email you the new time with a calendar file.')));
+
+  var cancel = card(h(F, null, h('h1', null, 'Cancel your booking?'), dl(ROWS.slice(0, 3)),
+    h(W.Alert, { variant: 'info', title: 'Your deposit comes back' }, 'JOD 10.000 goes back to the card you paid with, within 5 days.'),
+    h('div', { className: 'wy-field' }, h('span', { className: 'wy-field__label' }, 'Tell the bakery why (optional)'), h(W.Textarea, { rows: 2, placeholder: 'For example: I’m travelling that week' })),
+    stack([h(W.Button, { size: 'lg', variant: 'destructive' }, 'Yes, cancel my booking'), h(W.Button, { variant: 'outline' }, 'No, keep it')])));
+
+  var arabic = card(h(F, null, seal('ok', 'success', 'تم حجزك', 'مرحباً أحمد خليل. هذا حجزك؛ احتفظ بهذا الرابط لتغييره.'), dl([['ماذا', 'تذوّق الكعك، 45 دقيقة'], ['متى', 'الأحد 15 تشرين الثاني، 10:00'], ['أين', 'فرع العبدلي، عمّان'], ['مع', 'أوس حداد'], ['العربون', h('span', { className: 'x4-mono', dir: 'ltr' }, 'JOD 10.000')]]),
+    stack([h(W.Button, { size: 'lg', icon: 'calendar' }, 'أضِف إلى تقويمي'), h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } }, h(W.Button, { variant: 'outline', icon: 'sync' }, 'غيّر الموعد'), h(W.Button, { variant: 'outline', icon: 'close' }, 'ألغِ الحجز'))]),
+    h('p', { className: 'x4-small', style: { margin: 0 } }, 'يمكنك التغيير أو الإلغاء حتى السبت 14 تشرين الثاني، 10:00.')), { dir: 'rtl' });
+
+  var moved = card(h(F, null, seal('ok', 'sync', 'Moved to Monday 16 November, 11:00', 'Same place, same people. The new time is in your email with a calendar file.'), h(W.Button, { variant: 'outline', icon: 'calendar' }, 'Add the new time to my calendar')), { w: 380 });
+  var cancelled = card(h(F, null, seal('no', 'close', 'Your booking is cancelled', 'JOD 10.000 goes back to your card within 5 days. We’ve emailed you a confirmation.'), h(W.Button, { variant: 'outline', icon: 'calendar' }, 'Book another time')), { w: 380 });
+  var late = card(h(F, null, seal('warn', 'clock', 'It’s too late to change this online', 'Your booking is in less than 24 hours. Message or call the bakery and they’ll help.'), stack([h(W.Button, { variant: 'outline', icon: 'comment' }, 'Message Example Bakery'), h(W.Button, { variant: 'outline', icon: 'phone' }, h('span', { dir: 'ltr' }, '+962 6 000 0000'))])), { w: 380 });
+  var taken = card(h(F, null, h('h1', null, 'Move your booking'), h(W.Alert, { variant: 'warning', title: '11:00 was just taken' }, 'Someone booked it a moment ago. Nothing changed: your booking is still Sunday 15 November, 10:00. Pick another time.'), h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 } }, TIMES.map(function (t) { return chip(t, false, t === '09:00' || t === '11:00' || t === '14:00'); }))), { w: 380 });
+  var gone = card(h(F, null, seal('no', 'search', 'This booking link doesn’t work', 'It may be from an old email, or the booking already happened. Your latest email from Example Bakery has the right link.'), h(W.Button, { variant: 'outline' }, 'Book a new time')), { w: 380 });
+
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    frame('book.examplebakery.jo/booking/… · the link in every booking email, in the workspace’s brand', h('div', { className: 'x5-pub' }, booked, move, cancel), 760),
+    frame('Arabic, and after moving or cancelling', h('div', { className: 'x5-pub' }, arabic, moved, cancelled), 620),
+    frame('When it can’t be changed', h('div', { className: 'x5-pub' }, late, taken, gone), 520),
+    note('A customer’s own booking (/booking/[token], WHIT-945, SU.10)', ['The page every booking email and WhatsApp message links to: no sign-in, in the workspace’s brand (white label), English or Arabic from the browser. The token is the key; it works until the booking has happened.', 'One card with the booking, and three actions in order of how often they’re used: Add to my calendar (the main button), Move it, Cancel it. The deadline to change it online sits under them in a sentence.', 'Moving shows the next days and the free times as large buttons (44px), taken times crossed out; times are in the workspace’s zone, and the visitor’s too when it differs (ADR 0017 section 6). The button names the new time.', 'Cancelling names what happens to the deposit before the person confirms; the reason is optional and goes to the workspace’s Messages.', 'Inside the workspace’s cut-off (24 hours by default, Calendar settings) the actions become Message and Call. A time taken a moment ago (409) says nothing changed. An old or wrong link points to the latest email, never “error”.', 'The emails that link here: EmailBookings; the staff side: TplCalendarStaff; booking a new time: TplBookingPage.'])));
+</script>
+</body>
+</html>

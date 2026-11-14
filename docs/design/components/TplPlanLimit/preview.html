@@ -1,0 +1,53 @@
+<!-- @dsCard group="Templates · 3.4" height=1532 width=1344 subtitle="BM.11: a warning, never a block, on Billing and across the app for those who can change the plan" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Passing a plan limit</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4]]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  function lim(t, sub, used, max, pct, cls, tag) { return h('div', { className: 'x4-lim' }, h('div', null, h('b', null, t), h('small', null, sub)), h('div', { style: { display: 'grid', gap: 6 } }, h('div', { className: 'x4-meter ' + (cls || ''), role: 'meter', 'aria-valuenow': used, 'aria-valuemax': max, 'aria-label': t }, h('i', { style: { width: pct + '%' } })), h('span', { className: 'x4-small x4-num', style: { textAlign: 'start' } }, used + ' of ' + max)), h('div', { style: { justifySelf: 'end' } }, tag || null)); }
+  var billing = h(F, null, h('div', { className: 'x4-banner', role: 'status' }, I('alert', 18), h('span', null, h('b', null, 'Example Bakery has gone past its plan’s staff limit. '), 'Everything keeps working and nothing is removed.'), h(W.Button, { size: 'sm', variant: 'outline' }, 'See plan')),
+    shell('Billing', h(F, null, h(W.PageHeader, { title: 'Billing', description: 'Your plan, what you use and your receipts.' }),
+      h(W.Alert, { variant: 'warning', title: 'Your workspace has gone past a limit of its plan' }, 'Everything keeps working and nothing is removed. To raise the limit, change your plan or add a pack of 5 people.'),
+      h(W.Card, { title: 'Your plan’s limits', description: '[plan name] · renews 1 Dec 2026', action: h(W.Button, { size: 'sm' }, 'Change plan') }, h('div', { className: 'x4-list' }, lim('Staff', 'People who work in the workspace. Agents don’t count.', 7, 5, 100, 'is-over', h(W.Badge, { variant: 'warning', icon: 'alert' }, '2 over')), lim('Customers this month', 'Starts again on 1 Dec', 412, 500, 82, 'is-near', h(W.Badge, { variant: 'outline' }, 'Near')), lim('Agent work this month', 'Starts again on 1 Dec', '1,240', '5,000', 25), lim('Documents made today', 'Starts again tomorrow', 31, 200, 16),
+        h('div', { className: 'x4-lim' }, h('div', null, h('b', null, 'Your own web address'), h('small', null, 'In use, but not part of your plan. It keeps working.')), h('span'), h('div', { style: { justifySelf: 'end' } }, h(W.Badge, { variant: 'warning' }, 'Not in plan'))))))));
+  ReactDOM.createRoot(document.getElementById('root')).render(board(frame('Billing · past one limit, near another · the banner for those who can change the plan', h('div', { style: { display: 'flex', flexDirection: 'column', height: '100%' } }, billing), 900),
+    states([st('Near a limit (80%)', h(W.Alert, { variant: 'info', title: 'Nearly at 500 customers this month' }, '412 so far. Passing it won’t stop anything; we’ll tell you if you do.')),
+      st('Someone who can’t change the plan', h('p', null, 'Members don’t see the banner or the numbers. Inviting an eighth person still works; the invite says nothing about plans.')),
+      st('Arabic', h('div', { dir: 'rtl', style: { display: 'grid', gap: 10 } }, h(W.Alert, { variant: 'warning', title: 'تجاوزت مساحة العمل أحد حدود الخطة' }, 'كل شيء يعمل كما هو ولا يُحذف شيء. لرفع الحد غيّر خطتك أو أضف حزمة.'), h('div', { className: 'x4-list' }, h('div', { className: 'x4-lim', style: { gridTemplateColumns: '1fr 140px' } }, h('div', null, h('b', null, 'الموظفون'), h('small', null, 'لا يُحتسب المساعدون')), h('div', { style: { display: 'grid', gap: 6 } }, h('div', { className: 'x4-meter is-over' }, h('i', { style: { width: '100%' } })), h('span', { className: 'x4-small x4-num', style: { textAlign: 'start' } }, '7 / 5'))))), { dir: 'rtl' })], 3),
+    note('Passing a plan limit (BM.11, brand-ask-limit-warning)', ['A warning, never a block: “Everything keeps working and nothing is removed” is in every message about limits.', 'Owners and billing admins see a thin amber banner across the app until the plan changes or the month resets; it can be hidden for 7 days.', 'Billing shows a row per limit: what counts, a meter, “7 of 5”, and when it starts again. Over is amber with stripes and a word, never red, never colour alone.', 'Near (80%) is a quiet blue note on Billing only; nothing across the app.', 'A feature in use but not in the plan says so and keeps working.', 'Members see nothing. The limit email (EmailWorkspace) says the same words.'])));
+</script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!-- @dsCard group="Websites" height=866 width=1344 subtitle="What curl | sh prints: checks, questions, steps, problems and what to do" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>The installer in a terminal</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'Calendar': 'التقويم', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4], ['calendar', 'Calendar']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Calendar': 'التقويم', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  function term(t, kids, w) { return h('div', { className: 'x5-term' }, h('div', { className: 'x5-term__bar' }, h('i'), h('i'), h('i')), h('pre', null, kids)); }
+  function s(c, t) { return h('span', { className: c }, t); }
+  var ok = term('install', h(F, null, s('dim', '$ '), 'curl -fsSL https://whity.dev/install.sh | sh\n\n', s('b', 'Whity Core installer'), s('dim', '  ·  free and open source (AGPL-3.0)\n\n'),
+    s('ok', '✓'), ' Checked this server     ', s('dim', 'Ubuntu 24.04 · 4 CPUs · 8 GB · 61 GB free\n'), s('ok', '✓'), ' Docker found             ', s('dim', '27.3\n'),
+    s('q', '? '), 'Web address for Whity  ', s('dim', '(e.g. office.example.jo)'), ' › office.examplebakery.jo\n', s('q', '? '), 'Your email (first owner) › amro@examplebakery.jo\n\n',
+    s('ok', '✓'), ' Downloaded Whity Core 0.2.29\n', s('ok', '✓'), ' Started the database and the app\n', s('ok', '✓'), ' Got a certificate for office.examplebakery.jo\n', s('ok', '✓'), ' Made your owner account\n\n',
+    s('ok', 'Whity is ready.'), '\n  Open   ', s('b', 'https://office.examplebakery.jo'), '\n  Sign in with the link we emailed to amro@examplebakery.jo\n  Update later with: ', s('b', 'whity update'), '\n'));
+  var err = term('errors', h(F, null, s('ok', '✓'), ' Checked this server\n', s('err', '✗'), ' Port 443 is in use\n  Another program (nginx) is using it. Stop it, or run the installer with ', s('b', '--port 8443'), '.\n  Nothing was changed.\n\n',
+    s('warn', '!'), ' Docker isn’t installed\n  Install it with the official script, then run this again:\n  ', s('b', 'curl -fsSL https://get.docker.com | sh'), '\n\n', s('warn', '!'), ' Less than 2 GB of memory\n  Whity will run, but slowly. 4 GB is better.\n'));
+  var ar = term('ar', h('span', { dir: 'rtl', style: { display: 'block', fontFamily: 'var(--font-arabic)' } }, s('ok', '✓'), ' فُحص هذا الخادم\n', s('ok', '✓'), ' تم تنزيل Whity Core\n', s('ok', 'Whity جاهز.'), '\n  افتح https://office.examplebakery.jo\n'));
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    h('div', { className: 'x4-two' }, h('section', null, h('p', { className: 'x4-lab' }, 'A clean install'), ok), h('section', null, h('p', { className: 'x4-lab' }, 'Problems, and what to do'), err, h('p', { className: 'x4-lab', style: { marginTop: 20 } }, 'With LANG=ar'), ar)),
+    note('The installer in a terminal (WS.20)', ['What `curl -fsSL https://whity.dev/install.sh | sh` prints: checks, two questions, four steps, and the address to open. Nothing else.', '✓ done in green, ✗ stopped in red, ! a warning in amber, each with one line saying what to do and “Nothing was changed” when it stopped.', 'Plain words, no stack traces; `--verbose` shows the detail. Colours only when the terminal supports them; the marks carry the meaning.', 'Arabic when the system language is Arabic; commands and addresses stay in Latin.', 'The site’s install page (SiteInstall) shows the same command and this output.'])));
+</script>
+</body>
+</html>

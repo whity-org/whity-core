@@ -1,0 +1,105 @@
+<!-- @dsCard group="Documents · Form printouts" height=1200 width=2534 subtitle="FP: page 1 in Arabic, a supplier application and a consent form signed on a tablet" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Form printout: Arabic and other clients</title><style>
+
+
+
+
+
+
+
+
+
+
+*{box-sizing:border-box}
+body{margin:0;background:#d9dce1;font-family:'Noto Sans','Noto Sans Arabic',sans-serif;color:#1a1a1a}
+.page{width:210mm;height:297mm;background:#fff;position:relative;overflow:hidden;padding:16mm 16mm 22mm;font-size:9.5pt;line-height:1.5;page-break-after:always;margin:0 auto}
+.page[dir=rtl]{font-family:'Noto Sans Arabic','Noto Sans',sans-serif}
+.page + .page{margin-top:0}
+/* letterhead */
+.lh{display:flex;align-items:center;gap:4mm;padding-bottom:4mm;border-bottom:.5pt solid #c9ccd1}
+.logo{width:15mm;height:15mm;border-radius:3mm;background:var(--c);color:#fff;display:grid;place-items:center;font:600 13pt 'Readex Pro';flex:none}
+.lh > div > b{display:block;font-weight:600;font-size:11pt} .lh > div > span{display:block;color:#5b6168;font-size:8.5pt}
+.lh .end{margin-inline-start:auto;text-align:end;color:#5b6168;font-size:8.5pt}
+h1.t{font:600 22pt/1.2 'Readex Pro';color:var(--c);margin:6mm 0 1mm}
+.sub{color:#5b6168;font-size:9pt;margin:0 0 4mm}
+/* decision line */
+.dline{display:flex;flex-wrap:wrap;gap:1mm 5mm;align-items:center;border-top:1.5pt solid #1a1a1a;border-bottom:.5pt solid #c9ccd1;padding:2.2mm 0;font-size:8.5pt;margin-bottom:5mm}
+.dline .st{font-weight:600;font-size:9.5pt;display:inline-flex;gap:1.5mm;align-items:center}
+.dline .k{color:#5b6168} .mono{font-family:'Geist Mono',monospace;font-size:9pt;direction:ltr;unicode-bidi:isolate}
+.ok{color:#1b7a3d}
+/* notice */
+.notice{border-inline-start:2pt solid #1a1a1a;padding:1.5mm 0 1.5mm 4mm;margin:0 0 5mm;font-size:9pt}
+.page[dir=rtl] .notice{padding:1.5mm 4mm 1.5mm 0}
+.notice b{display:block;font-size:8.5pt;letter-spacing:.04em;text-transform:uppercase}
+/* section heading B */
+.sec{display:flex;align-items:center;gap:3mm;margin:6mm 0 3mm;break-after:avoid}
+.mk{position:relative;width:8.5mm;height:8.5mm;flex:none}
+.mk i{position:absolute;width:6.8mm;height:6.8mm;border-radius:1.9mm}
+.mk i:first-child{inset-inline-start:0;top:0;background:var(--c)}
+.mk i:last-child{inset-inline-end:0;bottom:0;background:#fff;border:.7mm solid var(--c);display:grid;place-items:center;font:600 9pt 'Readex Pro';color:var(--c);font-style:normal}
+.sec b{font-weight:600;font-size:12pt}
+.sec .na{margin-inline-start:auto;color:#5b6168;font-size:9pt;white-space:nowrap}
+.sec.is-na{border-bottom:.5pt solid #e3e5e8;padding-bottom:3mm}
+.sec.is-na b{color:#5b6168}
+/* questions */
+.q{margin:0 0 3.6mm;break-inside:avoid}
+.q.long{break-inside:auto}
+.qn{font-weight:600;font-size:9pt;display:flex;gap:2mm}
+.qn .n{min-width:7mm;font-variant-numeric:tabular-nums}
+.g{color:#6b7076;font-size:8pt;margin-inline-start:9mm}
+.a{margin:1mm 0 0 9mm;font-size:9.5pt}
+.page[dir=rtl] .a{margin:1mm 9mm 0 0}
+.a p{margin:0 0 2mm}
+.empty{color:#8a8f96;font-style:normal}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:2mm 6mm;margin:1.5mm 0 0 9mm}
+.page[dir=rtl] .facts{margin:1.5mm 9mm 0 0}
+.facts > div > span{display:block;color:#6b7076;font-size:8pt}
+.facts div b{font-weight:500}
+table.t{width:calc(100% - 9mm);margin-inline-start:9mm;border-collapse:collapse;font-size:9pt;margin-top:1.5mm}
+table.t th{text-align:start;font-weight:600;font-size:8pt;color:#1a1a1a;border-bottom:1pt solid #1a1a1a;padding:1mm 2mm 1mm 0}
+table.t td{border-bottom:.4pt solid #e3e5e8;padding:1.4mm 2mm 1.4mm 0;vertical-align:top}
+.ch{display:flex;flex-wrap:wrap;gap:1mm 6mm;margin-top:1mm;margin-inline-start:9mm}
+.ch span{display:inline-flex;gap:1.5mm;align-items:center}
+.ch span.off{color:#6b7076}
+.box{font-size:11pt;line-height:1}
+.ynr{display:grid;grid-template-columns:1fr 22mm;gap:2mm;border-bottom:.4pt solid #e3e5e8;padding:.75mm 0;margin-inline-start:9mm;font-size:9pt}
+.ynr b{font-weight:500;text-align:end}
+.yes{color:#1b7a3d} .no{color:#b3261e} .nap{color:#6b7076}
+.cont{color:#6b7076;font-size:8pt;font-weight:400}
+.wc{color:#6b7076;font-size:8pt;margin-inline-start:9mm}
+/* signatures */
+.sig{display:grid;grid-template-columns:1fr 46mm;gap:4mm;align-items:end;border-bottom:.4pt solid #e3e5e8;padding:2.5mm 0;margin-inline-start:9mm}
+.sig b{font-weight:600;display:block} .sig span{color:#6b7076;font-size:8pt;display:block}
+.sig .pad{height:13mm;border-bottom:.6pt solid #1a1a1a;position:relative;display:flex;align-items:flex-end;justify-content:center}
+.sig .pad svg{position:absolute;inset:0;width:100%;height:100%}
+.sig .pad.dash{border-bottom:.6pt dashed #8a8f96}
+.sig .pad em{font-style:normal;font-size:7.5pt;color:#8a8f96;margin-bottom:-4.2mm}
+.conf{display:inline-flex;gap:1.5mm;align-items:center;color:#1b7a3d;font-size:8pt;font-weight:500}
+.conf.wait{color:#6b7076}
+/* decision block */
+.dec{border:1pt solid #1a1a1a;border-radius:2.5mm;padding:5mm;display:grid;grid-template-columns:1fr 26mm;gap:4mm;margin:2mm 0 5mm}
+.dec .big{font:600 16pt 'Readex Pro';display:flex;align-items:center;gap:2mm}
+.dec dl{display:grid;grid-template-columns:auto 1fr;gap:1mm 5mm;margin:3mm 0 0;font-size:9pt}
+.dec dt{color:#6b7076} .dec dd{margin:0}
+.qr{width:26mm;height:26mm}
+.qrl{text-align:center;font-size:7pt;color:#6b7076;margin-top:1mm;overflow-wrap:anywhere} .qrl .mono{font-size:6.5pt}
+.appr{display:grid;grid-template-columns:30mm 1fr 34mm;gap:3mm;padding:1.6mm 0;border-bottom:.4pt solid #e3e5e8;font-size:9pt;align-items:center}
+.appr .when{text-align:end;color:#5b6168;font-size:8.5pt}
+.nc{color:#5b6168;font-size:8.5pt;margin-top:2mm}
+.off{}
+/* running header and footer */
+.rh{display:flex;align-items:center;gap:3mm;border-bottom:.5pt solid #c9ccd1;padding-bottom:2.5mm;margin-bottom:5mm;font-size:8pt;color:#5b6168}
+.rh .logo{width:7mm;height:7mm;border-radius:1.6mm;font-size:6.5pt}
+.rh b{color:#1a1a1a;font-weight:600}
+.rh .end{margin-inline-start:auto}
+.ft{position:absolute;left:16mm;right:16mm;bottom:8mm;display:flex;align-items:center;gap:4mm;border-top:.5pt solid #c9ccd1;padding-top:2.5mm;font-size:7.5pt;color:#5b6168}
+.ft .marks{margin-inline-start:auto;display:flex;gap:2mm}
+.ft .marks span{border:.6pt solid #8a8f96;border-radius:1.2mm;padding:.6mm 1.8mm;font-size:6.5pt;color:#5b6168;font-weight:500}
+.ann{position:absolute;top:4mm;inset-inline-end:16mm;font:500 7pt 'Geist Mono';letter-spacing:.06em;text-transform:uppercase;color:#b0b4ba}
+.cards{display:grid;grid-template-columns:repeat(var(--n),210mm);gap:10mm;padding:10mm;justify-content:start;align-items:start;background:var(--muted,#d9dce1)}.cards .page{box-shadow:0 2px 10px rgba(0,0,0,.12);margin:0}.cards .cardcap{grid-column:1/-1;font:500 12px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground,#5b6168);margin:0} html,body{margin:0}</style></head>
+<body>
+<div class="cards" style="--n:3"><section class="page" dir="rtl" style="--c:#7a2340" ><span class="ann">الصفحة 1 · بالعربية</span><div class="lh"><span class="logo">EU</span><div><b>جامعة المثال</b><span>لجنة أخلاقيات البحث العلمي</span></div><div class="end">عمّان · rec@example.edu</div></div><h1 class="t">طلب الموافقة الأخلاقية لبحث على البشر</h1><p class="sub">قُدّم عبر Whity الخاص بجامعة المثال من د. أحمد خليل في 2 تشرين الثاني 2026.</p><div class="dline"><span class="st ok">✓ تمت الموافقة</span><span><span class="k">المرجع</span> <span class="mono">REC-EU 14/3/2026-27</span></span><span><span class="k">الاستلام</span> 2 تشرين الثاني 2026</span><span><span class="k">القرار</span> 12 تشرين الثاني 2026</span><span class="k">القرار الكامل والموافقات في الصفحة 6</span></div><div class="notice"><b>مهم</b>لا يجوز البدء بالبحث قبل الحصول على موافقة اللجنة الخطية. لا تُمنح موافقة بأثر رجعي.</div><div class="sec"><span class="mk"><i></i><i>1</i></span><b>بيانات المشروع والباحثين</b></div><div class="q "><div class="qn"><span class="n">1.1</span><span>عنوان المشروع</span></div><div class="a">مدة النوم والأداء في الامتحانات لدى طلبة السنة الأولى</div></div><div class="q "><div class="qn"><span class="n">1.2</span><span>الباحث الرئيسي</span></div><div class=g>كما في بطاقتك الجامعية.</div><div class="facts"><div><span>الاسم</span><b>د. أحمد خليل</b></div><div><span>الكلية</span><b>الصيدلة</b></div><div><span>الرقم الوظيفي</span><b><span class=mono>EU-04418</span></b></div><div><span>البريد الإلكتروني</span><b><span class=mono>a.khalil@example.edu</span></b></div><div><span>الهاتف</span><b><span class=mono>+962 6 500 1234</span></b></div><div><span>الصفة</span><b>أستاذ مساعد</b></div></div></div><div class="q "><div class="qn"><span class="n">1.3</span><span>الباحثون الآخرون</span></div><div class=g>حتى ثلاثة باحثين.</div><table class="t"><thead><tr><th>الاسم</th><th>الكلية أو الجهة</th><th>الدور</th><th>البريد الإلكتروني</th></tr></thead><tbody><tr><td>د. عماد ناصر</td><td>الطب</td><td>مشرف مشارك</td><td><span class=mono>e.nasser@example.edu</span></td></tr><tr><td>د. أوس قاسم</td><td>التمريض</td><td>باحث مشارك</td><td><span class=mono>a.qasem@example.edu</span></td></tr></tbody></table></div><div class="q "><div class="qn"><span class="n">1.4</span><span>الطلبة</span></div><div class=g>حتى طالبين.</div><table class="t"><thead><tr><th>الاسم</th><th>الرقم الجامعي</th><th>المرحلة</th><th>البريد الإلكتروني</th></tr></thead><tbody><tr><td>إبراهيم منصور</td><td><span class=mono>2023-1184</span></td><td>ماجستير</td><td><span class=mono>i.mansour@std.example.edu</span></td></tr><tr><td>أوس حداد</td><td><span class=mono>2024-0291</span></td><td>ماجستير</td><td><span class=mono>a.haddad@std.example.edu</span></td></tr></tbody></table></div><div class="q "><div class="qn"><span class="n">1.5</span><span>هل المشروع مموّل؟</span></div><div class="a">لا</div></div><div class="q "><div class="qn"><span class="n">1.6</span><span>هل راجعت لجنة أخلاقيات أخرى هذا المشروع؟</span></div><div class=g>اختياري.</div><div class="a"><span class="empty">لم تتم الإجابة</span></div></div><div class="ft"><span class="mono">REC-EU 14/3/2026-27</span><span>صفحة 1 من 6</span><span class="marks"><span>ISO 9001:2015</span><span>Quality assured</span></span></div></section><section class="page" dir="ltr" style="--c:#b74c05" ><span class="ann">Another client · a supplier application</span><div class="lh"><span class="logo">EB</span><div><b>Example Bakery</b><span>Purchasing</span></div><div class="end">Mecca Street 112, Amman · Tax no. 0123456</div></div><h1 class="t">Supplier application</h1><p class="sub">Sent by Al-Nour Mills through Example Bakery’s supplier page on 4 November 2026.</p><div class="dline"><span class="st" style="color:#8a5a00">◐ Conditionally approved</span><span><span class="k">Reference</span> <span class="mono">SUP-2026-031</span></span><span><span class="k">Received</span> 4 Nov 2026</span><span><span class="k">Decided</span> 9 Nov 2026</span><span class="k">Conditions on page 2</span></div><div class="sec"><span class="mk"><i></i><i>1</i></span><b>Company</b></div><div class="q "><div class="qn"><span class="n">1.1</span><span>Company details</span></div><div class="facts"><div><span>Name</span><b>Al-Nour Mills</b></div><div><span>Registration no.</span><b><span class=mono>200114582</span></b></div><div><span>Tax no.</span><b><span class=mono>0099812</span></b></div><div><span>City</span><b>Zarqa</b></div><div><span>Contact</span><b>Ahmad Khalil</b></div><div><span>Phone</span><b><span class=mono>+962 5 390 1122</span></b></div></div></div><div class="q "><div class="qn"><span class="n">1.2</span><span>What do you supply?</span></div><div class="ch"><span class=""><span class="box">☒</span>Flour</span><span class=""><span class="box">☒</span>Sugar</span><span class="off"><span class="box">☐</span>Dairy</span><span class="off"><span class="box">☐</span>Packaging</span><span class="off"><span class="box">☐</span>Cleaning supplies</span></div></div><div class="sec"><span class="mk"><i></i><i>2</i></span><b>Food safety</b></div><div class="q "><div class="qn"><span class="n">2.1</span><span>Certificates</span></div><div class="ynr"><span>ISO 22000</span><b class="yes">✓ Yes</b></div><div class="ynr"><span>Halal certificate</span><b class="yes">✓ Yes</b></div><div class="ynr"><span>JFDA registration</span><b class="yes">✓ Yes</b></div><div class="ynr"><span>Third-party audit in the last year</span><b class="no">✗ No</b></div></div><div class="q "><div class="qn"><span class="n">2.2</span><span>Recall procedure</span></div><div class=g>No more than 200 words.</div><div class="a">We trace every bag to its batch and mill date and can recall within 24 hours; the last drill was in August 2026.</div></div><div class="sec is-na"><span class="mk"><i></i><i>3</i></span><b>Delivery</b><span class=na>Not answered yet</span></div><div class="ft"><span class="mono">SUP-2026-031</span><span>Page 1 of 2</span><span class="marks"><span>Food safety certified</span></span></div></section><section class="page" dir="ltr" style="--c:#0f6b5c" ><span class="ann">Another client · a consent form, signed on a tablet</span><div class="lh"><span class="logo">EC</span><div><b>Example Clinic</b><span>Dermatology</span></div><div class="end">Abdoun, Amman · +962 6 592 0000</div></div><h1 class="t">Consent to treatment</h1><p class="sub">Filled in on the clinic’s tablet on 13 November 2026.</p><div class="dline"><span class="st ok">✓ Signed</span><span><span class="k">Record</span> <span class="mono">CON-88213</span></span><span><span class="k">Patient</span> Ibrahim Mansour</span><span><span class="k">Date</span> 13 Nov 2026</span></div><div class="notice"><b>Important</b>You can withdraw consent at any time before the treatment starts.</div><div class="sec"><span class="mk"><i></i><i>1</i></span><b>The treatment</b></div><div class="q "><div class="qn"><span class="n">1.1</span><span>Treatment</span></div><div class="a">Fractional laser, both cheeks, 3 sessions</div></div><div class="q "><div class="qn"><span class="n">1.2</span><span>Risks explained</span></div><div class="ch"><span class=""><span class="box">☒</span>Redness for 2–3 days</span><span class=""><span class="box">☒</span>Swelling</span><span class=""><span class="box">☒</span>Darker or lighter patches</span><span class=""><span class="box">☒</span>Infection (rare)</span></div></div><div class="sec"><span class="mk"><i></i><i>2</i></span><b>Health questions</b></div><div class="q "><div class="qn"><span class="n">2.1</span><span>Do any of these apply?</span></div><div class="ynr"><span>Pregnant or breastfeeding</span><b class="nap">— N/A</b></div><div class="ynr"><span>Taking isotretinoin in the last 6 months</span><b class="no">✗ No</b></div><div class="ynr"><span>History of cold sores</span><b class="yes">✓ Yes</b></div></div><div class="sec"><span class="mk"><i></i><i>3</i></span><b>Signatures</b></div><div class="sig"><div><b>Ibrahim Mansour</b><span>Patient</span><span class="conf">✓ Confirmed in Whity · 13 Nov 2026, 16:02</span></div><div class="pad"><svg viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M8 30 Q 20 4, 30 26 T 52 20 Q 60 8, 72 28 T 94 14" fill="none" stroke="#1f3b73" stroke-width="1.6" stroke-linecap="round"/></svg></div></div><div class="sig"><div><b>Dr Awss Haddad</b><span>Treating doctor</span><span class="conf">✓ Confirmed in Whity · 13 Nov 2026, 16:05</span></div><div class="pad"><svg viewBox="0 0 100 40" preserveAspectRatio="none"><path d="M5 32 C 15 5, 22 40, 30 18 S 45 30, 52 12 S 70 38, 92 15" fill="none" stroke="#1f3b73" stroke-width="1.6" stroke-linecap="round"/></svg></div></div><div class="ft"><span class="mono">CON-88213</span><span>Page 1 of 1</span><span class="marks"><span>JCI accredited</span></span></div></section></div>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!-- @dsCard group="Web app on a phone" height=954 width=2674 subtitle="Web app on a phone: the settings menu, a page, a page several levels deep, what a manager sees, Arabic (PW.8)" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Phone web: settings</title><style>html,body{height:100%;margin:0} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 22 }); }
+  var T0 = { home: 'Home', inbox: 'Inbox', create: 'Create', agents: 'Chat', agentsIcon: 'comment', more: 'More' };
+  function status() { return h('div', { className: 'wm-status', 'aria-hidden': 'true' }, h('span', null, '9:41'), h('i'), h('span', null, I('wifi', 16), I('battery', 18))); }
+  function tabbar(active, T, badges) { T = T || T0; badges = badges || { inbox: 3 };
+    function tab(k, icon) { return h('div', { key: k, className: 'wm-tab' + (active === k ? ' is-on' : '') }, I(icon, 24), T[k], badges[k] ? h('b', null, badges[k]) : null); }
+    return h('nav', { className: 'wm-tabbar', 'aria-label': 'Main' }, tab('home', 'dashboard'), tab('inbox', 'inbox'), h('button', { key: 'c', className: 'wm-create', 'aria-label': T.create }, I('plus', 28)), tab('agents', T.agentsIcon || 'robot'), tab('more', 'menu')); }
+  function bottom(o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.tabs === false ? null : tabbar(o.active, o.T, o.badges), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function phone(label, kids, o) { o = o || {}; return h('div', { className: 'wm-col' }, h('div', { className: 'wm-label' }, label), h('div', { className: 'wm-phone', dir: o.dir }, status(), kids, o.overlay || null)); }
+  function search(t, f) { return h('div', { className: 'wm-search' }, I('search', 20), h('span', null, t), f ? h('button', { type: 'button' }, I('filter', 16), f) : null); }
+  function stage(blue, tag, kids, keys) { var LOT = { 'YOUR BRAND, OUR PLATFORM': ['brand-sheet-platform', 'view'], 'AGENTS PROPOSE': ['agents-propose', 'view'], 'YOU DECIDE': ['approve-set-down', 'view'], 'IN THE APP': ['approve-set-down', 'view'], 'UPDATING · LOOPS': ['updating', 'loop'], 'ALL CAUGHT UP': ['all-caught-up', 'view'] }; var l = LOT[tag]; if (!l) return h('div', { className: 'wm-lottie' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, 'LOTTIE · ' + tag), kids, keys ? h('div', { className: 'wm-keys' }, keys.map(function (k, i) { return h('span', { key: i }, k); })) : null); return h('div', { className: 'wm-lottie has-file' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, l[0] + '.json'), h('div', { className: 'w-lottie', 'data-lottie': 'lottie/' + l[0] + '.json', 'data-play': l[1] }, h('div', { className: 'w-lottie__fallback' }, kids))); }
+  function at(cls, x, y, extra) { return h('div', { className: cls, style: Object.assign({ left: x, top: y }, extra || {}) }); }
+  function dots(n, on) { var a = []; for (var i = 0; i < n; i++) a.push(h('i', { key: i, className: i === on ? 'is-on' : '' })); return h('div', { className: 'wm-dots' }, a); }
+  function foot(kids) { return h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-form', style: { borderTop: 0 } }, kids), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function q(title, sub, step, of) { return h(F, null, h('div', { className: 'wm-progress', 'aria-hidden': 'true' }, h('i', { style: { width: Math.round(step / of * 100) + '%' } })), h('div', { className: 'wm-q' }, h('h1', null, title), sub ? h('p', null, sub) : null)); }
+  function choice(t, sub, on, icon) { return h('div', { className: 'wm-choice' + (on ? ' is-on' : '') }, icon ? I(icon, 24) : null, h('span', null, t, sub ? h('small', null, sub) : null), h('i', { className: 'wm-radio' })); }
+  function navbar(t) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), h('span')); }
+
+  var SEED = 'amro@examplebakery.jo', HUE = W.brandHue('#0961bb');
+  function me(s) { return h(W.Avatar, { name: 'Amro Saleh', pattern: SEED, hue: HUE, size: s || 40 }); }
+  function pav(seed, name, s) { return h(W.Avatar, { name: name, pattern: seed, hue: HUE, size: s || 40 }); }
+  function nav(t, end) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), end || h('span')); }
+  function head(t, sub) { return h('div', { className: 'wm-head' }, h('h1', null, t), sub ? h('p', null, sub) : null); }
+  function gl(t) { return h('div', { className: 'wm-gl' }, t); }
+  function gf(t) { return h('div', { className: 'wm-gf' }, t); }
+  function grp() { return h('div', { className: 'wm-group' }, Array.prototype.slice.call(arguments)); }
+  function set(icon, t, v, o) { o = o || {};
+    var end = o.end !== undefined ? o.end : o.sw !== undefined ? h(W.Switch, { defaultChecked: o.sw, 'aria-label': t }) : I(o.ext ? 'external' : 'chevron-right', 18);
+    return h('div', { className: 'wm-set' + (o.danger ? ' is-danger' : '') + (o.link ? ' is-link' : '') }, icon ? h('span', { className: 'wm-set__ic' + (o.tone ? ' is-' + o.tone : '') }, typeof icon === 'string' ? I(icon, 20) : icon) : null,
+      h('span', { className: 'wm-set__t' }, t, o.sub ? h('small', null, o.sub) : null), v != null ? h('span', { className: 'wm-set__v' }, v) : null, end); }
+  function segs(a, on, cls) { return h('div', { className: 'wm-segs' + (cls ? ' ' + cls : ''), role: 'tablist' }, a.map(function (x, i) { return h('span', { key: i, role: 'tab', 'aria-selected': i === on, className: i === on ? 'is-on' : '' }, x[0], x[1] ? h('em', null, x[1]) : null); })); }
+  function chips(a, on) { return h('div', { className: 'wm-chips' }, a.map(function (x, i) { return h('span', { key: i, className: on.indexOf(i) > -1 ? 'is-on' : '' }, on.indexOf(i) > -1 ? I('check', 16) : null, x); })); }
+  function scroll() { return h('div', { className: 'wm-scroll' }, Array.prototype.slice.call(arguments)); }
+  function sheet(title, kids) { return h(F, null, h('div', { className: 'wm-scrim' }), h('div', { className: 'wm-sheet', role: 'dialog', 'aria-label': title }, h('div', { className: 'wm-grab' }), title ? h('h2', null, title) : null, kids, h('div', { className: 'wm-home-ind' }, h('i')))); }
+  function act() { return bottom({ tabs: false, action: h('div', { className: 'wm-actbar' }, Array.prototype.slice.call(arguments)) }); }
+  function searchrow(t) { return h('div', { className: 'wm-searchrow' }, search(t, 'Filter'), h('button', { 'aria-label': 'Invite people' }, I('plus', 24))); }
+  function li(ic, t, sub, end, agent) { return h('div', { className: 'wm-li' + (agent ? ' is-agent' : '') }, typeof ic === 'string' ? h('span', { className: 'wm-li__ic' }, I(ic, 20)) : ic, h('div', { style: { minWidth: 0 } }, h('b', null, t), h('small', null, sub)), h('div', { className: 'wm-li__end' }, end)); }
+  function ac(ic, tone, t, sub, extra) { return h('div', { className: 'wm-act' }, typeof ic === 'string' ? h('span', { className: 'wm-set__ic' + (tone ? ' is-' + tone : '') }, I(ic, 18)) : ic, h('div', null, t, h('small', null, sub), extra || null)); }
+  function badge(v, t) { return h(W.Badge, { variant: v }, t); }
+
+  function hh(sub) { return h('div', { className: 'wm-head' }, h('div', { className: 'wm-head__top' }, h(W.TenantLogo, { name: 'Example Bakery', size: 28 }), me(36)), h('h1', null, 'Good morning, Amro'), h('p', null, sub)); }
+
+  var TA = { home: 'الرئيسية', inbox: 'الوارد', create: 'إنشاء', agents: 'المحادثات', agentsIcon: 'comment', more: 'المزيد' };
+  var BAD = { inbox: 3, agents: 2 };
+  function url() { return h('div', { className: 'pw-url', 'aria-hidden': 'true' }, h('span', { className: 'pw-url__b' }, I('chevron-left', 22)), h('span', { className: 'pw-url__p' }, I('lock', 14), 'app.whity.dev'), h('span', { className: 'pw-url__b' }, I('upload', 20))); }
+  function tb(active, o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.bulk || tabbar(active, o.T, BAD), o.browser ? url() : null, h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function title(t, sub, end) { return h('div', { className: 'pw-title' }, h('div', { style: { minWidth: 0 } }, h('h1', null, t), sub ? h('p', null, sub) : null), end ? h('div', { className: 'pw-title__end' }, end) : null); }
+  function back(t) { return h('div', { className: 'pw-back' }, I('chevron-left', 24), t); }
+  function crumb(a) { var out = []; a.forEach(function (x, i) { if (i) out.push(h('span', { key: 'c' + i }, I('chevron-right', 14))); out.push(h('span', { key: i }, x)); }); return h('div', { className: 'pw-crumb' }, out); }
+  function pagehead(c, t, sub, extra) { return h('div', { className: 'pw-pagehead' }, c ? crumb(c) : null, h('h1', null, t), sub ? h('p', null, sub) : null, extra || null); }
+  function row(o) {
+    return h('div', { className: 'pw-row' + (o.sel ? ' is-sel' : '') }, o.sel !== undefined ? h('span', { className: 'pw-cb' + (o.sel ? ' is-on' : ''), role: 'checkbox', 'aria-checked': !!o.sel }, o.sel ? I('check', 18) : null) : null,
+      h('div', { className: 'pw-row__b' }, h('div', { className: 'pw-row__t' }, h('b', null, o.t), o.badge || null, o.sel === undefined ? h('button', { className: 'pw-more', 'aria-label': (o.moreLabel || 'More for ') + o.t }, I('more', 20)) : null),
+        o.lines.map(function (l, i) { return h('div', { key: i, className: 'pw-row__l' }, h('span', null, l[0]), h('span', null, l[1])); }))); }
+  function plist() { return h('div', { className: 'pw-list' }, Array.prototype.slice.call(arguments)); }
+  function sbar(t, add, f) { return h('div', { className: 'wm-searchrow' }, search(t, f || 'Filter'), h('button', { 'aria-label': add }, I('plus', 24))); }
+  function fchips(a) { return h('div', { className: 'pw-fchips' }, a.map(function (x, i) { return typeof x === 'string' ? h('span', { key: i }, x, I('close', 16)) : h('span', { key: i, className: 'is-plain' + (x.drop ? ' is-drop' : '') + (x.on ? '' : ''), style: x.on ? { background: 'var(--primary-tint)', borderColor: 'var(--primary)', color: 'var(--primary-tint-foreground)' } : null }, x.icon ? I(x.icon, 16) : null, x.t, x.drop ? I('chevron-down', 16) : null); })); }
+  function opt(t, on, sub, icon) { return set(icon || null, t, null, { end: on ? I('check', 22) : h('span'), sub: sub }); }
+  function opts() { return h('div', { className: 'pw-opts' }, grp.apply(null, arguments)); }
+  function field(l, v, o) { o = o || {}; return h('div', { className: 'pw-field' + (o.focus ? ' is-focus' : '') }, h('label', null, l), h('div', { className: v ? '' : 'is-ph' }, v || o.ph, o.focus ? h('span', { className: 'pw-caret' }) : null)); }
+  function kb(ar) {
+    var rows = ar ? ['ضصثقفغعهخحج', 'شسيبلاتنمكط', 'ئءؤرىةوزظد'] : ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+    function keys(s) { return s.split('').map(function (c, i) { return h('span', { key: i }, c); }); }
+    return h('div', { className: 'pw-kb', 'aria-hidden': 'true', dir: ar ? 'rtl' : 'ltr' }, h('div', { className: 'pw-kb__r' }, keys(rows[0])), h('div', { className: 'pw-kb__r' }, keys(rows[1])),
+      h('div', { className: 'pw-kb__r' }, ar ? null : h('span', { className: 'is-fn' }, I('arrow-up', 18)), keys(rows[2]), h('span', { className: 'is-fn' }, '⌫')),
+      h('div', { className: 'pw-kb__r' }, h('span', { className: 'is-fn' }, '123'), h('span', { className: 'is-fn' }, I('world', 18)), h('span', { className: 'is-space' }, ar ? 'مسافة' : 'space'), h('span', { className: 'is-ret' }, ar ? 'التالي' : 'next')), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function note(t, p, items) { return h('div', { className: 'pw-note' }, h('h3', null, t), p ? h('p', null, p) : null, h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function cur(el) { return React.cloneElement(el, { className: el.props.className + ' is-current' }); }
+  function tile(i, t) { return h('div', { className: 'wm-tile' }, I(i, 28), t); }
+  function sheetbar() { return h('div', { className: 'pw-sheetbar' }, Array.prototype.slice.call(arguments)); }
+  function code(t) { return h('code', null, t); }
+  var RT = 'rtl';
+
+  var G = [['Workspace', [['settings', 'General'], ['branding', 'Branding']]], ['Sign-in and security', [['shield', 'Security'], ['key', 'SSO'], ['user', 'Sign-up'], ['form', 'Public forms']]], ['Email', [['mail', 'Email'], ['world', 'Email domains']]],
+    ['Data', [['archive', 'Storage'], ['flag', 'Tags'], ['language', 'Languages'], ['text', 'Translations']]], ['Advanced', [['trigger', 'Feature flags'], ['error', 'Error tracking']]]];
+  function menu(groups, curName) { var out = []; groups.forEach(function (g, i) { out.push(h(F, { key: i }, gl(g[0]), grp.apply(null, g[1].map(function (r) { var el = set(r[0], r[1], null, r[1] === curName ? { sub: 'Last opened' } : {}); return r[1] === curName ? cur(el) : el; })))); }); return out; }
+  var p1 = phone('Settings menu · back from Branding', h(F, null, back('More'), title('Settings'), h('div', { className: 'wm-scroll' }, menu(G, 'Branding')), tb('more', { search: h('div', { style: { padding: '10px 16px 0' } }, search('Search settings')) })));
+  var p2 = phone('A page · Branding', h(F, null, back('Settings'), pagehead(['Settings', 'Workspace'], 'Branding'),
+    scroll(field('Workspace name', 'Example Bakery'), h('div', { className: 'pw-field' }, h('label', null, 'Logo'), h('div', null, h(W.TenantLogo, { name: 'Example Bakery', size: 36, showName: false }), h('span', { style: { flex: 1 } }, 'logo.svg'), h(W.Button, { variant: 'outline' }, 'Change'))),
+      h('div', { className: 'pw-field' }, h('label', null, 'Brand colour'), h('div', null, h('span', { style: { width: 28, height: 28, borderRadius: 8, background: '#b74c05' } }), h('span', { style: { fontFamily: 'var(--font-mono)' } }, '#B74C05'))), gf('Your colour is checked for contrast and adjusted for buttons and links if needed.')),
+    tb('more', { action: h('div', { className: 'wm-actbar' }, h(W.Button, { variant: 'outline' }, 'Discard'), h(W.Button, null, 'Save changes')) })));
+  function rec(t, host, val) { return set(null, t + ' · ' + host, null, { sub: val, end: h('button', { className: 'pw-ib', 'aria-label': 'Copy ' + t + ' record' }, I('copy', 20)) }); }
+  var p3 = phone('Several levels deep · a domain', h(F, null, back('Email domains'), pagehead(['Settings', 'Email', 'Email domains'], 'examplebakery.jo', null, h('div', { style: { paddingTop: 4 } }, badge('warning', 'Waiting for DNS'))),
+    scroll(gf('Add these three records where you bought the domain. We check every few minutes and email you when it works.'), grp(rec('TXT', '@', 'whity-verify=8f3a2c91'), rec('CNAME', 'wm1._domainkey', 'dkim1.mail.whity.dev'), rec('CNAME', 'bounce', 'bounce.mail.whity.dev'))),
+    tb('more', { action: h('div', { className: 'wm-actbar' }, h(W.Button, { icon: 'sync' }, 'Check now')) })));
+  var p4 = phone('A manager · fewer groups', h(F, null, back('More'), title('Settings'), h('div', { className: 'wm-scroll' }, menu([['Workspace', [['settings', 'General'], ['branding', 'Branding']]], ['Data', [['flag', 'Tags'], ['language', 'Languages']]]]), gf('You see the settings your role can change. An owner can change the rest.')),
+    tb('more', { search: h('div', { style: { padding: '10px 16px 0' } }, search('Search settings')) })));
+  var GA = [['مساحة العمل', [['settings', 'عام'], ['branding', 'الهوية']]], ['الدخول والأمان', [['shield', 'الأمان'], ['key', 'الدخول الموحّد (SSO)'], ['user', 'التسجيل'], ['form', 'النماذج العامة']]], ['البريد', [['mail', 'البريد'], ['world', 'نطاقات البريد']]],
+    ['البيانات', [['archive', 'التخزين'], ['flag', 'الوسوم'], ['language', 'اللغات'], ['text', 'الترجمات']]]];
+  function menuA() { var out = []; GA.forEach(function (g, i) { out.push(h(F, { key: i }, gl(g[0]), grp.apply(null, g[1].map(function (r) { var el = set(r[0], r[1], null, r[1] === 'الهوية' ? { sub: 'آخر ما فتحته' } : {}); return r[1] === 'الهوية' ? cur(el) : el; })))); }); return out; }
+  var p5 = phone('Arabic · Settings menu', h(F, null, back('المزيد'), title('الإعدادات'), h('div', { className: 'wm-scroll' }, menuA()), tb('more', { T: TA, search: h('div', { style: { padding: '10px 16px 0' } }, search('ابحث في الإعدادات')) })), { dir: RT });
+  var n = note('Settings on a phone', 'WHIT-1006 and WHIT-826. Replaces the sideways row of groups.', [
+    'Settings (in More) opens the menu as its own page: the five groups as titled lists, every page in them a row.',
+    h(F, null, 'Coming back, the page you came from is marked ', h('b', null, 'Last opened'), ' and scrolled into view.'),
+    'A page has a back link naming where it goes, then the path in small text, then the title. Several levels deep, the path grows, never the title.',
+    'Groups and pages your role can’t open are not shown; a line says why the list is short.',
+    'Saving: the save bar docks at the bottom above the tab bar (M.4), with Discard beside it.',
+    'Search settings sits at the bottom of the menu, as in lists (M.7).']);
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wm-row' }, p1, p2, p3, p4, p5, n));
+</script>
+</body>
+</html>

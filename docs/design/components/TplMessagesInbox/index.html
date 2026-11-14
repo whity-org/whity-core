@@ -1,0 +1,82 @@
+<!-- @dsCard group="Templates · 3.4" height=2661 width=1344 subtitle="WHIT-939: customers’ email and web chat, internal notes, an agent’s held reply, assign and close, states and Arabic" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1344px;min-height:2661px}</style><meta charset="utf-8"><title>Messages inbox</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4]]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  var EN = { open: 'Open', waiting: 'Waiting for customer', closed: 'Closed', all: 'All', mine: 'Mine', un: 'Unassigned', search: 'Search messages', assign: 'Assign', toMe: 'Assigned to Awss Haddad', close: 'Close conversation', chat: 'Web chat', email: 'Email',
+    convs: [['Ibrahim Mansour', 'ibrahim', 'chat', 'Can you deliver at 8 on Thursday?', '10:42', true, 'Awss'], ['Amman Coffee Co.', 'amman', 'mail', 'A question about INV-1047', '09:15', true, null], ['Example Café', 'cafe', 'mail', 'Thanks, received the order.', 'Yesterday', false, 'Amro'], ['Emad Nasser', 'emad', 'chat', 'Is the tasting on Saturday?', 'Mon', false, 'Awss'], ['Ahmad Khalil', 'ahmadk', 'chat', 'Thank you!', 'Mon', false, null]],
+    unassigned: 'Unassigned', who: 'Ibrahim Mansour', sub: 'Web chat · ibrahim@example.com',
+    m1: 'Hello, I ordered 20 croissants for Thursday. Can I make it 30?', m2: 'Hi Ibrahim, let me check with the kitchen.', note: 'Kitchen says yes if confirmed before 2 pm. Amro, can you approve the extra 10?', noteBy: 'Internal note · Awss Haddad · 10:38 · customers never see notes', m3: 'Great, thanks. Also, can you deliver at 8?',
+    held: 'Yes, we can deliver at 8:00 on Thursday. Your order is now 30 croissants.', heldBy: 'Orders assistant · not sent yet · sends at 10:46 unless you cancel', cancel: 'Cancel', edit: 'Edit', sendNow: 'Send now',
+    reply: 'Reply', inote: 'Internal note', ph: 'Write to Ibrahim…', via: 'Sends by web chat', send: 'Send', t1: '10:31 · Ibrahim', t2: '10:35 · Awss Haddad', t3: '10:42 · Ibrahim' };
+  var ARS = { open: 'مفتوحة', waiting: 'بانتظار العميل', closed: 'مغلقة', all: 'الكل', mine: 'لي', un: 'غير مُسندة', search: 'ابحث في الرسائل', assign: 'إسناد', toMe: 'مُسندة إلى أوس حداد', close: 'إغلاق المحادثة', chat: 'دردشة الموقع', email: 'البريد',
+    convs: [['إبراهيم منصور', 'ibrahim', 'chat', 'هل يمكنكم التوصيل الساعة 8 يوم الخميس؟', '10:42', true, 'Awss'], ['قهوة عمّان', 'amman', 'mail', 'سؤال عن الفاتورة INV-1047', '09:15', true, null], ['مقهى المثال', 'cafe', 'mail', 'شكراً، وصل الطلب.', 'أمس', false, 'Amro'], ['عماد ناصر', 'emad', 'chat', 'هل التذوّق يوم السبت؟', 'الإثنين', false, 'Awss']],
+    unassigned: 'غير مُسندة', who: 'إبراهيم منصور', sub: 'دردشة الموقع · ibrahim@example.com',
+    m1: 'مرحباً، طلبت 20 كرواسون ليوم الخميس. هل يمكن أن أجعلها 30؟', m2: 'أهلاً إبراهيم، سأتأكد من المطبخ.', note: 'المطبخ يوافق إذا تأكد الطلب قبل الثانية ظهراً. عمرو، هل توافق على الـ10 الإضافية؟', noteBy: 'ملاحظة داخلية · أوس حداد · 10:38 · لا يراها العملاء', m3: 'رائع، شكراً. وهل يمكن التوصيل الساعة 8؟',
+    held: 'نعم، يمكننا التوصيل الساعة 8:00 يوم الخميس. أصبح طلبك 30 كرواسون.', heldBy: 'مساعد الطلبات · لم تُرسل بعد · تُرسل الساعة 10:46 ما لم تلغها', cancel: 'إلغاء', edit: 'تعديل', sendNow: 'أرسل الآن',
+    reply: 'رد', inote: 'ملاحظة داخلية', ph: 'اكتب إلى إبراهيم…', via: 'تُرسل عبر دردشة الموقع', send: 'إرسال', t1: '10:31 · إبراهيم', t2: '10:35 · أوس حداد', t3: '10:42 · إبراهيم' };
+  function conv(c, i, T) { return h('div', { key: i, className: 'x4-conv' + (i === 0 ? ' is-on' : '') }, av(c[0], c[1], 36), h('div', { style: { minWidth: 0 } }, h('b', null, c[5] ? h('span', { className: 'x4-dotu', 'aria-label': 'Unread' }) : null, c[0]), h('p', null, c[3]),
+      h('div', { className: 'x4-conv__meta' }, h(W.Badge, { variant: 'outline', icon: c[2] === 'chat' ? 'comment' : 'mail' }, c[2] === 'chat' ? T.chat : T.email), c[6] ? av(c[6] === 'Awss' ? 'Awss Haddad' : 'Amro Saleh', c[6] === 'Awss' ? 'awss@ex' : 'amro@examplebakery.jo', 20) : h(W.Badge, { variant: 'secondary' }, T.unassigned))), h('small', null, c[4])); }
+  function inbox(T, o) { o = o || {};
+    var tabs = h(W.Tabs, { items: [{ value: 'o', label: T.open, count: 12 }, { value: 'w', label: T.waiting, count: 4 }, { value: 'c', label: T.closed }] });
+    var list = h('div', { className: 'x4-ilist' }, h('div', { className: 'x4-ilist__top' },
+      h(W.Segmented, { label: T.assign, defaultValue: 'all', options: [{ value: 'all', label: T.all }, { value: 'mine', label: T.mine }, { value: 'un', label: T.un }] }), h(W.Input, { 'aria-label': T.search, placeholder: T.search })), T.convs.map(function (c, i) { return conv(c, i, T); }));
+    var thread = h('div', { className: 'x4-thread' }, h('div', { className: 'x4-thead' }, av(T.who, 'ibrahim', 40), h('div', null, h('b', null, T.who), h('span', { className: 'x4-small' }, T.sub)),
+        h(W.Button, { variant: 'outline', size: 'sm', icon: 'user', iconEnd: 'chevron-down' }, T.toMe), h(W.Button, { variant: 'outline', size: 'sm', icon: 'check' }, T.close)),
+      h('div', { className: 'x4-msgs' }, h('div', { className: 'x4-msg' }, h('div', { className: 'x4-msg__b' }, T.m1), h('small', null, T.t1)),
+        h('div', { className: 'x4-msg is-us' }, h('div', { className: 'x4-msg__b' }, T.m2), h('small', null, T.t2)),
+        h('div', { className: 'x4-msg is-note' }, h('div', { className: 'x4-msg__b' }, T.note), h('small', null, I('lock', 12), T.noteBy)),
+        h('div', { className: 'x4-msg' }, h('div', { className: 'x4-msg__b' }, T.m3), h('small', null, T.t3)),
+        h('div', { className: 'x4-msg is-us is-held' }, h('div', { className: 'x4-msg__b' }, T.held), h('div', { className: 'x4-held' }, I('robot', 14), h('span', null, T.heldBy), h(W.Button, { size: 'sm', variant: 'ghost' }, T.cancel), h(W.Button, { size: 'sm', variant: 'outline', icon: 'edit' }, T.edit)))),
+      o.readonly ? h('div', { className: 'x4-compose' }, h(W.Alert, { variant: 'info', title: 'You can read this conversation' }, 'Replying needs the “Reply to customers” permission. Ask an owner.')) :
+      h('div', { className: 'x4-compose' + (o.noteMode ? ' is-note' : '') }, h(W.Segmented, { label: T.reply, defaultValue: o.noteMode ? 'n' : 'r', options: [{ value: 'r', label: T.reply }, { value: 'n', label: T.inote }] }), h('div', { className: 'x4-compose__box' }, T.ph),
+        h('div', { className: 'x4-compose__row' }, h(W.IconButton, { icon: 'attach', label: 'Attach a file' }), h('span', { className: 'x4-small' }, T.via), h('span', { className: 'x4-sp' }), h(W.Button, { icon: 'send' }, T.send))));
+    return h('div', { dir: o.dir, style: { display: 'grid', gap: 12 } }, tabs, h('div', { className: 'x4-inbox' }, list, thread)); }
+  var page = shell('Messages', h(F, null, h(W.PageHeader, { title: 'Messages', description: 'Customers’ email and web chat in one place. Customers never see internal notes.', actions: h(W.Button, { variant: 'outline', icon: 'settings' }, 'Messages settings') }), inbox(EN)));
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    frame('Open conversation · a note and an agent’s held reply', page, 1010),
+    states([
+      st('First time', h(W.EmptyState, { icon: 'comment', title: 'No messages yet', description: 'Turn on web chat or connect an email address, and customers’ messages land here.', action: h(W.Button, { variant: 'outline', size: 'sm' }, 'Set up messages') })),
+      st('Filtered, nothing found', h(W.EmptyState, { icon: 'search', title: 'Nothing matches', description: 'No open conversations are assigned to you.', action: h(W.Button, { variant: 'outline', size: 'sm' }, 'Show all') })),
+      st('A failed send', h(F, null, h('div', { className: 'x4-msg is-us is-failed', style: { maxWidth: '100%' } }, h('div', { className: 'x4-msg__b' }, 'Your order is confirmed for Thursday.'), h('small', null, I('alert', 12), 'Not sent. The customer’s email bounced.')), h('div', { className: 'x4-row' }, h(W.Button, { size: 'sm', variant: 'outline', icon: 'sync' }, 'Try again'), h(W.Button, { size: 'sm', variant: 'ghost' }, 'Copy text')))),
+      st('Writing a note', h('div', { className: 'x4-compose is-note', style: { border: 0, padding: 0, background: 'none' } }, h(W.Segmented, { label: 'Mode', defaultValue: 'n', options: [{ value: 'r', label: 'Reply' }, { value: 'n', label: 'Internal note' }] }), h('div', { className: 'x4-compose__box' }, 'Amro, can you approve the extra 10?'), h('div', { className: 'x4-compose__row' }, h('span', { className: 'x4-small' }, 'Only your team sees this'), h('span', { className: 'x4-sp' }), h(W.Button, null, 'Add note')))),
+      st('Read-only · no access', h(F, null, h(W.Alert, { variant: 'info', title: 'You can read this conversation' }, 'Replying needs the “Reply to customers” permission.'), h(W.EmptyState, { icon: 'lock', title: 'You can’t open Messages', description: 'Ask an owner to give you access.' })))], 5),
+    frame('Arabic', h('div', { style: { padding: 20 } }, inbox(ARS, { dir: 'rtl' })), 720),
+    note('Messages inbox (WHIT-939)', ['The list and the conversation sit side by side from 768px; on a phone one at a time (PW.4 rows, the thread full screen).', 'Tabs by status (Open, Waiting for customer, Closed) with counts; All, Mine, Unassigned under them; search under that.', 'Each row: who, the last line, where it came from (web chat or email), who it’s assigned to, the time. A blue dot is unread.', 'Internal notes sit full width on the amber tint with a lock: “customers never see notes”.', 'An agent’s reply waits dashed with “not sent yet” and the time it goes, plus Cancel and Edit. Nothing an agent writes leaves without that window.', 'The composer switches between Reply and Internal note; the box turns amber for a note so nobody sends a note by mistake.', 'Assign and Close sit in the conversation’s header. A failed send says why, in red, with Try again.', 'People without the reply permission read only; the composer becomes a note saying so.'])));
+</script>
+</body>
+</html>

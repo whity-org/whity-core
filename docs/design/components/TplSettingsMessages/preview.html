@@ -1,0 +1,57 @@
+<!-- @dsCard group="Templates · 3.4" height=1954 width=1344 subtitle="WHIT-939: web chat, the reply address, and the incoming-email secret shown once" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Settings: Messages</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4]]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  var main = h(F, null,
+    h(W.Card, { title: 'Web chat', description: 'A chat box on a page of its own that customers can open', action: h(W.Switch, { label: 'On', defaultChecked: true }) }, h('div', { style: { display: 'grid', gap: 12 } },
+      h(W.Textarea, { label: 'Greeting', rows: 2, defaultValue: 'Hello! Ask us about orders, cakes or delivery.' }), h('div', { className: 'x4-row' }, h('span', { className: 'x4-mono' }, 'app.whity.dev/chat/example-bakery'), h(W.Button, { size: 'sm', variant: 'outline', icon: 'copy' }, 'Copy link'), h(W.Button, { size: 'sm', variant: 'ghost', icon: 'external' }, 'Open')))),
+    h(W.Card, { title: 'Email', description: 'Customers’ emails to this address arrive in Messages, and your replies come from it.' }, h(W.Input, { label: 'Reply address', defaultValue: 'hello@examplebakery.jo', helperText: 'Verified in Email domains.' })),
+    h(W.Card, { title: 'Incoming email', description: 'Forward email from your provider to this address. Whity checks the secret on every message.' }, h('div', { style: { display: 'grid', gap: 12 } },
+      h('div', { className: 'wy-dns' }, h('span', null, 'Address'), h('code', null, 'https://app.whity.dev/hooks/mail/eb-7f3a'), h(W.Button, { size: 'sm', variant: 'outline', icon: 'copy' }, 'Copy')),
+      h(W.Alert, { variant: 'warning', title: 'Copy the secret now' }, 'You won’t see it again. If you lose it, make a new one.'), h('div', { className: 'x4-token' }, h('span', null, 'whsec_4f9a2c81e0b7d356a1c9'), h(W.Button, { size: 'sm', icon: 'copy' }, 'Copy secret')),
+      h('div', null, h(W.Button, { variant: 'outline', icon: 'sync' }, 'Make a new secret')))), saveBar('You changed the greeting.'));
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    frame('Settings › Messages · the secret shown once', setPage('Messages', 'Messages', 'Web chat and email for customers’ messages.', main), 1200),
+    states([st('Nothing set up yet', h(F, null, h(W.EmptyState, { icon: 'comment', title: 'Messages are off', description: 'Turn on web chat, or add an address customers can email.' }), h('div', { className: 'x4-row', style: { justifyContent: 'center' } }, h(W.Button, null, 'Turn on web chat'), h(W.Button, { variant: 'outline' }, 'Add an email address')))),
+      st('Make a new secret?', h(W.ConfirmDialog, { inline: true, title: 'Make a new secret?', description: 'The old secret stops working at once. Update it with your email provider, or incoming email stops arriving.', confirmLabel: 'Make a new secret', icon: 'sync' })),
+      st('Arabic', h('div', { dir: 'rtl', style: { display: 'grid', gap: 12 } }, h(W.Card, { title: 'دردشة الموقع', description: 'صندوق دردشة على صفحتك الخاصة', action: h(W.Switch, { label: 'تشغيل', defaultChecked: true }) }, h(W.Textarea, { label: 'الترحيب', rows: 2, defaultValue: 'أهلاً! اسألنا عن الطلبات والكعك والتوصيل.' })),
+        h(W.Alert, { variant: 'warning', title: 'انسخ الرمز السري الآن' }, 'لن تراه مرة أخرى. إن فقدته، أنشئ رمزاً جديداً.')), { dir: 'rtl' })], 3),
+    note('Settings › Messages (WHIT-939)', ['Three cards: Web chat (on or off, the greeting, the link), Email (the reply address), Incoming email (the address and its secret).', 'The secret shows once, in a mono box with Copy, under an amber “Copy it now”. After leaving the page only “Make a new secret” remains.', 'A new secret asks first and names the consequence: the old one stops at once.', 'Changes save with the save bar (section 21); the secret is never part of it.'])));
+</script>
+</body>
+</html>

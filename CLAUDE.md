@@ -13,8 +13,14 @@
 - Example data uses Example Bakery and friends for companies and the Whity team for people (Amro Saleh, Awss Haddad, Ahmad Khalil, Ibrahim Mansour, Emad Nasser; WS.4); plan names and prices stay `[plan name]` and `[price]`.
 - The reference for screens is `docs/design/components/` (each card's `README.md`, `index.html`) and `docs/design/screenshots/`; `13-app-map.md` maps each screen to its cards. Compare built screens with the screenshots in both themes (and Arabic where there's a card) before calling UI work done.
 - Work one milestone per branch and pull request (`PLAN.md`). Pull requests merge on green CI; only a release into main needs the owner.
-- Use the size tokens and `text-xs`, `text-sm` and the control sizes, never fixed sizes; the 13px floor and Larger text depend on it.
 - The document editor: section 18, `docs/design/handoff/editor/` (contract and TipTap mapping) and `docs/design/PLAN.md`.
 - **Global, hosted in the EU** (WS.17, WS.18): never describe Whity as built for one country; say "hosted in the EU" or "stored in the EU", not "GDPR compliant".
 - **Motion** (06-motion, LT.4): Lottie only at the moments listed, one scene at most on a screen, never blocking, colours from the tokens, last frame for Calm, Off and reduce motion; loops only while really waiting.
 - **Emails** (EM.1): build from `handoff/emails/`; one main button, 17px text, the workspace's brand, no actions inside approval emails.
+- **The web app on a phone** (PW.1–PW.11): under 640px the web app uses the phone's tab bar, rows, sheets and bottom bars (`Pw*` cards), not a squeezed desktop.
+- **Public pages wear the workspace's brand** (SU.1, SU.10, SC): verify, booking, join, chat and form pages need no sign-in, show the workspace's logo and colour, and say what to do next in plain words, never "error".
+- **Form printouts** (FP.1–FP.12, `handoff/print/FORM-PRINTOUTS.md`): any form prints a record automatically; paid plans and trials customise every part, free workspaces print the standard layout; a printout already made never changes.
+
+## Team additions (not in the design snippet)
+
+- Use the size tokens and `text-xs`, `text-sm` and the control sizes, never fixed sizes; the 13px floor and Larger text depend on it.

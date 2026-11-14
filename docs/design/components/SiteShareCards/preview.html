@@ -1,0 +1,52 @@
+<!-- @dsCard group="Websites" height=1327 width=1344 subtitle="Open Graph images for Whity’s pages, a workspace’s public pages and shared documents" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Link previews</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'Calendar': 'التقويم', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4], ['calendar', 'Calendar']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Calendar': 'التقويم', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  function og(cls, kids, style) { return h('div', { className: 'x5-og ' + cls, style: style }, kids); }
+  var site = og('paper', h(F, null, h('div', { className: 'row' }, h(W.Lockup, { height: 24 })), h('div', null, h('h2', null, 'Invoices that report themselves.'), h('p', null, 'Money in Whity: invoices, payments and your tax system’s e-invoicing.')), h('span', { className: 'tag' }, 'whity.dev/money'), h('span', { className: 'sheet' })));
+  var siteAr = h('div', { dir: 'rtl' }, og('paper', h(F, null, h('div', { className: 'row' }, h(W.Lockup, { height: 24 })), h('div', null, h('h2', { style: { fontFamily: 'var(--font-display)' } }, 'فواتير تُبلّغ عن نفسها.'), h('p', null, 'المال في Whity: الفواتير والمدفوعات والفوترة الإلكترونية.')), h('span', { className: 'tag' }, 'whity.dev/ar/money'), h('span', { className: 'sheet' }))));
+  var booking = og('tenant', h(F, null, h('div', { className: 'row' }, h('span', { style: { background: '#fff', borderRadius: 10, padding: 6, display: 'inline-flex' } }, h('span', { className: 'x4-plogo', style: { '--c': '#b74c05' } }, 'EB')), 'Example Bakery'), h('div', null, h('h2', null, 'Book a cake tasting'), h('p', null, '75 minutes at Abdali · from JOD 10.000 deposit')), h('span', { className: 'tag' }, 'examplebakery.jo/book')), { background: '#b74c05' });
+  var docu = og('paper', h(F, null, h('div', { className: 'row' }, h('span', { className: 'x4-plogo', style: { '--c': '#7a2340' } }, 'EU'), 'Example University'), h('div', null, h('h2', { style: { fontSize: 28 } }, 'Ethics approval REC-EU 14/3/2026-27'), h('p', null, 'Open to see it, or scan its QR code to check it’s genuine.')), h('span', { className: 'tag' }, 'Shared through Whity · private link'), h('span', { className: 'sheet' })));
+  var plugin = og('paper', h(F, null, h('div', { className: 'row' }, h(W.Lockup, { height: 22 }), h('span', { className: 'tag', style: { opacity: .7 } }, 'Plugin store')), h('div', null, h('h2', null, 'Delivery Tracker'), h('p', null, 'Track every order from oven to door. Verified · by Example Labs')), h('span', { className: 'tag' }, 'store.whity.dev/delivery-tracker'), h('span', { className: 'sheet' })));
+  var form = og('tenant', h(F, null, h('div', { className: 'row' }, h('span', { style: { background: '#fff', borderRadius: 10, padding: 6, display: 'inline-flex' } }, h('span', { className: 'x4-plogo', style: { '--c': '#0f6b5c' } }, 'EC')), 'Example Clinic'), h('div', null, h('h2', null, 'Book your first visit'), h('p', null, 'A short form, about 3 minutes.')), h('span', { className: 'tag' }, 'exampleclinic.jo/f/first-visit')), { background: '#0f6b5c' });
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    h('section', null, h('p', { className: 'x4-lab' }, 'Link previews, 1200 × 630, shown at half size'), h('div', { style: { display: 'grid', gridTemplateColumns: '600px 600px', gap: 24 } }, site, siteAr, booking, form, docu, plugin)),
+    note('Link previews (Open Graph and WhatsApp)', ['Whity’s own pages (whity.dev, docs, the store) use sheets on paper: the lockup, one sentence in Readex Pro, the plane under a sheet, the address in mono.', 'A workspace’s public pages (booking, forms, chat) use its own colour and logo, never Whity’s pattern (white label).', 'Shared documents never show content in the preview: the issuer, the title or reference, and “private link”.', 'Text stays inside 1080 × 560 so it survives crops; 34 pt title at 1200 px, 2 lines at most.', 'Generated by Whity Render from the same tokens; Arabic pages get Arabic previews.'])));
+</script>
+</body>
+</html>
