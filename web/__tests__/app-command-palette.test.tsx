@@ -36,13 +36,16 @@ jest.mock('@whity/features/i18n', () => ({
 const switchTenant = jest.fn(async () => undefined);
 /** The signed-in client: `/api/me/*` and Chat's directory, by path. */
 let apiRoutes: Record<string, unknown> = {};
-const apiMock = jest.fn(async (url: string) => {
+/** The typed client's GET, answered from `apiRoutes` by path and query. */
+const apiMock = jest.fn(async (path: string, init?: { params?: { query?: Record<string, string | number> } }) => {
+  const query = init?.params?.query;
+  const url = query ? `${path}?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)]))}` : path;
   const body = apiRoutes[url];
-  return { ok: body !== undefined, json: async () => body ?? {} };
+  return body === undefined ? { data: undefined, error: {}, response: { status: 404 } } : { data: body, response: { status: 200 } };
 });
+jest.mock('@/lib/api/client', () => ({ api: { GET: (...args: Parameters<typeof apiMock>) => apiMock(...args) } }));
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({
-    apiClient: apiMock,
     user: { id: 1, tenant_id: 1 },
     memberships: [
       { tenant_id: 1, tenant_name: 'Example Bakery', role: 'owner' },

@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import type { ChatDirectory } from '@/lib/chat-wire';
 import type { AgentProposal } from '@/components/agents/proposals';
 import { routingHref, routingMeta, type InboxItem } from '@/components/documents/routing-wire';
@@ -95,7 +95,6 @@ export function toWaitingEntries(
 
 export function usePaletteData(options: PaletteDataOptions): PaletteData {
   const { open, wantWaiting, chat, documents, approvalsHref, arabic, unknownAgent } = options;
-  const { apiClient } = useAuth();
   const [agents, setAgents] = useState<ChatAgent[] | null>(null);
   const [waiting, setWaiting] = useState<WaitingEntry[] | null>(null);
   const [waitingLoaded, setWaitingLoaded] = useState(false);
@@ -106,8 +105,9 @@ export function usePaletteData(options: PaletteDataOptions): PaletteData {
     if (!open) return undefined;
     let live = true;
     if (chat) {
-      apiClient('/api/v1/chat/directory?q=')
-        .then(async (response) => (response.ok ? ((await response.json()) as { data?: ChatDirectory }).data ?? null : null))
+      api
+        .GET('/api/v1/chat/directory', { params: { query: { q: '' } } })
+        .then(({ data: body }) => ((body as { data?: ChatDirectory } | undefined)?.data ?? null))
         .then(
           (directory) => {
             if (!live) return;
@@ -123,8 +123,9 @@ export function usePaletteData(options: PaletteDataOptions): PaletteData {
         );
     }
     if (documents) {
-      apiClient('/api/v1/me/recent-documents')
-        .then(async (response) => (response.ok ? ((await response.json()) as { data?: RecentDocument[] }).data ?? [] : []))
+      api
+        .GET('/api/v1/me/recent-documents')
+        .then(({ data: body }) => ((body as { data?: RecentDocument[] } | undefined)?.data ?? []))
         .then(
           (rows) => {
             if (!live) return;
@@ -141,15 +142,16 @@ export function usePaletteData(options: PaletteDataOptions): PaletteData {
     return () => {
       live = false;
     };
-  }, [open, chat, documents, arabic, apiClient]);
+  }, [open, chat, documents, arabic]);
 
   // What is waiting: when `/approve` is typed, fresh each time.
   useEffect(() => {
     if (!open || !wantWaiting) return undefined;
     // The last answer stays on screen while a fresh one loads.
     let live = true;
-    apiClient(`/api/v1/me/waiting?limit=${WAITING_LIMIT}`)
-      .then(async (response) => (response.ok ? ((await response.json()) as WaitingResponse) : null))
+    api
+      .GET('/api/v1/me/waiting', { params: { query: { limit: WAITING_LIMIT } } })
+      .then(({ data: body }) => (body === undefined ? null : (body as unknown as WaitingResponse)))
       .then(
         (body) => {
           if (!live) return;
@@ -165,7 +167,7 @@ export function usePaletteData(options: PaletteDataOptions): PaletteData {
     return () => {
       live = false;
     };
-  }, [open, wantWaiting, approvalsHref, arabic, unknownAgent, apiClient]);
+  }, [open, wantWaiting, approvalsHref, arabic, unknownAgent]);
 
   // Without Chat there is no one to ask: an empty list, not "loading".
   return { agents: chat ? agents : [], waiting, waitingLoaded, recentDocuments };
