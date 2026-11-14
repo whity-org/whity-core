@@ -1,0 +1,61 @@
+<!-- @dsCard group="Templates · 3.4" height=1677 width=1344 subtitle="WHIT-915: a workspace’s own sign-up page, the email-confirm page, and every state" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Join a workspace</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4]]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  function tcard(kids, o) { o = o || {}; return h('div', { className: 'x4-authc', dir: o.dir }, h('div', { className: 'x4-brand' }, h(W.TenantLogo, { name: 'Example Bakery', size: 36 })), kids); }
+  var form = tcard(h(F, null, h('h1', null, 'Join Example Bakery'), h('p', null, 'Order, see your invoices and book tastings online.'), h(W.Input, { label: 'Your name', defaultValue: 'Ibrahim Mansour' }), h(W.Input, { label: 'Email', defaultValue: 'ibrahim@example.com' }),
+    h('div', { className: 'x4-bot' }, I('success', 18), 'You’re a person. Checked by Cloudflare.'), h(W.Button, { size: 'lg' }, 'Join'), h('div', { className: 'x4-authc__foot' }, 'Already joined? ', h('a', { className: 'wy-link', href: '#' }, 'Sign in'))));
+  var confirm = tcard(h(F, null, h('h1', null, 'Finish joining'), h('p', null, 'Choose a password for ibrahim@example.com.'), h(W.Input, { label: 'Password', type: 'password', defaultValue: 'correct horse battery', helperText: 'At least 10 characters.' }), h(W.Button, { size: 'lg' }, 'Join Example Bakery'),
+    h('div', { className: 'wy-auth__or' }, 'or'), h(W.Button, { variant: 'outline' }, 'Join with my Whity ID')));
+  function s(ic, cls, t, p, btn) { return h('div', { className: 'x4-authc' }, h('span', { className: 'x4-authc__ic ' + (cls || '') }, I(ic, 24)), h('h1', { style: { fontSize: 20 } }, t), h('p', null, p), btn || null); }
+  var ar = tcard(h(F, null, h('h1', null, 'انضم إلى Example Bakery'), h('p', null, 'اطلب وتابع فواتيرك واحجز مواعيد التذوّق عبر الإنترنت.'), h(W.Input, { label: 'اسمك', defaultValue: 'إبراهيم منصور' }), h(W.Input, { label: 'البريد الإلكتروني', defaultValue: 'ibrahim@example.com' }), h(W.Button, { size: 'lg' }, 'انضمام')), { dir: 'rtl' });
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    frame('/join/example-bakery and /join/confirm · in the workspace’s own brand, Arabic', h('div', { className: 'x4-ground wy-theme-partner' }, form, confirm, ar), 700),
+    h('section', null, h('p', { className: 'x4-lab' }, 'Every state'), h('div', { className: 'x4-grid4 wy-theme-partner' },
+      s('mail', '', 'Check your email', 'We sent a link to ibrahim@example.com. It works for 24 hours.', h(W.Button, { variant: 'outline' }, 'Send it again')),
+      s('clock', 'is-dash', 'Waiting for approval', 'Example Bakery approves each new customer. We’ll email you when you’re in.'),
+      s('success', 'is-ok', 'You’ve joined Example Bakery', 'Your account is ready.', h(W.Button, null, 'Open Example Bakery')),
+      s('user', '', 'You’re already a member', 'ibrahim@example.com already belongs to Example Bakery.', h(W.Button, null, 'Sign in')),
+      s('lock', 'is-warn', 'This workspace isn’t taking sign-ups', 'Ask Example Bakery to invite you, or check the link you were given.'),
+      s('alert', 'is-warn', 'This link has expired or was used', 'Links work once, for 24 hours.', h(W.Button, { variant: 'outline' }, 'Start again')),
+      s('ban', 'is-warn', 'You can’t join Example Bakery', 'Your request was declined or your access is paused. Contact Example Bakery if you think this is wrong.'),
+      s('mail', 'is-warn', 'Use your company email', 'Example Bakery only accepts addresses at examplecafe.jo or ammancoffee.jo.', h(W.Button, { variant: 'outline' }, 'Use another address')))),
+    note('Join a workspace (WHIT-915)', ['The workspace’s own page in its own colour and logo (white label, section 9); Whity appears only in “Built on Whity” where the plan shows it.', 'Name, email and the bot check, then Join. The email link opens Finish joining: choose a password, or join with an existing Whity ID.', 'Every outcome is one card with one icon and one next step: check your email, waiting (dashed: not yet), joined, already a member, closed, link used or expired, can’t join, domain not accepted.', 'Unknown workspaces show the same “isn’t taking sign-ups” card, so the page never confirms which names exist.'])));
+</script>
+</body>
+</html>

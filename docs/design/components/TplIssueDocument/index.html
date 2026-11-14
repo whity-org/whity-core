@@ -1,0 +1,58 @@
+<!-- @dsCard group="Templates · 3.4" height=1928 width=1344 subtitle="M4c: choose a template from a record, fill what’s missing, issue" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1344px;min-height:1928px}</style><meta charset="utf-8"><title>Issuing a document from a template</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4]]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  function tpl(c, t, sub, on, end) { return h('div', { className: 'x4-tpl' + (on ? ' is-on' : '') }, h('span', { className: 'x4-thumb', style: { '--c': c } }, h('i')), h('div', null, h('b', null, t), h('small', null, sub)), end || null); }
+  var pick = h(W.Dialog, { inline: true, title: 'Issue a document for INV-031', description: 'Example Café · JOD 48.250. Its details fill the template.', onClose: function () {}, footer: h(F, null, h(W.Button, { variant: 'ghost' }, 'Cancel'), h(W.Button, { variant: 'outline' }, 'Edit before issuing'), h(W.Button, null, 'Continue')) },
+    h('div', { style: { display: 'grid', gap: 10 } }, tpl('#b74c05', 'Invoice cover letter', 'Letter · published v4 · 1 field to fill', true), tpl('#b74c05', 'Payment reminder', 'Letter · published v2'), tpl('#b74c05', 'Delivery note', 'Delivery note · published v6'), h('span', { className: 'x4-small' }, 'Only templates made for invoices are listed.')));
+  function fld(t, miss) { return h('span', { className: 'x4-fld' + (miss ? ' is-miss' : '') }, t); }
+  var doc = h('div', { className: 'x4-paper', style: { '--c': '#b74c05', fontSize: 13 } }, h('div', { className: 'x4-paper__lh' }, h('div', null, h('b', null, 'Example Bakery'), h('small', null, 'Mecca Street 112, Amman · Tax no. 0123456')), h('span', { className: 'x4-plogo' }, 'EB')),
+    h('h2', null, 'Invoice cover letter'), h('p', null, 'Dear ', fld('Example Café'), ','), h('p', null, 'Invoice ', fld('INV-031'), ' for ', fld('JOD 48.250'), ' is attached.'), h('p', null, 'Delivery slot: ', fld('Delivery slot', true)), h('p', null, 'Kind regards,', h('br'), 'Example Bakery'));
+  var issuing = shell('Library', h('div', { className: 'x4-issue', style: { margin: -24, height: 'calc(100% + 48px)' } }, h('div', { className: 'x4-issue__doc' }, doc),
+    h('div', { className: 'x4-issue__bar' }, h('div', null, h('span', { className: 'x4-small' }, 'Issuing from'), h('b', { style: { display: 'block' } }, 'Invoice cover letter · v4')), h(W.Input, { label: 'For', defaultValue: 'INV-031 · Example Café' }),
+      h(W.Input, { label: 'Delivery slot', required: true, errorText: 'Fill this before issuing. It’s on the letter.' }), h(W.Alert, { variant: 'info', title: 'Issuing gives it a number' }, 'LT-0042. After that it can’t be edited, only cancelled and issued again.'),
+      h('div', { className: 'x4-row' }, h(W.Button, { variant: 'outline', icon: 'view' }, 'Preview PDF'), h('span', { className: 'x4-sp' }), h(W.Button, { icon: 'check' }, 'Issue')))));
+  var done = h(F, null, h('div', { className: 'x4-row' }, h('span', { className: 'x4-authc__ic is-ok' }, I('success', 24)), h('div', null, h('b', { style: { fontSize: 17 } }, 'LT-0042 is issued'), h('div', { className: 'x4-small' }, 'Filed with INV-031 · Example Café'))), h('div', { className: 'x4-row' }, h(W.Button, { icon: 'send' }, 'Send to Example Café'), h(W.Button, { variant: 'outline', icon: 'download' }, 'PDF'), h(W.Button, { variant: 'ghost' }, 'Done')));
+  var ar = h('div', { dir: 'rtl', style: { display: 'grid', gap: 10 } }, h(W.Input, { label: 'موعد التوصيل', required: true, errorText: 'املأ هذا قبل الإصدار. إنه في الرسالة.' }), h(W.Alert, { variant: 'info', title: 'الإصدار يعطيها رقماً' }, 'LT-0042. بعد ذلك لا يمكن تعديلها، فقط إلغاؤها وإصدارها من جديد.'), h('div', { className: 'x4-row' }, h('span', { className: 'x4-sp' }), h(W.Button, { icon: 'check' }, 'إصدار')));
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    h('div', { className: 'x4-two' }, h('section', null, h('p', { className: 'x4-lab' }, '1 · Choose a template, from the invoice'), pick), h('section', null, h('p', { className: 'x4-lab' }, '3 · Issued'), h('div', { className: 'x4-state' }, done), h('p', { className: 'x4-lab', style: { marginTop: 20 } }, 'Arabic · the issuing bar'), h('div', { className: 'x4-state' }, ar))),
+    frame('2 · The template’s published version with the record’s values; one field still to fill', issuing, 980),
+    note('Issuing a document from a template (M4c, brand-ask-issue-document)', ['Start from the record (an invoice, a person, an order): Issue a document lists only templates made for that kind, with their published version and how many fields need filling.', 'The page shows the published template with the record’s values in blue. Fields still empty are dashed red, here and in the bar.', 'The bar on the end side holds the template’s own fields, the record it’s for, and Issue. Issue explains what the number means: no edits after, only cancel and issue again.', 'Edit before issuing makes a letter from the template that people can change freely, with the preview on.', 'Done says the number and where it’s filed, with Send, PDF and Done.'])));
+</script>
+</body>
+</html>

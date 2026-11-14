@@ -1,0 +1,58 @@
+<!-- @dsCard group="Emails and messages" height=1190 width=1344 subtitle="Invoice, reminder, receipt, booking and order messages to customers, and the sign-in code, in English and Arabic" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>WhatsApp and SMS messages</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'Calendar': 'التقويم', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4], ['calendar', 'Calendar']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Calendar': 'التقويم', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  function chan(name, sub, bubbles, o) { o = o || {}; return h('div', { className: 'x5-chan', dir: o.dir }, h('div', { className: 'x5-chan__h' }, h('span', { className: 'x4-plogo', style: { '--c': '#b74c05' } }, 'EB'), h('div', null, h('b', null, name), h('small', null, sub))), h('div', { className: 'x5-chan__b' }, bubbles)); }
+  function bub(kids, time, btn) { return h('div', { className: 'x5-bub' }, kids, btn ? h('span', { className: 'btn' }, btn) : null, h('small', null, time)); }
+  function v(t) { return h('span', { className: 'x5-var' }, t); }
+  var wa = chan('Example Bakery', 'WhatsApp · business account', h(F, null,
+    bub(h(F, null, 'Hello ', v('Ahmad Khalil'), ', your invoice ', v('INV-1043'), ' for ', v('JOD 46.168'), ' is ready. Pay by ', v('20 Nov'), '.'), '09:12', 'View and pay'),
+    bub(h(F, null, 'A reminder: invoice ', v('INV-1043'), ' (', v('JOD 46.168'), ') was due on ', v('20 Nov'), '. If you’ve paid, thank you and ignore this.'), '09:00', 'View and pay'),
+    bub(h(F, null, 'Thank you, we received ', v('JOD 46.168'), ' for ', v('INV-1043'), '. Your receipt is attached.'), '14:40', 'Receipt (PDF)')));
+  var book = chan('Example Bakery', 'WhatsApp · bookings', h(F, null,
+    bub(h(F, null, 'Booked: ', v('Cake tasting'), ' on ', v('Sun 15 Nov at 10:00'), ' at ', v('Abdali'), ' with ', v('Awss'), '.'), '18:02', 'Move or cancel'),
+    bub(h(F, null, 'See you tomorrow at ', v('10:00'), ' for your ', v('cake tasting'), ' at ', v('Abdali'), '.'), '18:00 the day before', 'Move or cancel')));
+  var sms = chan('Whity', 'SMS · sign-in', h(F, null, bub(h(F, null, v('482951'), ' is your Whity sign-in code. It works for 10 minutes. Never share it; Whity will never ask for it.'), '13:21'), bub(h(F, null, 'Example Bakery: your order ', v('#3021'), ' is ready to pick up at ', v('Abdali'), ' until ', v('20:00'), '.'), '16:45')));
+  var ar = chan('Example Bakery', 'واتساب', h(F, null, bub(h(F, null, 'مرحباً ', v('أحمد خليل'), '، فاتورتك ', v('INV-1043'), ' بقيمة ', v('46.168 د.أ'), ' جاهزة. يُرجى الدفع قبل ', v('20 تشرين الثاني'), '.'), '09:12', 'عرض ودفع'), bub(h(F, null, 'تم الحجز: ', v('تذوّق الكعك'), ' يوم ', v('الأحد 15 تشرين الثاني الساعة 10:00'), ' في ', v('العبدلي'), '.'), '18:02', 'تغيير أو إلغاء')), { dir: 'rtl' });
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    h('section', null, h('p', { className: 'x4-lab' }, 'Messages to a workspace’s customers · placeholders in blue'), h('div', { className: 'x5-msgs' }, wa, book, sms)),
+    h('div', { className: 'x4-two' }, st('Arabic', ar), st('Rules', h('ul', { style: { margin: 0, paddingInlineStart: 18, display: 'grid', gap: 6 } }, h('li', null, 'Sent in the workspace’s name, never Whity’s (only sign-in codes come from Whity).'), h('li', null, 'One message, one purpose, one button: View and pay, Receipt, Move or cancel.'), h('li', null, 'Amounts to the currency’s decimals; dates and times in the workspace’s zone.'), h('li', null, 'Approved WhatsApp templates (utility) in English and Arabic; the customer’s language picks one.'), h('li', null, 'SMS only where WhatsApp isn’t available, and for sign-in codes: 160 characters, no links in codes.')))),
+    note('Customer messages: WhatsApp and SMS', ['Invoice sent, payment reminder and receipt; booking confirmed and the day-before reminder; order ready; the sign-in code by SMS.', 'Each has a fixed template with placeholders (shown in blue), in English and Arabic, matching the email of the same moment (EmailMoney, EmailBookings).', 'Buttons open the customer’s page (pay, receipt, move or cancel) on the workspace’s domain.', 'Agent messages to staff are in TplAgentNotify; staff chat is in TmChat.'])));
+</script>
+</body>
+</html>

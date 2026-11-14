@@ -17,6 +17,6 @@ A plugin registers a block with a manifest: name, icon, group (the plugin's name
 Select several blocks (shift-click or drag across the gutter) and **Save as block**: a name, **Synced** or **Copy**, and **Only me** or **Everyone in the workspace**. Saved blocks appear in the / menu under Saved blocks.
 
 - **Synced:** a light outline in the main colour and a label ("Bank details · Synced · used in 12 documents") with Edit original and Detach. Editing the original updates drafts, notes and wiki pages at once; a published template picks up the change at its next publish, so what prints never changes without a person publishing it (E.38).
-- **Per document:** in the original, text or fields can be marked "filled per document" (dotted outline); each document fills its own value while the rest stays synced. Merge fields work inside.
+- **Per document:** in the original, text or fields can be marked "filled per document" (dotted outline); each document fills its own value while the rest stays synced. Merge fields work inside. Each part has a stable key and a label (“Signer’s name”) shown in the Fill in prompt; reordering or editing the block never mixes up which value goes where (E.23a).
 - **Copy:** inserts ordinary blocks with no link.
 - Owners and admins manage the workspace library (rename, delete, see where a synced block is used). Exporting a saved block as a plugin comes later (E.24).

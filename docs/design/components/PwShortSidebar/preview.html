@@ -1,0 +1,43 @@
+<!-- @dsCard group="Navigation" height=1360 width=2024 subtitle="The desktop sidebar in a window 600px tall: the links scroll, the workspace, Settings and your account stay put; the account menu (PW.10, WHIT-827)" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Sidebar on short screens</title><style>html,body{height:100%;margin:0;font-family:var(--font-sans)} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  function it(icon, t, o) { o = o || {}; return h('a', { href: '#', className: 'wy-shell__item' + (o.on ? ' is-on' : ''), 'aria-current': o.on ? 'page' : undefined }, I(icon), h('span', { className: 'wy-shell__label' }, t), o.n ? h('span', { className: 'wy-shell__count' }, o.n) : null); }
+  function g(label, items) { return h('div', { className: 'wy-shell__group' }, label ? h('div', { className: 'wy-shell__glabel' }, label) : null, items); }
+  var EN = { groups: [[null, [['dashboard', 'Home'], ['inbox', 'Inbox', 3], ['approval', 'Approvals', 2]]], ['Work', [['document', 'Documents'], ['calendar', 'Calendar'], ['list-todo', 'Tasks'], ['form', 'Forms'], ['comment', 'Messages']]], ['Money', [['invoice', 'Invoices'], ['wallet', 'Payments'], ['bank', 'Bank'], ['chart', 'Reports']]], ['Stock', [['package', 'Inventory'], ['receipt', 'Receiving']]], ['People', [['users', 'Users'], ['role', 'Roles'], ['org', 'Groups']]], ['AI', [['robot', 'Agents'], ['activity', 'Agent activity']]]],
+    settings: 'Settings', name: 'Amro Saleh', role: 'Owner', page: 'Invoices', sub: '48 invoices', search: 'Search', cols: ['Number', 'Customer', 'Amount', 'Status'],
+    rows: [['INV-1048', 'Awss Haddad', 'JOD 120.000', ['info', 'Sent']], ['INV-1047', 'Ibrahim Mansour', 'JOD 312.000', ['destructive', 'Overdue']], ['INV-1046', 'Emad Nasser', 'JOD 46.168', ['success', 'Paid']], ['INV-1045', 'Amman Coffee Co.', 'JOD 980.500', ['secondary', 'Draft']], ['INV-1044', 'Ahmad Khalil', 'JOD 75.000', ['success', 'Paid']]] };
+  var AR = { groups: [[null, [['dashboard', 'الرئيسية'], ['inbox', 'الوارد', 3], ['approval', 'الموافقات', 2]]], ['العمل', [['document', 'المستندات'], ['calendar', 'التقويم'], ['list-todo', 'المهام'], ['form', 'النماذج'], ['comment', 'الرسائل']]], ['المال', [['invoice', 'الفواتير'], ['wallet', 'المدفوعات'], ['bank', 'البنك'], ['chart', 'التقارير']]], ['المخزون', [['package', 'المخزون'], ['receipt', 'الاستلام']]], ['الأشخاص', [['users', 'المستخدمون'], ['role', 'الأدوار'], ['org', 'المجموعات']]], ['الذكاء الاصطناعي', [['robot', 'المساعدون'], ['activity', 'نشاط المساعدين']]]],
+    settings: 'الإعدادات', name: 'عمرو صالح', role: 'المالك', page: 'الفواتير', sub: '48 فاتورة', search: 'بحث', cols: ['الرقم', 'العميل', 'المبلغ', 'الحالة'],
+    rows: [['INV-1048', 'أوس حداد', '120.000 د.أ', ['info', 'مرسلة']], ['INV-1047', 'إبراهيم منصور', '312.000 د.أ', ['destructive', 'متأخرة']], ['INV-1046', 'عماد ناصر', '46.168 د.أ', ['success', 'مدفوعة']], ['INV-1045', 'قهوة عمّان', '980.500 د.أ', ['secondary', 'مسودة']], ['INV-1044', 'أحمد خليل', '75.000 د.أ', ['success', 'مدفوعة']]] };
+  function desk(L, o) { o = o || {}; var dir = o.ar ? 'rtl' : 'ltr';
+    return h('div', null, h('div', { className: 'wm-label', style: { marginBottom: 10 } }, o.label), h('div', { className: 'pw-desk', dir: dir },
+      h('aside', null, h('div', { className: 'pw-desk__top' + (o.y ? ' is-under' : '') }, h('div', { className: 'wy-shell__tenant' }, h(W.TenantLogo, { name: 'Example Bakery', size: 22, showName: false }), h('span', null, 'Example Bakery'), I('sort', 14))),
+        h('div', { className: 'pw-desk__nav' + (o.y ? '' : ' is-top') }, h('div', { className: 'pw-desk__in', style: { transform: 'translateY(-' + (o.y || 0) + 'px)' } }, L.groups.map(function (gr, i) { return h(F, { key: i }, g(gr[0], gr[1].map(function (x, j) { return h(F, { key: j }, it(x[0], x[1], { n: x[2], on: x[1] === L.page })); }))); })),
+          h('span', { className: 'pw-desk__thumb', style: { top: 8 + (o.y || 0) * 0.42, height: 150 } })),
+        h('div', { className: 'pw-desk__foot' }, it('settings', L.settings), h('div', { className: 'pw-desk__me' + (o.menu ? ' is-open' : ''), role: 'button', 'aria-haspopup': 'menu', 'aria-expanded': !!o.menu }, h(W.Avatar, { name: 'Amro Saleh', pattern: 'amro@examplebakery.jo', hue: HUE, size: 32 }), h('div', null, h('b', null, L.name), h('small', null, L.role)), I('chevron-up', 16))),
+        o.menu || null),
+      h('main', null, h('div', { className: 'pw-desk__bar' }, h('label', { className: 'wy-shell__search' }, I('search', 14), h('input', { placeholder: L.search, 'aria-label': L.search }), h('kbd', { dir: 'ltr' }, '⌘K')), h('div', { className: 'wy-shell__topacts' }, h(W.IconButton, { icon: 'notification', label: 'Notifications' }))),
+        h('div', { className: 'pw-desk__body' }, h(W.PageHeader, { title: L.page, description: L.sub }), h('div', { className: 'pw-dtable' }, h('div', { className: 'pw-drow is-h' }, L.cols.map(function (c, i) { return h('span', { key: i }, c); })),
+          L.rows.map(function (r, i) { return h('div', { key: i, className: 'pw-drow' }, h('span', { style: { fontWeight: 600 } }, r[0]), h('span', null, r[1]), h('span', null, r[2]), h('span', null, h(W.Badge, { variant: r[3][0] }, r[3][1]))); }))))));
+  }
+  function mi(icon, t, end, hover) { return h('div', { className: 'pw-umenu__i' + (hover ? ' is-hover' : ''), role: 'menuitem' }, I(icon), h('span', null, t), end || null); }
+  var menu = h('div', { className: 'pw-umenu', role: 'menu', 'aria-label': 'Account' }, h('div', { className: 'pw-umenu__h' }, h('b', null, 'Amro Saleh'), h('small', null, 'amro@examplebakery.jo')),
+    mi('user', 'Account settings', null, true), mi('language', 'Language', h('em', null, 'English')), mi('sun', 'Appearance', h('div', { className: 'pw-tog' }, h('span', { className: 'is-on' }, I('sun', 12), 'Light'), h('span', null, I('moon', 12), 'Dark'))), mi('help', 'Help'), h('div', { className: 'pw-umenu__sep' }), mi('logout', 'Sign out'));
+  var n = h('div', { className: 'pw-note' }, h('h3', null, 'The sidebar on short screens'), h('p', null, 'WHIT-1006 and WHIT-827. A laptop window 600px tall.'), h('ol', null,
+    h('li', null, 'The workspace at the top, and Settings and your account at the bottom, stay put. Only the links between them scroll.'),
+    h('li', null, 'A soft fade at either end shows there is more. Once scrolled, a line appears under the workspace.'),
+    h('li', null, 'The page you are on is scrolled into view when the page opens.'),
+    h('li', null, 'Your account row opens its menu upward: Account settings, Language, Light or Dark, Help, Sign out (WHIT-827).'),
+    h('li', null, 'Below 480px tall, groups fold so only the current one is open (2.5).')));
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'pw-deskwrap' }, desk(EN, { label: '1280 × 600 · scrolled down, the ends stay', y: 150 }), desk(EN, { label: 'Account menu open', menu: menu }), desk(AR, { label: 'Arabic · scrolled down', y: 150, ar: true }), n));
+</script>
+</body>
+</html>

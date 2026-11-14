@@ -1,0 +1,54 @@
+<!-- @dsCard group="Templates · 3.4" height=1657 width=1344 subtitle="verify/[token]: the page a printed QR opens — genuine, replaced, withdrawn, not found, and Arabic" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Verifying a document</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'Calendar': 'التقويم', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4], ['calendar', 'Calendar']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Calendar': 'التقويم', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  function brand(ar) { return h('div', { className: 'x4-brand' }, h('span', { className: 'x4-plogo', style: { '--c': '#7a2340', width: 36, height: 36, borderRadius: 9, fontSize: 13 } }, 'EU'), h('div', null, h('b', { style: { display: 'block' } }, ar ? 'جامعة المثال' : 'Example University'), h('span', { className: 'x4-small' }, ar ? 'التحقق من المستندات' : 'Document verification'))); }
+  function ver(seal, ic, t, p, dl, extra, o) { o = o || {}; return h('div', { className: 'x5-ver', dir: o.dir }, brand(o.dir === 'rtl'), h('span', { className: 'x5-seal ' + seal }, I(ic, 28)), h('h1', null, t), h('p', null, p), dl ? h('dl', null, dl.map(function (r, i) { return h(F, { key: i }, h('dt', null, r[0]), h('dd', null, r[1])); })) : null, extra || null, h('div', { className: 'x5-foot' }, o.dir === 'rtl' ? 'يُتحقق منه عبر Whity · لا حاجة إلى حساب' : 'Checked by Whity · no account needed')); }
+  var REF = h('span', { className: 'x4-mono' }, 'REC-EU 14/3/2026-27');
+  var genuine = ver('ok', 'success', 'This document is genuine', 'It was issued by the organisation named below, on the date shown. Compare it with the paper in your hand.', [['Document', 'Ethics approval · Human Research Ethics Application'], ['Issued by', 'Example University · Research Ethics Committee'], ['Issued on', '12 November 2026'], ['Reference', REF], ['Revision', '1 of 1'], ['Pages', '6']], h(W.Alert, { variant: 'info', title: 'What this proves' }, 'That the reference, date and issuer match our record. It doesn’t show the answers: ask the researcher for the full PDF.'));
+  var replaced = ver('warn', 'sync', 'A newer version exists', 'This paper was genuine when it was issued, then replaced. Ask for the newer one.', [['Reference', REF], ['Revision', '1'], ['Replaced by revision', '2, on 3 December 2026']]);
+  var ar = ver('ok', 'success', 'هذا المستند أصلي', 'أصدرته الجهة المذكورة أدناه في التاريخ المبيّن. قارنه بالورقة التي بين يديك.', [['المستند', 'موافقة أخلاقية · طلب بحث على البشر'], ['الجهة المصدرة', 'جامعة المثال · لجنة أخلاقيات البحث العلمي'], ['تاريخ الإصدار', '12 تشرين الثاني 2026'], ['المرجع', REF]], null, { dir: 'rtl' });
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    frame('verify.example.edu/REC-EU-14 · the page a QR code opens, in the issuer’s brand', h('div', { className: 'x5-pub' }, genuine, replaced, ar), 760),
+    states([st('Withdrawn (people who can open the record)', ver('no', 'ban', 'This document was withdrawn', 'Example University withdrew it on 20 November 2026. It no longer counts.', [['Withdrawn on', '20 November 2026'], ['Reference', REF]], h(W.Button, { variant: 'outline' }, 'Open the full record'))),
+      st('Not found', ver('no', 'search', 'We can’t find this document', 'The code doesn’t match anything Example University issued. Check you scanned the code on the document, not one printed beside it.')),
+      st('Checking, too many, unavailable', h('div', { style: { display: 'grid', gap: 14 } }, h('div', { className: 'x4-row' }, h('span', { className: 'x5-seal wait', style: { width: 40, height: 40 } }, I('clock', 20)), h('b', null, 'Checking this document…')), h(W.Alert, { variant: 'warning', title: 'Too many checks' }, 'Please wait a little while and scan again.'), h(W.Alert, { variant: 'destructive', title: 'Verification is unavailable' }, 'We could not check this code just now. Please try again shortly.')))], 3),
+    note('Verifying a document (verify/[token], 6.7)', ['The page a printed QR opens, for anyone holding the paper: no sign-in, in the issuer’s brand (white label), English or Arabic from the browser.', 'One card with one answer: genuine (green seal), a newer version exists (amber), withdrawn or not found (grey), never red, so a reader isn’t alarmed by a mistyped code.', 'Genuine lists what can be compared with the paper: the document, issuer, date, reference, revision and pages. It never shows the content; a line says so.', 'Withdrawn is told only to people who can open the record; the public sees “A newer version exists” or the genuine facts.', 'Checking, too many checks and unavailable each say what to do next.'])));
+</script>
+</body>
+</html>

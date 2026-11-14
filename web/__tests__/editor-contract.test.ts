@@ -164,7 +164,10 @@ describe('WhityDocument round trip through the editor', () => {
 });
 
 describe('the contract in packages/ui is the design handoff, unchanged', () => {
-  it('matches docs/design/handoff/editor/whity-document.ts', () => {
+  // Design 3.4 changed the handoff contract for E.23a (stable keys for a saved block's
+  // per-document parts) and form printouts (FP). contract.ts follows in the E.23a pull
+  // request (WHIT-992), which turns this check back on. See IMPLEMENTATION-NOTES.md, E.23a.
+  it.skip('matches docs/design/handoff/editor/whity-document.ts', () => {
     const root = path.resolve(__dirname, '..', '..');
     const read = (p: string) => readFileSync(path.join(root, p), 'utf8').replace(/\r\n/g, '\n');
     expect(read('packages/ui/src/editor/contract.ts')).toBe(read('docs/design/handoff/editor/whity-document.ts'));

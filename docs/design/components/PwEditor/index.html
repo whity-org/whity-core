@@ -1,0 +1,121 @@
+<!-- @dsCard group="Web app on a phone" height=954 width=3574 subtitle="Web app on a phone: the document editor toolbar, modes, overflow, publish check, keyboard open, Arabic (PW.6)" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:3574px;min-height:954px}</style><meta charset="utf-8"><title>Phone web: editor</title><style>html,body{height:100%;margin:0} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 22 }); }
+  var T0 = { home: 'Home', inbox: 'Inbox', create: 'Create', agents: 'Chat', agentsIcon: 'comment', more: 'More' };
+  function status() { return h('div', { className: 'wm-status', 'aria-hidden': 'true' }, h('span', null, '9:41'), h('i'), h('span', null, I('wifi', 16), I('battery', 18))); }
+  function tabbar(active, T, badges) { T = T || T0; badges = badges || { inbox: 3 };
+    function tab(k, icon) { return h('div', { key: k, className: 'wm-tab' + (active === k ? ' is-on' : '') }, I(icon, 24), T[k], badges[k] ? h('b', null, badges[k]) : null); }
+    return h('nav', { className: 'wm-tabbar', 'aria-label': 'Main' }, tab('home', 'dashboard'), tab('inbox', 'inbox'), h('button', { key: 'c', className: 'wm-create', 'aria-label': T.create }, I('plus', 28)), tab('agents', T.agentsIcon || 'robot'), tab('more', 'menu')); }
+  function bottom(o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.tabs === false ? null : tabbar(o.active, o.T, o.badges), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function phone(label, kids, o) { o = o || {}; return h('div', { className: 'wm-col' }, h('div', { className: 'wm-label' }, label), h('div', { className: 'wm-phone', dir: o.dir }, status(), kids, o.overlay || null)); }
+  function search(t, f) { return h('div', { className: 'wm-search' }, I('search', 20), h('span', null, t), f ? h('button', { type: 'button' }, I('filter', 16), f) : null); }
+  function stage(blue, tag, kids, keys) { var LOT = { 'YOUR BRAND, OUR PLATFORM': ['brand-sheet-platform', 'view'], 'AGENTS PROPOSE': ['agents-propose', 'view'], 'YOU DECIDE': ['approve-set-down', 'view'], 'IN THE APP': ['approve-set-down', 'view'], 'UPDATING · LOOPS': ['updating', 'loop'], 'ALL CAUGHT UP': ['all-caught-up', 'view'] }; var l = LOT[tag]; if (!l) return h('div', { className: 'wm-lottie' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, 'LOTTIE · ' + tag), kids, keys ? h('div', { className: 'wm-keys' }, keys.map(function (k, i) { return h('span', { key: i }, k); })) : null); return h('div', { className: 'wm-lottie has-file' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, l[0] + '.json'), h('div', { className: 'w-lottie', 'data-lottie': 'lottie/' + l[0] + '.json', 'data-play': l[1] }, h('div', { className: 'w-lottie__fallback' }, kids))); }
+  function at(cls, x, y, extra) { return h('div', { className: cls, style: Object.assign({ left: x, top: y }, extra || {}) }); }
+  function dots(n, on) { var a = []; for (var i = 0; i < n; i++) a.push(h('i', { key: i, className: i === on ? 'is-on' : '' })); return h('div', { className: 'wm-dots' }, a); }
+  function foot(kids) { return h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-form', style: { borderTop: 0 } }, kids), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function q(title, sub, step, of) { return h(F, null, h('div', { className: 'wm-progress', 'aria-hidden': 'true' }, h('i', { style: { width: Math.round(step / of * 100) + '%' } })), h('div', { className: 'wm-q' }, h('h1', null, title), sub ? h('p', null, sub) : null)); }
+  function choice(t, sub, on, icon) { return h('div', { className: 'wm-choice' + (on ? ' is-on' : '') }, icon ? I(icon, 24) : null, h('span', null, t, sub ? h('small', null, sub) : null), h('i', { className: 'wm-radio' })); }
+  function navbar(t) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), h('span')); }
+
+  var SEED = 'amro@examplebakery.jo', HUE = W.brandHue('#0961bb');
+  function me(s) { return h(W.Avatar, { name: 'Amro Saleh', pattern: SEED, hue: HUE, size: s || 40 }); }
+  function pav(seed, name, s) { return h(W.Avatar, { name: name, pattern: seed, hue: HUE, size: s || 40 }); }
+  function nav(t, end) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), end || h('span')); }
+  function head(t, sub) { return h('div', { className: 'wm-head' }, h('h1', null, t), sub ? h('p', null, sub) : null); }
+  function gl(t) { return h('div', { className: 'wm-gl' }, t); }
+  function gf(t) { return h('div', { className: 'wm-gf' }, t); }
+  function grp() { return h('div', { className: 'wm-group' }, Array.prototype.slice.call(arguments)); }
+  function set(icon, t, v, o) { o = o || {};
+    var end = o.end !== undefined ? o.end : o.sw !== undefined ? h(W.Switch, { defaultChecked: o.sw, 'aria-label': t }) : I(o.ext ? 'external' : 'chevron-right', 18);
+    return h('div', { className: 'wm-set' + (o.danger ? ' is-danger' : '') + (o.link ? ' is-link' : '') }, icon ? h('span', { className: 'wm-set__ic' + (o.tone ? ' is-' + o.tone : '') }, typeof icon === 'string' ? I(icon, 20) : icon) : null,
+      h('span', { className: 'wm-set__t' }, t, o.sub ? h('small', null, o.sub) : null), v != null ? h('span', { className: 'wm-set__v' }, v) : null, end); }
+  function segs(a, on, cls) { return h('div', { className: 'wm-segs' + (cls ? ' ' + cls : ''), role: 'tablist' }, a.map(function (x, i) { return h('span', { key: i, role: 'tab', 'aria-selected': i === on, className: i === on ? 'is-on' : '' }, x[0], x[1] ? h('em', null, x[1]) : null); })); }
+  function chips(a, on) { return h('div', { className: 'wm-chips' }, a.map(function (x, i) { return h('span', { key: i, className: on.indexOf(i) > -1 ? 'is-on' : '' }, on.indexOf(i) > -1 ? I('check', 16) : null, x); })); }
+  function scroll() { return h('div', { className: 'wm-scroll' }, Array.prototype.slice.call(arguments)); }
+  function sheet(title, kids) { return h(F, null, h('div', { className: 'wm-scrim' }), h('div', { className: 'wm-sheet', role: 'dialog', 'aria-label': title }, h('div', { className: 'wm-grab' }), title ? h('h2', null, title) : null, kids, h('div', { className: 'wm-home-ind' }, h('i')))); }
+  function act() { return bottom({ tabs: false, action: h('div', { className: 'wm-actbar' }, Array.prototype.slice.call(arguments)) }); }
+  function searchrow(t) { return h('div', { className: 'wm-searchrow' }, search(t, 'Filter'), h('button', { 'aria-label': 'Invite people' }, I('plus', 24))); }
+  function li(ic, t, sub, end, agent) { return h('div', { className: 'wm-li' + (agent ? ' is-agent' : '') }, typeof ic === 'string' ? h('span', { className: 'wm-li__ic' }, I(ic, 20)) : ic, h('div', { style: { minWidth: 0 } }, h('b', null, t), h('small', null, sub)), h('div', { className: 'wm-li__end' }, end)); }
+  function ac(ic, tone, t, sub, extra) { return h('div', { className: 'wm-act' }, typeof ic === 'string' ? h('span', { className: 'wm-set__ic' + (tone ? ' is-' + tone : '') }, I(ic, 18)) : ic, h('div', null, t, h('small', null, sub), extra || null)); }
+  function badge(v, t) { return h(W.Badge, { variant: v }, t); }
+
+  function hh(sub) { return h('div', { className: 'wm-head' }, h('div', { className: 'wm-head__top' }, h(W.TenantLogo, { name: 'Example Bakery', size: 28 }), me(36)), h('h1', null, 'Good morning, Amro'), h('p', null, sub)); }
+
+  var TA = { home: 'الرئيسية', inbox: 'الوارد', create: 'إنشاء', agents: 'المحادثات', agentsIcon: 'comment', more: 'المزيد' };
+  var BAD = { inbox: 3, agents: 2 };
+  function url() { return h('div', { className: 'pw-url', 'aria-hidden': 'true' }, h('span', { className: 'pw-url__b' }, I('chevron-left', 22)), h('span', { className: 'pw-url__p' }, I('lock', 14), 'app.whity.dev'), h('span', { className: 'pw-url__b' }, I('upload', 20))); }
+  function tb(active, o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.bulk || tabbar(active, o.T, BAD), o.browser ? url() : null, h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function title(t, sub, end) { return h('div', { className: 'pw-title' }, h('div', { style: { minWidth: 0 } }, h('h1', null, t), sub ? h('p', null, sub) : null), end ? h('div', { className: 'pw-title__end' }, end) : null); }
+  function back(t) { return h('div', { className: 'pw-back' }, I('chevron-left', 24), t); }
+  function crumb(a) { var out = []; a.forEach(function (x, i) { if (i) out.push(h('span', { key: 'c' + i }, I('chevron-right', 14))); out.push(h('span', { key: i }, x)); }); return h('div', { className: 'pw-crumb' }, out); }
+  function pagehead(c, t, sub, extra) { return h('div', { className: 'pw-pagehead' }, c ? crumb(c) : null, h('h1', null, t), sub ? h('p', null, sub) : null, extra || null); }
+  function row(o) {
+    return h('div', { className: 'pw-row' + (o.sel ? ' is-sel' : '') }, o.sel !== undefined ? h('span', { className: 'pw-cb' + (o.sel ? ' is-on' : ''), role: 'checkbox', 'aria-checked': !!o.sel }, o.sel ? I('check', 18) : null) : null,
+      h('div', { className: 'pw-row__b' }, h('div', { className: 'pw-row__t' }, h('b', null, o.t), o.badge || null, o.sel === undefined ? h('button', { className: 'pw-more', 'aria-label': (o.moreLabel || 'More for ') + o.t }, I('more', 20)) : null),
+        o.lines.map(function (l, i) { return h('div', { key: i, className: 'pw-row__l' }, h('span', null, l[0]), h('span', null, l[1])); }))); }
+  function plist() { return h('div', { className: 'pw-list' }, Array.prototype.slice.call(arguments)); }
+  function sbar(t, add, f) { return h('div', { className: 'wm-searchrow' }, search(t, f || 'Filter'), h('button', { 'aria-label': add }, I('plus', 24))); }
+  function fchips(a) { return h('div', { className: 'pw-fchips' }, a.map(function (x, i) { return typeof x === 'string' ? h('span', { key: i }, x, I('close', 16)) : h('span', { key: i, className: 'is-plain' + (x.drop ? ' is-drop' : '') + (x.on ? '' : ''), style: x.on ? { background: 'var(--primary-tint)', borderColor: 'var(--primary)', color: 'var(--primary-tint-foreground)' } : null }, x.icon ? I(x.icon, 16) : null, x.t, x.drop ? I('chevron-down', 16) : null); })); }
+  function opt(t, on, sub, icon) { return set(icon || null, t, null, { end: on ? I('check', 22) : h('span'), sub: sub }); }
+  function opts() { return h('div', { className: 'pw-opts' }, grp.apply(null, arguments)); }
+  function field(l, v, o) { o = o || {}; return h('div', { className: 'pw-field' + (o.focus ? ' is-focus' : '') }, h('label', null, l), h('div', { className: v ? '' : 'is-ph' }, v || o.ph, o.focus ? h('span', { className: 'pw-caret' }) : null)); }
+  function kb(ar) {
+    var rows = ar ? ['ضصثقفغعهخحج', 'شسيبلاتنمكط', 'ئءؤرىةوزظد'] : ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+    function keys(s) { return s.split('').map(function (c, i) { return h('span', { key: i }, c); }); }
+    return h('div', { className: 'pw-kb', 'aria-hidden': 'true', dir: ar ? 'rtl' : 'ltr' }, h('div', { className: 'pw-kb__r' }, keys(rows[0])), h('div', { className: 'pw-kb__r' }, keys(rows[1])),
+      h('div', { className: 'pw-kb__r' }, ar ? null : h('span', { className: 'is-fn' }, I('arrow-up', 18)), keys(rows[2]), h('span', { className: 'is-fn' }, '⌫')),
+      h('div', { className: 'pw-kb__r' }, h('span', { className: 'is-fn' }, '123'), h('span', { className: 'is-fn' }, I('world', 18)), h('span', { className: 'is-space' }, ar ? 'مسافة' : 'space'), h('span', { className: 'is-ret' }, ar ? 'التالي' : 'next')), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function note(t, p, items) { return h('div', { className: 'pw-note' }, h('h3', null, t), p ? h('p', null, p) : null, h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function cur(el) { return React.cloneElement(el, { className: el.props.className + ' is-current' }); }
+  function tile(i, t) { return h('div', { className: 'wm-tile' }, I(i, 28), t); }
+  function sheetbar() { return h('div', { className: 'pw-sheetbar' }, Array.prototype.slice.call(arguments)); }
+  function code(t) { return h('code', null, t); }
+  var RT = 'rtl';
+
+  function edhead(t, st, mode, pub, ar) { var M = { edit: ['Editing', '', 'edit'], sug: ['Suggesting', 'sug', 'suggest'], view: ['Viewing', 'view', 'view'], editAr: ['تحرير', '', 'edit'] }[mode];
+    return h(F, null, h('div', { className: 'pw-edhead' }, h('button', { className: 'pw-ib is-dir', 'aria-label': ar ? 'رجوع' : 'Back' }, I('chevron-left', 26)), h('b', null, t),
+      pub === false ? h('button', { className: 'pw-ib', 'aria-label': 'More' }, I('more', 22)) : h(W.Button, null, pub || 'Publish')),
+      h('div', { className: 'pw-edsub' }, h('button', { className: 'pw-mode' + (M[1] ? ' is-' + M[1] : ''), 'aria-label': (ar ? 'الوضع: ' : 'Mode: ') + M[0] }, I(M[2], 18), M[0], I('chevron-down', 16)), h('small', null, st))); }
+  function body(caret) { return h('div', { className: 'pw-doc' }, h('h2', null, 'Lease, Abdali branch'), h('p', null, 'This lease is between Example Bakery and Amman Properties for the shop on Wasfi Al-Tal Street, Abdali.'),
+    h('p', null, 'Rent is JOD 1,200 a month, paid by the 5th of each month.', caret ? h('span', { className: 'pw-caret' }) : null), h('p', null, 'The lease runs for two years from 1 January 2027.')); }
+  function tbar(o) { o = o || {}; return h('div', { className: 'pw-tb' + (o.sug ? ' is-sug' : ''), role: 'toolbar', 'aria-label': 'Formatting' }, h('button', { 'aria-label': 'Text style' }, 'Aa'), h('button', { className: 'is-on', 'aria-label': 'Bold', 'aria-pressed': true }, I('bold', 20)), h('button', { 'aria-label': 'Italic' }, I('italic', 20)), h('button', { 'aria-label': 'List' }, I('list-bullet', 20)), h('i'),
+    h('button', { 'aria-label': 'Insert' }, I('plus', 22)), h('button', { 'aria-label': 'Comment' }, I('comment-add', 20)), h('span', { className: 'sp' }), h('button', { 'aria-label': 'More tools' }, I('more', 22)), o.kb ? h('button', { 'aria-label': 'Hide keyboard' }, I('keyboard', 22)) : null); }
+  var p1 = phone('Editing · keyboard open', h(F, null, edhead('Lease, Abdali branch', 'Saved', 'edit'), body(true), tbar({ kb: true }), kb()));
+  var p2 = phone('Mode menu', h(F, null, edhead('Lease, Abdali branch', 'Saved', 'edit'), body(), h('div', { className: 'wm-bottom' }, tbar(), h('div', { className: 'wm-home-ind' }, h('i')))),
+    { overlay: sheet('Mode', h(F, null, opts(opt('Editing', true, 'Change the text directly', 'edit'), opt('Suggesting', false, 'Your changes wait for the owner to accept', 'suggest'), opt('Viewing', false, 'Read only. Nothing changes.', 'view'))
+      , gf('People who can only suggest see Suggesting and Viewing.'))) });
+  var p3 = phone('Suggesting', h(F, null, edhead('Lease, Abdali branch', 'Saved · 1 suggestion', 'sug'),
+    h('div', { className: 'pw-doc' }, h('h2', null, 'Lease, Abdali branch'), h('p', null, 'Rent is JOD ', h('span', { className: 'pw-del' }, '1,200'), ' ', h('span', { className: 'pw-ins' }, '1,250'), ' a month, paid by the 5th of each month.'),
+      h('div', { className: 'pw-sugcard' }, h('div', null, pav('awss@ex', 'Awss Haddad', 28), h('span', null, h('b', null, 'Awss Haddad'), ' suggested 1,250 · 2 min')), h('div', null, h(W.Button, { icon: 'check' }, 'Accept'), h(W.Button, { variant: 'outline', icon: 'close' }, 'Reject'))),
+      h('p', null, 'The lease runs for two years from 1 January 2027.')),
+    h('div', { className: 'wm-bottom' }, tbar({ sug: true }), h('div', { className: 'wm-home-ind' }, h('i')))));
+  var p4 = phone('Viewing', h(F, null, edhead('Lease, Abdali branch', 'Published · 12 Nov', 'view', false), body(),
+    h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-actbar' }, h(W.Button, { variant: 'outline', icon: 'comment' }, 'Comment'), h(W.Button, { variant: 'outline', icon: 'download' }, 'PDF'), h(W.Button, { variant: 'outline', icon: 'send' }, 'Share')), h('div', { className: 'wm-home-ind' }, h('i')))));
+  var p5 = phone('More tools', h(F, null, edhead('Lease, Abdali branch', 'Saved', 'edit'), body(), h('div', { className: 'wm-bottom' }, tbar(), h('div', { className: 'wm-home-ind' }, h('i')))),
+    { overlay: sheet('More tools', h(F, null, grp(set('view', 'Preview'), set('page', 'Page view', null, { sw: false }), set('download', 'Download PDF'), set('search', 'Find in document'), set('clock', 'Version history')), gl('Insert'),
+      h('div', { className: 'wm-tiles' }, tile('heading-2', 'Heading'), tile('table', 'Table'), tile('image', 'Image'), tile('signature', 'Signature'), tile('page-break', 'Page break'), tile('field', 'Field')))) });
+  var p6 = phone('Publish check', h(F, null, edhead('Lease, Abdali branch', 'Saved · 1 suggestion', 'edit'), body(), h('div', { className: 'wm-bottom' }, tbar(), h('div', { className: 'wm-home-ind' }, h('i')))),
+    { overlay: sheet('Before you publish', h(F, null, h('div', { className: 'wm-check' }, h('ul', null, h('li', null, I('success', 20), 'Number set: LS-0007'), h('li', null, I('success', 20), 'Every field is filled'), h('li', null, I('success', 20), 'Signer: Ahmad Khalil'),
+      h('li', { className: 'is-todo', style: { color: 'var(--foreground)' } }, h('span', { style: { color: 'var(--warning-text)', display: 'inline-flex' } }, I('alert', 20)), '1 suggestion to decide', h(W.Button, { variant: 'outline' }, 'Review')))),
+      gf('Decide every suggestion first. Publishing sends the lease to Ahmad Khalil to sign.'), h('div', { className: 'pw-stack' }, h(W.Button, { disabled: true }, 'Publish')))) });
+  var p7 = phone('Arabic · Editing · keyboard open', h(F, null, edhead('عقد إيجار، فرع العبدلي', 'محفوظ', 'editAr', 'نشر', true),
+    h('div', { className: 'pw-doc' }, h('h2', null, 'عقد إيجار، فرع العبدلي'), h('p', null, 'هذا العقد بين Example Bakery وشركة عقارات عمّان للمحل في شارع وصفي التل، العبدلي.'), h('p', null, 'الإيجار 1,200 دينار في الشهر، يُدفع قبل اليوم الخامس من كل شهر.', h('span', { className: 'pw-caret' }))),
+    h('div', { className: 'pw-tb', role: 'toolbar', 'aria-label': 'التنسيق' }, h('button', { 'aria-label': 'نمط النص' }, 'أب'), h('button', { className: 'is-on', 'aria-label': 'عريض' }, I('bold', 20)), h('button', { 'aria-label': 'مائل' }, I('italic', 20)), h('button', { 'aria-label': 'قائمة' }, I('list-bullet', 20)), h('i'), h('button', { 'aria-label': 'إدراج' }, I('plus', 22)), h('button', { 'aria-label': 'تعليق' }, I('comment-add', 20)), h('span', { className: 'sp' }), h('button', { 'aria-label': 'أدوات أخرى' }, I('more', 22)), h('button', { 'aria-label': 'إخفاء لوحة المفاتيح' }, I('keyboard', 22))),
+    kb(true)), { dir: RT });
+  var n = note('Editor toolbar on a phone', 'WHIT-1006. The editor is a full-screen task: no tab bar.', [
+    'Two short lines on top: Back, the title and Publish; under them the mode and the save state. Nothing else lives up there.',
+    'Mode is one button that opens a sheet: Editing, Suggesting, Viewing, each explained. Suggesting tints the button and the toolbar amber.',
+    'The toolbar docks at the bottom, and rides on the keyboard while typing. It keeps six tools (text style, bold, italic, list, insert, comment) plus More; the last button hides the keyboard.',
+    'More tools is a sheet: Preview, Page view, PDF, Find, Version history, then the insert tiles.',
+    'Publish opens the check as a sheet. Anything to fix has its own button; Publish waits until required items are done.',
+    'Viewing has no toolbar: Comment, PDF and Share sit at the bottom.']);
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wm-row' }, p1, p2, p3, p4, p5, p6, p7, n));
+</script>
+</body>
+</html>

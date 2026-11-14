@@ -1,0 +1,60 @@
+<!-- @dsCard group="Templates · 3.4" height=2051 width=1344 subtitle="WHIT-994, M.29: after Whity ID with no workspace yet — create, waiting, or you need an invitation" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1344px;min-height:2051px}</style><meta charset="utf-8"><title>Welcome and create your workspace</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4]]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  var SW = ['#0961bb', '#b74c05', '#0f7b5f', '#7a3fb0', '#c2185b', '#2f3a45'];
+  function sw(on) { return h('div', { className: 'x4-swatches', role: 'radiogroup', 'aria-label': 'Main colour' }, SW.map(function (c, i) { return h('span', { key: i, role: 'radio', 'aria-checked': i === on, className: i === on ? 'is-on' : '', style: { background: c } }, i === on ? I('check', 18) : null); })); }
+  function card(kids, o) { o = o || {}; return h('div', { className: 'x4-authc', dir: o.dir }, h('div', { className: 'x4-brand' }, h(W.Lockup, { height: 26 })), kids); }
+  var create = card(h(F, null, h('h1', null, 'Create your workspace'), h('p', null, 'You’re signed in with Whity ID as amro@examplebakery.jo, and you don’t belong to a workspace yet.'),
+    h(W.Input, { label: 'Workspace name', defaultValue: 'Amro Saleh', helperText: 'Your company’s name. You can change it later.' }), h('div', { className: 'wy-field' }, h('span', { className: 'wy-field__label' }, 'Main language'), h(W.Segmented, { label: 'Main language', defaultValue: 'en', options: [{ value: 'en', label: 'English' }, { value: 'ar', label: 'العربية', lang: 'ar' }] })),
+    h('div', { className: 'wy-field' }, h('span', { className: 'wy-field__label' }, 'Main colour'), sw(0)), h(W.Button, { size: 'lg' }, 'Create workspace'),
+    h('div', { className: 'x4-authc__foot' }, 'Waiting for an invitation instead? Ask for it at amro@examplebakery.jo. ', h('a', { className: 'wy-link', href: '#' }, 'Sign out'))));
+  var waiting = card(h(F, null, h('span', { className: 'x4-authc__ic is-dash' }, I('clock', 26)), h('h1', null, 'You’re waiting to join Example Bakery'), h('div', null, h(W.Badge, { variant: 'outline' }, 'Waiting for an administrator')), h('p', null, 'Example Bakery’s administrators decide who joins. We’ll email amro@examplebakery.jo when you can sign in.'),
+    h(W.Button, { variant: 'outline' }, 'Sign out'), h('div', { className: 'x4-authc__foot' }, 'You can’t make another workspace while this one decides.')));
+  var invite = card(h(F, null, h('span', { className: 'x4-authc__ic is-warn' }, I('mail', 26)), h('h1', null, 'You need an invitation'), h('p', null, 'This Whity doesn’t let people make their own workspace. Ask your company’s Whity administrator to invite this address:'),
+    h('div', { className: 'x4-token', style: { fontFamily: 'var(--font-sans)' } }, h('span', null, 'amro@examplebakery.jo'), h(W.Button, { size: 'sm', variant: 'outline', icon: 'copy' }, 'Copy')), h(W.Button, { variant: 'outline' }, 'Use another account')));
+  var ar = card(h(F, null, h('h1', null, 'أنشئ مساحة عملك'), h('p', null, 'سجّلت الدخول بحساب Whity ID باسم amro@examplebakery.jo، ولست عضواً في أي مساحة عمل بعد.'), h(W.Input, { label: 'اسم مساحة العمل', defaultValue: 'عمرو صالح', helperText: 'اسم شركتك. يمكنك تغييره لاحقاً.' }),
+    h('div', { className: 'wy-field' }, h('span', { className: 'wy-field__label' }, 'اللغة الرئيسية'), h(W.Segmented, { label: 'اللغة الرئيسية', defaultValue: 'ar', options: [{ value: 'en', label: 'English', lang: 'en' }, { value: 'ar', label: 'العربية' }] })), h('div', { className: 'wy-field' }, h('span', { className: 'wy-field__label' }, 'اللون الرئيسي'), sw(1)), h(W.Button, { size: 'lg' }, 'أنشئ مساحة العمل')), { dir: 'rtl' });
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    frame('/welcome · after signing in with Whity ID, with no workspace yet', h('div', { className: 'x4-ground' }, create, waiting, invite), 760),
+    states([st('Timed out', h(F, null, h('p', null, h('b', null, 'This page timed out. '), 'Sign in again to carry on; nothing was made.'), h(W.Button, null, 'Sign in again'))), st('Name left empty', h(W.Input, { label: 'Workspace name', defaultValue: '', errorText: 'Type a name for your workspace.' })), st('Something went wrong', h(W.Alert, { variant: 'destructive', title: 'We couldn’t make the workspace' }, 'Nothing was saved. Try again in a minute.'))], 3),
+    frame('Arabic', h('div', { className: 'x4-ground' }, ar), 700),
+    note('Welcome and “Create your workspace” (WHIT-994, M.29)', ['After Whity ID, someone with no workspace lands here, never on an error. The server says which of three things is true.', 'Create: name (their own name to start), main language and main colour, the onboarding card’s step 2. Creating signs them straight in as owner.', 'Waiting: they already have a place that isn’t active (an invitation, an approval, a pause). Name it, say who decides, and offer no second workspace.', 'Needs an invitation: this instance doesn’t allow new workspaces. Show the exact address to give, with Copy.', 'All three on the signed-out frame (AuthShell): Whity’s mark on top, one card, Sign out always there.'])));
+</script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!-- @dsCard group="Templates · 3.4" height=2480 width=1344 subtitle="WHIT-915: who can sign up, the starting role, domains, team invites and the queue" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1344px;min-height:2480px}</style><meta charset="utf-8"><title>Settings: Sign-up and team invites</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4]]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  function q(name, seed, mail, when, o) { o = o || {}; return h('div', { className: 'x4-q' }, av(name, seed, 36), h('div', { style: { minWidth: 0 } }, h('b', null, name), h('small', null, mail)), h('span', { className: 'x4-small' }, when), h('div', { className: 'x4-row' }, h(W.Button, { size: 'sm', variant: 'ghost' }, o.ar ? 'رفض' : 'Reject'), h(W.Button, { size: 'sm', icon: 'check' }, o.ar ? 'قبول' : 'Approve'))); }
+  var main = h(F, null,
+    h(W.Card, { title: 'Who can sign up', description: 'For your customers. Staff join by invitation or by email domain.' }, h('div', { style: { display: 'grid', gap: 16 } },
+      h(W.RadioGroup, { label: 'Sign-up', defaultValue: 'approval', options: [{ value: 'off', label: 'Off', hint: 'Only people you invite can join.' }, { value: 'approval', label: 'Approval required', hint: 'Anyone can ask; an admin approves each one.' }, { value: 'open', label: 'Open', hint: 'Anyone with the link joins at once.' }] }),
+      h('div', { className: 'wy-form2' }, h(W.Select, { label: 'New people start as', defaultValue: 'c', options: [{ value: 'c', label: 'Customer' }], helperText: 'Only roles safe for customers are listed.' }), h('div', { className: 'wy-field' }, h('span', { className: 'wy-field__label' }, 'Allowed email domains'), h('div', { className: 'x4-chipin' }, h('span', null, 'Any domain', I('close', 12)), h('em', null, 'Add a domain…')))),
+      h('div', { className: 'wy-dns' }, h('span', null, 'Link'), h('code', null, 'app.whity.dev/join/example-bakery'), h(W.Button, { size: 'sm', variant: 'outline', icon: 'copy' }, 'Copy')))),
+    h(W.Card, { title: 'Team invites', description: 'New: a customer company can invite its own people, so you don’t have to.', action: h(W.Switch, { label: 'On', defaultChecked: true }) }, h('div', { className: 'wy-form2' }, h(W.Select, { label: 'Invited people start as', defaultValue: 't', options: [{ value: 't', label: 'Customer team member' }], helperText: 'They see their company’s orders and invoices, nothing else.' }), h(W.Input, { label: 'People per customer', defaultValue: '5', helperText: 'Each customer can invite up to this many.' }))),
+    h(W.Card, { title: 'Waiting to join · 3', description: 'Oldest first. They get an email either way.', action: h(W.Button, { size: 'sm', variant: 'outline' }, 'Approve all 3') }, h('div', { className: 'x4-list' }, q('Ibrahim Mansour', 'ibrahim', 'ibrahim@example.com', '2 days ago'), q('Emad Nasser', 'emad', 'emad@ammancoffee.jo · invited by Ahmad Khalil (team invite)', 'Yesterday'), q('Example Café', 'cafe', 'orders@examplecafe.jo', '3 hours ago'))), saveBar('You changed who can sign up.'));
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    frame('Settings › Sign-up · approval required, team invites on, three waiting', setPage('Sign-up', 'Sign-up', 'How customers join Example Bakery.', main), 1340),
+    states([st('Paused: the role gained admin permissions', h(W.Alert, { variant: 'destructive', title: 'Sign-ups are paused' }, '“Customer” can now change settings, so new people can’t start with it. Choose another role, or remove those permissions from Customer.')),
+      st('No bot check on this Whity', h(W.Alert, { variant: 'warning', title: 'Open sign-up needs a bot check' }, 'The operator hasn’t set one up. Approval required still works.')),
+      st('No role qualifies yet', h(F, null, h(W.Select, { label: 'New people start as', options: [], placeholder: 'No customer-safe role', errorText: 'Make a role without admin permissions first.' }), h(W.Button, { variant: 'outline', size: 'sm' }, 'Open Roles'))),
+      st('Nobody waiting', h(W.EmptyState, { icon: 'users', title: 'Nobody is waiting', description: 'People who ask to join appear here.' })),
+      st('Off', h('p', null, 'Only people you invite can join. The link shows “This workspace isn’t taking sign-ups.”'))], 5),
+    frame('Arabic · waiting to join', h('div', { dir: 'rtl', style: { padding: 20 } }, h(W.Card, { title: 'بانتظار الانضمام · 2', description: 'الأقدم أولاً. يصلهم بريد في الحالتين.' }, h('div', { className: 'x4-list' }, q('إبراهيم منصور', 'ibrahim', 'ibrahim@example.com', 'قبل يومين', { ar: true }), q('عماد ناصر', 'emad', 'دعاه أحمد خليل (دعوة فريق)', 'أمس', { ar: true })))), 330),
+    note('Settings › Sign-up and team invites (WHIT-915)', ['Who can sign up: Off, Approval required, Open, each with one line saying what happens.', 'Only customer-safe roles are offered. If the saved role later gains admin permissions, sign-ups pause and a red note says why and what to do.', 'Allowed domains as chips; the sign-up link with Copy.', 'New: Team invites. A customer company invites its own people, up to a number you set, starting as “Customer team member”. Their requests say who invited them.', 'The queue sits on the same page, oldest first, with Approve and Reject on each and Approve all.', 'Saving uses the save bar (section 21).'])));
+</script>
+</body>
+</html>

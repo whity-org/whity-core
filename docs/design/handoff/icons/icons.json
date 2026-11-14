@@ -780,6 +780,41 @@
    "name": "org",
    "tabler": "hierarchy-2",
    "mirrorsInRtl": false
+  },
+  {
+   "name": "folder",
+   "tabler": "folder",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "folder-open",
+   "tabler": "folder-open",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "grid",
+   "tabler": "layout-grid",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "star",
+   "tabler": "star",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "keyboard",
+   "tabler": "keyboard",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "checkbox",
+   "tabler": "checkbox",
+   "mirrorsInRtl": false
+  },
+  {
+   "name": "square",
+   "tabler": "square",
+   "mirrorsInRtl": false
   }
  ]
 }

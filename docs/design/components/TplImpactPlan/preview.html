@@ -1,0 +1,65 @@
+<!-- @dsCard group="Templates · 3.4" height=1804 width=1344 subtitle="WHIT-829: a Whity Builder publish or roll back with safe, data and destructive changes and test results" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Proposal with an impact plan</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4]]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  function chg(kind, t, sub, recs) { var K = { safe: ['check', 'Safe'], data: ['field', 'Changes data'], destructive: ['delete', 'Deletes data'] }[kind];
+    return h('div', { className: 'x4-chg is-' + kind }, h('span', { className: 'x4-kind is-' + kind }, I(K[0], 14), K[1]), h('div', null, h('b', null, t), h('small', null, sub)), h('span', { className: 'x4-small' }, recs || '')); }
+  function plan(o) { o = o || {};
+    return h('article', { className: 'wy-proposal', style: { maxWidth: 'none' } }, h('header', { className: 'wy-proposal__head' }, h(W.ActorChip, { kind: 'agent', name: 'Whity Builder', onBehalfOf: 'Amro' }), h(W.Badge, { variant: 'outline' }, 'Waiting for your approval')),
+      h('h3', { className: 'wy-proposal__title' }, o.title || 'Publish “Bakery orders” version 1.4'), h('p', { className: 'wy-proposal__summary' }, o.summary || 'Adds a pickup time to orders and moves old notes into the new field. 3 changes, tested on a copy of your data.'),
+      h('div', { className: 'x4-plan' }, o.changes), o.tests,
+      o.ack || null,
+      h('footer', { className: 'wy-proposal__foot' }, h('div', { className: 'wy-proposal__meta' }, h('span', null, o.undo || 'Can be rolled back to version 1.3')), h('div', { className: 'wy-proposal__actions' }, h(W.Button, { variant: 'ghost', size: 'sm' }, 'Decline'), h(W.Button, { variant: 'outline', size: 'sm', icon: 'view' }, 'Try it on a copy'), h(W.Button, { size: 'sm', icon: 'check', disabled: !!o.block }, 'Approve')))); }
+  var pass = h('div', { className: 'x4-tests' }, h(W.Badge, { variant: 'success', icon: 'success' }, '24 tests passed'), h('span', { className: 'x4-small' }, 'Ran on a copy of Example Bakery’s data, 13 Nov, 10:20'), h('span', { className: 'x4-sp' }), h(W.Button, { size: 'sm', variant: 'ghost', iconEnd: 'chevron-right' }, 'See the tests'));
+  var data = plan({ changes: h(F, null, chg('safe', 'Adds the field “Pickup time” to orders', 'English: Pickup time · Arabic: وقت الاستلام'), chg('safe', 'Adds “Pickup time” to the order form and the receipt', 'Shown after “Delivery”'), chg('data', 'Moves times written in order notes into “Pickup time”', 'Notes keep their text. English and Arabic notes are both read.', '312 orders')), tests: pass });
+  var destr = plan({ title: 'Roll back “Bakery orders” to version 1.2', summary: 'Version 1.3 added “Allergens”. Rolling back removes the field and what people typed in it.', undo: 'Cannot be undone: the allergen notes are deleted', block: true,
+    changes: h(F, null, chg('safe', 'Removes “Allergens” from the order form', 'Older orders keep printing as they were'), chg('destructive', 'Deletes the field “Allergens” and its values', 'English: Allergens · Arabic: مسببات الحساسية', '88 orders')), tests: pass,
+    ack: h('label', { className: 'x4-ack' }, h('input', { type: 'checkbox', style: { width: 20, height: 20, marginTop: 2 } }), h('span', null, h('b', null, 'I understand 88 orders lose their allergen notes.'), ' Export them first if you need them. Approve stays off until this is ticked.')) });
+  var safe = plan({ title: 'Publish “Bakery orders” version 1.3.1', summary: 'Fixes the Arabic label on the receipt. Nothing in your data changes.', changes: chg('safe', 'Changes the receipt label “Pickup” in Arabic', 'استلام → وقت الاستلام'), tests: pass });
+  var failed = plan({ title: 'Publish “Bakery orders” version 1.4', block: true, changes: chg('data', 'Moves times written in order notes into “Pickup time”', 'English and Arabic notes are both read.', '312 orders'),
+    tests: h('div', { className: 'x4-tests is-fail' }, h(W.Badge, { variant: 'destructive', icon: 'error' }, '2 of 24 tests failed'), h('span', null, '“Orders with no notes keep an empty pickup time” and 1 more.'), h('span', { className: 'x4-sp' }), h(W.Button, { size: 'sm', variant: 'outline' }, 'Ask Whity Builder to fix it')) });
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    h('div', { className: 'x4-two' }, h('section', null, h('p', { className: 'x4-lab' }, 'Data changes · tests passed'), data), h('section', null, h('p', { className: 'x4-lab' }, 'Destructive · roll back'), destr)),
+    h('div', { className: 'x4-two' }, h('section', null, h('p', { className: 'x4-lab' }, 'Safe only'), safe), h('section', null, h('p', { className: 'x4-lab' }, 'Failed tests · can’t be approved'), failed)),
+    h('section', null, h('p', { className: 'x4-lab' }, 'Arabic'), h('div', { dir: 'rtl' }, h('article', { className: 'wy-proposal', style: { maxWidth: 'none' } }, h('header', { className: 'wy-proposal__head' }, h(W.ActorChip, { kind: 'agent', name: 'Whity Builder', onBehalfOf: 'عمرو', forLabel: 'نيابةً عن' }), h(W.Badge, { variant: 'outline' }, 'بانتظار موافقتك')),
+      h('h3', { className: 'wy-proposal__title' }, 'نشر «طلبات المخبز» الإصدار 1.4'), h('div', { className: 'x4-plan' }, h('div', { className: 'x4-chg is-safe' }, h('span', { className: 'x4-kind is-safe' }, I('check', 14), 'آمن'), h('div', null, h('b', null, 'يضيف الحقل «وقت الاستلام» إلى الطلبات')), h('span')), h('div', { className: 'x4-chg is-data' }, h('span', { className: 'x4-kind is-data' }, I('field', 14), 'يغيّر البيانات'), h('div', null, h('b', null, 'ينقل الأوقات المكتوبة في ملاحظات الطلبات إلى «وقت الاستلام»'), h('small', null, 'تبقى نصوص الملاحظات كما هي.')), h('span', { className: 'x4-small' }, '312 طلباً'))),
+      h('div', { className: 'x4-tests' }, h(W.Badge, { variant: 'success', icon: 'success' }, 'نجحت 24 تجربة'), h('span', { className: 'x4-small' }, 'على نسخة من بيانات Example Bakery'))))),
+    note('Impact plan (WHIT-829)', ['A Whity Builder publish or roll back arrives as an approval like any other, from Whity Builder for the person who asked.', 'Each change is one row with its kind in words and an icon: Safe (green), Changes data (amber, with the number of records), Deletes data (red, solid border). Never colour alone.', 'Each change shows its English and Arabic text where it adds words people will see.', 'Test results sit under the changes; failed tests turn Approve off and offer “Ask Whity Builder to fix it”.', 'Destructive plans need a tick naming exactly what is lost before Approve turns on, and say “Cannot be undone” in the footer. Approve is never pre-selected.', '“Try it on a copy” opens the plugin on the test copy so the person can see it first.'])));
+</script>
+</body>
+</html>

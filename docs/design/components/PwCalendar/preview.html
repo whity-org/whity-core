@@ -1,0 +1,115 @@
+<!-- @dsCard group="Web app on a phone" height=954 width=2674 subtitle="Web app on a phone: calendar week and month, many people, the sub-page switcher, Arabic (PW.7)" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Phone web: calendar</title><style>html,body{height:100%;margin:0} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 22 }); }
+  var T0 = { home: 'Home', inbox: 'Inbox', create: 'Create', agents: 'Chat', agentsIcon: 'comment', more: 'More' };
+  function status() { return h('div', { className: 'wm-status', 'aria-hidden': 'true' }, h('span', null, '9:41'), h('i'), h('span', null, I('wifi', 16), I('battery', 18))); }
+  function tabbar(active, T, badges) { T = T || T0; badges = badges || { inbox: 3 };
+    function tab(k, icon) { return h('div', { key: k, className: 'wm-tab' + (active === k ? ' is-on' : '') }, I(icon, 24), T[k], badges[k] ? h('b', null, badges[k]) : null); }
+    return h('nav', { className: 'wm-tabbar', 'aria-label': 'Main' }, tab('home', 'dashboard'), tab('inbox', 'inbox'), h('button', { key: 'c', className: 'wm-create', 'aria-label': T.create }, I('plus', 28)), tab('agents', T.agentsIcon || 'robot'), tab('more', 'menu')); }
+  function bottom(o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.tabs === false ? null : tabbar(o.active, o.T, o.badges), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function phone(label, kids, o) { o = o || {}; return h('div', { className: 'wm-col' }, h('div', { className: 'wm-label' }, label), h('div', { className: 'wm-phone', dir: o.dir }, status(), kids, o.overlay || null)); }
+  function search(t, f) { return h('div', { className: 'wm-search' }, I('search', 20), h('span', null, t), f ? h('button', { type: 'button' }, I('filter', 16), f) : null); }
+  function stage(blue, tag, kids, keys) { var LOT = { 'YOUR BRAND, OUR PLATFORM': ['brand-sheet-platform', 'view'], 'AGENTS PROPOSE': ['agents-propose', 'view'], 'YOU DECIDE': ['approve-set-down', 'view'], 'IN THE APP': ['approve-set-down', 'view'], 'UPDATING · LOOPS': ['updating', 'loop'], 'ALL CAUGHT UP': ['all-caught-up', 'view'] }; var l = LOT[tag]; if (!l) return h('div', { className: 'wm-lottie' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, 'LOTTIE · ' + tag), kids, keys ? h('div', { className: 'wm-keys' }, keys.map(function (k, i) { return h('span', { key: i }, k); })) : null); return h('div', { className: 'wm-lottie has-file' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, l[0] + '.json'), h('div', { className: 'w-lottie', 'data-lottie': 'lottie/' + l[0] + '.json', 'data-play': l[1] }, h('div', { className: 'w-lottie__fallback' }, kids))); }
+  function at(cls, x, y, extra) { return h('div', { className: cls, style: Object.assign({ left: x, top: y }, extra || {}) }); }
+  function dots(n, on) { var a = []; for (var i = 0; i < n; i++) a.push(h('i', { key: i, className: i === on ? 'is-on' : '' })); return h('div', { className: 'wm-dots' }, a); }
+  function foot(kids) { return h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-form', style: { borderTop: 0 } }, kids), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function q(title, sub, step, of) { return h(F, null, h('div', { className: 'wm-progress', 'aria-hidden': 'true' }, h('i', { style: { width: Math.round(step / of * 100) + '%' } })), h('div', { className: 'wm-q' }, h('h1', null, title), sub ? h('p', null, sub) : null)); }
+  function choice(t, sub, on, icon) { return h('div', { className: 'wm-choice' + (on ? ' is-on' : '') }, icon ? I(icon, 24) : null, h('span', null, t, sub ? h('small', null, sub) : null), h('i', { className: 'wm-radio' })); }
+  function navbar(t) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), h('span')); }
+
+  var SEED = 'amro@examplebakery.jo', HUE = W.brandHue('#0961bb');
+  function me(s) { return h(W.Avatar, { name: 'Amro Saleh', pattern: SEED, hue: HUE, size: s || 40 }); }
+  function pav(seed, name, s) { return h(W.Avatar, { name: name, pattern: seed, hue: HUE, size: s || 40 }); }
+  function nav(t, end) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), end || h('span')); }
+  function head(t, sub) { return h('div', { className: 'wm-head' }, h('h1', null, t), sub ? h('p', null, sub) : null); }
+  function gl(t) { return h('div', { className: 'wm-gl' }, t); }
+  function gf(t) { return h('div', { className: 'wm-gf' }, t); }
+  function grp() { return h('div', { className: 'wm-group' }, Array.prototype.slice.call(arguments)); }
+  function set(icon, t, v, o) { o = o || {};
+    var end = o.end !== undefined ? o.end : o.sw !== undefined ? h(W.Switch, { defaultChecked: o.sw, 'aria-label': t }) : I(o.ext ? 'external' : 'chevron-right', 18);
+    return h('div', { className: 'wm-set' + (o.danger ? ' is-danger' : '') + (o.link ? ' is-link' : '') }, icon ? h('span', { className: 'wm-set__ic' + (o.tone ? ' is-' + o.tone : '') }, typeof icon === 'string' ? I(icon, 20) : icon) : null,
+      h('span', { className: 'wm-set__t' }, t, o.sub ? h('small', null, o.sub) : null), v != null ? h('span', { className: 'wm-set__v' }, v) : null, end); }
+  function segs(a, on, cls) { return h('div', { className: 'wm-segs' + (cls ? ' ' + cls : ''), role: 'tablist' }, a.map(function (x, i) { return h('span', { key: i, role: 'tab', 'aria-selected': i === on, className: i === on ? 'is-on' : '' }, x[0], x[1] ? h('em', null, x[1]) : null); })); }
+  function chips(a, on) { return h('div', { className: 'wm-chips' }, a.map(function (x, i) { return h('span', { key: i, className: on.indexOf(i) > -1 ? 'is-on' : '' }, on.indexOf(i) > -1 ? I('check', 16) : null, x); })); }
+  function scroll() { return h('div', { className: 'wm-scroll' }, Array.prototype.slice.call(arguments)); }
+  function sheet(title, kids) { return h(F, null, h('div', { className: 'wm-scrim' }), h('div', { className: 'wm-sheet', role: 'dialog', 'aria-label': title }, h('div', { className: 'wm-grab' }), title ? h('h2', null, title) : null, kids, h('div', { className: 'wm-home-ind' }, h('i')))); }
+  function act() { return bottom({ tabs: false, action: h('div', { className: 'wm-actbar' }, Array.prototype.slice.call(arguments)) }); }
+  function searchrow(t) { return h('div', { className: 'wm-searchrow' }, search(t, 'Filter'), h('button', { 'aria-label': 'Invite people' }, I('plus', 24))); }
+  function li(ic, t, sub, end, agent) { return h('div', { className: 'wm-li' + (agent ? ' is-agent' : '') }, typeof ic === 'string' ? h('span', { className: 'wm-li__ic' }, I(ic, 20)) : ic, h('div', { style: { minWidth: 0 } }, h('b', null, t), h('small', null, sub)), h('div', { className: 'wm-li__end' }, end)); }
+  function ac(ic, tone, t, sub, extra) { return h('div', { className: 'wm-act' }, typeof ic === 'string' ? h('span', { className: 'wm-set__ic' + (tone ? ' is-' + tone : '') }, I(ic, 18)) : ic, h('div', null, t, h('small', null, sub), extra || null)); }
+  function badge(v, t) { return h(W.Badge, { variant: v }, t); }
+
+  function hh(sub) { return h('div', { className: 'wm-head' }, h('div', { className: 'wm-head__top' }, h(W.TenantLogo, { name: 'Example Bakery', size: 28 }), me(36)), h('h1', null, 'Good morning, Amro'), h('p', null, sub)); }
+
+  var TA = { home: 'الرئيسية', inbox: 'الوارد', create: 'إنشاء', agents: 'المحادثات', agentsIcon: 'comment', more: 'المزيد' };
+  var BAD = { inbox: 3, agents: 2 };
+  function url() { return h('div', { className: 'pw-url', 'aria-hidden': 'true' }, h('span', { className: 'pw-url__b' }, I('chevron-left', 22)), h('span', { className: 'pw-url__p' }, I('lock', 14), 'app.whity.dev'), h('span', { className: 'pw-url__b' }, I('upload', 20))); }
+  function tb(active, o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.bulk || tabbar(active, o.T, BAD), o.browser ? url() : null, h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function title(t, sub, end) { return h('div', { className: 'pw-title' }, h('div', { style: { minWidth: 0 } }, h('h1', null, t), sub ? h('p', null, sub) : null), end ? h('div', { className: 'pw-title__end' }, end) : null); }
+  function back(t) { return h('div', { className: 'pw-back' }, I('chevron-left', 24), t); }
+  function crumb(a) { var out = []; a.forEach(function (x, i) { if (i) out.push(h('span', { key: 'c' + i }, I('chevron-right', 14))); out.push(h('span', { key: i }, x)); }); return h('div', { className: 'pw-crumb' }, out); }
+  function pagehead(c, t, sub, extra) { return h('div', { className: 'pw-pagehead' }, c ? crumb(c) : null, h('h1', null, t), sub ? h('p', null, sub) : null, extra || null); }
+  function row(o) {
+    return h('div', { className: 'pw-row' + (o.sel ? ' is-sel' : '') }, o.sel !== undefined ? h('span', { className: 'pw-cb' + (o.sel ? ' is-on' : ''), role: 'checkbox', 'aria-checked': !!o.sel }, o.sel ? I('check', 18) : null) : null,
+      h('div', { className: 'pw-row__b' }, h('div', { className: 'pw-row__t' }, h('b', null, o.t), o.badge || null, o.sel === undefined ? h('button', { className: 'pw-more', 'aria-label': (o.moreLabel || 'More for ') + o.t }, I('more', 20)) : null),
+        o.lines.map(function (l, i) { return h('div', { key: i, className: 'pw-row__l' }, h('span', null, l[0]), h('span', null, l[1])); }))); }
+  function plist() { return h('div', { className: 'pw-list' }, Array.prototype.slice.call(arguments)); }
+  function sbar(t, add, f) { return h('div', { className: 'wm-searchrow' }, search(t, f || 'Filter'), h('button', { 'aria-label': add }, I('plus', 24))); }
+  function fchips(a) { return h('div', { className: 'pw-fchips' }, a.map(function (x, i) { return typeof x === 'string' ? h('span', { key: i }, x, I('close', 16)) : h('span', { key: i, className: 'is-plain' + (x.drop ? ' is-drop' : '') + (x.on ? '' : ''), style: x.on ? { background: 'var(--primary-tint)', borderColor: 'var(--primary)', color: 'var(--primary-tint-foreground)' } : null }, x.icon ? I(x.icon, 16) : null, x.t, x.drop ? I('chevron-down', 16) : null); })); }
+  function opt(t, on, sub, icon) { return set(icon || null, t, null, { end: on ? I('check', 22) : h('span'), sub: sub }); }
+  function opts() { return h('div', { className: 'pw-opts' }, grp.apply(null, arguments)); }
+  function field(l, v, o) { o = o || {}; return h('div', { className: 'pw-field' + (o.focus ? ' is-focus' : '') }, h('label', null, l), h('div', { className: v ? '' : 'is-ph' }, v || o.ph, o.focus ? h('span', { className: 'pw-caret' }) : null)); }
+  function kb(ar) {
+    var rows = ar ? ['ضصثقفغعهخحج', 'شسيبلاتنمكط', 'ئءؤرىةوزظد'] : ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+    function keys(s) { return s.split('').map(function (c, i) { return h('span', { key: i }, c); }); }
+    return h('div', { className: 'pw-kb', 'aria-hidden': 'true', dir: ar ? 'rtl' : 'ltr' }, h('div', { className: 'pw-kb__r' }, keys(rows[0])), h('div', { className: 'pw-kb__r' }, keys(rows[1])),
+      h('div', { className: 'pw-kb__r' }, ar ? null : h('span', { className: 'is-fn' }, I('arrow-up', 18)), keys(rows[2]), h('span', { className: 'is-fn' }, '⌫')),
+      h('div', { className: 'pw-kb__r' }, h('span', { className: 'is-fn' }, '123'), h('span', { className: 'is-fn' }, I('world', 18)), h('span', { className: 'is-space' }, ar ? 'مسافة' : 'space'), h('span', { className: 'is-ret' }, ar ? 'التالي' : 'next')), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function note(t, p, items) { return h('div', { className: 'pw-note' }, h('h3', null, t), p ? h('p', null, p) : null, h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function cur(el) { return React.cloneElement(el, { className: el.props.className + ' is-current' }); }
+  function tile(i, t) { return h('div', { className: 'wm-tile' }, I(i, 28), t); }
+  function sheetbar() { return h('div', { className: 'pw-sheetbar' }, Array.prototype.slice.call(arguments)); }
+  function code(t) { return h('code', null, t); }
+  var RT = 'rtl';
+
+  function calhead(sub, t, today, ar) { return h('div', { className: 'pw-calhead' }, h('button', { className: 'pw-switch', 'aria-label': ar ? 'تبديل الصفحة' : 'Switch page' }, h('small', null, sub), h('span', null, t, I('chevron-down', 22))), h('button', { className: 'pw-tbtn' }, today)); }
+  function dl(t, ar) { return h('div', { className: 'pw-dateline' }, h('button', { className: 'pw-ib is-dir', 'aria-label': ar ? 'السابق' : 'Previous' }, I('chevron-left', 24)), h('b', null, t), h('button', { className: 'pw-ib is-dir', 'aria-label': ar ? 'التالي' : 'Next' }, I('chevron-right', 24))); }
+  function bk(t, s, sub, who, wait) { return h('div', { className: 'pw-bk' + (wait ? ' is-wait' : '') }, h('time', null, t), h('i'), h('div', { style: { minWidth: 0 } }, h('b', null, s), h('small', null, sub)), who ? pav(who[0], who[1], 32) : h('span')); }
+  function day(t, sub, kids, cls) { return h('div', { className: 'pw-day' + (cls ? ' ' + cls : '') }, h('div', { className: 'pw-day__h' }, h('span', null, t), h('small', null, sub)), kids); }
+  var AW = ['awss@ex', 'Awss Haddad'], AH = ['ahmad@ex', 'Ahmad Khalil'], IB = ['ibrahim@ex', 'Ibrahim Mansour'], EM = ['emad@ex', 'Emad Nasser'], AM = ['amro@examplebakery.jo', 'Amro Saleh'];
+  function ctop(seg) { return h(F, null, calhead('Calendar', 'Bookings', 'Today'), segs([['Day'], ['Week'], ['Month']], seg)); }
+  var newb = { action: h('div', { className: 'wm-actbar' }, h(W.Button, { icon: 'plus' }, 'New booking')) };
+  var p1 = phone('Week · a list of days', h(F, null, ctop(1), dl('15 – 21 Nov 2026'), fchips([{ t: 'Everyone', drop: true }, { t: 'Abdali branch', drop: true }]),
+    scroll(day('Sun 15 Nov', '2 bookings', h(F, null, bk('10:00', 'Cake tasting', 'Ibrahim Mansour · with Awss', AW), bk('13:30', 'Event order call', 'Emad Nasser · waiting for payment', AH, true))),
+      day('Mon 16 Nov', 'Nothing booked'), day('Tue 17 Nov', '1 booking', bk('09:00', 'Wedding cake consult', 'Ahmad Khalil · with Amro', AM)), day('Wed 18 Nov', '3 bookings', bk('11:00', 'Tasting for 6', 'Amman Coffee Co.', AW))), tb('more', newb)));
+  var p2 = phone('Week · everyone, many people', h(F, null, ctop(1), dl('15 – 21 Nov 2026'), fchips([{ t: 'Everyone · 6 people', drop: true }, { t: 'All branches', drop: true }]),
+    scroll(day('Thu 19 Nov', '7 bookings', h(F, null, bk('09:00', 'Wedding cake consult', 'Ahmad Khalil', AM), bk('09:30', 'Order pickup', 'Emad Nasser', AW), bk('10:00', 'Tasting', 'Ibrahim Mansour', AH), h('div', { className: 'pw-bkmore' }, '4 more', I('chevron-down', 18)))),
+      day('Fri 20 Nov', 'Weekend · closed', null, 'is-off'), day('Sat 21 Nov', 'Weekend · 1 booking', bk('12:00', 'Birthday order pickup', 'Awss Haddad', IB), 'is-off')), tb('more', newb)));
+  function month(ar) { var hd = ar ? ['أحد', 'إثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; var C = { 2: 2, 3: 1, 4: 4, 8: 3, 9: 2, 10: 5, 11: 1, 12: 3, 15: 2, 17: 1, 18: 3, 19: 7, 21: 1, 22: 2, 23: 4, 25: 2, 26: 3, 29: 1, 30: 2 };
+    var cells = hd.map(function (x, i) { return h('span', { key: 'h' + i, className: 'is-h' }, x); });
+    for (var d = 1; d <= 35; d++) { var dd = d > 30 ? d - 30 : d, col = (d - 1) % 7, off = col >= 5; cells.push(h('span', { key: d, className: [off ? 'is-off' : '', d > 30 ? 'is-out' : '', d === 13 ? 'is-today' : '', d === 15 ? 'is-sel' : ''].join(' '), 'aria-label': dd + (C[d] && d <= 30 ? ', ' + C[d] + (ar ? ' حجوزات' : ' bookings') : '') }, h('b', null, dd), h('em', null, d <= 30 && C[d] ? C[d] : ' '))); }
+    return h('div', { className: 'pw-month' }, cells); }
+  var p3 = phone('Month · counts per day', h(F, null, ctop(2), dl('November 2026'), month(), scroll(day('Sun 15 Nov', '2 bookings', h(F, null, bk('10:00', 'Cake tasting', 'Ibrahim Mansour · with Awss', AW), bk('13:30', 'Event order call', 'Emad Nasser · waiting for payment', AH, true))))
+    , tb('more', newb)));
+  var p4 = phone('Switch page', h(F, null, ctop(1), dl('15 – 21 Nov 2026'), scroll(day('Sun 15 Nov', '2 bookings', bk('10:00', 'Cake tasting', 'Ibrahim Mansour', AW))), tb('more')),
+    { overlay: sheet('Calendar', opts(opt('Bookings', true, 'Day, week and month', 'appointment'), opt('Services', false, 'What customers can book', 'tool'), opt('Rooms and branches', false, 'Where bookings happen', 'org'), opt('Hours and time off', false, 'Who works when', 'clock'), opt('Calendar settings', false, 'Booking rules and reminders', 'settings'))) });
+  var p5 = phone('Arabic · Month', h(F, null, calhead('التقويم', 'الحجوزات', 'اليوم', true), segs([['يوم'], ['أسبوع'], ['شهر']], 2), dl('تشرين الثاني 2026', true), month(true),
+    scroll(day('الأحد 15 تشرين الثاني', 'حجزان', h(F, null, bk('10:00', 'تذوّق الكعك', 'إبراهيم منصور · مع أوس', AW), bk('13:30', 'مكالمة طلب مناسبة', 'عماد ناصر · بانتظار الدفع', AH, true)))),
+    tb('more', { T: TA, action: h('div', { className: 'wm-actbar' }, h(W.Button, { icon: 'plus' }, 'حجز جديد')) })), { dir: RT });
+  var n = note('Calendar on a phone', 'WHIT-1006, with the phone states from WHIT-946.', [
+    'Day stays the agenda from the phone app. Week is a list of days, each a card with its bookings; a day with nothing says so in one line.',
+    'Month is a grid of counts. Tap a day and its bookings show under the grid.',
+    'The weekend is shaded, from the workspace’s settings. The week starts on the workspace’s first day.',
+    'The date range sits on its own line between ‹ and ›. Today is a button by the title.',
+    'Who and where are chips above the list. With many people, a day shows three bookings and “4 more”.',
+    'Waiting for payment keeps the dashed line. The sub-pages (Services, Rooms and branches, Hours and time off, Settings) are behind the title, as a sheet.']);
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wm-row' }, p1, p2, p3, p4, p5, n));
+</script>
+</body>
+</html>

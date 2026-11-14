@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en" dir="ltr" xmlns="http://www.w3.org/1999/xhtml">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">
+<title>{{sender}} asks you to sign {{signer_doc}}</title>
+<style>
+  body { margin:0; padding:0; background:#f4f4f5; }
+  a { color:{{tenant_color}}; }
+  @media (max-width:620px) { .card { padding:24px 20px !important; border-radius:0 !important; } .outer { padding:0 !important; } }
+  @media (prefers-color-scheme: dark) {
+    body, .bg { background:#09090b !important; } .card { background:#18181b !important; }
+    .card h1, .card p, .card td { color:#f4f4f5 !important; } .card .soft, .foot p { color:#a1a1aa !important; }
+    .rows, .note td { background:#27272a !important; } .rows td { border-color:#3f3f46 !important; }
+  }
+</style></head>
+<body style="margin:0;padding:0;background:#f4f4f5">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">It takes a minute. Due {{due}}.</div>
+<table role="presentation" class="bg" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f5"><tr><td class="outer" align="center" style="padding:32px 16px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;font-family:'Noto Sans', 'Segoe UI', Arial, Helvetica, sans-serif;text-align:left" dir="ltr">
+<tr><td class="card" style="background:#ffffff;border-radius:18px;padding:36px 40px"><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px"><tr><td style="width:40px;height:40px;border-radius:11px;background:{{tenant_color}};color:#fff;font-size:20px;font-weight:600;text-align:center;line-height:40px">{{tenant_initial}}</td><td style="width:12px"></td><td style="font-size:18px;font-weight:600;color:#18181b">{{tenant_name}}</td></tr></table><h1 style="margin:0 0 14px;font-size:25px;line-height:1.3;font-weight:600;color:#18181b">Please sign this</h1><p style="margin:0 0 16px;font-size:17px;line-height:1.6;color:#18181b">{{sender}} sent you <b>{{signer_doc}}</b> to read and sign.</p><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 22px"><tr><td style="border-radius:12px;background:{{tenant_color}}"><a href="{{url}}" style="display:inline-block;padding:15px 30px;font-size:17px;font-weight:600;line-height:22px;color:#ffffff;text-decoration:none;border-radius:12px">Read and sign</a></td></tr></table><p style="margin:0 0 16px;font-size:17px;line-height:1.6;color:#52525b">You sign by confirming in Whity and, if you like, drawing your signature on a touch screen. Nobody else can sign for you.</p></td></tr>
+<tr><td class="foot" style="padding:20px 8px 0;font-size:13px;line-height:1.6;color:#71717a"><p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#71717a">Sent by {{tenant_name}} for {{sender}}.</p><p class="wl" style="margin:12px 0 0;font-size:13px;color:#a1a1aa">Sent with Whity</p></td></tr>
+</table></td></tr></table>
+</body></html>

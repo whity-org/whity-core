@@ -76,7 +76,7 @@ Done when: EditorArabic and EditorType match; an axe check passes on the editor;
 Live collaboration (cursors, presence, version history) comes after M8 (E.3).
 
 
-# App screens: build plan (2.3–3.2)
+# App screens: build plan (2.3–3.4)
 
 Every screen in the inventory now has cards (`13-app-map.md`). Build them after the foundation (editor M1) is in, one milestone per branch and pull request, comparing with `screenshots/` in both themes and in Arabic where there's an Arabic card.
 
@@ -122,7 +122,16 @@ Profit and loss, balance sheet, ageing, stock value and sales tax (`TplReports`)
 ## A13 · Lottie in the app and the Animations setting (LT.4)
 The player (`handoff/motion/whity-lottie.js` pattern, or `lottie` in Flutter) with colours from the tokens; the moments in `TplMoments` and `TmMoments`; single approvals play `approve-set-down`, bulk stays in code; the Animations setting (Full, Calm, Off) in Account › Preferences and on the phone. Done when: each moment plays once as specified, never blocks a button, follows the workspace's colour and dark mode, and shows its last frame for Calm, Off and reduce motion.
 
-Everything after A13 is in the long-term roadmap (section 28): the 3.1 modules (L8) and Whity mobile (L9) are designed and wait there.
+## A14 · The web app on a phone (PW.1–PW.11)
+Under 640px: the tab bar with More and Create, lists with sort, select and bulk, the library, the editor's phone toolbar and modes, calendar, settings, read-only builders, the short-screen sidebar and the account menu (WHIT-827), installing as the workspace's own app and asking for notifications once. Done when: every `Pw*` card is matched at 390 wide in light, dark and Arabic; no page scrolls sideways at 360; the install offer appears once and only in the browser.
+
+## A15 · Screens and surfaces with no card before 3.4 (SC.1–SC.18, SU.1–SU.10)
+Messages (inbox, chat box, settings), Approvals › Decided, impact plans, agent credentials and whity-agent, saved blocks, welcome and joining, sign-up and public-form settings, plan limits, document themes, issuing a document, the two-column sign-in, Whity ID; then the verify page, payment return, the calendar on a computer, the persona editor, the customer's booking page, WhatsApp and SMS templates and link previews. Order them inside the milestones they belong to (calendar with ADR 0017, persona with agents) where that's simpler. Done when: each card in `13-app-map.md`'s 3.4 rows is matched in light, dark and Arabic, and every route in the app map names a built screen.
+
+## P1 · Form printouts (FP.1–FP.12)
+The print engine work in `handoff/print/FORM-PRINTOUTS.md`: the automatic layout from a form's sections, the blocks in `DocFormBlocks`, the decision and approvals, signatures confirmed in Whity (drawn on touch screens), the footer with reference, page x of y and the client's marks, and the Form printouts tab of a document theme (`TplFormPrintStyle`, paid plans and trials; free = standard). Done when: the ethics application in `DocFormPrintout` prints page for page from a real form, in English and Arabic; a trial ending changes only new printouts; the QR opens the verify page.
+
+Everything after A15 and P1 is in the long-term roadmap (section 28): the 3.1 modules (L8) and Whity mobile (L9) are designed and wait there.
 
 
 # Websites (3.3)
@@ -150,7 +159,10 @@ Security, Partners, About, Contact, Privacy, Licence and 404, and the mega foote
 ## W8 · Launch check
 Done when: every feature claim on every page is checked against what has shipped; no link on the sites is broken; `llms.txt`, `security.txt` and the brand kit are served.
 
-# Emails (3.3)
+# Emails (3.3, 3.4)
 
 ## E1 · The fifteen emails (EM.1)
 Build from `handoff/emails/` (English and Arabic, placeholders listed in its README). Done when: each email renders as its card (`EmailAccount`, `EmailMoney`, `EmailAgents`, `EmailWorkspace`, `EmailArabic`, `EmailDark`) in Gmail, Outlook and Apple Mail, light and dark; white-label removes "Sent with Whity" and sends from the workspace's own domain; security emails can't be turned off; approval emails only open the app.
+
+## E2 · The ten 3.4 emails (SU.8)
+Bookings (confirmed and moved with an `.ics`, one UID for the booking's life; cancelled with METHOD:CANCEL; the reminder), form received, form decision with the printout PDF, sign request, join approved and declined, message reply (threading back into Messages). Done when: each renders as `EmailBookings`, `EmailForms`, `EmailJoining` in Gmail, Outlook and Apple Mail, light and dark, English and Arabic; a moved booking updates the same calendar entry; a reply to `message-reply` lands in the same conversation.
