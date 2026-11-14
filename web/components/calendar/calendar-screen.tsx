@@ -54,6 +54,7 @@ import { CalendarNav } from './calendar-nav';
 import { EventDialog } from './event-dialog';
 import { useCalendarAccess, useCalendarBasics } from './use-calendar-basics';
 import { useCalendarWords } from './use-calendar-words';
+import { useNewIntent } from '@/lib/commands/new-intent';
 
 const EVERYONE = 'everyone';
 const ALL_BRANCHES = 'all';
@@ -124,6 +125,10 @@ function CalendarBody({
   const [suggesting, setSuggesting] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [newBooking, setNewBooking] = useState(false);
+  // ⌘K `/new booking` (WHIT-1069): New booking, when this person could press it.
+  useNewIntent('booking', () => {
+    if (access.canWrite && services.length > 0) setNewBooking(true);
+  });
   const [eventOpen, setEventOpen] = useState(false);
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
 

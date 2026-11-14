@@ -1,4 +1,4 @@
-export { FormsListScreen } from "./forms-list-screen"
+export { FormsListScreen, type FormsNewRequest } from "./forms-list-screen"
 export { FormBuilderScreen } from "./form-builder-screen"
 export { FormsCatalogScreen } from "./forms-catalog-screen"
 export { MySubmissionsScreen } from "./my-submissions-screen"

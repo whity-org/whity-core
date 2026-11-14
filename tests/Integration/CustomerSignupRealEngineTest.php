@@ -137,7 +137,9 @@ final class CustomerSignupRealEngineTest extends TestCase
             $safe,
             $service,
             $audit,
-            $bot
+            $bot,
+            null,
+            new \Whity\Core\Signup\JoinDecisionMailer(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $settingsService), 'https://app.test/login'),
         );
     }
 
@@ -234,8 +236,17 @@ final class CustomerSignupRealEngineTest extends TestCase
 
         self::assertSame(403, $this->decide(self::TENANT_A, self::STAFF_A, $requestId, true)->getStatusCode());
 
+        $mailsBefore = count($this->sent);
         $approved = $this->decide(self::TENANT_A, self::ADMIN_A, $requestId, true);
         self::assertSame(200, $approved->getStatusCode(), $approved->getBody());
+
+        // E2 `join-approved`: the person hears it, from the workspace.
+        self::assertCount($mailsBefore + 1, $this->sent);
+        $mail = $this->sent[$mailsBefore];
+        self::assertSame('waiting@example.test', $mail['to']);
+        self::assertStringStartsWith("You're in: welcome to ", $mail['subject']);
+        self::assertStringContainsString('Hello Waiting Person, your request to join was approved.', $mail['body']);
+        self::assertStringContainsString('https://app.test/login', $mail['body']);
 
         $row = $this->membership(self::TENANT_A, 'waiting@example.test');
         self::assertSame('active', $row['status']);
@@ -264,7 +275,8 @@ final class CustomerSignupRealEngineTest extends TestCase
         // The same address asks again: the request looks like any other, the
         // link says no, and the queue stays empty.
         self::assertSame(202, $this->request('tenant-a', 'turned.away@example.test', 'Turned Away')->getStatusCode());
-        $again = $this->confirm($this->tokenFromMail(1), null);
+        // Mail 1 is the decline (E2); the new link is the latest one.
+        $again = $this->confirm($this->tokenFromMail(count($this->sent) - 1), null);
         self::assertSame(409, $again->getStatusCode());
         self::assertSame('refused', $this->decode($again)['details']['reason']);
         self::assertSame([], $this->decode($this->listRequests(self::TENANT_A, self::ADMIN_A))['data']);
@@ -565,7 +577,15 @@ final class CustomerSignupRealEngineTest extends TestCase
         $this->request('tenant-a', 'second.chance@example.test', 'Second Chance');
         $this->confirm($this->tokenFromMail(0), 'a-long-enough-password');
         $id = (int) $this->decode($this->listRequests(self::TENANT_A, self::ADMIN_A))['data'][0]['id'];
+        $mailsBefore = count($this->sent);
         $this->decide(self::TENANT_A, self::ADMIN_A, $id, false);
+
+        // E2 `join-declined`: told, without an invitation to reply (no workspace address set).
+        $mail = $this->sent[$mailsBefore];
+        self::assertSame('second.chance@example.test', $mail['to']);
+        self::assertStringStartsWith('About your request to join ', $mail['subject']);
+        self::assertStringContainsString("couldn't accept your request to join.", $mail['body']);
+        self::assertStringNotContainsString('reply to this email', $mail['body']);
 
         $rejected = $this->decode($this->admin->listRequests(
             $this->authed(self::TENANT_A, self::ADMIN_A, 'GET', '/api/signup/requests?status=rejected')

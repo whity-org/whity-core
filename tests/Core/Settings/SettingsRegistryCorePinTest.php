@@ -199,6 +199,11 @@ final class SettingsRegistryCorePinTest extends TestCase
             // WS.5, WS.19: the operator's website (global-only).
             'website.plans',
             'website.contact_workspace',
+            // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
+            'signup.mode',
+            'signup.role_id',
+            'signup.allowed_domains',
+            'signup.customer_invites',
         ];
     }
 
@@ -421,6 +426,10 @@ final class SettingsRegistryCorePinTest extends TestCase
             'app.installable' => 'true',
             'website.plans' => '',
             'website.contact_workspace' => '',
+            'signup.mode' => 'off',
+            'signup.role_id' => '0',
+            'signup.allowed_domains' => '[]',
+            'signup.customer_invites' => 'false',
         ];
     }
 
