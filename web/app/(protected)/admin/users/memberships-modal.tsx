@@ -3,7 +3,7 @@
 import { roleLabel } from '@whity/features/roles';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import {

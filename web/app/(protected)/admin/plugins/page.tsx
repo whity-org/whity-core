@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NoAccess } from '@/components/no-access';
 import Link from 'next/link';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { uploadPluginPackage } from '@/lib/api/plugin-upload';
 import { Lottie } from '@whity/ui/lottie';
 import { useToast } from '@/lib/toast-context';

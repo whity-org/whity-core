@@ -6,7 +6,7 @@ import { throwUnlessOk } from '@/lib/forbidden';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';

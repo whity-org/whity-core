@@ -15,7 +15,6 @@
     "test:watch": "jest --watch",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "generate:api": "openapi-typescript ../public/openapi.json -o lib/api/schema.d.ts",
     "tokens:generate": "node ../src/design/tokens/generate-tokens.js",
     "tokens:generate:json": "node ../src/design/tokens/generate-tokens.js json",
     "tokens:generate:dart": "node ../src/design/tokens/generate-tokens.js dart",
@@ -24,6 +23,7 @@
   "dependencies": {
     "@hookform/resolvers": "^7.0.2",
     "@tabler/icons-react": "^3.50.0",
+    "@whity/api-client": "file:../packages/api-client",
     "@whity/features": "file:../packages/features",
     "@whity/ui": "file:../packages/ui",
     "@xyflow/react": "^12.12.1",

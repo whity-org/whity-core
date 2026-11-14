@@ -1,7 +1,7 @@
 import type { Block, PerDocumentPart, SavedBlock } from '@whity/ui/editor/contract';
 import type { DocumentEditorAdapter } from '@whity/features/document-editor';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 /**
  * Saved blocks in the editor (editor M7; E.21-E.24): the web half of

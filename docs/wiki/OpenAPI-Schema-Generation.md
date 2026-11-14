@@ -216,15 +216,20 @@ Tests are in `tests/OpenAPI/` and `tests/Console/`.
 
 The spec is the generation input for the frontend's typed API client:
 
-- `cd web && npm run generate:api` regenerates `web/lib/api/schema.d.ts` from
-  `public/openapi.json` via **openapi-typescript**. The committed file must
-  match a fresh generation — CI fails otherwise (`web` job drift check).
-- `web/lib/api/client.ts` wraps the schema with **openapi-fetch** and
-  preserves the platform auth behavior as middleware: `credentials: 'include'`,
-  the `X-Requested-With` CSRF header (WC-160), and the 401 → silent refresh →
-  single retry flow. The retry bypasses the middleware, so refresh loops are
-  structurally impossible. `web/__tests__/typed-api-client.test.ts` pins this
-  contract.
+- `cd packages/api-client && npm run generate` regenerates
+  `packages/api-client/src/schema.d.ts` from `public/openapi.json` via
+  **openapi-typescript**. The committed file must match a fresh generation —
+  CI fails otherwise (drift check in the `web` job).
+- `@whity/api-client` wraps the schema with **openapi-fetch**: `credentials:
+  'include'`, the `X-Requested-With` CSRF header (WC-160), and the 401 → one
+  shared silent refresh → single retry flow. The retry bypasses the
+  middleware, so refresh loops are structurally impossible.
+- `web/lib/api/client.ts` is a thin wrapper over the package's
+  `createApiClient`: it routes the refresh through the app's cross-tab
+  `refreshSession`, announces a refused refresh, sends a 402 to `/billing` and
+  keeps the last 5xx's reference. `web/__tests__/typed-api-client.test.ts`
+  pins this contract. `apiFetch(url, init)` applies the same rules to the few
+  URLs the spec can't name (plugin routes built at run time).
 - Screens import the singleton: `import { api } from '@/lib/api/client'` and
   call `api.GET('/api/users')`, `api.POST('/api/delegations', { body })`,
   `api.PATCH('/api/users/{id}', { params: { path: { id } }, body })` — request
@@ -233,5 +238,5 @@ The spec is the generation input for the frontend's typed API client:
   (`components['schemas']['Delegation']`) instead of hand-mirroring the API.
 
 Changing an endpoint therefore means: update the handler + `CoreApiSchemas`,
-run `php public/index.php generate:openapi`, then `npm run generate:api`, and
+run `php public/index.php generate:openapi`, then `npm run generate` in `packages/api-client`, and
 commit all three artifacts together.
