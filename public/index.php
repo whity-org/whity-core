@@ -5132,6 +5132,8 @@ $routingNotifications->subscribe($hookManager);
 // "We received it" to a signed-in person who sends a form.
 (new \Whity\Core\Document\Routing\SignRequestEmail($db->getPdo(), $profileEmailRepository, $brandedEmailSender, $frontendUrls->base()))->subscribe($hookManager);
 (new \Whity\Core\Form\FormReceivedEmail($db->getPdo(), $profileEmailRepository, $brandedEmailSender, $settingsService, $frontendUrls->base()))->subscribe($hookManager);
+// E2 `form-decision` (WHIT-1034): the decision, with the final document's PDF (P1) when there is one.
+(new \Whity\Core\Form\FormDecisionEmail($db->getPdo(), $profileEmailRepository, $brandedEmailSender, $settingsService, $frontendUrls->base(), $documentArtifactStore))->subscribe($hookManager);
 
 // THE EFFECT ENGINE (#1032), beside the notifier and for the same reasons.
 //
