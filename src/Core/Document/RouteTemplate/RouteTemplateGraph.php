@@ -7,6 +7,7 @@ namespace Whity\Core\Document\RouteTemplate;
 use InvalidArgumentException;
 use Whity\Core\Document\Routing\RouteQuorum;
 use Whity\Core\Document\Routing\RouteSatisfaction;
+use Whity\Core\Document\Routing\RouteStepExclusions;
 use Whity\Core\Document\Routing\RouteStepInputs;
 use Whity\Core\Document\Routing\RouteStepKind;
 use Whity\Core\Document\Routing\RouteVerdict;
@@ -107,7 +108,7 @@ final class RouteTemplateGraph
      * @param mixed $edges    The raw `edges` value from the request body.
      * @param int   $maxSteps The tenant's effective `documents.routing_max_steps`.
      * @param int   $tenantId Whose design it is, for whether it may end with a final document.
-     * @return array{steps: list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, kind?: ?string, final_template_id?: ?int, inputs: list<array<string, mixed>>, canvas_x: int, canvas_y: int}>, edges: list<array{from: int, to: int, verdict: string}>}
+     * @return array{steps: list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, kind?: ?string, final_template_id?: ?int, inputs: list<array<string, mixed>>, exclude_named_in: list<string>, canvas_x: int, canvas_y: int}>, edges: list<array{from: int, to: int, verdict: string}>}
      */
     public function validate(mixed $steps, mixed $edges, int $maxSteps, int $tenantId = 0): array
     {
@@ -131,7 +132,7 @@ final class RouteTemplateGraph
     }
 
     /**
-     * @return list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, kind?: ?string, final_template_id?: ?int, inputs: list<array<string, mixed>>, canvas_x: int, canvas_y: int}>
+     * @return list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, kind?: ?string, final_template_id?: ?int, inputs: list<array<string, mixed>>, exclude_named_in: list<string>, canvas_x: int, canvas_y: int}>
      */
     private function validateSteps(mixed $steps, int $maxSteps, int $tenantId): array
     {
@@ -320,6 +321,8 @@ final class RouteTemplateGraph
             try {
                 $inputs = RouteStepInputs::parse($step['inputs'] ?? null);
                 RouteStepInputs::assertAllowed($inputs, $satisfiedBy, null);
+                // WHIT-1018: people named in these questions are left out here.
+                $excludeNamedIn = RouteStepExclusions::parse($step['exclude_named_in'] ?? null);
             } catch (InvalidArgumentException $e) {
                 throw RouteTemplateRejectedException::because("Step {$position}: " . $e->getMessage());
             }
@@ -337,6 +340,7 @@ final class RouteTemplateGraph
                 'kind' => null,
                 'final_template_id' => null,
                 'inputs' => $inputs,
+                'exclude_named_in' => $excludeNamedIn,
                 'canvas_x' => self::coordinate($step['canvas_x'] ?? 0, $position, 'canvas_x'),
                 'canvas_y' => self::coordinate($step['canvas_y'] ?? 0, $position, 'canvas_y'),
             ];
@@ -367,7 +371,7 @@ final class RouteTemplateGraph
      * template to render with.
      *
      * @param array<string, mixed> $step
-     * @return array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back: bool, kind: string, final_template_id: ?int, inputs: list<array<string, mixed>>, canvas_x: int, canvas_y: int}
+     * @return array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back: bool, kind: string, final_template_id: ?int, inputs: list<array<string, mixed>>, exclude_named_in: list<string>, canvas_x: int, canvas_y: int}
      */
     private function finaliseStage(array $step, int $position, int $tenantId): array
     {
@@ -387,6 +391,11 @@ final class RouteTemplateGraph
         if (($step['inputs'] ?? []) !== [] && ($step['inputs'] ?? null) !== null) {
             throw RouteTemplateRejectedException::because(
                 "Step {$position} makes the final document. Nobody acts on it, so it cannot ask for values."
+            );
+        }
+        if (($step['exclude_named_in'] ?? []) !== [] && ($step['exclude_named_in'] ?? null) !== null) {
+            throw RouteTemplateRejectedException::because(
+                "Step {$position} makes the final document. It reaches nobody, so it has nobody to leave out."
             );
         }
         $label = $step['label'] ?? null;
@@ -415,6 +424,7 @@ final class RouteTemplateGraph
             'kind' => RouteStepKind::FINALISE,
             'final_template_id' => $templateId,
             'inputs' => [],
+            'exclude_named_in' => [],
             'canvas_x' => self::coordinate($step['canvas_x'] ?? 0, $position, 'canvas_x'),
             'canvas_y' => self::coordinate($step['canvas_y'] ?? 0, $position, 'canvas_y'),
         ];

@@ -202,6 +202,8 @@ export interface RouteStep {
    * forward as `values`. Absent on an older server, which meant none.
    */
   inputs?: RouteStepInput[];
+  /** WHIT-1018: the subject's people questions whose answers this step leaves out. */
+  exclude_named_in?: string[];
 }
 
 /** WHIT-1016: one value a step asks for. */

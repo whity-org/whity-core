@@ -212,6 +212,8 @@ final class RoutingPresenter
             'final_template_id' => isset($step['final_template_id']) ? (int) $step['final_template_id'] : null,
             // WHIT-1016: the values a person letting it through here fills in.
             'inputs' => RouteStepInputs::decode($step['inputs'] ?? null),
+            // WHIT-1018: the subject's people questions whose answers are left out here.
+            'exclude_named_in' => RouteStepExclusions::decode($step['exclude_named_in'] ?? null),
         ];
     }
 

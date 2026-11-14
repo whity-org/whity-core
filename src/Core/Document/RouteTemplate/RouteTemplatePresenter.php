@@ -115,6 +115,8 @@ final class RouteTemplatePresenter
             'final_template_id' => $step['final_template_id'] ?? null,
             // WHIT-1016: the values a person letting it through here fills in.
             'inputs' => $step['inputs'] ?? [],
+            // WHIT-1018: people named in these questions are left out here.
+            'exclude_named_in' => $step['exclude_named_in'] ?? [],
             'canvas_x' => $step['canvas_x'],
             'canvas_y' => $step['canvas_y'],
         ];

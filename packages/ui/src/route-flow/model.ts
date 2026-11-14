@@ -136,6 +136,11 @@ export interface RouteFlowStep {
    * none, so a model that dropped it would empty it on the next save.
    */
   inputs?: RouteFlowStepInput[];
+  /**
+   * WHIT-1018: the form's people questions (such as `supervisor`) whose
+   * answers this stage leaves out. Held for the same reason as {@link inputs}.
+   */
+  excludeNamedIn?: string[];
   canvasX: number;
   canvasY: number;
 }

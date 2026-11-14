@@ -12647,6 +12647,8 @@ export interface components {
                 satisfied_by?: "act" | "delivery";
                 allow_send_back?: boolean;
                 inputs?: components["schemas"]["RouteStepInput"][];
+                /** @description The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this step leaves out: not asked, not counted in the quorum, not printed among the approvals. */
+                exclude_named_in?: string[];
                 /** @enum {string|null} */
                 kind?: "sign" | "finalise" | null;
                 /** @description On a signing step: the capacity the signer signs in, such as "Director". At most 200 characters. */
@@ -12719,6 +12721,7 @@ export interface components {
             sign_on_behalf_of?: string | null;
             final_template_id?: number | null;
             inputs?: components["schemas"]["RouteStepInput"][];
+            exclude_named_in?: string[];
             rejection_count: number;
         };
         DocumentSignature: {
@@ -16653,6 +16656,8 @@ export interface components {
             kind?: "finalise" | null;
             final_template_id?: number | null;
             inputs?: components["schemas"]["RouteStepInput"][];
+            /** @description The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this stage leaves out: not asked, not counted in the quorum, not printed among the approvals. */
+            exclude_named_in?: string[];
             canvas_x?: number;
             canvas_y?: number;
         };

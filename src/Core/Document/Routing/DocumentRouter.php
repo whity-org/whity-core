@@ -349,6 +349,7 @@ final class DocumentRouter
                     $step['sign_on_behalf_of'],
                     $step['final_template_id'],
                     inputs: $step['inputs'],
+                    excludeNamedIn: $step['exclude_named_in'],
                 );
             }
 
@@ -2281,6 +2282,37 @@ final class DocumentRouter
     }
 
     /**
+     * WHIT-1018: leave out the people the subject names in the step's
+     * `exclude_named_in` questions (a project's supervisor, say). They are
+     * never written as recipients, so they are not asked, not counted in the
+     * quorum, and not printed among the approvals. Read from the subject as it
+     * is now, so a supervisor changed on resubmit is the one left out.
+     *
+     * @param array<string, mixed>    $step
+     * @param list<ResolvedRecipient> $resolved
+     * @return list<ResolvedRecipient>
+     */
+    private function withoutNamedPeople(int $tenantId, int $routeId, array $step, array $resolved): array
+    {
+        $keys = RouteStepExclusions::decode($step['exclude_named_in'] ?? null);
+        if ($keys === [] || $resolved === []) {
+            return $resolved;
+        }
+        $route = $this->routes->findById($routeId, $tenantId);
+        $provider = $route !== null ? $this->subjects?->get((string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE)) : null;
+        if (!$provider instanceof RouteSubjectPeopleInterface) {
+            return $resolved;
+        }
+        $subjectId = (int) ($route['subject_id'] ?? $route['document_id'] ?? 0);
+        $named = array_flip($provider->peopleNamedIn($tenantId, $subjectId, $keys));
+
+        return array_values(array_filter(
+            $resolved,
+            static fn (ResolvedRecipient $recipient): bool => !isset($named[$recipient->profileId]),
+        ));
+    }
+
+    /**
      * Ask the step's registered rule who it reaches.
      *
      * A kind nothing registered fails LOUDLY and by name. Migration 112
@@ -2331,7 +2363,7 @@ final class DocumentRouter
         );
 
         try {
-            return $resolver->resolve($context);
+            return $this->withoutNamedPeople($tenantId, $routeId, $step, $resolver->resolve($context));
         } catch (InvalidArgumentException $e) {
             // The rule is telling the caller its config is unusable, in words
             // written for them. Same treatment as authoring-time validation.
@@ -2371,7 +2403,8 @@ final class DocumentRouter
      *                    decision: bool, decision_quorum: ?string, satisfied_by: string,
      *                    allow_send_back: bool, edges: array<string, int>, kind: ?string,
      *                    sign_capacity: ?string, sign_on_behalf_of: ?string,
-     *                    final_template_id: ?int, inputs: list<array<string, mixed>>}>
+     *                    final_template_id: ?int, inputs: list<array<string, mixed>>,
+     *                    exclude_named_in: list<string>}>
      */
     private function validateSteps(int $tenantId, array $steps): array
     {
@@ -2627,6 +2660,8 @@ final class DocumentRouter
             try {
                 $inputs = RouteStepInputs::parse($step['inputs'] ?? null);
                 RouteStepInputs::assertAllowed($inputs, $satisfiedBy, $isSign ? RouteStepKind::SIGN : null);
+                // WHIT-1018: people named in these questions are left out here.
+                $excludeNamedIn = RouteStepExclusions::parse($step['exclude_named_in'] ?? null);
             } catch (InvalidArgumentException $e) {
                 throw RoutingRejectedException::because(sprintf('Step %d: %s', $position, $e->getMessage()));
             }
@@ -2646,6 +2681,7 @@ final class DocumentRouter
                 'sign_on_behalf_of' => $signOnBehalfOf,
                 'final_template_id' => null,
                 'inputs' => $inputs,
+                'exclude_named_in' => $excludeNamedIn,
             ];
         }
 
@@ -2676,7 +2712,7 @@ final class DocumentRouter
      *               decision: bool, decision_quorum: ?string, satisfied_by: string,
      *               allow_send_back: bool, edges: array<string, int>, kind: ?string,
      *               sign_capacity: ?string, sign_on_behalf_of: ?string, final_template_id: ?int,
-     *               inputs: list<array<string, mixed>>}
+     *               inputs: list<array<string, mixed>>, exclude_named_in: list<string>}
      *
      * @throws RoutingRejectedException
      */
@@ -2705,6 +2741,12 @@ final class DocumentRouter
         if (($step['inputs'] ?? []) !== [] && ($step['inputs'] ?? null) !== null) {
             throw RoutingRejectedException::because(sprintf(
                 'Step %d makes the final document. Nobody acts on it, so it cannot ask for values.',
+                $position,
+            ));
+        }
+        if (($step['exclude_named_in'] ?? []) !== [] && ($step['exclude_named_in'] ?? null) !== null) {
+            throw RoutingRejectedException::because(sprintf(
+                'Step %d makes the final document. It reaches nobody, so it has nobody to leave out.',
                 $position,
             ));
         }
@@ -2741,6 +2783,7 @@ final class DocumentRouter
             'sign_on_behalf_of' => null,
             'final_template_id' => $templateId,
             'inputs' => [],
+            'exclude_named_in' => [],
         ];
     }
 

@@ -6380,6 +6380,8 @@ final class CoreApiSchemas
                 'final_template_id' => self::int(true),
                 // WHIT-1016: the values a person letting it through here fills in.
                 'inputs' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepInput')],
+                // WHIT-1018: the subject's people questions whose answers this step leaves out.
+                'exclude_named_in' => ['type' => 'array', 'items' => ['type' => 'string']],
                 // #1037. HOW MANY TIMES A REJECTION HAS SENT THE DOCUMENT BACK
                 // FROM HERE. A backwards reject edge - "to the author, to fix" -
                 // is the most common approval design there is, and nothing
@@ -6520,6 +6522,8 @@ final class CoreApiSchemas
                         'allow_send_back' => self::bool(),
                         // WHIT-1016: values the person letting it through fills in.
                         'inputs' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepInput'), 'maxItems' => 5],
+                        // WHIT-1018.
+                        'exclude_named_in' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 10, 'description' => "The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this step leaves out: not asked, not counted in the quorum, not printed among the approvals."],
                         // WHIT-922: `sign` makes the step a signing step, answered
                         // by signing or declining. Its quorum is `all` (the
                         // default) or `any`; it takes no edges.
@@ -7673,6 +7677,8 @@ final class CoreApiSchemas
                 // WHIT-1016: values the person letting it through fills in. Not
                 // on a delivery or final document stage.
                 'inputs' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepInput'), 'maxItems' => 5],
+                // WHIT-1018: people named in these questions are left out at this stage.
+                'exclude_named_in' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 10, 'description' => "The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this stage leaves out: not asked, not counted in the quorum, not printed among the approvals."],
                 'canvas_x' => self::int(),
                 'canvas_y' => self::int(),
                 // NOT in the required list, unlike `DocumentRouteStep` above.

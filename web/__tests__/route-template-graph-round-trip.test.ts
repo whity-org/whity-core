@@ -37,6 +37,7 @@ describe('the route-template graph round trip', () => {
     satisfied_by: 'act',
     allow_send_back: true,
     inputs: [],
+    exclude_named_in: [],
     canvas_x: 120,
     canvas_y: 40,
     ...overrides,
@@ -68,6 +69,7 @@ describe('the route-template graph round trip', () => {
           { key: 'meeting_no', label: 'Committee meeting number', label_ar: 'رقم جلسة اللجنة', required: true, max_length: 20 },
           { key: 'file_no', label: 'File number', label_ar: null, required: false, max_length: 100 },
         ],
+        exclude_named_in: ['supervisor', 'co_supervisor'],
         canvas_x: 400,
         canvas_y: 220,
       }),
@@ -137,6 +139,15 @@ describe('the route-template graph round trip', () => {
 
     expect(flow.steps[0].inputs).toEqual([]);
     expect(toGraphRequest(flow).steps[0].inputs).toEqual([]);
+  });
+
+  it('keeps who a stage leaves out, and reads a server that sends none as nobody (WHIT-1018)', () => {
+    const saved = toGraphRequest(toFlowGraph(graph([step({ exclude_named_in: ['supervisor'] })])));
+    expect(saved.steps[0].exclude_named_in).toEqual(['supervisor']);
+
+    const legacy = step();
+    delete (legacy as Partial<RouteTemplateStepWire>).exclude_named_in;
+    expect(toGraphRequest(toFlowGraph(graph([legacy]))).steps[0].exclude_named_in).toEqual([]);
   });
 
   it('does not send back the two facts the tenant owns', () => {

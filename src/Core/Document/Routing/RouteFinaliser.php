@@ -91,6 +91,8 @@ final class RouteFinaliser implements RouteFinaliseService
 
     private readonly RouteStepValueRepository $stepValues;
 
+    private readonly RouteApprovals $approvals;
+
     /** @var DocumentIssuing|\Closure(): DocumentIssuing */
     private DocumentIssuing|\Closure $issuing;
 
@@ -125,6 +127,7 @@ final class RouteFinaliser implements RouteFinaliseService
         $this->renderAvailable = $renderAvailable;
         $this->numbering = new DocumentNumbering($db);
         $this->stepValues = new RouteStepValueRepository($db);
+        $this->approvals = new RouteApprovals($db);
     }
 
     /**
@@ -289,6 +292,12 @@ final class RouteFinaliser implements RouteFinaliseService
         $approved = $this->approvedVersion($tenantId, $row);
         $values = $this->sharedValues($tenantId)
             + $this->routeValues($tenantId, (int) $row['route_id'])
+            // WHIT-1018: who approved, a table row each.
+            + $this->approvals->values(
+                $tenantId,
+                (int) $row['route_id'],
+                ($source['lang'] ?? 'en') === 'ar' ? 'تمت الموافقة' : 'Approved',
+            )
             + $provider->finalValues($tenantId, $subjectId, $approved, (string) ($source['lang'] ?? 'en'), $templateVersion);
         $actor = ActingAs::engine($tenantId);
 
