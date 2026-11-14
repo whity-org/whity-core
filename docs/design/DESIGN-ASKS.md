@@ -1,5 +1,7 @@
 # Design asks for the brand team
 
+**Answered by design 3.4 (14 Nov 2026).** Every ask below now has a card: WHIT-821, 826, 827, 828, 829, 830, 906, 915, 939, 945, 946 and 1006 are closed, with the card for each in `IMPLEMENTATION-NOTES.md`, "Design asks 3.4 answers". The list stays as the record of what was asked.
+
 Screens the app needs that have no card in `components/` and aren't drawn in the app map. Owner rule (31 Oct 2026): don't invent layouts beyond the existing patterns. Each ask goes to the brand team through the owner. Meanwhile the screen is built from existing components behind a seam (one layout or card component), so the design can drop in later.
 
 Every ask needs both languages (English and Arabic, RTL) and both themes, and follows the register: tokens only, Noto Sans at 14px, one filled main button, dashed for "not happened yet".
