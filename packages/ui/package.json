@@ -114,6 +114,7 @@
     "./menu-bar": "./src/menu-bar.tsx",
     "./money/currency": "./src/money/currency.ts",
     "./page-header": "./src/page-header.tsx",
+    "./phone-tab-bar": "./src/phone-tab-bar.tsx",
     "./page-shell": "./src/page-shell.tsx",
     "./pagination": "./src/pagination.tsx",
     "./plugin-card": "./src/plugin-card.tsx",
