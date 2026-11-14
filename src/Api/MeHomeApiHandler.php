@@ -8,6 +8,7 @@ use PDO;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\SettingsRegistry;
+use Whity\Core\Settings\TenantSettingsRepository;
 use Whity\Core\Tenant\TenantContext;
 
 /**
@@ -154,19 +155,10 @@ final class MeHomeApiHandler
     /** @param list<string> $keys Whether this workspace itself gave any of these a value. */
     private function settingSet(int $tenantId, array $keys): bool
     {
-        $names = [];
-        $params = [':tenant_id' => $tenantId];
-        foreach ($keys as $i => $key) {
-            $names[] = ":key{$i}";
-            $params[":key{$i}"] = $key;
-        }
-        $stmt = $this->db->prepare(
-            'SELECT value FROM tenant_settings WHERE tenant_id = :tenant_id AND setting_key IN (' . implode(', ', $names) . ')'
-        );
-        $stmt->execute($params);
-        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $value) {
+        foreach ((new TenantSettingsRepository($this->db))->valuesFor($tenantId, $keys) as $value) {
             // Stored as JSON: an empty string and null both mean nothing is set.
-            $text = trim((string) $value, " \"\t\r\n");
+            $text = trim($value, " \"	
+");
             if ($text !== '' && $text !== 'null') {
                 return true;
             }
