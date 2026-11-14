@@ -8449,9 +8449,10 @@ final class CoreApiSchemas
             // "this profile at this resource" grant.
             'ResourceRoleGrant' => self::object([
                 'id' => self::int(),
+                'resource_id' => self::int(),
                 'role_id' => self::int(),
                 'profile_id' => self::int(true),
-            ], ['id', 'role_id', 'profile_id']),
+            ], ['id', 'resource_id', 'role_id', 'profile_id']),
             'ResourceRoleGrantListResponse' => self::listEnvelope('ResourceRoleGrant'),
             'ResourceRoleGrantCreateRequest' => self::object([
                 'resource_type' => self::str(),
@@ -17577,22 +17578,37 @@ final class CoreApiSchemas
     private static function resourceRoleGrantRoutes(): array
     {
         return [
-            self::permissionRoute('GET', '/api/resource-role-grants', 'roles:read', [
-                'summary' => 'List the role grants addressed at one resource',
-                'description' => 'Returns both grant shapes: a null `profile_id` is the '
-                    . '"everyone at this resource" grant, a set `profile_id` grants to that one profile. '
-                    . 'Always scoped to the caller\'s tenant, so a resource belonging to another tenant '
-                    . 'yields an empty list rather than an error.',
-                'tags' => ['rbac'],
-                'parameters' => [
-                    self::queryParam('resource_type', 'string', 'A registered resource type (e.g. `ou`, `acme:record`)', true),
-                    self::queryParam('resource_id', 'integer', 'The record the grants are addressed at', true),
+            [
+                'method' => 'GET',
+                'path' => '/api/resource-role-grants',
+                'requiredRole' => null,
+                // Checked in the handler: your own grants (profile_id = you) need
+                // no permission; every other read needs roles:read.
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'List the role grants at one resource, or made to one profile',
+                    'description' => 'With `resource_id`: the grants at that record, in both shapes: a null '
+                        . '`profile_id` is the "everyone at this resource" grant, a set `profile_id` grants to '
+                        . 'that one profile. With `profile_id` instead: the grants of this type made to that '
+                        . 'profile by name, which are the records they stand at. Everyone-grants are left out '
+                        . 'there, because on their own they give nobody access. Pass one of the two, not both. '
+                        . 'Anyone may list their own grants (`profile_id` = their own profile); listing '
+                        . 'another person\'s, or the grants at a resource, needs `roles:read`. '
+                        . 'Always scoped to the caller\'s tenant, so another tenant\'s resource or profile '
+                        . 'yields an empty list rather than an error.',
+                    'tags' => ['rbac'],
+                    'parameters' => [
+                        self::queryParam('resource_type', 'string', 'A registered resource type (e.g. `ou`, `acme:record`)', true),
+                        self::queryParam('resource_id', 'integer', 'The record the grants are addressed at. Required unless profile_id is given', false),
+                        self::queryParam('profile_id', 'integer', 'List the grants made to this profile by name instead', false),
+                    ],
+                    'responses' => [
+                        200 => self::jsonResponse('The grants', 'ResourceRoleGrantListResponse'),
+                        403 => self::errorResponse('Listing another person\'s grants, or the grants at a resource, without roles:read'),
+                        422 => self::errorResponse('resource_type is unregistered, neither or both of resource_id and profile_id were given, or one is invalid'),
+                    ] + self::authErrors(),
                 ],
-                'responses' => [
-                    200 => self::jsonResponse('The grants at this resource', 'ResourceRoleGrantListResponse'),
-                    422 => self::errorResponse('resource_type is unregistered, or resource_id is missing/invalid'),
-                ] + self::authErrors(),
-            ]),
+            ],
             self::permissionRoute('POST', '/api/resource-role-grants', 'roles:manage', [
                 'summary' => 'Grant a role at one resource (idempotent)',
                 'description' => 'Granting a role that is already granted at that resource is a SUCCESS '
