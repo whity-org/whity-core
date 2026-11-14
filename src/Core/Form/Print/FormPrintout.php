@@ -80,14 +80,16 @@ final class FormPrintout
         $content[] = ['type' => 'formTitle', 'title' => $title, 'byline' => $byline];
 
         $atTop = in_array($this->style['decision'], ['topAndEnd', 'top'], true);
-        $atEnd = in_array($this->style['decision'], ['topAndEnd', 'end'], true);
+        // The full block is the certificate: only once there is a decision.
+        $decided = $decision !== null && in_array($decision['status'], ['approved', 'rejected'], true);
+        $atEnd = $decided && in_array($this->style['decision'], ['topAndEnd', 'end'], true);
         $office = $this->officeItems($reference, $in['submission']['submittedAt'] ?? null, $decision);
         if ($this->style['officeDetails'] === 'strip') {
             $content[] = ['type' => 'officeStrip', 'title' => $t->get('officeStrip'), 'items' => array_slice($office, 0, 4)];
             if ($atTop && $decision !== null) {
                 $content[] = $this->decisionLine($decision, [], $atEnd);
             }
-        } elseif ($atTop || $decision === null) {
+        } elseif ($atTop || !$decided) {
             $content[] = $this->decisionLine($decision, array_values(array_filter($office, static fn (array $i): bool => !isset($i['status']))), $atEnd && $decision !== null);
         }
 
