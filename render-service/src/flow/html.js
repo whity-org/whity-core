@@ -34,7 +34,9 @@ const path = require('node:path');
 const ASSET_DIR = path.join(__dirname, 'assets');
 
 /** Read once at module load — these are shipped files, not user input. */
-const FLOW_CSS = fs.readFileSync(path.join(ASSET_DIR, 'flow.css'), 'utf8');
+// form.css (design 3.4) styles only classes the form printout blocks emit.
+const FLOW_CSS = fs.readFileSync(path.join(ASSET_DIR, 'flow.css'), 'utf8')
+  + '\n' + fs.readFileSync(path.join(ASSET_DIR, 'form.css'), 'utf8');
 const PAGINATE_JS = fs.readFileSync(path.join(ASSET_DIR, 'paginate.js'), 'utf8');
 /* The SAME module this file uses for its own escaping and isolation, shipped
  * into the page so the paginator's generated front matter and running heads
@@ -52,6 +54,7 @@ const DEFAULT_FONT_STACK =
   "'Noto Sans', 'Noto Sans Arabic', 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif";
 
 const { escapeHtml, isolateForeignRuns } = require('./bidi');
+const { renderFormBlock } = require('./form');
 const { QR_SIZE_MM, MAX_FIELD_BOXES, MAX_ANSWER_LINES, BARCODE_SYMBOLOGIES } = require('./document');
 
 /* The one barcode encoder in this service: the verification code and every
@@ -446,7 +449,30 @@ function renderLetterhead(block, direction) {
     const lines = (part.lines || []).map((l) => `<div class="flow-letterhead-line">${isolateForeignRuns(l, direction)}</div>`).join('');
     return `<div class="${cls}">${image}${name}${title}${lines}</div>`;
   };
+  // 3.4 (`letterhead.layout`): centred stacks the start side's parts in the
+  // middle; bilingual puts the start side, the logo, then the Arabic side.
+  if (block.layout === 'centred') {
+    return `${unitOpen(block, 'letterhead', 'flow-letterhead-centred')}${side(block.start, 'flow-letterhead-start')}${block.end ? side(block.end, 'flow-letterhead-end') : ''}</div>`;
+  }
+  if (block.layout === 'bilingual') {
+    const start = block.start || {};
+    const logo = start.image ? side({ image: start.image }, 'flow-letterhead-mid') : '<div class="flow-letterhead-mid"></div>';
+    const latin = side({ name: start.name, lines: start.lines }, 'flow-letterhead-start');
+    const alt = block.alt ? side({ name: block.alt.name, lines: block.alt.lines }, 'flow-letterhead-alt') : '<div></div>';
+    return `${unitOpen(block, 'letterhead', 'flow-letterhead-bilingual')}${latin}${logo}${alt.replace('<div class="flow-letterhead-alt">', '<div class="flow-letterhead-alt" dir="rtl" lang="ar">')}</div>`;
+  }
   return `${unitOpen(block, 'letterhead')}${side(block.start, 'flow-letterhead-start')}${side(block.end, 'flow-letterhead-end')}</div>`;
+}
+
+/** The SVG of a QR code, or '' when it can't be encoded (see renderQr). */
+function qrSvg(value) {
+  try {
+    return bwipjs.toSVG({ bcid: 'qrcode', text: value, eclevel: 'M', scale: 3, includetext: false });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[whity_render] verification code could not be encoded:', err && err.message ? err.message : err);
+    return '';
+  }
 }
 
 function renderBlock(block, direction) {
@@ -494,6 +520,16 @@ function renderBlock(block, direction) {
       return renderMath(block);
     case 'pageBreak':
       return '<div class="flow-page-break" data-flow-unit="pageBreak"></div>';
+    case 'formTitle':
+    case 'formSection':
+    case 'formQuestion':
+    case 'notice':
+    case 'signatureRow':
+    case 'decisionLine':
+    case 'decisionBlock':
+    case 'approvals':
+    case 'officeStrip':
+      return renderFormBlock(block, direction, (value) => `<div class="ff-qr">${qrSvg(value)}</div>`);
     case 'spacer':
       return `<div class="flow-spacer" data-flow-unit="spacer" style="height:${mm(Number(block.heightMm) || 5)}"></div>`;
     default:
@@ -532,13 +568,25 @@ function buildFlowHtml(doc) {
   // header/footer templates, the front-matter spec, and the cross-reference
   // index. The index carries anchor ids only — the page numbers it will be
   // printed with do not exist yet.
+  // FP.10: a running band's QR is drawn here, where the encoder is, and
+  // handed to the paginator as finished SVG markup.
+  const withQr = (spec) => {
+    if (!spec) return spec;
+    const out = { ...spec };
+    for (const key of ['start', 'center', 'end']) {
+      if (out[key] && typeof out[key] === 'object' && out[key].qr) {
+        out[key] = { ...out[key], qr: { svg: qrSvg(out[key].qr.value) } };
+      }
+    }
+    return out;
+  };
   const bootData = {
     page: doc.page,
     direction: doc.direction,
     labels: doc.labels,
     title: doc.title,
-    header: doc.header,
-    footer: doc.footer,
+    header: withQr(doc.header),
+    footer: withQr(doc.footer),
     frontMatter: doc.frontMatter,
     index: doc.index,
   };
