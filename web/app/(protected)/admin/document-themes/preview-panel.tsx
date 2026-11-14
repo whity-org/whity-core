@@ -162,24 +162,26 @@ export function PaperMock({
     <div
       role="img"
       aria-label={t('themes.mock.label', 'An example first page of a form printout in your print colour')}
-      className="light flex aspect-[210/297] w-full flex-col gap-1.5 rounded-card border border-border bg-card p-4 text-foreground text-[10px] leading-snug"
-      style={style}
+      className="light flex aspect-[210/297] w-full flex-col gap-1.5 rounded-card border border-border bg-card p-4 text-foreground leading-snug"
+      // A picture of a printed page (role="img"), drawn at the sheet's scale
+      // from one base size, as the card draws it; not text read on screen.
+      style={{ ...style, fontSize: 10 }}
     >
       <div className="flex items-start justify-between border-b border-border pb-2">
         <div className="grid">
           <span className="font-semibold">{workspaceName}</span>
-          <span className="text-muted-foreground text-[8px]">{t('themes.mock.unit', 'Purchasing')}</span>
+          <span className="text-muted-foreground text-[0.8em]">{t('themes.mock.unit', 'Purchasing')}</span>
         </div>
-        <span className="grid size-6 place-items-center rounded-md bg-(--print) font-semibold text-[9px] text-card">{initials}</span>
+        <span className="grid size-6 place-items-center rounded-md bg-(--print) font-semibold text-[0.9em] text-card">{initials}</span>
       </div>
-      <span className="mt-2 font-semibold text-(--print) text-[15px]">{t('themes.mock.title', 'Supplier application')}</span>
-      <div className="flex flex-wrap gap-2.5 border-y border-y-border py-1 text-[9px]">
+      <span className="mt-2 font-semibold text-(--print) text-[1.5em]">{t('themes.mock.title', 'Supplier application')}</span>
+      <div className="flex flex-wrap gap-2.5 border-y border-y-border py-1 text-[0.9em]">
         <span className="font-semibold text-success-text">✓ {t('themes.mock.approved', 'Approved')}</span>
         <span dir="ltr">SUP-2026-031</span>
         <span className="text-muted-foreground">{t('themes.mock.received', 'Received 4 Nov')}</span>
       </div>
       <SectionHeading style={sectionStyle} title={t('themes.mock.section', 'Company')} />
-      <div className={twoColumns ? 'grid grid-cols-[40%_1fr] gap-1.5 text-[9px]' : 'grid gap-0.5 text-[9px]'}>
+      <div className={twoColumns ? 'grid grid-cols-[40%_1fr] gap-1.5 text-[0.9em]' : 'grid gap-0.5 text-[0.9em]'}>
         {answers.map(([q, a]) => (
           <div key={q} className="contents">
             <span className="font-semibold">{q}</span>
@@ -192,7 +194,7 @@ export function PaperMock({
           <i key={i} className="block h-px bg-border" />
         ))}
       </div>
-      <div className="mt-auto flex gap-2 border-t border-border pt-1 text-muted-foreground text-[8px]">
+      <div className="mt-auto flex gap-2 border-t border-border pt-1 text-muted-foreground text-[0.8em]">
         <span dir="ltr">SUP-2026-031</span>
         <span>{t('themes.mock.page', 'Page 1 of 2')}</span>
         <span className="ms-auto rounded-sm border border-border px-1">{t('themes.mock.mark', 'Food safety certified')}</span>
@@ -203,19 +205,19 @@ export function PaperMock({
 
 /** Section 1 under the chosen heading style (FP.4). */
 function SectionHeading({ style, title }: { style: string; title: string }) {
-  const heading = <span className="font-semibold text-[13px]">{title}</span>;
+  const heading = <span className="font-semibold text-[1.3em]">{title}</span>;
   switch (style) {
     case 'number':
       return (
         <div className="mt-1.5 flex items-baseline gap-2 border-b border-border pb-1">
-          <span className="font-semibold text-(--print) text-[15px]">1</span>
+          <span className="font-semibold text-(--print) text-[1.5em]">1</span>
           {heading}
         </div>
       );
     case 'eyebrow':
       return (
         <div className="mt-1.5 grid border-b border-border pb-1">
-          <span className="font-mono text-(--print) text-[8.5px]" dir="ltr">SECTION 01 OF 03</span>
+          <span className="font-mono text-(--print) text-[0.85em]" dir="ltr">SECTION 01 OF 03</span>
           {heading}
         </div>
       );
@@ -233,7 +235,7 @@ function SectionHeading({ style, title }: { style: string; title: string }) {
     case 'tab':
       return (
         <div className="mt-1.5 grid justify-items-start gap-1 border-b-2 border-(--print) pb-1">
-          <span className="rounded-t-[5px] bg-(--print-tint) px-1.5 font-mono text-(--print) text-[8.5px]" dir="ltr">SECTION 1</span>
+          <span className="rounded-t-[5px] bg-(--print-tint) px-1.5 font-mono text-(--print) text-[0.85em]" dir="ltr">SECTION 1</span>
           {heading}
         </div>
       );

@@ -24,7 +24,7 @@ export function printVars(accent: string): React.CSSProperties {
 const PREVIEWS: Record<string, () => React.ReactNode> = {
   number: () => <span className="font-semibold text-(--print) text-base">4</span>,
   mark: () => <MarkPreview n="4" />,
-  eyebrow: () => <span className="font-mono text-(--print) text-[10px]">04 / 09</span>,
+  eyebrow: () => <span className="font-mono text-(--print) text-[1em]">04 / 09</span>,
   rail: () => (
     <span className="flex gap-0.5" aria-hidden="true">
       {[0, 1, 2, 3, 4].map((i) => (
@@ -33,7 +33,7 @@ const PREVIEWS: Record<string, () => React.ReactNode> = {
     </span>
   ),
   tab: () => (
-    <span className="rounded-t-[5px] border-b-2 border-(--print) bg-(--print-tint) px-1.5 py-0.5 font-mono text-(--print) text-[9px]">
+    <span className="rounded-t-[5px] border-b-2 border-(--print) bg-(--print-tint) px-1.5 py-0.5 font-mono text-(--print) text-[0.9em]">
       SECTION 4
     </span>
   ),
@@ -47,7 +47,7 @@ export function MarkPreview({ n, size = 22 }: { n: string; size?: number }) {
     <span className="relative inline-block shrink-0" style={{ width: size, height: size }} aria-hidden="true">
       <i className="absolute start-0 top-0 rounded-[5px] bg-(--print)" style={{ width: square, height: square }} />
       <i
-        className="absolute end-0 bottom-0 grid place-items-center rounded-[5px] border-2 border-(--print) bg-card font-semibold not-italic text-(--print) text-[9px]"
+        className="absolute end-0 bottom-0 grid place-items-center rounded-[5px] border-2 border-(--print) bg-card font-semibold not-italic text-(--print) text-[0.9em]"
         style={{ width: square, height: square }}
       >
         {n}
@@ -134,7 +134,8 @@ export function SectionHeadingPicker({
                 locked && !selected && 'opacity-50'
               )}
             >
-              <span className="flex h-6 items-center" aria-hidden="true">
+              {/* A miniature of the printed heading, at the sheet's scale. */}
+              <span className="flex h-6 items-center" aria-hidden="true" style={{ fontSize: 10 }}>
                 {Preview ? <Preview /> : null}
               </span>
               <span className="inline-flex items-center gap-1">
