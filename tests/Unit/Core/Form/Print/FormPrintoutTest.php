@@ -203,7 +203,7 @@ final class FormPrintoutTest extends TestCase
         $titles = array_column(self::blocks($payload, 'formSection'), 'title');
         self::assertContains('For official use', $titles);
         $dean = array_values(array_filter(self::blocks($payload, 'formQuestion'), static fn (array $q): bool => $q['text'] === 'Dean’s recommendation'))[0];
-        self::assertSame([['label' => 'Decision', 'value' => 'Recommend approval'], ['label' => 'By', 'value' => 'Prof. Ahmad Odeh'], ['label' => 'Date', 'value' => '6 Nov 2026']], $dean['answer']['items']);
+        self::assertSame([['label' => 'Answer', 'value' => 'Recommend approval'], ['label' => 'By', 'value' => 'Prof. Ahmad Odeh'], ['label' => 'Date', 'value' => '6 Nov 2026']], $dean['answer']['items']);
     }
 
     public function testAFreeWorkspacePrintsTheStandardLayoutWhateverItsThemeSays(): void
@@ -251,5 +251,24 @@ final class FormPrintoutTest extends TestCase
     {
         self::assertSame(4, FormPrintout::words('Sleep isn’t optional, really.'));
         self::assertSame(3, FormPrintout::words('دراسة النوم والامتحانات'));
+    }
+
+    public function testALabelsOwnNumberIsUsedAndAnUntitledSectionReadsAsWords(): void
+    {
+        self::assertSame(['1.1', 'Project title'], FormPrintout::numbered('1.1 Project title'));
+        self::assertSame(['9', 'Attached: Research Proposal Document'], FormPrintout::numbered('9. Attached: Research Proposal Document'));
+        self::assertSame([null, '2026 budget'], FormPrintout::numbered('2026 budget'), 'a year is not a question number');
+        self::assertSame([null, 'Project title'], FormPrintout::numbered('Project title'));
+
+        $out = (new FormPrintout())->build([
+            'lang' => 'en', 'style' => FormPrintStyle::resolve(null, true), 'workspace' => ['name' => 'W'],
+            'form' => ['title' => 'F', 'sections' => [['key' => 'project_details', 'title' => [], 'description' => []]], 'fields' => [[
+                'field_key' => 'title', 'field_type' => 'text', 'label' => ['en' => '1.1 Project title'], 'is_required' => true, 'section_key' => 'project_details',
+            ]]],
+            'answers' => ['title' => 'Sleep'], 'submission' => [],
+        ]);
+        self::assertSame('Project details', self::blocks($out, 'formSection')[0]['title']);
+        $q = self::blocks($out, 'formQuestion')[0];
+        self::assertSame(['1.1', 'Project title'], [$q['number'], $q['text']]);
     }
 }

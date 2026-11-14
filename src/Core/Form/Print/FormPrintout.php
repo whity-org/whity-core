@@ -361,7 +361,8 @@ final class FormPrintout
             $known[$key] = true;
             $out[] = [
                 'key' => $key,
-                'title' => $this->t->pick($section['title'] ?? null) ?: $key,
+                // A section with no title prints its key as words ("project_details": "Project details").
+                'title' => $this->t->pick($section['title'] ?? null) ?: self::humanise($key),
                 'description' => $this->t->pick($section['description'] ?? null),
                 'fields' => $byKey[$key] ?? [],
             ];
@@ -498,7 +499,10 @@ final class FormPrintout
     private function question(string $number, array $field, mixed $answer): array
     {
         $t = $this->t;
-        $block = ['type' => 'formQuestion', 'number' => $number, 'text' => mb_substr($t->pick($field['label'] ?? null) ?: (string) $field['field_key'], 0, 600)];
+        [$own, $text] = self::numbered($t->pick($field['label'] ?? null) ?: (string) $field['field_key']);
+        // A label that carries its own number ("1.1 Project title", as forms
+        // copied from a paper original do) prints with that number.
+        $block = ['type' => 'formQuestion', 'number' => $own ?? $number, 'text' => mb_substr($text, 0, 600)];
         $guidance = $t->pick($field['help_text_i18n'] ?? null) ?: (string) ($field['help_text'] ?? '');
         if (!($field['is_required'] ?? false) && $this->isBlank($answer)) {
             $guidance = trim($guidance . ' ' . $t->get('optional'));
@@ -682,7 +686,7 @@ final class FormPrintout
         $content[] = $this->sectionHeading('i', $t->get('officeUse'), null);
         foreach ($fields as $field) {
             $entry = $office[(string) $field['field_key']] ?? null;
-            $label = mb_substr($t->pick($field['label'] ?? null) ?: (string) $field['field_key'], 0, 600);
+            $label = mb_substr(self::numbered($t->pick($field['label'] ?? null) ?: (string) $field['field_key'])[1], 0, 600);
             if ($entry === null || $this->isBlank($entry['value'])) {
                 $content[] = ['type' => 'formQuestion', 'number' => '', 'text' => $label, 'answer' => ['kind' => 'empty', 'text' => $t->get('notAnswered')]];
                 continue;
@@ -699,7 +703,7 @@ final class FormPrintout
                 $content[] = ['type' => 'formQuestion', 'number' => '', 'text' => $label, 'answer' => $answer];
                 continue;
             }
-            $items = [['label' => $t->get('decision'), 'value' => mb_substr($value, 0, 500)]];
+            $items = [['label' => $t->get('answer'), 'value' => mb_substr($value, 0, 500)]];
             if (($entry['by'] ?? '') !== '') {
                 $items[] = ['label' => $t->get('by'), 'value' => (string) $entry['by']];
             }
@@ -802,6 +806,27 @@ final class FormPrintout
     private function optionLabel(array $option): string
     {
         return $this->t->pick($option['label'] ?? null) ?: (string) ($option['value'] ?? '');
+    }
+
+    /**
+     * A label's own leading number, and the label without it.
+     *
+     * @return array{0: ?string, 1: string}
+     */
+    public static function numbered(string $label): array
+    {
+        if (preg_match('/^\s*(\d{1,3}(?:\.\d{1,3}){0,3})\.?\s+(\S.*)$/su', $label, $m) === 1) {
+            return [$m[1], trim($m[2])];
+        }
+
+        return [null, $label];
+    }
+
+    private static function humanise(string $key): string
+    {
+        $words = trim(str_replace(['_', '-'], ' ', $key));
+
+        return $words === '' ? $key : mb_strtoupper(mb_substr($words, 0, 1)) . mb_substr($words, 1);
     }
 
     /** Words as a reader counts them: runs of letters and digits, in any script. */
