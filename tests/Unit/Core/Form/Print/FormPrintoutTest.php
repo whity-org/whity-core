@@ -181,6 +181,14 @@ final class FormPrintoutTest extends TestCase
         self::assertSame('No drawn signature', $none['noDrawing']);
     }
 
+    public function testAStoredDrawingPrintsAsPathData(): void
+    {
+        $answer = ['name' => 'Ibrahim Mansour', 'signed_at' => '2026-11-02T11:05:00Z', 'drawing' => ['width' => 480, 'height' => 160, 'strokes' => [[[10, 40], [40, 10.5]], [[200, 80]]]]];
+        $row = self::blocks($this->build([], ['pi_sign' => $answer]), 'signatureRow')[0];
+
+        self::assertSame(['viewBox' => [480, 160], 'paths' => ['M10 40 L40 10.5', 'M200 80 l0.1 0']], $row['drawing']);
+    }
+
     public function testTheDecisionApprovalsAndNotCounted(): void
     {
         $payload = $this->build();

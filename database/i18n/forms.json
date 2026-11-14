@@ -309,6 +309,8 @@
         "field.removeRow": "Remove row",
         "field.row": "Row {number}",
         "field.signatureNote": "Typing your full name here counts as your signature. The time is recorded when you send this form.",
+        "field.signatureDraw": "Draw your signature (optional)",
+        "field.signatureDrawNote": "With a finger, a pen or the mouse. It prints beside your name on the form’s record.",
         "field.tooManyFiles": "You can attach up to {max} files here.",
         "field.uploadFailed": "That file could not be uploaded. Please try again.",
         "field.uploading": "Uploading…",

@@ -9,6 +9,7 @@ import { useState, type ReactNode } from 'react';
 import { Button } from '@whity/ui/button';
 import { Input } from '@whity/ui/input';
 import { useTranslation } from '@whity/features/i18n';
+import { SignaturePad, type SignatureAppearance } from '@/components/documents/signature-drawing';
 import type { Answer, FileUploader, FormFieldSpec, LocalizedText } from '@/components/forms/form-fields';
 
 export interface TableColumn {
@@ -169,28 +170,38 @@ export function RepeatingField({
 }
 
 /**
- * A typed signature. The answer holds only the name: the time is the server's, so
- * this page has nothing to say about when it was signed.
+ * A signature: the typed name, and (design 3.4, FP.7) the signature drawn on a
+ * touch screen, which the printout shows beside "Confirmed in Whity". Drawing is
+ * optional, so nobody without a pointer is stuck; the time is the server's.
  */
 export function SignatureField({
   id,
   required,
   value,
+  drawing,
   onChange,
 }: {
   id: string;
   required: boolean;
   value: string;
-  onChange: (name: string) => void;
+  drawing?: SignatureAppearance | null;
+  onChange: (name: string, drawing: SignatureAppearance | null) => void;
 }) {
   const t = useTranslation('forms');
 
   return (
     <div className="space-y-1.5">
-      <Input id={id} type="text" aria-required={required} autoComplete="name" value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input id={id} type="text" aria-required={required} autoComplete="name" value={value} onChange={(event) => onChange(event.target.value, drawing ?? null)} />
       <p className="text-xs text-muted-foreground">
         {t('field.signatureNote', 'Typing your full name here counts as your signature. The time is recorded when you send this form.')}
       </p>
+      <div className="space-y-1.5 pt-2">
+        <p className="text-sm font-medium">{t('field.signatureDraw', 'Draw your signature (optional)')}</p>
+        <SignaturePad value={drawing ?? null} onChange={(next) => onChange(value, next)} />
+        <p className="text-xs text-muted-foreground">
+          {t('field.signatureDrawNote', 'With a finger, a pen or the mouse. It prints beside your name on the form’s record.')}
+        </p>
+      </div>
     </div>
   );
 }

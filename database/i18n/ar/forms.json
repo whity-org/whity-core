@@ -310,6 +310,8 @@
         "field.removeRow": "إزالة الصف",
         "field.row": "الصف {number}",
         "field.signatureNote": "كتابة اسمك الكامل هنا تُعد توقيعًا منك. يُسجَّل الوقت عند إرسال هذا النموذج.",
+        "field.signatureDraw": "ارسم توقيعك (اختياري)",
+        "field.signatureDrawNote": "بإصبعك أو بقلم أو بالفأرة. يُطبع بجانب اسمك في سجل النموذج.",
         "field.tooManyFiles": "يمكنك إرفاق {max} ملفات كحد أقصى هنا.",
         "field.uploadFailed": "تعذّر رفع هذا الملف. يرجى المحاولة مرة أخرى.",
         "field.uploading": "جارٍ الرفع…",

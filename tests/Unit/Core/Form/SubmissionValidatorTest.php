@@ -368,4 +368,31 @@ final class SubmissionValidatorTest extends TestCase
         $this->expectException(FormRejectedException::class);
         SubmissionValidator::validate($fields, ['notes' => '   ']);
     }
+
+    /** Design 3.4 (FP.7): a signature may carry the strokes drawn on a touch screen. */
+    public function testASignatureKeepsItsDrawingAndRefusesAScribble(): void
+    {
+        $fields = [self::field('pi_sign', FieldType::SIGNATURE)];
+        $drawing = ['width' => 480, 'height' => 160, 'strokes' => [[[10, 40], [40, 10], [60.04, 10], [80, 40], [150, 30]]]];
+
+        $result = SubmissionValidator::validate($fields, ['pi_sign' => ['name' => 'Dr Ahmad Khalil', 'drawing' => $drawing]]);
+        self::assertSame('Dr Ahmad Khalil', $result['values']['pi_sign']['name']);
+        self::assertSame([[10.0, 40.0], [40.0, 10.0], [60.0, 10.0], [80.0, 40.0], [150.0, 30.0]], $result['values']['pi_sign']['drawing']['strokes'][0]);
+
+        $typed = SubmissionValidator::validate($fields, ['pi_sign' => ['name' => 'Awss Haddad']]);
+        self::assertArrayNotHasKey('drawing', $typed['values']['pi_sign'], 'drawing stays optional');
+
+        $this->expectException(FormRejectedException::class);
+        SubmissionValidator::validate($fields, ['pi_sign' => ['name' => 'A', 'drawing' => ['width' => 480, 'height' => 160, 'strokes' => [[[1, 1]]]]]]);
+    }
+
+    /** Design 3.4 (FP.8): a long answer may be limited in words. */
+    public function testALongAnswerOverItsWordLimitIsRefused(): void
+    {
+        $fields = [self::field('aims', FieldType::TEXTAREA, ['validation' => ['maxWords' => 3]])];
+        self::assertSame('Three words only', SubmissionValidator::validate($fields, ['aims' => 'Three words only'])['values']['aims']);
+
+        $this->expectException(FormRejectedException::class);
+        SubmissionValidator::validate($fields, ['aims' => 'Four words are too many']);
+    }
 }
