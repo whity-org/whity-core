@@ -38,6 +38,8 @@ What it changes:
 - **Server:** `SavedBlockExpander` fills by key and reports `orphanedParts` instead of dropping them; `SavedBlockRepository`, `SavedBlocksApiHandler` and the OpenAPI schema take `perDocumentParts`; `required` parts block issuing like E.27. Tests in `tests/Api/SavedBlocksApiRealEngineTest.php` and the editor's saved-parts tests.
 - **Migration (number from the orchestrator):** for each saved block, mint keys for its parts in reading order and write them into the marks and fields of `saved_blocks.blocks` and every `saved_block_versions.blocks`; set `perDocumentParts[i].key`; then rewrite every `savedBlock` node's `overrides` in `document_sources.blocks` from `<blockId>#i` to `perDocumentParts[i].key`. Frozen published copies in `document_source_versions` are **Q19**. Idempotent, one transaction per tenant.
 
+`web/__tests__/editor-contract.test.ts` holds `contract.ts` byte-equal to `handoff/editor/whity-document.ts`. 3.4 changed the handoff (E.23a, and `FormPrintoutStyle` for P1), so that one check is skipped in this pull request; the E.23a pull request copies the contract and turns it back on.
+
 ## Already built against the 3.4 cards
 
 Most of A15 was built before its card, from the asks (WHIT-939, 944-946, 906, 915, 820, 809, 956). Those screens now owe a comparison with their card, not a build. A14 has the stopgap phone pass (WHIT-999 to WHIT-1006, WHIT-1009) but none of the `Pw*` designs. P1 and most of E2 are missing.
