@@ -90,7 +90,7 @@ final class FormPrintout
                 $content[] = $this->decisionLine($decision, [], $atEnd);
             }
         } elseif ($atTop || !$decided) {
-            $content[] = $this->decisionLine($decision, array_values(array_filter($office, static fn (array $i): bool => !isset($i['status']))), $atEnd && $decision !== null);
+            $content[] = $this->decisionLine($decision, array_values(array_filter($office, static fn (array $i): bool => !isset($i['status']))), $atEnd);
         }
 
         $description = $t->pick($in['form']['description'] ?? null);
@@ -114,7 +114,7 @@ final class FormPrintout
         if ($staff !== []) {
             $this->officialUse($content, $staff, $in['office'] ?? []);
         }
-        if ($atEnd && $decision !== null) {
+        if ($atEnd) {
             if ($this->style['decision'] !== 'top') {
                 $content[] = ['type' => 'pageBreak'];
             }
