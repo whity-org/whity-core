@@ -2606,7 +2606,7 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
 
         self::assertFalse($repo->updateDetails($id, self::TENANT_B, ['name' => 'X', 'description' => null, 'sharing' => 'me']), 'a cross-tenant rename touches zero rows');
         self::assertNull($repo->replaceBlocks($id, self::TENANT_B, 1, $blocks, []), 'a cross-tenant blocks change touches zero rows');
-        self::assertFalse($repo->updatePerDocumentKeys($id, self::TENANT_B, ['signer']));
+        self::assertFalse($repo->updatePerDocumentParts($id, self::TENANT_B, [['key' => 'pd_signer1', 'label' => ['en' => 'Signer'], 'kind' => 'text']]));
         self::assertFalse($repo->archive($id, self::TENANT_B), 'a cross-tenant delete touches zero rows');
         self::assertSame(0, $repo->recordUses(self::TENANT_B, $docB, [[$id, 1]]), "Tenant B can't record a use of Tenant A's block");
         self::assertSame(0, $repo->recordUses(self::TENANT_B, $docA, []), "Tenant B's replace leaves Tenant A's uses alone");

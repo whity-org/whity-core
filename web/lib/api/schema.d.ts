@@ -17111,7 +17111,12 @@ export interface components {
             blocks: {
                 [key: string]: unknown;
             }[];
-            /** @description Keys of the parts each document fills itself (E.23) */
+            /** @description E.23a: the parts each document fills itself, in reading order, by stable key */
+            perDocumentParts: components["schemas"]["SavedBlockPart"][];
+            /**
+             * @deprecated
+             * @description Deprecated in 3.4, kept one release: the keys of perDocumentParts
+             */
             perDocumentKeys: string[];
             /** @description Starts at 1; goes up by one on every change of blocks */
             version: number;
@@ -17151,11 +17156,32 @@ export interface components {
             blocks: {
                 [key: string]: unknown;
             }[];
-            /** @description Keys used by perDocument marks in the blocks; at most 200 */
+            /** @description E.23a: labels, required and placeholders by key; which parts exist comes from the blocks. At most 200 */
+            per_document_parts?: components["schemas"]["SavedBlockPart"][];
+            /**
+             * @deprecated
+             * @description Deprecated in 3.4: accepted and ignored
+             */
             per_document_keys?: string[];
         };
         SavedBlockListResponse: {
             data: components["schemas"]["SavedBlock"][];
+        };
+        SavedBlockPart: {
+            /** @description Stable key (pd_ + 8 characters), minted once when the part is marked */
+            key: string;
+            label: {
+                en: string;
+                ar?: string;
+            };
+            /** @enum {string} */
+            kind: "text" | "field";
+            /** @description Blocks issuing until a document fills it */
+            required?: boolean;
+            /** @description Inline[] shown, dashed, until a document fills it */
+            placeholder?: {
+                [key: string]: unknown;
+            }[];
         };
         SavedBlockResponse: {
             data: components["schemas"]["SavedBlock"];
@@ -17174,7 +17200,12 @@ export interface components {
             blocks?: {
                 [key: string]: unknown;
             }[];
-            /** @description Keys used by perDocument marks in the blocks */
+            /** @description E.23a: labels, required and placeholders by key; left out, they are kept */
+            per_document_parts?: components["schemas"]["SavedBlockPart"][];
+            /**
+             * @deprecated
+             * @description Deprecated in 3.4: accepted and ignored
+             */
             per_document_keys?: string[];
             /** @description The version the change was made against; a different current version is 409 changed */
             version?: number;

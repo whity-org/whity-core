@@ -7,7 +7,8 @@ import { useEditorLabels } from '@whity/features/document-editor';
 import { Button } from '@whity/ui/button';
 import type { Block, WhityDocument } from '@whity/ui/editor/contract';
 import { DocEditor } from '@whity/ui/editor/doc-editor';
-import { perDocumentKeys } from '@whity/ui/editor/saved-parts';
+import { assignPartKeys, perDocumentParts } from '@whity/ui/editor/saved-parts';
+import type { PerDocumentPart } from '@whity/ui/editor/contract';
 import { AreaError } from '@whity/ui/page-states';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { DOCUMENTS_WRITE } from '@/lib/capabilities';
@@ -82,8 +83,10 @@ export default function EditSavedBlockPage({ params }: { params: Promise<{ id: s
   const save = async () => {
     if (!block || !doc) return;
     setSaving(true);
-    // E.23: the parts each document fills, found where the original marks them.
-    const result = await updateLibraryBlock(block.id, { blocks: doc.blocks, perDocumentKeys: perDocumentKeys(doc.blocks), version: block.version });
+    // E.23a: the parts each document fills, by their stable keys, keeping their labels.
+    const blocks = assignPartKeys(doc.blocks);
+    const parts = perDocumentParts(blocks, block.perDocumentParts as unknown as PerDocumentPart[]);
+    const result = await updateLibraryBlock(block.id, { blocks, perDocumentParts: parts, version: block.version });
     setSaving(false);
     if (result.ok) {
       setBlock(result.block);

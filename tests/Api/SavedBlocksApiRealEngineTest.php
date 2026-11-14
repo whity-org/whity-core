@@ -179,6 +179,62 @@ final class SavedBlocksApiRealEngineTest extends TestCase
         self::assertSame(0, (int) $this->q('SELECT COUNT(*) FROM saved_block_versions WHERE version > 1')->fetchColumn());
     }
 
+    // ── per-document parts (E.23a) ───────────────────────────────────────
+
+    public function testPartsComeFromTheBlocksWithStableKeys(): void
+    {
+        $blocks = [
+            ['id' => 'a', 'type' => 'paragraph', 'content' => [
+                ['type' => 'text', 'text' => 'Signed by '],
+                ['type' => 'text', 'text' => 'Amro Saleh', 'marks' => [['type' => 'perDocument']]],
+                ['type' => 'text', 'text' => ' on '],
+                ['type' => 'field', 'path' => 'doc.date', 'label' => 'Date', 'perDocument' => true],
+            ]],
+            ['id' => 'b', 'type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Witness', 'marks' => [['type' => 'perDocument', 'key' => 'pd_witness1']]]]],
+        ];
+        $res = $this->create(self::WRITER, $this->body(['blocks' => $blocks, 'per_document_parts' => [
+            ['key' => 'pd_witness1', 'label' => ['en' => 'Witness name', 'ar' => 'اسم الشاهد'], 'required' => true],
+        ]]));
+        self::assertSame(201, $res->getStatusCode(), $res->getBody());
+        $b = $this->data($res);
+        $parts = $b['perDocumentParts'];
+        self::assertCount(3, $parts);
+        // Marks without a key get one, written on the mark and the field.
+        self::assertMatchesRegularExpression('/^pd_[A-Za-z0-9_-]{8}$/', $parts[0]['key']);
+        self::assertSame(['en' => 'Amro Saleh'], $parts[0]['label'], 'a part is labelled with its own text');
+        self::assertSame('text', $parts[0]['kind']);
+        self::assertEquals([['type' => 'perDocument', 'key' => $parts[0]['key']]], $b['blocks'][0]['content'][1]['marks']);
+        self::assertSame('field', $parts[1]['kind']);
+        self::assertSame($parts[1]['key'], $b['blocks'][0]['content'][3]['perDocument']);
+        // A part that has a key keeps it and what the creator gave it.
+        self::assertEquals(['key' => 'pd_witness1', 'label' => ['en' => 'Witness name', 'ar' => 'اسم الشاهد'], 'kind' => 'text', 'required' => true], $parts[2]);
+        self::assertSame(array_column($parts, 'key'), $b['perDocumentKeys']);
+
+        // Reordering keeps every key; labels stay without being sent again.
+        $id = (int) $b['id'];
+        $moved = $this->data($this->patch(self::WRITER, $id, ['blocks' => [$b['blocks'][1], $b['blocks'][0]], 'version' => 1]));
+        self::assertSame(2, $moved['version']);
+        self::assertSame(['pd_witness1', $parts[0]['key'], $parts[1]['key']], $moved['perDocumentKeys']);
+        self::assertSame('Witness name', $moved['perDocumentParts'][0]['label']['en']);
+
+        // Relabelling alone isn't a new version.
+        $relabelled = $this->data($this->patch(self::WRITER, $id, ['per_document_parts' => [['key' => $parts[0]['key'], 'label' => ['en' => 'Signer']]]]));
+        self::assertSame(2, $relabelled['version']);
+        self::assertSame('Signer', $relabelled['perDocumentParts'][1]['label']['en']);
+    }
+
+    public function testBadPartsAreRefused(): void
+    {
+        foreach ([
+            'not a list' => ['per_document_parts' => ['key' => 'pd_x']],
+            'no key' => ['per_document_parts' => [['label' => ['en' => 'x']]]],
+            'same key twice' => ['per_document_parts' => [['key' => 'pd_x'], ['key' => 'pd_x']]],
+            'label not an object' => ['per_document_parts' => [['key' => 'pd_x', 'label' => 'x']]],
+        ] as $case => $override) {
+            self::assertSame(422, $this->create(self::WRITER, $this->body($override))->getStatusCode(), $case);
+        }
+    }
+
     // ── changes and versions ─────────────────────────────────────────────
 
     public function testChangingBlocksBumpsTheVersionAndKeepsTheOldOne(): void
@@ -196,7 +252,7 @@ final class SavedBlocksApiRealEngineTest extends TestCase
         $changed = $this->data($this->patch(self::WRITER, $id, ['blocks' => $next, 'per_document_keys' => ['signer'], 'version' => 1]));
         self::assertSame(2, $changed['version']);
         self::assertEquals($next, $changed['blocks']);
-        self::assertSame(['signer'], $changed['perDocumentKeys']);
+        self::assertSame([], $changed['perDocumentKeys'], 'E.23a: the parts come from the blocks; per_document_keys is ignored');
 
         self::assertEquals($this->bank(), $this->data($this->call('version', self::WRITER, $id, ['version' => '1']))['blocks'], 'version 1 is kept (E.38)');
         self::assertEquals($next, $this->data($this->call('version', self::WRITER, $id, ['version' => '2']))['blocks']);

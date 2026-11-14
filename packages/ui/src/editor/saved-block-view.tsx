@@ -7,7 +7,7 @@ import { Icon } from "../icon"
 import { cn } from "../utils"
 import type { Block, Inline } from "./contract"
 import { freshEditorBlocks } from "./convert"
-import { applyOverrides, partText, segments } from "./saved-parts"
+import { applyOverrides, lookupPart, partText, segments, type Segment } from "./saved-parts"
 import { fill, type EditorLabels } from "./labels"
 import { inlineText, useEditorServices } from "./services"
 
@@ -23,7 +23,7 @@ export function SavedBlockView(props: ReactNodeViewProps) {
   const id = String(props.node.attrs.savedBlockId ?? "")
   const saved = services.savedBlocks?.find((b) => b.id === id) ?? null
   const editable = props.editor.isEditable
-  const overrides = (props.node.attrs.overrides ?? {}) as Record<string, Inline[]>
+  const overrides = (props.node.attrs.overrides ?? {}) as Partial<Record<string, Inline[]>>
 
   const detach = () => {
     const pos = props.getPos()
@@ -36,11 +36,12 @@ export function SavedBlockView(props: ReactNodeViewProps) {
       .run()
   }
 
-  /** E.23: this document's own text for one part; empty goes back to the original's. */
-  const fillPart = (key: string, text: string) => {
+  /** E.23a: this document's own text for one part, by its key; empty goes back to the original's. */
+  const fillPart = (segment: Extract<Segment, { part: string }>, text: string) => {
     const next = { ...overrides }
-    if (text) next[key] = [{ type: "text", text }]
-    else delete next[key]
+    delete next[segment.legacy] // a value under the pre-3.4 name moves to the key
+    if (text) next[segment.part] = [{ type: "text", text }]
+    else delete next[segment.part]
     props.updateAttributes({ overrides: next })
   }
 
@@ -49,7 +50,7 @@ export function SavedBlockView(props: ReactNodeViewProps) {
       s.part === null ? (
         <React.Fragment key={i}>{inlineText(s.runs)}</React.Fragment>
       ) : (
-        <PartField key={s.part} original={partText(s.runs)} value={inlineText(overrides[s.part] ?? [])} editable={editable} labels={labels} onChange={(text) => fillPart(s.part!, text)} />
+        <PartField key={s.part} original={partText(s.runs)} value={inlineText(lookupPart(overrides, s) ?? [])} editable={editable} labels={labels} onChange={(text) => fillPart(s, text)} />
       )
     )
 

@@ -26,6 +26,8 @@ function markToPm(mark: DocMark): PmMark {
     case "insertion":
     case "deletion":
       return { type: mark.type, attrs: { suggestionId: mark.suggestionId } }
+    case "perDocument":
+      return { type: "perDocument", attrs: { key: mark.key || null } }
     default:
       return { type: mark.type }
   }
@@ -43,6 +45,9 @@ function markFromPm(mark: PmMark): DocMark {
     case "insertion":
     case "deletion":
       return { type: mark.type, suggestionId: String(a.suggestionId ?? "") }
+    case "perDocument":
+      // E.23a: the part's stable key; a pre-3.4 mark has none until it is keyed.
+      return (typeof a.key === "string" && a.key ? { type: "perDocument", key: a.key } : { type: "perDocument" }) as DocMark
     default:
       return { type: mark.type } as DocMark
   }
@@ -102,7 +107,8 @@ function inlineFromPm(content: JSONContent[] | undefined): Inline[] {
       const a = node.attrs ?? {}
       const field: Inline = { type: "field", path: String(a.path ?? ""), label: String(a.label ?? "") }
       if (a.required != null) field.required = Boolean(a.required)
-      if (a.perDocument != null) field.perDocument = Boolean(a.perDocument)
+      // E.23a: the part's key; `true` is a pre-3.4 field not keyed yet.
+      if (a.perDocument != null) field.perDocument = (typeof a.perDocument === "string" ? a.perDocument : true) as string
       const marks = sortMarks(node.marks?.map((m) => markFromPm(m as PmMark)))
       if (marks) field.marks = marks
       out.push(field)

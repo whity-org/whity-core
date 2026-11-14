@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use Whity\Auth\RoleChecker;
 use Whity\Core\Audit\AuditLoggerInterface;
+use Whity\Core\Document\SavedBlock\PerDocumentParts;
 use Whity\Core\Document\SavedBlock\SavedBlockRepository;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\RBAC\ScopedPermissionSet;
@@ -105,6 +106,14 @@ final class SavedBlocksApiHandler
         if ($keys instanceof Response) {
             return $keys;
         }
+        $given = self::parts(self::partsField($body));
+        if ($given instanceof Response) {
+            return $given;
+        }
+        // E.23a: every part gets its stable key here, so a client that marks
+        // parts without one (or an old one) still stores keyed parts.
+        $map = [];
+        $blocks = PerDocumentParts::assignKeys($blocks, $map);
 
         $id = $this->repo->create($tenantId, [
             'name'              => $name,
@@ -112,8 +121,8 @@ final class SavedBlocksApiHandler
             'mode'              => $mode,
             'sharing'           => $sharing,
             'owner_profile_id'  => $callerId,
-            'blocks'            => $blocks,
-            'per_document_keys' => $keys,
+            'blocks'             => $blocks,
+            'per_document_parts' => PerDocumentParts::fromBlocks($blocks, $given ?? []),
         ]);
         $this->audit?->record('documents.saved_block.created', [
             'tenant_id'     => $tenantId,
@@ -185,14 +194,23 @@ final class SavedBlocksApiHandler
                 return $blocks;
             }
         }
-        $keys = $row['per_document_keys'];
         $keysField = self::keysField($body);
         if ($keysField !== null) {
-            $keys = self::keys($keysField);
+            $keys = self::keys($keysField); // accepted for one release, then ignored (E.23a)
             if ($keys instanceof Response) {
                 return $keys;
             }
         }
+        $given = self::parts(self::partsField($body));
+        if ($given instanceof Response) {
+            return $given;
+        }
+        if ($blocks !== null) {
+            $map = [];
+            $blocks = PerDocumentParts::assignKeys($blocks, $map);
+        }
+        // Labels, required and placeholders: what was sent, else what the block had.
+        $parts = PerDocumentParts::fromBlocks($blocks ?? $row['blocks'], $given ?? self::byKey($row['per_document_parts']));
         $expected = $body['version'] ?? null;
         if ($expected !== null && (!is_int($expected) || $expected !== $row['version'])) {
             return Response::error('Someone changed this saved block; reload it', 409, ['code' => 'changed', 'version' => $row['version']]);
@@ -203,18 +221,18 @@ final class SavedBlocksApiHandler
         $version = (int) $row['version'];
         // Key order doesn't count: PostgreSQL's JSONB stores objects with its own.
         if ($blocks !== null && self::canonical($blocks) !== self::canonical($row['blocks'])) {
-            $next = $this->repo->replaceBlocks($id, $tenantId, $version, $blocks, $keys);
+            $next = $this->repo->replaceBlocks($id, $tenantId, $version, $blocks, $parts);
             if ($next === null) {
                 return Response::error('Someone changed this saved block; reload it', 409, ['code' => 'changed']);
             }
             $version = $next;
             $changed[] = 'blocks';
-            if ($keys !== $row['per_document_keys']) {
-                $changed[] = 'per_document_keys';
+            if (self::canonical($parts) !== self::canonical($row['per_document_parts'])) {
+                $changed[] = 'per_document_parts';
             }
-        } elseif ($keys !== $row['per_document_keys']) {
-            $this->repo->updatePerDocumentKeys($id, $tenantId, $keys);
-            $changed[] = 'per_document_keys';
+        } elseif (self::canonical($parts) !== self::canonical($row['per_document_parts'])) {
+            $this->repo->updatePerDocumentParts($id, $tenantId, $parts);
+            $changed[] = 'per_document_parts';
         }
         // After the blocks, so a lost race (409 above) changes nothing at all.
         if ($name !== $row['name'] || $description !== $row['description'] || $sharing !== $row['sharing']) {
@@ -444,6 +462,8 @@ final class SavedBlocksApiHandler
             'sharing'         => $row['sharing'],
             'owner'           => $owner,
             'blocks'          => $row['blocks'],
+            'perDocumentParts' => $row['per_document_parts'],
+            // Deprecated in 3.4 (E.23a), kept one release: the parts' keys.
             'perDocumentKeys' => $row['per_document_keys'],
             'version'         => $row['version'],
             'usedIn'          => $row['used_in'],
@@ -551,6 +571,69 @@ final class SavedBlocksApiHandler
         }
 
         return null;
+    }
+
+    /**
+     * per_document_parts, or the contract's perDocumentParts. Null when neither is sent.
+     *
+     * @param array<string, mixed> $body
+     */
+    private static function partsField(array $body): mixed
+    {
+        foreach (['per_document_parts', 'perDocumentParts'] as $name) {
+            if (array_key_exists($name, $body)) {
+                return $body[$name] ?? [];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * What the creator gave the parts (E.23a): a list of at most 200 objects
+     * with a distinct non-empty string key, by key. Null when not sent. Which
+     * parts exist comes from the blocks, not from this list.
+     *
+     * @return array<string, array<string, mixed>>|Response|null
+     */
+    private static function parts(mixed $value): array|Response|null
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (!is_array($value) || !array_is_list($value) || count($value) > self::MAX_KEYS) {
+            return Response::error('per_document_parts must be a list of at most ' . self::MAX_KEYS . ' parts', 422);
+        }
+        $out = [];
+        foreach ($value as $i => $part) {
+            $key = is_array($part) ? ($part['key'] ?? null) : null;
+            if (!is_string($key) || $key === '' || strlen($key) > self::MAX_KEY || isset($out[$key])) {
+                return Response::error("per_document_parts[{$i}] must be an object with a distinct key of at most " . self::MAX_KEY . ' characters', 422);
+            }
+            if (array_key_exists('label', $part) && !is_array($part['label'])) {
+                return Response::error("per_document_parts[{$i}].label must be an object with en and ar", 422);
+            }
+            /** @var array<string, mixed> $part */
+            $out[$key] = $part;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<mixed> $parts
+     * @return array<string, array<string, mixed>>
+     */
+    private static function byKey(array $parts): array
+    {
+        $out = [];
+        foreach ($parts as $part) {
+            if (is_array($part) && is_string($part['key'] ?? null)) {
+                $out[$part['key']] = $part;
+            }
+        }
+
+        return $out;
     }
 
     private static function iso(string $value): string

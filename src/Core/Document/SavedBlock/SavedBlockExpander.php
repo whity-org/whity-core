@@ -23,11 +23,10 @@ use Whity\Core\Document\Blocks\PluginBlockPrinter;
  * Only one level is expanded: a saved block inside a saved block's own
  * blocks stays a reference, so a loop can't form.
  *
- * Per-document parts (E.23): in the original, each run of consecutive text
- * or fields marked `perDocument` in a block's line is one part, keyed
- * `<block id>#<n>` (as the editor's saved-parts.ts finds them). A document's
- * `overrides` fill parts by key; a part it hasn't filled prints the
- * original's text.
+ * Per-document parts (E.23, E.23a): {@see PerDocumentParts}. A document's
+ * `overrides` fill parts by their stable key, or by the name a pre-3.4 row
+ * gave them (`<block id>#<n>`); a part it hasn't filled prints the original's
+ * text.
  */
 final class SavedBlockExpander
 {
@@ -105,7 +104,7 @@ final class SavedBlockExpander
     }
 
     /** The blocks whose `content` is a line of text, and so can hold a part. */
-    private const TEXT_TYPES = ['paragraph', 'heading', 'quote', 'bullet', 'number', 'checklist', 'callout'];
+    private const TEXT_TYPES = PerDocumentParts::TEXT_TYPES;
 
     /**
      * The blocks with each part a document filled replaced by its own text.
@@ -150,42 +149,12 @@ final class SavedBlockExpander
     private static function fillLine(string $blockId, array $runs, array $overrides): array
     {
         $out = [];
-        $n = 0;
-        $inPart = false;
-        $key = null;
-        foreach ($runs as $run) {
-            $part = self::isPerDocument($run);
-            if ($part && !$inPart) {
-                $key = $blockId . '#' . $n++;
-                $own = $overrides[$key] ?? null;
-                if (is_array($own) && $own !== []) {
-                    array_push($out, ...array_values($own));
-                }
-            }
-            $inPart = $part;
-            if ($part && is_array($overrides[$key] ?? null) && $overrides[$key] !== []) {
-                continue; // replaced by the document's own text
-            }
-            $out[] = $run;
+        foreach (PerDocumentParts::segments($blockId, $runs) as $segment) {
+            $own = $segment['key'] === null ? null : PerDocumentParts::lookup($overrides, $segment);
+            array_push($out, ...($own ?? $segment['runs'])); // a filled part prints the document's own text
         }
 
         return $out;
-    }
-
-    private static function isPerDocument(mixed $run): bool
-    {
-        if (!is_array($run)) {
-            return false;
-        }
-        $marked = false;
-        foreach (is_array($run['marks'] ?? null) ? $run['marks'] : [] as $mark) {
-            if (is_array($mark) && ($mark['type'] ?? null) === 'perDocument') {
-                $marked = true;
-            }
-        }
-        $type = $run['type'] ?? null;
-
-        return ($type === 'text' && $marked) || ($type === 'field' && ($marked || ($run['perDocument'] ?? false) === true));
     }
 
     /**

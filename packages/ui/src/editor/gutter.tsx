@@ -226,7 +226,7 @@ function BlockGutter({
       if (pos >= range.from && pos < range.to) nodes.push(node.toJSON() as JSONContent)
       return false
     })
-    const saved = await saveBlock({ ...choice, blocks: fromEditorContent({ type: "doc", content: nodes }), perDocumentKeys: [] })
+    const saved = await saveBlock({ ...choice, blocks: fromEditorContent({ type: "doc", content: nodes }), perDocumentParts: [] })
     if (choice.mode !== "synced") return
     // Synced: the blocks become the saved block, drawn from the library from now on.
     const now = savingRange()

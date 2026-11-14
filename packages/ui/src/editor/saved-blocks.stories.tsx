@@ -33,7 +33,7 @@ const BANK: SavedBlock = {
     { id: "s1", type: "heading", level: 3, content: [t("Bank details")] },
     { id: "s2", type: "callout", kind: "note", content: [t("Example Bank, Mecca Street branch · IBAN JO71 EXBK 0000 0000 0000 1234 5678 90 · SWIFT EXBKJOAM")] },
   ],
-  perDocumentKeys: [],
+  perDocumentParts: [],
   version: 3,
   usedIn: 12,
 }
@@ -55,10 +55,13 @@ const SIGN: SavedBlock = {
     {
       id: "g1",
       type: "paragraph",
-      content: [t("Signed by "), { type: "text", text: "Amro Saleh", marks: [{ type: "perDocument" }] }, t(" on "), { type: "text", text: "12 November 2026", marks: [{ type: "perDocument" }] }],
+      content: [t("Signed by "), { type: "text", text: "Amro Saleh", marks: [{ type: "perDocument", key: "pd_signer01" }] }, t(" on "), { type: "text", text: "12 November 2026", marks: [{ type: "perDocument", key: "pd_signdate" }] }],
     },
   ],
-  perDocumentKeys: ["g1#0", "g1#1"],
+  perDocumentParts: [
+    { key: "pd_signer01", label: { en: "Signer's name", ar: "اسم الموقّع" }, kind: "text" },
+    { key: "pd_signdate", label: { en: "Date", ar: "التاريخ" }, kind: "text" },
+  ],
   usedIn: 4,
 }
 
