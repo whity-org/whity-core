@@ -94,6 +94,12 @@ export interface AppSidebarProps {
   onCollapsedChange?: (collapsed: boolean) => void
   /** Controlled mobile open state. Uncontrolled if omitted. */
   mobileOpen?: boolean
+  /**
+   * Under 640px the host shows the phone tab bar (`PwNav`, `PhoneTabBar`)
+   * instead: the drawer and its open button leave the phone layout, and More
+   * lists the same groups. 640–767px keeps the drawer, 768–1023px the rail.
+   */
+  phoneTabBar?: boolean
   onMobileOpenChange?: (open: boolean) => void
   /** Custom link component (e.g. Next.js <Link>) — defaults to a plain <a>. */
   linkComponent?: React.ElementType
@@ -192,6 +198,7 @@ export function AppSidebar({
   collapsed: collapsedProp,
   onCollapsedChange,
   mobileOpen: mobileOpenProp,
+  phoneTabBar = false,
   onMobileOpenChange,
   linkComponent,
   collapsibleGroups = false,
@@ -459,7 +466,10 @@ export function AppSidebar({
         type="button"
         aria-label={openNavLabel}
         onClick={() => setMobileOpen(true)}
-        className="fixed start-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-40 flex size-11 items-center justify-center rounded-control-lg border border-border bg-card outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 md:hidden"
+        className={cn(
+          "fixed start-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-40 flex size-11 items-center justify-center rounded-control-lg border border-border bg-card outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 md:hidden",
+          phoneTabBar && "max-sm:hidden"
+        )}
       >
         <IconMenu2 className="size-5" />
       </button>
@@ -481,6 +491,7 @@ export function AppSidebar({
           mobileOpen && "translate-x-0 rtl:translate-x-0",
           "md:sticky md:top-0 md:z-auto md:h-screen md:shrink-0 md:translate-x-0 rtl:md:translate-x-0",
           collapsed && "md:w-14",
+          phoneTabBar && "max-sm:hidden",
           className
         )}
       >
