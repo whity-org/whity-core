@@ -41247,6 +41247,7 @@ export interface operations {
     get_api_v1_form_submissions_id_printout: {
         parameters: {
             query?: {
+                /** @description The printout language, `en` or `ar`. Left out, the language of the person who sent the response. */
                 lang?: "en" | "ar";
             };
             header?: never;

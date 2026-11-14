@@ -581,6 +581,10 @@
   "get_api_form_submissions_id": {
     "ar": "عرض إجابة نموذج وحقولها"
   },
+  "get_api_form_submissions_id_printout": {
+    "en": "Print a form response in the automatic layout",
+    "ar": "طباعة ردّ على نموذج بالتخطيط التلقائي"
+  },
   "get_api_form_submissions_id_review": {
     "ar": "عرض ما سجّله المكتب عن إجابة"
   },
@@ -1390,6 +1394,10 @@
   },
   "post_api_document_themes": {
     "ar": "إنشاء سمة مستندات"
+  },
+  "post_api_document_themes_form_printout_preview": {
+    "en": "Preview form printouts with unsaved theme options",
+    "ar": "معاينة مطبوعات النماذج بخيارات نسق غير محفوظة"
   },
   "post_api_document_themes_ref_archive": {
     "ar": "أرشفة سمة مستندات"

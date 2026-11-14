@@ -2203,7 +2203,7 @@ final class CoreApiSchemas
                     . 'PDF its route’s final step makes. `lang` is `en` or `ar`; left out, the language of the person '
                     . 'who sent it. One render against the workspace’s limits.',
                 'tags' => ['forms'],
-                'parameters' => [['name' => 'lang', 'in' => 'query', 'required' => false, 'schema' => ['type' => 'string', 'enum' => ['en', 'ar']]]],
+                'parameters' => [['name' => 'lang', 'in' => 'query', 'required' => false, 'description' => 'The printout language, `en` or `ar`. Left out, the language of the person who sent the response.', 'schema' => ['type' => 'string', 'enum' => ['en', 'ar']]]],
                 'responses' => [
                     200 => ['description' => 'The PDF', 'content' => ['application/pdf' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
                     404 => self::errorResponse('Submission not found'),

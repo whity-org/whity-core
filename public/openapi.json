@@ -29101,6 +29101,7 @@
                         "name": "lang",
                         "in": "query",
                         "required": false,
+                        "description": "The printout language, `en` or `ar`. Left out, the language of the person who sent the response.",
                         "schema": {
                             "type": "string",
                             "enum": [
