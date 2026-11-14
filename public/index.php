@@ -3449,7 +3449,7 @@ $router->register('DELETE', '/api/document-sources/{id:\d+}',       [$documentSo
 // Document themes (editor M4d, E.44, DOCUMENT-THEMES.md 5): reads with
 // documents:read, the workspace's own themes managed with documents:themes.
 // A theme is addressed by its ref: whity.standard or tenant.<key>.
-$documentThemesHandler = new \Whity\Api\DocumentThemesApiHandler($documentThemeRepository, $documentThemeResolver, $settingsService);
+$documentThemesHandler = new \Whity\Api\DocumentThemesApiHandler($documentThemeRepository, $documentThemeResolver, $settingsService, $entitlementService);
 // Each path is written out, not built from a variable: the OpenAPI catalogue
 // tests read these registrations as literals and match them against
 // CoreApiSchemas::documentThemeRoutes().
