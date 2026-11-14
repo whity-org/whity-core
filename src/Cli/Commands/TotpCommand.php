@@ -12,8 +12,8 @@ use Whity\Database\Database;
  * `whity-cli totp` — TOTP secret maintenance.
  *
  * Subcommands:
- *   reencrypt   Re-encrypt legacy AES-256-CBC TOTP secrets into the current
- *               authenticated-encryption format (WC-158). Idempotent — safe to re-run.
+ *   reencrypt   Move every stored TOTP secret onto the current key of the key ring
+ *               (older formats and retired keys included). Idempotent — safe to re-run.
  */
 class TotpCommand extends BaseCommand implements CliCommand
 {
@@ -61,7 +61,7 @@ class TotpCommand extends BaseCommand implements CliCommand
         }
 
         $key = TotpService::resolveEncryptionKey();
-        $reencryptor = new TotpSecretReencryptor(new TotpService($key), $key);
+        $reencryptor = new TotpSecretReencryptor(TotpService::fromEnv(), $key);
         $stats = $reencryptor->reencrypt(Database::connect()->getPdo());
 
         echo sprintf(

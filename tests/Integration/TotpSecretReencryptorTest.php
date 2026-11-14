@@ -76,4 +76,21 @@ class TotpSecretReencryptorTest extends TestCase
         $this->assertSame(0, $stats2['migrated']);
         $this->assertSame(2, $stats2['skipped']);
     }
+
+    public function testMovesRowsWrittenBeforeTheKeyRingOntoTheCurrentKey(): void
+    {
+        $pdo = $this->pdo();
+        $totp = new TotpService(self::KEY);
+        $plain = 'JBSWY3DPEHPK3PXP';
+        $bare = \Defuse\Crypto\Crypto::encryptWithPassword($plain, self::KEY);
+
+        $pdo->prepare('INSERT INTO profiles (id, two_factor_secret) VALUES (?, ?)')->execute([1, $bare]);
+
+        $stats = (new TotpSecretReencryptor($totp, self::KEY))->reencrypt($pdo);
+        $this->assertSame(['migrated' => 1, 'skipped' => 0, 'failed' => 0], $stats);
+
+        $row = (string) $pdo->query('SELECT two_factor_secret FROM profiles WHERE id = 1')->fetchColumn();
+        $this->assertTrue($totp->isOnCurrentKey($row));
+        $this->assertSame($plain, $totp->decryptSecret($row));
+    }
 }

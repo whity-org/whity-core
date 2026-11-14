@@ -451,7 +451,7 @@ $jwtParser = new JwtParser($jwtSecret);
 // Single source of truth shared by the setup/confirm path and the login-validation path so the
 // 2FA secret is always encrypted and decrypted with the SAME key. Fails fast in non-development
 // when ENCRYPTION_KEY is missing/empty, mirroring the JWT_SECRET guard above.
-$totpService = new TotpService(TotpService::resolveEncryptionKey());
+$totpService = TotpService::fromEnv();
 
 // 4. Initialize permission registry
 $permissionRegistry = new PermissionRegistry();
