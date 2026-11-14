@@ -1,4 +1,4 @@
-import type { Block, SavedBlock } from '@whity/ui/editor/contract';
+import type { Block, PerDocumentPart, SavedBlock } from '@whity/ui/editor/contract';
 import type { DocumentEditorAdapter } from '@whity/features/document-editor';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
@@ -21,7 +21,7 @@ export function toSavedBlock(b: WireSavedBlock): SavedBlock {
     // A removed person's block stays usable; it has no owner to name.
     owner: b.owner ? { kind: 'person', id: String(b.owner.id ?? ''), name: b.owner.name } : { kind: 'system', name: 'Whity' },
     blocks: b.blocks as unknown as Block[],
-    perDocumentKeys: b.perDocumentKeys,
+    perDocumentParts: b.perDocumentParts as unknown as PerDocumentPart[],
     version: b.version,
     usedIn: b.usedIn,
   };
@@ -49,7 +49,7 @@ export type LibraryChangeResult = { ok: true; block: LibraryBlock } | { ok: fals
 
 export async function updateLibraryBlock(
   id: number,
-  patch: { name?: string; sharing?: 'me' | 'workspace'; blocks?: Block[]; perDocumentKeys?: string[]; version?: number }
+  patch: { name?: string; sharing?: 'me' | 'workspace'; blocks?: Block[]; perDocumentParts?: PerDocumentPart[]; version?: number }
 ): Promise<LibraryChangeResult> {
   const { data, response, error } = await api.PATCH('/api/v1/saved-blocks/{id}', {
     params: { path: { id } },
@@ -57,7 +57,7 @@ export async function updateLibraryBlock(
       ...(patch.name !== undefined ? { name: patch.name } : {}),
       ...(patch.sharing !== undefined ? { sharing: patch.sharing } : {}),
       ...(patch.blocks !== undefined ? { blocks: patch.blocks as unknown as WireSavedBlock['blocks'] } : {}),
-      ...(patch.perDocumentKeys !== undefined ? { per_document_keys: patch.perDocumentKeys } : {}),
+      ...(patch.perDocumentParts !== undefined ? { per_document_parts: patch.perDocumentParts as unknown as WireSavedBlock['perDocumentParts'] } : {}),
       ...(patch.version !== undefined ? { version: patch.version } : {}),
     },
   });
@@ -103,7 +103,7 @@ export const savedBlocksAdapter: Pick<DocumentEditorAdapter, 'savedBlocks' | 'sa
         mode: block.mode,
         sharing: block.sharing,
         blocks: block.blocks as unknown as WireSavedBlock['blocks'],
-        per_document_keys: block.perDocumentKeys,
+        per_document_parts: block.perDocumentParts as unknown as WireSavedBlock['perDocumentParts'],
       },
     });
     if (data === undefined || data.data === null) throw new Error(`Failed to save the block (${response.status})`);

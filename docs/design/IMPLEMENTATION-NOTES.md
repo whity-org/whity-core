@@ -40,6 +40,10 @@ What it changes:
 
 `web/__tests__/editor-contract.test.ts` holds `contract.ts` byte-equal to `handoff/editor/whity-document.ts`. 3.4 changed the handoff (E.23a, and `FormPrintoutStyle` for P1), so that one check is skipped in this pull request; the E.23a pull request copies the contract and turns it back on.
 
+**Status (WHIT-992, 14 Nov 2026): built.** `contract.ts` is the 3.4 handoff again and the equality check is back on. Parts are keyed on both sides by the same rules (`packages/ui/src/editor/saved-parts.ts`, `src/Core/Document/SavedBlock/PerDocumentParts.php`): the bubble mints the key when a part is marked, a paste inside the original re-keys, a paste elsewhere drops the mark, and the API keys any part sent without one and keeps labels by key. Migration 270 keys stored blocks and every version with one map per block and moves drafts' overrides to the keys; it is idempotent and was run on SQLite and PostgreSQL against pre-3.4 row shapes. Every reader also looks a value up by the pre-3.4 name when its key has none. Published versions needed nothing: publishing already writes the saved block's own blocks into the version (E.38), so they hold no references or overrides (Q19).
+
+Not in it: reporting `SavedBlockVersionChange` (new and orphaned parts) in the editor when a document moves to a newer version, and `required` parts blocking issuing. Values for removed parts are kept, as E.23a asks, but nothing shows them yet. Both are small and belong with the saved-block screens' card comparison (A15, `TplSavedBlocks`).
+
 ## Already built against the 3.4 cards
 
 Most of A15 was built before its card, from the asks (WHIT-939, 944-946, 906, 915, 820, 809, 956). Those screens now owe a comparison with their card, not a build. A14 has the stopgap phone pass (WHIT-999 to WHIT-1006, WHIT-1009) but none of the `Pw*` designs. P1 and most of E2 are missing.

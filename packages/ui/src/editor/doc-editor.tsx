@@ -30,7 +30,7 @@ import { EDITOR_LABELS, fill, type EditorLabels } from "./labels"
 import { LinkCard, LinkPopover } from "./link-tools"
 import { SlashCommand, type SlashState } from "./slash"
 import { EditorToolbar, insertField, type EditorView, type PageZoom } from "./toolbar"
-import { UnknownBlock } from "./schema"
+import { PerDocument, UnknownBlock } from "./schema"
 import { BlockToolbar } from "./block-toolbar"
 import { FieldBar } from "./field-bar"
 import { EditorServicesProvider, type EditorServices, type FieldPreview } from "./services"
@@ -332,7 +332,9 @@ function DocEditor({
             ? UnknownBlock.configure({ label: (type) => fill(labels.laterBlock, { block: type }) })
             : ext.name === "suggesting"
               ? Suggesting.configure({ isLocal, onActivate: (id) => activeRef.current(id) })
-              : ext
+              : ext.name === "perDocument"
+                ? PerDocument.configure({ keep: perDocumentParts })
+                : ext
       ),
     ],
     content: toEditorContent(collab ? rendered.blocks : doc.blocks),

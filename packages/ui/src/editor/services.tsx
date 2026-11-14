@@ -123,7 +123,7 @@ export interface PluginBlocks {
 }
 
 /** What Save as block sends: the contract's SavedBlock without what the library assigns. */
-export type NewSavedBlock = Pick<SavedBlock, "name" | "mode" | "sharing" | "blocks" | "perDocumentKeys">
+export type NewSavedBlock = Pick<SavedBlock, "name" | "mode" | "sharing" | "blocks" | "perDocumentParts">
 
 /**
  * Preview with a record (E.12): each field's value for that record, by path.

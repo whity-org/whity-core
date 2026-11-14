@@ -1,5 +1,8 @@
 import { Mark, Node, mergeAttributes } from "@tiptap/core"
+import { Fragment, Slice, type Node as PmNode } from "@tiptap/pm/model"
+import { Plugin, PluginKey } from "@tiptap/pm/state"
 
+import { mintPartKey } from "./saved-parts"
 import { richSchemaExtensions } from "./schema-rich"
 
 /**
@@ -265,11 +268,61 @@ export const Deletion = Mark.create({
   parseHTML: () => [{ tag: "del" }],
   renderHTML: ({ mark }) => ["del", { "data-suggestion": mark.attrs.suggestionId }, 0],
 })
-export const PerDocument = Mark.create({
+/**
+ * E.23, E.23a: text a document fills itself, in a synced saved block's
+ * original. `key` names the part for good: minted when the creator marks it
+ * (bubble.tsx), never reused. Adjacent text with different keys is two
+ * parts, so the mark doesn't merge across keys.
+ *
+ * Pasting: in the original (`keep`), a copied part gets a new key (one per
+ * key copied), so it is a second part; anywhere else the mark is dropped.
+ */
+export const PerDocument = Mark.create<{ keep: boolean }>({
   name: "perDocument",
+  addOptions: () => ({ keep: false }),
+  addAttributes: () => ({
+    key: {
+      default: null,
+      parseHTML: (el) => el.getAttribute("data-per-document") || null,
+      renderHTML: (attrs) => ({ "data-per-document": (attrs.key as string | null) ?? "" }),
+    },
+  }),
   parseHTML: () => [{ tag: "span[data-per-document]" }],
-  renderHTML: () => ["span", { "data-per-document": "" }, 0],
+  renderHTML: ({ HTMLAttributes }) => ["span", HTMLAttributes, 0],
+  addProseMirrorPlugins() {
+    const keep = this.options.keep
+    return [
+      new Plugin({
+        key: new PluginKey("perDocumentPaste"),
+        props: { transformPasted: (slice) => rekeyPasted(slice, keep) },
+      }),
+    ]
+  },
 })
+
+export function rekeyPasted(slice: Slice, keep: boolean): Slice {
+  const fresh = new Map<string, string>()
+  const rekey = (old: unknown) => {
+    const name = typeof old === "string" ? old : ""
+    if (!fresh.has(name)) fresh.set(name, mintPartKey())
+    return fresh.get(name)!
+  }
+  const walk = (fragment: Fragment): Fragment => {
+    const nodes: PmNode[] = []
+    fragment.forEach((node) => {
+      let next = node
+      if (node.content.size) next = next.copy(walk(node.content))
+      const marks = node.marks.flatMap((m) => (m.type.name !== "perDocument" ? [m] : keep ? [m.type.create({ key: rekey(m.attrs.key) })] : []))
+      if (marks.length !== node.marks.length || node.marks.some((m, i) => m !== marks[i])) next = next.mark(marks)
+      if (node.type.name === "field" && node.attrs.perDocument != null) {
+        next = next.type.create({ ...next.attrs, perDocument: keep ? rekey(node.attrs.perDocument) : null }, next.content, next.marks)
+      }
+      nodes.push(next)
+    })
+    return Fragment.fromArray(nodes)
+  }
+  return new Slice(walk(slice.content), slice.openStart, slice.openEnd)
+}
 
 /** In schema order; the contract's marks come out of the editor in this order. */
 export const MARK_ORDER = [

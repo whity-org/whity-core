@@ -42,6 +42,7 @@ const block = (over: Record<string, unknown>) => ({
   sharing: 'workspace',
   owner: { kind: 'person', id: 10, name: 'Awss Haddad' },
   blocks: [],
+  perDocumentParts: [],
   perDocumentKeys: [],
   version: 3,
   usedIn: 12,
