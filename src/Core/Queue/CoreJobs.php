@@ -119,7 +119,9 @@ final class CoreJobs
                         $coreSender->gate()
                     ),
                     $logger,
-                    \Whity\Core\Http\FrontendUrls::fromEnv()->link(\Whity\Core\Http\FrontendUrls::ERROR_DETAILS)
+                    \Whity\Core\Http\FrontendUrls::fromEnv()->link(\Whity\Core\Http\FrontendUrls::ERROR_DETAILS),
+                    // At most NotifyErrorGroupJob::EMAILS_PER_HOUR alerts emailed an hour.
+                    new \Whity\Core\Store\DatabaseSharedStore($pdo)
                 ),
                 false
             );
