@@ -110,6 +110,19 @@ final class McpTokenHandler
         }
         [$profileId, $tenantId] = $identity;
 
+        // WHIT-1040 (TplAgentCredential): the starting grant is held to the
+        // same rule as a later change (PATCH .../grant): each mode must be one
+        // the grant screen offers this person for that permission. So an agent
+        // is never issued Allowed or Ask first on a permission its issuer
+        // lacks, nor Allowed on something that can't be undone; Off is always
+        // possible. RBAC still checks every call either way.
+        if ($agent) {
+            $problems = $this->startingGrantProblems($scope, $profileId, $tenantId);
+            if ($problems !== []) {
+                return Response::error(implode('; ', $problems), 422, ['code' => 'grant_above_issuer']);
+            }
+        }
+
         $token = $this->mcpTokenService->issue($profileId, $tenantId, $name, $scope, principalKind: $agent ? AgentScopeGrant::AGENT_KIND : 'user');
         ['jti' => $jti, 'exp' => $exp] = $this->extractClaims($token);
 
@@ -265,6 +278,36 @@ final class McpTokenHandler
 
         $token['scope'] = $scope;
         return Response::json(['data' => $this->presentGrant($token, $profileId, $tenantId)], 200);
+    }
+
+    /**
+     * Why a new agent credential's `grant:` entries can't be issued, one line
+     * per permission, in the grant screen's words. Empty when every mode is
+     * one the screen offers.
+     *
+     * @param list<string> $scope
+     * @return list<string>
+     */
+    private function startingGrantProblems(array $scope, int $profileId, int $tenantId): array
+    {
+        $entries = AgentScopeGrant::fromScope($scope)->entries();
+        // Without a role checker nothing reads as held: issue as before and
+        // leave it to RBAC on every call, rather than refuse every grant.
+        if ($entries === [] || $this->roleChecker === null) {
+            return [];
+        }
+
+        $view     = new AgentGrantView($this->operations());
+        $held     = $this->held(array_keys($entries), $profileId, $tenantId);
+        $problems = [];
+        foreach ($entries as $permission => $mode) {
+            $choices = $view->choices((string) $permission, $scope, $held);
+            if (!in_array($mode, $choices['modes'], true)) {
+                $problems[] = "{$permission}: " . ($choices['withheld'][$mode]['message'] ?? 'not possible');
+            }
+        }
+
+        return $problems;
     }
 
     /**
