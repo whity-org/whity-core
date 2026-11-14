@@ -1764,32 +1764,28 @@ $profileEmailRepository = new ProfileEmailRepository($db->getPdo());
 // own frontend. See docs/wiki/Headless.md.
 $frontendUrls = \Whity\Core\Http\FrontendUrls::fromEnv();
 $verifyUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::EMAIL_VERIFICATION);
+// EM.1: one sender for every email core sends (E2): a workspace's in its brand
+// and language, the instance's own (tenant 0) in the instance's brand. The
+// workspace branding source is handed over once the entitlement service exists (below).
+$brandedEmailSender = new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService, $logger);
+// E2: the one gate every email asks (operator, workspace, agent and person switches).
+$brandedEmailSender->useGate(new \Whity\Core\Mail\EmailGate($settingsService, $db->getPdo()));
 $emailVerificationProvider = new TokenEmailVerificationProvider(
     $emailVerificationService,
     $profileEmailRepository,
-    $mailer,
+    $brandedEmailSender,
     $verifyUrlBase,
-    // WC-email: render the link as a branded HTML email (with a text fallback),
-    // driven by the instance branding/mail settings.
-    new \Whity\Core\Mail\EmailLayout(),
-    $settingsService
 );
 // WC-email: customer lifecycle emails. The subscriber listens on lifecycle hooks
 // (welcome on registration today; approval/invitation to follow) and sends via
 // the branded EmailLayout, gated per-event on the mail.events.* toggles. Sends
 // are best-effort — a failure can never break the originating request.
 $emailNotifications = new \Whity\Core\Mail\EmailNotifications(
-    $mailer,
-    new \Whity\Core\Mail\EmailLayout(),
+    $brandedEmailSender,
     $settingsService,
     $frontendUrls->base(),
-    $logger
 );
 $emailNotifications->subscribe($hookManager);
-// EM.1: one sender for every email a workspace sends (its brand, its language),
-// and the two security emails that can't be turned off. The workspace branding
-// source is handed over once the entitlement service exists (below).
-$brandedEmailSender = new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService, $logger);
 // SDK 1.99 (WHIT-978): plugins send as the workspace through the same sender.
 \Whity\register_service(\Whity\Sdk\Mail\WorkspaceEmails::class, new \Whity\Core\Mail\SdkWorkspaceEmails($brandedEmailSender)); // @phpstan-ignore-line
 // SDK 1.102 (WHIT-985): Whity's own billing emails to a workspace's payers, only from a plugin
@@ -1913,10 +1909,8 @@ $router->register('GET', '/api/auth/2fa/status', [$twoFactorHandler, 'status'], 
 $passwordResetService = new \Whity\Core\Identity\PasswordResetService($db->getPdo());
 $resetUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::PASSWORD_RESET);
 $passwordResetMailer = new \Whity\Core\Identity\PasswordResetMailer(
-    $mailer,
+    $brandedEmailSender,
     $resetUrlBase,
-    new \Whity\Core\Mail\EmailLayout(),
-    $settingsService
 );
 $passwordResetHandler = new \Whity\Api\PasswordResetHandler(
     $passwordResetService,
@@ -1964,10 +1958,8 @@ $twoFactorRecoveryService = new \Whity\Core\Identity\TwoFactorRecoveryService(
 );
 $twoFactorRecoveryConfirmUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::TWO_FACTOR_RECOVERY);
 $twoFactorRecoveryMailer = new \Whity\Core\Identity\TwoFactorRecoveryMailer(
-    $mailer,
+    $brandedEmailSender,
     $twoFactorRecoveryConfirmUrlBase,
-    new \Whity\Core\Mail\EmailLayout(),
-    $settingsService
 );
 $twoFactorRecoveryHandler = new \Whity\Api\TwoFactorRecoveryHandler(
     $twoFactorRecoveryService,
@@ -1990,7 +1982,7 @@ $twoFactorRecoveryApprovalsHandler = new \Whity\Api\TwoFactorRecoveryApprovalsAp
         $db->getPdo(),
         new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo()),
         $totpService,
-        new \Whity\Core\Security\IdentityCheckMailer($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService),
+        new \Whity\Core\Security\IdentityCheckMailer($brandedEmailSender),
     )
 );
 $router->register('GET',  '/api/2fa-recovery/pending',           [$twoFactorRecoveryApprovalsHandler, 'listPending'], null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
@@ -2017,10 +2009,8 @@ $invitationService = new \Whity\Core\Identity\InvitationService(
 );
 $invitationUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::INVITATION_ACCEPT);
 $invitationMailer = new \Whity\Core\Identity\InvitationMailer(
-    $mailer,
+    $brandedEmailSender,
     $invitationUrlBase,
-    new \Whity\Core\Mail\EmailLayout(),
-    $settingsService
 );
 $invitationsHandler = new \Whity\Api\InvitationsApiHandler(
     $db->getPdo(),
@@ -4280,7 +4270,7 @@ $signingService = new \Whity\Core\Document\Signing\SigningService(
     ),
     $signingChallengeRepository,
     $instanceSealKeys,
-    new \Whity\Core\Document\Signing\SigningCodeMailer($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService),
+    new \Whity\Core\Document\Signing\SigningCodeMailer($brandedEmailSender),
 );
 $documentSigningHandler = new \Whity\Api\DocumentSigningApiHandler(
     $documentRepository,
@@ -5020,7 +5010,8 @@ $router->register('POST',   '/api/data-types/{type}/bulk',           [$dataTypes
 // records a per-channel delivery, and enqueues the durable send job. Also
 // subscribed on the HookManager, so firing the `notification.dispatch` hook (from
 // core or a plugin) dispatches a notification (hook-subscriber mode).
-$transportRegistry = \Whity\Core\Notification\CoreTransports::make($logger);
+// E2: the `email` channel is delivered through core mail, not only logged.
+$transportRegistry = \Whity\Core\Notification\CoreTransports::make($logger, $brandedEmailSender, $profileEmailRepository);
 $notificationRepository = new \Whity\Core\Notification\NotificationRepository($db->getPdo());
 // Per-user preference resolver — the dispatcher consults it to filter a
 // recipient's channels (transactional types always bypass; #c56a6455).
@@ -5035,7 +5026,8 @@ $notificationDispatcher = new \Whity\Core\Notification\NotificationDispatcher(
     ),
     $logger,
     $notificationPreferenceResolver,
-    $auditLogger
+    $auditLogger,
+    $brandedEmailSender->gate()
 );
 $notificationDispatcher->subscribe($hookManager);
 \Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger, $logger);
@@ -5631,10 +5623,8 @@ $publicSignupHandler = new \Whity\Api\PublicSignupApiHandler(
     $hostResolver,
     $publicFormBotCheck,
     new \Whity\Core\Signup\CustomerSignupMailer(
-        $mailer,
+        $brandedEmailSender,
         $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::SIGNUP_CONFIRM),
-        new \Whity\Core\Mail\EmailLayout(),
-        $settingsService
     ),
     new DatabaseSharedStore($db->getPdo()),
     $auditLogger,
@@ -6165,7 +6155,6 @@ $agentProposals = new \Whity\Core\Agent\AgentProposalRepository(
 (new \Whity\Core\Notification\AgentEmailNotifier(
     $db->getPdo(),
     $agentProposals,
-    new \Whity\Core\Notification\NotificationPreferenceRepository($db->getPdo()),
     $profileEmailRepository,
     new DatabaseSharedStore($db->getPdo()),
     $brandedEmailSender,

@@ -34,8 +34,7 @@ final class EmailNotificationsTest extends TestCase
         );
         $this->mailer = new CapturingMailer();
         $this->subject = new EmailNotifications(
-            $this->mailer,
-            new EmailLayout(),
+            new \Whity\Core\Mail\BrandedEmailSender($this->mailer, new EmailLayout(), $this->settings),
             $this->settings,
             'https://app.example.test',
         );

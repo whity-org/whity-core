@@ -66,12 +66,12 @@ final class AgentEmailNotifierTest extends TestCase
         $this->settings = new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo));
         $this->mailer = new CapturingMailer();
         $this->sender = new BrandedEmailSender($this->mailer, new EmailLayout(), $this->settings);
+        $this->sender->useGate(new \Whity\Core\Mail\EmailGate($this->settings, $this->pdo));
         $this->proposals = new AgentProposalRepository($this->pdo);
         $this->preferences = new NotificationPreferenceRepository($this->pdo);
         $this->notifier = new AgentEmailNotifier(
             $this->pdo,
             $this->proposals,
-            $this->preferences,
             new ProfileEmailRepository($this->pdo),
             new DatabaseSharedStore($this->pdo),
             $this->sender,
@@ -143,7 +143,6 @@ final class AgentEmailNotifierTest extends TestCase
             $this->pdo,
             $this->settings,
             new AgentStatsRepository($this->pdo),
-            $this->preferences,
             new ProfileEmailRepository($this->pdo),
             new DatabaseSharedStore($this->pdo),
             $this->sender,
