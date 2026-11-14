@@ -35,6 +35,8 @@ final class FormPrintoutTest extends TestCase
             $f('drugs', 'select', 'Drugs or medicines', 'regulated', ['options' => $yn]),
             $f('devices', 'select', 'Medical devices', 'regulated', ['options' => $yn]),
             $f('samples', 'select', 'Human samples', 'regulated', ['options' => $yn]),
+            // An "if yes" follow-up left empty does not stop the section collapsing.
+            $f('drug_identify', 'textarea', 'Identify the drugs', 'regulated', ['is_required' => false]),
             $f('pi_sign', 'signature', 'Principal investigator', 'declaration'),
             $f('dean', 'select', 'Dean’s recommendation', null, ['audience' => 'staff', 'options' => [['value' => 'recommend', 'label' => ['en' => 'Recommend approval']]]]),
         ];

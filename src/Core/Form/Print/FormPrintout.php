@@ -420,15 +420,18 @@ final class FormPrintout
         // A question a condition hid and nobody answered was never asked.
         $fields = array_values(array_filter($fields, fn (array $f): bool => ($f['visible_when'] ?? null) === null || !$this->isBlank($answers[(string) $f['field_key']] ?? null)));
 
-        $allNa = $fields !== [] && array_filter($fields, fn (array $f): bool => !$this->isNa($f, $answers[(string) $f['field_key']] ?? null)) === [];
+        // FP.9: a section whose every answered question says N/A (the rest left
+        // empty, as their "if yes, …" follow-ups are) prints as one line.
+        $answered = array_values(array_filter($fields, fn (array $f): bool => !$this->isBlank($answers[(string) $f['field_key']] ?? null)));
+        $allNa = $answered !== [] && array_filter($answered, fn (array $f): bool => !$this->isNa($f, $answers[(string) $f['field_key']] ?? null)) === [];
         if ($allNa && $empty !== 'printAll') {
             if ($empty === 'hide') {
                 return;
             }
-            $names = array_map(fn (array $f): string => $t->pick($f['label'] ?? null), array_slice($fields, 0, 6));
+            $names = array_map(fn (array $f): string => self::numbered($t->pick($f['label'] ?? null))[1], array_slice($answered, 0, 6));
             $content[] = $this->sectionHeading((string) $number, $section['title'], $total, null, [
                 'label' => $t->get('notApplicable'),
-                'summary' => $t->get('allNa', ['n' => count($fields), 'names' => implode(', ', $names) . (count($fields) > 6 ? '…' : '')]),
+                'summary' => mb_substr($t->get('allNa', ['n' => count($answered), 'names' => implode(', ', $names) . (count($answered) > 6 ? '…' : '')]), 0, 600),
             ]);
 
             return;
