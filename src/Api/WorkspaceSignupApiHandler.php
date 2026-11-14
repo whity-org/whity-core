@@ -52,6 +52,8 @@ final class WorkspaceSignupApiHandler
         private readonly AuditLogger $audit,
         private readonly ?BotCheck $bot = null,
         private readonly ?\Whity\Core\Signup\JoinProviders $joinProviders = null,
+        // E2 `EmailJoining`: the person hears the decision.
+        private readonly ?\Whity\Core\Signup\JoinDecisionMailer $joinMailer = null,
     ) {
     }
 
@@ -242,6 +244,31 @@ final class WorkspaceSignupApiHandler
         };
     }
 
+    /**
+     * E2: email the person who asked to join, from the workspace. Best-effort:
+     * the decision stands whether or not the email goes.
+     */
+    private function tellThePerson(int $tenantId, int $signupId, bool $approve): void
+    {
+        if ($this->joinMailer === null) {
+            return;
+        }
+        try {
+            $stmt = $this->db->prepare('SELECT email, display_name FROM customer_signups WHERE id = :id AND tenant_id = :tid');
+            $stmt->execute([':id' => $signupId, ':tid' => $tenantId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!is_array($row) || trim((string) $row['email']) === '') {
+                return;
+            }
+            $name = (string) ($row['display_name'] ?? '');
+            $approve
+                ? $this->joinMailer->approved($tenantId, (string) $row['email'], $name)
+                : $this->joinMailer->declined($tenantId, (string) $row['email'], $name);
+        } catch (\Throwable $e) {
+            error_log('[customer-signup] decision email failed: ' . $e->getMessage());
+        }
+    }
+
     /** @param array{tenantId: int, userId: int} $ctx */
     private function decided(array $ctx, int $id, bool $approve, ?int $membershipId): Response
     {
@@ -254,6 +281,7 @@ final class WorkspaceSignupApiHandler
             'target_id' => $id,
             'metadata' => ['membership_id' => $membershipId],
         ]);
+        $this->tellThePerson($ctx['tenantId'], $id, $approve);
 
         return Response::json(['data' => ['id' => $id, 'status' => $status]], 200);
     }
