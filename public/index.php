@@ -5753,7 +5753,8 @@ $workspaceSignupHandler =new \Whity\Api\WorkspaceSignupApiHandler(
     $customerSignupService,
     $auditLogger,
     $publicFormBotCheck,
-    $joinProviders
+    $joinProviders,
+    new \Whity\Core\Signup\JoinDecisionMailer($brandedEmailSender, $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::SSO_LOGIN)),
 );
 $router->register('GET',  '/api/signup/settings',                   [$workspaceSignupHandler, 'getSettings'],    null, null, CorePermissions::SIGNUP_MANAGE);
 $router->register('PUT',  '/api/signup/settings',                   [$workspaceSignupHandler, 'updateSettings'], null, null, CorePermissions::SIGNUP_MANAGE);
