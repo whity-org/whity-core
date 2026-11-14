@@ -168,14 +168,12 @@ final class TotpReplayRealEngineTest extends TestCase
      */
     public function testSecretStoredBeforeTheKeyRingSignsInAndIsMovedToTheCurrentKey(): void
     {
-        $bare = \Defuse\Crypto\Crypto::encryptWithPassword(
-            $this->plainSecret,
-            'totp-replay-test-encryption-key-32-chars',
-        );
+        $plain = 'JBSWY3DPEHPK3PXP';
+        $bare = \Defuse\Crypto\Crypto::encryptWithPassword($plain, 'totp-replay-test-encryption-key-32-chars');
         $this->pdo->prepare('UPDATE profiles SET two_factor_secret = ? WHERE id = ?')
             ->execute([$bare, self::PROFILE_ID]);
 
-        $code = TOTP::create($this->plainSecret)->now();
+        $code = TOTP::create($plain)->now();
         $response = $this->handler->handle2fa($this->mintTempTokenAndRequest($code));
         self::assertSame(200, $response->getStatusCode());
 
@@ -184,6 +182,6 @@ final class TotpReplayRealEngineTest extends TestCase
         $stored = (string) $stmt->fetchColumn();
         self::assertStringStartsWith('v1:', $stored);
         $totp = new TotpService('totp-replay-test-encryption-key-32-chars');
-        self::assertSame($this->plainSecret, $totp->decryptSecret($stored));
+        self::assertSame($plain, $totp->decryptSecret($stored));
     }
 }

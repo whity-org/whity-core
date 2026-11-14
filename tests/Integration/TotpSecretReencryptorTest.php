@@ -89,7 +89,9 @@ class TotpSecretReencryptorTest extends TestCase
         $stats = (new TotpSecretReencryptor($totp, self::KEY))->reencrypt($pdo);
         $this->assertSame(['migrated' => 1, 'skipped' => 0, 'failed' => 0], $stats);
 
-        $row = (string) $pdo->query('SELECT two_factor_secret FROM profiles WHERE id = 1')->fetchColumn();
+        $select = $pdo->query('SELECT two_factor_secret FROM profiles WHERE id = 1');
+        $this->assertNotFalse($select);
+        $row = (string) $select->fetchColumn();
         $this->assertTrue($totp->isOnCurrentKey($row));
         $this->assertSame($plain, $totp->decryptSecret($row));
     }
