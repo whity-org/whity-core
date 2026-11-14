@@ -79351,6 +79351,15 @@
                                                     ]
                                                 },
                                                 "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                                            },
+                                            "layout": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "start",
+                                                    "centred",
+                                                    "bilingual"
+                                                ],
+                                                "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                                             }
                                         }
                                     }
@@ -80353,6 +80362,15 @@
                                             ]
                                         },
                                         "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                                    },
+                                    "layout": {
+                                        "type": "string",
+                                        "enum": [
+                                            "start",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                                     }
                                 }
                             },
@@ -80367,6 +80385,153 @@
                             "largePrint": {
                                 "type": "boolean",
                                 "description": "Large print: an 11pt body in print, with headings scaled by the same steps."
+                            },
+                            "form": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout.",
+                                "properties": {
+                                    "header": {
+                                        "type": "string",
+                                        "enum": [
+                                            "letterhead",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Standard: `letterhead`."
+                                    },
+                                    "officeDetails": {
+                                        "type": "string",
+                                        "enum": [
+                                            "decisionLine",
+                                            "strip"
+                                        ],
+                                        "description": "Standard: `decisionLine`."
+                                    },
+                                    "decision": {
+                                        "type": "string",
+                                        "enum": [
+                                            "topAndEnd",
+                                            "top",
+                                            "end"
+                                        ],
+                                        "description": "Standard: `topAndEnd`."
+                                    },
+                                    "sectionStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                            "mark",
+                                            "number",
+                                            "eyebrow",
+                                            "rail",
+                                            "tab",
+                                            "plane"
+                                        ],
+                                        "description": "Standard: `mark`."
+                                    },
+                                    "questions": {
+                                        "type": "string",
+                                        "enum": [
+                                            "stacked",
+                                            "twoColumns"
+                                        ],
+                                        "description": "Standard: `stacked`."
+                                    },
+                                    "longAnswers": {
+                                        "type": "string",
+                                        "enum": [
+                                            "countAndContinued",
+                                            "plain"
+                                        ],
+                                        "description": "Standard: `countAndContinued`."
+                                    },
+                                    "choices": {
+                                        "type": "string",
+                                        "enum": [
+                                            "allOptions",
+                                            "chosenOnly"
+                                        ],
+                                        "description": "Standard: `allOptions`."
+                                    },
+                                    "yesNo": {
+                                        "type": "string",
+                                        "enum": [
+                                            "word",
+                                            "threeColumns"
+                                        ],
+                                        "description": "Standard: `word`."
+                                    },
+                                    "empty": {
+                                        "type": "string",
+                                        "enum": [
+                                            "collapseAndMark",
+                                            "hide",
+                                            "printAll"
+                                        ],
+                                        "description": "Standard: `collapseAndMark`."
+                                    },
+                                    "signatures": {
+                                        "type": "string",
+                                        "enum": [
+                                            "confirmedAndDrawn",
+                                            "confirmedOnly",
+                                            "withPaperLines"
+                                        ],
+                                        "description": "Standard: `confirmedAndDrawn`."
+                                    },
+                                    "approvals": {
+                                        "type": "string",
+                                        "enum": [
+                                            "list",
+                                            "cards"
+                                        ],
+                                        "description": "Standard: `list`."
+                                    },
+                                    "footer": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "description": "What the footer prints beside \"Page x of y\", which always prints.",
+                                        "properties": {
+                                            "reference": {
+                                                "type": "boolean"
+                                            },
+                                            "pageCount": {
+                                                "type": "boolean",
+                                                "enum": [
+                                                    true
+                                                ]
+                                            },
+                                            "marks": {
+                                                "type": "boolean"
+                                            },
+                                            "qrEveryPage": {
+                                                "type": "boolean"
+                                            }
+                                        }
+                                    },
+                                    "marks": {
+                                        "type": "array",
+                                        "maxItems": 3,
+                                        "description": "Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan.",
+                                        "items": {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "required": [
+                                                "src"
+                                            ],
+                                            "properties": {
+                                                "src": {
+                                                    "type": "string",
+                                                    "pattern": "^/api/files/[0-9]{1,12}/content$"
+                                                },
+                                                "alt": {
+                                                    "type": "string",
+                                                    "maxLength": 80
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         },
                         "description": "The values it sets over the theme it extends. Leave a token out to keep the base's."
@@ -80441,6 +80606,15 @@
                                     ]
                                 },
                                 "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                            },
+                            "layout": {
+                                "type": "string",
+                                "enum": [
+                                    "start",
+                                    "centred",
+                                    "bilingual"
+                                ],
+                                "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                             }
                         }
                     }
@@ -80516,6 +80690,15 @@
                                             ]
                                         },
                                         "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                                    },
+                                    "layout": {
+                                        "type": "string",
+                                        "enum": [
+                                            "start",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                                     }
                                 }
                             },
@@ -80530,6 +80713,153 @@
                             "largePrint": {
                                 "type": "boolean",
                                 "description": "Large print: an 11pt body in print, with headings scaled by the same steps."
+                            },
+                            "form": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout.",
+                                "properties": {
+                                    "header": {
+                                        "type": "string",
+                                        "enum": [
+                                            "letterhead",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Standard: `letterhead`."
+                                    },
+                                    "officeDetails": {
+                                        "type": "string",
+                                        "enum": [
+                                            "decisionLine",
+                                            "strip"
+                                        ],
+                                        "description": "Standard: `decisionLine`."
+                                    },
+                                    "decision": {
+                                        "type": "string",
+                                        "enum": [
+                                            "topAndEnd",
+                                            "top",
+                                            "end"
+                                        ],
+                                        "description": "Standard: `topAndEnd`."
+                                    },
+                                    "sectionStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                            "mark",
+                                            "number",
+                                            "eyebrow",
+                                            "rail",
+                                            "tab",
+                                            "plane"
+                                        ],
+                                        "description": "Standard: `mark`."
+                                    },
+                                    "questions": {
+                                        "type": "string",
+                                        "enum": [
+                                            "stacked",
+                                            "twoColumns"
+                                        ],
+                                        "description": "Standard: `stacked`."
+                                    },
+                                    "longAnswers": {
+                                        "type": "string",
+                                        "enum": [
+                                            "countAndContinued",
+                                            "plain"
+                                        ],
+                                        "description": "Standard: `countAndContinued`."
+                                    },
+                                    "choices": {
+                                        "type": "string",
+                                        "enum": [
+                                            "allOptions",
+                                            "chosenOnly"
+                                        ],
+                                        "description": "Standard: `allOptions`."
+                                    },
+                                    "yesNo": {
+                                        "type": "string",
+                                        "enum": [
+                                            "word",
+                                            "threeColumns"
+                                        ],
+                                        "description": "Standard: `word`."
+                                    },
+                                    "empty": {
+                                        "type": "string",
+                                        "enum": [
+                                            "collapseAndMark",
+                                            "hide",
+                                            "printAll"
+                                        ],
+                                        "description": "Standard: `collapseAndMark`."
+                                    },
+                                    "signatures": {
+                                        "type": "string",
+                                        "enum": [
+                                            "confirmedAndDrawn",
+                                            "confirmedOnly",
+                                            "withPaperLines"
+                                        ],
+                                        "description": "Standard: `confirmedAndDrawn`."
+                                    },
+                                    "approvals": {
+                                        "type": "string",
+                                        "enum": [
+                                            "list",
+                                            "cards"
+                                        ],
+                                        "description": "Standard: `list`."
+                                    },
+                                    "footer": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "description": "What the footer prints beside \"Page x of y\", which always prints.",
+                                        "properties": {
+                                            "reference": {
+                                                "type": "boolean"
+                                            },
+                                            "pageCount": {
+                                                "type": "boolean",
+                                                "enum": [
+                                                    true
+                                                ]
+                                            },
+                                            "marks": {
+                                                "type": "boolean"
+                                            },
+                                            "qrEveryPage": {
+                                                "type": "boolean"
+                                            }
+                                        }
+                                    },
+                                    "marks": {
+                                        "type": "array",
+                                        "maxItems": 3,
+                                        "description": "Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan.",
+                                        "items": {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "required": [
+                                                "src"
+                                            ],
+                                            "properties": {
+                                                "src": {
+                                                    "type": "string",
+                                                    "pattern": "^/api/files/[0-9]{1,12}/content$"
+                                                },
+                                                "alt": {
+                                                    "type": "string",
+                                                    "maxLength": 80
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         },
                         "description": "The values it sets, replacing the whole token set. Leave a token out to use the base's."
@@ -80595,6 +80925,15 @@
                                             ]
                                         },
                                         "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                                    },
+                                    "layout": {
+                                        "type": "string",
+                                        "enum": [
+                                            "start",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                                     }
                                 }
                             }
@@ -80765,6 +81104,15 @@
                                     ]
                                 },
                                 "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                            },
+                            "layout": {
+                                "type": "string",
+                                "enum": [
+                                    "start",
+                                    "centred",
+                                    "bilingual"
+                                ],
+                                "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                             }
                         }
                     },
@@ -80779,6 +81127,153 @@
                     "largePrint": {
                         "type": "boolean",
                         "description": "Large print: an 11pt body in print, with headings scaled by the same steps."
+                    },
+                    "form": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "description": "How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout.",
+                        "properties": {
+                            "header": {
+                                "type": "string",
+                                "enum": [
+                                    "letterhead",
+                                    "centred",
+                                    "bilingual"
+                                ],
+                                "description": "Standard: `letterhead`."
+                            },
+                            "officeDetails": {
+                                "type": "string",
+                                "enum": [
+                                    "decisionLine",
+                                    "strip"
+                                ],
+                                "description": "Standard: `decisionLine`."
+                            },
+                            "decision": {
+                                "type": "string",
+                                "enum": [
+                                    "topAndEnd",
+                                    "top",
+                                    "end"
+                                ],
+                                "description": "Standard: `topAndEnd`."
+                            },
+                            "sectionStyle": {
+                                "type": "string",
+                                "enum": [
+                                    "mark",
+                                    "number",
+                                    "eyebrow",
+                                    "rail",
+                                    "tab",
+                                    "plane"
+                                ],
+                                "description": "Standard: `mark`."
+                            },
+                            "questions": {
+                                "type": "string",
+                                "enum": [
+                                    "stacked",
+                                    "twoColumns"
+                                ],
+                                "description": "Standard: `stacked`."
+                            },
+                            "longAnswers": {
+                                "type": "string",
+                                "enum": [
+                                    "countAndContinued",
+                                    "plain"
+                                ],
+                                "description": "Standard: `countAndContinued`."
+                            },
+                            "choices": {
+                                "type": "string",
+                                "enum": [
+                                    "allOptions",
+                                    "chosenOnly"
+                                ],
+                                "description": "Standard: `allOptions`."
+                            },
+                            "yesNo": {
+                                "type": "string",
+                                "enum": [
+                                    "word",
+                                    "threeColumns"
+                                ],
+                                "description": "Standard: `word`."
+                            },
+                            "empty": {
+                                "type": "string",
+                                "enum": [
+                                    "collapseAndMark",
+                                    "hide",
+                                    "printAll"
+                                ],
+                                "description": "Standard: `collapseAndMark`."
+                            },
+                            "signatures": {
+                                "type": "string",
+                                "enum": [
+                                    "confirmedAndDrawn",
+                                    "confirmedOnly",
+                                    "withPaperLines"
+                                ],
+                                "description": "Standard: `confirmedAndDrawn`."
+                            },
+                            "approvals": {
+                                "type": "string",
+                                "enum": [
+                                    "list",
+                                    "cards"
+                                ],
+                                "description": "Standard: `list`."
+                            },
+                            "footer": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "What the footer prints beside \"Page x of y\", which always prints.",
+                                "properties": {
+                                    "reference": {
+                                        "type": "boolean"
+                                    },
+                                    "pageCount": {
+                                        "type": "boolean",
+                                        "enum": [
+                                            true
+                                        ]
+                                    },
+                                    "marks": {
+                                        "type": "boolean"
+                                    },
+                                    "qrEveryPage": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            },
+                            "marks": {
+                                "type": "array",
+                                "maxItems": 3,
+                                "description": "Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan.",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                        "src"
+                                    ],
+                                    "properties": {
+                                        "src": {
+                                            "type": "string",
+                                            "pattern": "^/api/files/[0-9]{1,12}/content$"
+                                        },
+                                        "alt": {
+                                            "type": "string",
+                                            "maxLength": 80
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -92063,6 +92558,15 @@
                                             ]
                                         },
                                         "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                                    },
+                                    "layout": {
+                                        "type": "string",
+                                        "enum": [
+                                            "start",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                                     }
                                 },
                                 "required": [
@@ -92081,6 +92585,153 @@
                             "largePrint": {
                                 "type": "boolean",
                                 "description": "Large print: an 11pt body in print, with headings scaled by the same steps."
+                            },
+                            "form": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout.",
+                                "properties": {
+                                    "header": {
+                                        "type": "string",
+                                        "enum": [
+                                            "letterhead",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Standard: `letterhead`."
+                                    },
+                                    "officeDetails": {
+                                        "type": "string",
+                                        "enum": [
+                                            "decisionLine",
+                                            "strip"
+                                        ],
+                                        "description": "Standard: `decisionLine`."
+                                    },
+                                    "decision": {
+                                        "type": "string",
+                                        "enum": [
+                                            "topAndEnd",
+                                            "top",
+                                            "end"
+                                        ],
+                                        "description": "Standard: `topAndEnd`."
+                                    },
+                                    "sectionStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                            "mark",
+                                            "number",
+                                            "eyebrow",
+                                            "rail",
+                                            "tab",
+                                            "plane"
+                                        ],
+                                        "description": "Standard: `mark`."
+                                    },
+                                    "questions": {
+                                        "type": "string",
+                                        "enum": [
+                                            "stacked",
+                                            "twoColumns"
+                                        ],
+                                        "description": "Standard: `stacked`."
+                                    },
+                                    "longAnswers": {
+                                        "type": "string",
+                                        "enum": [
+                                            "countAndContinued",
+                                            "plain"
+                                        ],
+                                        "description": "Standard: `countAndContinued`."
+                                    },
+                                    "choices": {
+                                        "type": "string",
+                                        "enum": [
+                                            "allOptions",
+                                            "chosenOnly"
+                                        ],
+                                        "description": "Standard: `allOptions`."
+                                    },
+                                    "yesNo": {
+                                        "type": "string",
+                                        "enum": [
+                                            "word",
+                                            "threeColumns"
+                                        ],
+                                        "description": "Standard: `word`."
+                                    },
+                                    "empty": {
+                                        "type": "string",
+                                        "enum": [
+                                            "collapseAndMark",
+                                            "hide",
+                                            "printAll"
+                                        ],
+                                        "description": "Standard: `collapseAndMark`."
+                                    },
+                                    "signatures": {
+                                        "type": "string",
+                                        "enum": [
+                                            "confirmedAndDrawn",
+                                            "confirmedOnly",
+                                            "withPaperLines"
+                                        ],
+                                        "description": "Standard: `confirmedAndDrawn`."
+                                    },
+                                    "approvals": {
+                                        "type": "string",
+                                        "enum": [
+                                            "list",
+                                            "cards"
+                                        ],
+                                        "description": "Standard: `list`."
+                                    },
+                                    "footer": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "description": "What the footer prints beside \"Page x of y\", which always prints.",
+                                        "properties": {
+                                            "reference": {
+                                                "type": "boolean"
+                                            },
+                                            "pageCount": {
+                                                "type": "boolean",
+                                                "enum": [
+                                                    true
+                                                ]
+                                            },
+                                            "marks": {
+                                                "type": "boolean"
+                                            },
+                                            "qrEveryPage": {
+                                                "type": "boolean"
+                                            }
+                                        }
+                                    },
+                                    "marks": {
+                                        "type": "array",
+                                        "maxItems": 3,
+                                        "description": "Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan.",
+                                        "items": {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "required": [
+                                                "src"
+                                            ],
+                                            "properties": {
+                                                "src": {
+                                                    "type": "string",
+                                                    "pattern": "^/api/files/[0-9]{1,12}/content$"
+                                                },
+                                                "alt": {
+                                                    "type": "string",
+                                                    "maxLength": 80
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         },
                         "required": [

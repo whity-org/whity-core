@@ -17594,6 +17594,7 @@ final class CoreApiSchemas
                     'items' => ['type' => 'string', 'enum' => ['address', 'taxId', 'phone', 'email']],
                     'description' => 'The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`.',
                 ],
+                'layout' => ['type' => 'string', 'enum' => ['start', 'centred', 'bilingual'], 'description' => 'Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).'],
             ],
         ];
         $properties = [
@@ -17608,15 +17609,64 @@ final class CoreApiSchemas
             // E.46 and E.47 (editor M8).
             $properties['titleFace'] = ['type' => 'string', 'enum' => ['readex', 'noto'], 'description' => 'The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).'];
             $properties['largePrint'] = ['type' => 'boolean', 'description' => 'Large print: an 11pt body in print, with headings scaled by the same steps.'];
+            // Design 3.4, FP.2-FP.10.
+            $properties['form'] = self::formPrintoutStyle();
         }
 
         $schema = ['type' => 'object', 'additionalProperties' => false, 'properties' => $properties];
         if ($complete) {
-            $schema['required'] = array_keys($properties);
+            // `form` is present only when the theme sets it.
+            $schema['required'] = array_values(array_diff(array_keys($properties), ['form']));
             $schema['properties']['letterhead']['required'] = ['logo', 'lines'];
         }
 
         return $schema;
+    }
+
+    /**
+     * How form responses print (FormPrintStyle, design 3.4). Every key is
+     * optional; anything but the standard needs `documents.form_printouts`.
+     *
+     * @return array<string, mixed>
+     */
+    private static function formPrintoutStyle(): array
+    {
+        $properties = [];
+        foreach (\Whity\Core\Document\Theme\FormPrintStyle::OPTIONS as $key => $values) {
+            $properties[$key] = ['type' => 'string', 'enum' => $values, 'description' => "Standard: `{$values[0]}`."];
+        }
+        $properties['footer'] = [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'description' => 'What the footer prints beside "Page x of y", which always prints.',
+            'properties' => [
+                'reference' => ['type' => 'boolean'],
+                'pageCount' => ['type' => 'boolean', 'enum' => [true]],
+                'marks' => ['type' => 'boolean'],
+                'qrEveryPage' => ['type' => 'boolean'],
+            ],
+        ];
+        $properties['marks'] = [
+            'type' => 'array',
+            'maxItems' => \Whity\Core\Document\Theme\FormPrintStyle::MAX_MARKS,
+            'description' => 'Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan.',
+            'items' => [
+                'type' => 'object',
+                'additionalProperties' => false,
+                'required' => ['src'],
+                'properties' => [
+                    'src' => ['type' => 'string', 'pattern' => '^/api/files/[0-9]{1,12}/content$'],
+                    'alt' => ['type' => 'string', 'maxLength' => 80],
+                ],
+            ],
+        ];
+
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'description' => 'How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout.',
+            'properties' => $properties,
+        ];
     }
 
     /**
