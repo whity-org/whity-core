@@ -5654,6 +5654,7 @@ $messagingService = \Whity\Core\Messaging\CoreMessaging::build(
     static fn (string $name, array $payload, array $opts): ?int => $queueService->dispatch($name, $payload, $opts),
     $planLimitMeters,
     (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+    $brandedEmailSender,
 );
 \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messagingService);
 // WHIT-967 (SDK 1.99): a plugin messages a workspace's customer through Messages.

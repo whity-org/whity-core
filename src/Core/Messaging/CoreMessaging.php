@@ -34,6 +34,8 @@ final class CoreMessaging
         Closure $enqueue,
         ?MeterService $meters = null,
         ?string $appUrl = null,
+        // E2: emails go out as the workspace's HTML card through the one sender.
+        ?\Whity\Core\Mail\BrandedEmailSender $sender = null,
     ): MessagingService {
         $settings = new MessagingSettings($pdo, $secrets);
 
@@ -49,6 +51,17 @@ final class CoreMessaging
                     return is_string($name) ? $name : null;
                 },
                 self::messageIdHost($appUrl),
+                $sender,
+                static function (int $tenantId, int $messageId) use ($pdo): ?string {
+                    $stmt = $pdo->prepare(
+                        'SELECT p.display_name FROM messages m JOIN profiles p ON p.id = m.author_profile_id
+                          WHERE m.tenant_id = :tid AND m.id = :id'
+                    );
+                    $stmt->execute([':tid' => $tenantId, ':id' => $messageId]);
+                    $name = $stmt->fetchColumn();
+
+                    return is_string($name) ? $name : null;
+                },
             ));
         }
         if (!$channels->has(WebChatChannel::KEY)) {

@@ -25,13 +25,15 @@ final class EmailOptions
         public readonly ?string $messageId = null,
         public readonly ?string $inReplyTo = null,
         public readonly array $references = [],
+        /** The From name as given ("Example Bakery"), instead of "the workspace, via Whity". */
+        public readonly ?string $fromName = null,
     ) {
     }
 
     /** Whether anything here needs a {@see ThreadedMailer}. */
     public function needsHeaders(): bool
     {
-        return $this->attachments !== [] || $this->replyTo !== null || $this->messageId !== null
+        return $this->attachments !== [] || $this->replyTo !== null || $this->fromName !== null || $this->messageId !== null
             || $this->inReplyTo !== null || $this->references !== [];
     }
 }

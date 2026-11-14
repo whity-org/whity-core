@@ -104,6 +104,62 @@ final class MessagingRealEngineTest extends TestCase
         TenantContext::reset();
     }
 
+    public function testWithTheSharedSenderAReplyIsTheWorkspacesHtmlCard(): void
+    {
+        $this->settings->save(self::A, false, null, 'hello@bakery.example');
+        $mails = [];
+        $mailer = new class (function (OutgoingEmail $e) use (&$mails): void {
+            $mails[] = $e;
+        }) implements ThreadedMailer, \Whity\Core\Mail\Mailer {
+            public function __construct(private readonly \Closure $sink)
+            {
+            }
+
+            public function sendThreaded(OutgoingEmail $email): void
+            {
+                ($this->sink)($email);
+            }
+
+            public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
+            {
+                throw new \LogicException('a message goes out threaded');
+            }
+        };
+        $settings = new \Whity\Core\Settings\SettingsService(new GlobalSettingsRepository($this->pdo), new \Whity\Core\Settings\TenantSettingsRepository($this->pdo));
+        $sender = new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $settings);
+        $messaging = CoreMessaging::build(
+            $this->pdo,
+            new MessageChannelRegistry(),
+            $mailer,
+            new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'),
+            static fn (string $name, array $payload, array $opts): int => 1,
+            null,
+            'https://app.whity.test',
+            $sender,
+        );
+
+        $first = $messaging->send(self::A, Recipient::person(self::CUSTOMER_A), 'Your cake is ready.', new SendOptions(subject: 'Your order'));
+        self::assertSame('sent', $messaging->deliver(self::A, (int) $first['id']));
+        $second = $messaging->reply(self::A, (int) $first['conversation_id'], self::STAFF_A, "Pick-up is at 5.\nSee you then.");
+        self::assertSame('sent', $messaging->deliver(self::A, (int) $second['id']));
+
+        self::assertCount(2, $mails);
+        $reply = $mails[1];
+        // E2 `message-reply`: HTML, not plain text, and still threaded into the conversation.
+        self::assertNotNull($reply->htmlBody);
+        self::assertStringContainsString('<b style="font-weight:600">Staff A</b> from ', (string) $reply->htmlBody);
+        self::assertStringContainsString(' replied:', (string) $reply->htmlBody);
+        self::assertStringContainsString('Pick-up is at 5.<br>', (string) $reply->htmlBody);
+        self::assertStringContainsString('it goes straight to the same conversation', (string) $reply->htmlBody);
+        self::assertStringContainsString('> Pick-up is at 5.', $reply->textBody);
+        self::assertSame('Re: Your order', $reply->subject);
+        self::assertSame('hello@bakery.example', $reply->replyTo);
+        self::assertSame($mails[0]->messageId, $reply->inReplyTo);
+        self::assertSame('Example Bakery', $reply->fromName, 'from the workspace itself');
+        // The first message is the workspace writing, not replying.
+        self::assertStringContainsString(' wrote:', (string) $mails[0]->htmlBody);
+    }
+
     public function testSendQueuesThenDeliversWithThreadingHeaders(): void
     {
         $this->settings->save(self::A, false, null, 'hello@bakery.example');

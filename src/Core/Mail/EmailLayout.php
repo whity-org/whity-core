@@ -57,8 +57,23 @@ final class EmailLayout
         $site = self::esc($b->siteName);
         $initial = self::esc($b->initial());
         $heading = self::esc($c->heading);
+        // `message-reply` has no heading: the lead line opens it.
+        $h1 = $c->heading !== ''
+            ? '<h1 style="margin:0 0 14px;font-size:25px;line-height:1.3;font-weight:600;color:' . self::TEXT . '">' . $heading . "</h1>\n"
+            : '';
 
         $body = '';
+        if ($c->leadLine !== null) {
+            $body .= '<p style="margin:0 0 16px;font-size:17px;line-height:1.6;color:' . self::TEXT . '">'
+                . self::esc($c->leadLine['before']) . '<b style="font-weight:600">' . self::esc($c->leadLine['strong']) . '</b>'
+                . self::esc($c->leadLine['after']) . '</p>';
+        }
+        if ($c->quote !== null && $c->quote !== '') {
+            // The quoted reply: a line on its start side, its own line breaks kept.
+            $body .= '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 22px"><tr>'
+                . '<td dir="auto" style="border-' . $start . ':3px solid ' . self::LINE . ';padding:4px 14px;font-size:17px;line-height:1.6;color:' . self::TEXT . '">'
+                . nl2br(self::esc(trim($c->quote)), false) . '</td></tr></table>';
+        }
         $paragraphs = '';
         foreach ($c->paragraphs as $p) {
             $paragraphs .= self::para($p, self::TEXT);
@@ -197,8 +212,7 @@ final class EmailLayout
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;font-family:{$font};text-align:{$start}" dir="{$dir}">
 <tr><td class="card" style="background:#ffffff;border-radius:18px;padding:36px 40px">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px"><tr><td style="width:40px;height:40px;border-radius:11px;background:{$brand};color:#ffffff;font-size:20px;font-weight:600;text-align:center;line-height:40px">{$initial}</td><td style="width:12px"></td><td style="font-size:18px;font-weight:600;color:{$text}">{$site}</td></tr></table>
-<h1 style="margin:0 0 14px;font-size:25px;line-height:1.3;font-weight:600;color:{$text}">{$heading}</h1>
-{$body}
+{$h1}{$body}
 </td></tr>
 <tr><td class="foot" style="padding:20px 8px 0;font-size:13px;line-height:1.6;color:#71717a">{$foot}</td></tr>
 </table></td></tr></table>
@@ -209,7 +223,21 @@ HTML;
     private function renderText(EmailContent $c, EmailBranding $b): string
     {
         $words = self::WORDS[$c->isArabic() ? 'ar' : 'en'];
-        $lines = [$b->siteName, '', $c->heading, ''];
+        $lines = [$b->siteName, ''];
+        if ($c->heading !== '') {
+            $lines[] = $c->heading;
+            $lines[] = '';
+        }
+        if ($c->leadLine !== null) {
+            $lines[] = $c->leadLine['before'] . $c->leadLine['strong'] . $c->leadLine['after'];
+            $lines[] = '';
+        }
+        if ($c->quote !== null && $c->quote !== '') {
+            foreach (preg_split('/\R/', trim($c->quote)) ?: [] as $quoted) {
+                $lines[] = '> ' . $quoted;
+            }
+            $lines[] = '';
+        }
         foreach ($c->paragraphs as $p) {
             $lines[] = $p;
             $lines[] = '';
