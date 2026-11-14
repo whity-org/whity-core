@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Auth;
 
-use Defuse\Crypto\Crypto;
-use Defuse\Crypto\Exception\CryptoException;
 use OTPHP\TOTP;
-use ParagonieConstantTime\Encoding;
+use Whity\Core\Security\EncryptedSecretStore;
 use Whity\Core\Security\EncryptionKeyGuard;
 
 /**
@@ -17,7 +15,11 @@ use Whity\Core\Security\EncryptionKeyGuard;
  * for two-factor authentication.
  *
  * Uses spomky-labs/otphp for TOTP generation and validation (RFC 6238).
- * Encrypts secrets with authenticated encryption (defuse/php-encryption) for storage.
+ * Secrets are stored through the shared key ring ({@see EncryptedSecretStore}),
+ * so they follow the same key id, current key and retired keys as every other
+ * stored secret. Values written before that (a bare ciphertext with no key-id
+ * prefix) still decrypt under the current or any retired key; callers move them
+ * onto the current key with {@see rewrapForCurrentKey()}.
  */
 class TotpService
 {
@@ -32,16 +34,34 @@ class TotpService
      */
     private const DEV_ENCRYPTION_KEY = 'dev_secret';
 
-    private string $encryptionKey;
+    private EncryptedSecretStore $store;
 
     /**
-     * Constructor
-     *
-     * @param string $encryptionKey Encryption key for secret storage (will be hashed to 256 bits)
+     * @param string|EncryptedSecretStore $keys The key ring, or a single key (used as key id `v1`).
      */
-    public function __construct(string $encryptionKey)
+    public function __construct(string|EncryptedSecretStore $keys)
     {
-        $this->encryptionKey = $encryptionKey;
+        $this->store = $keys instanceof EncryptedSecretStore
+            ? $keys
+            : new EncryptedSecretStore(['v1' => $keys], 'v1');
+    }
+
+    /**
+     * Build the service on the platform key ring from the environment.
+     *
+     * The current key comes from {@see resolveEncryptionKey()} (so the development
+     * fallback and the non-development guard are unchanged); the key id and the
+     * retired keys come from `ENCRYPTION_KEY_ID` / `ENCRYPTION_KEYS_RETIRED`, read
+     * by {@see EncryptedSecretStore::fromEnv()}.
+     *
+     * @param array<string, mixed>|null $env Environment map; defaults to $_ENV.
+     */
+    public static function fromEnv(?array $env = null): self
+    {
+        $env ??= $_ENV;
+        $env['ENCRYPTION_KEY'] = self::resolveEncryptionKey($env);
+
+        return new self(EncryptedSecretStore::fromEnv($env));
     }
 
     /**
@@ -54,13 +74,15 @@ class TotpService
      * .env.example but never actually enforced), and only `APP_ENV=development` may fall back to the
      * well-known dev default.
      *
+     * @param array<string, mixed>|null $env Environment map; defaults to $_ENV.
      * @return string The resolved encryption key.
      * @throws \RuntimeException If ENCRYPTION_KEY is missing/too short in a non-development environment.
      */
-    public static function resolveEncryptionKey(): string
+    public static function resolveEncryptionKey(?array $env = null): string
     {
-        $appEnv = $_ENV['APP_ENV'] ?? 'production';
-        $key = $_ENV['ENCRYPTION_KEY'] ?? '';
+        $env ??= $_ENV;
+        $appEnv = (string) ($env['APP_ENV'] ?? 'production');
+        $key = (string) ($env['ENCRYPTION_KEY'] ?? '');
 
         if ($key === '' && $appEnv === 'development') {
             return self::DEV_ENCRYPTION_KEY;
@@ -84,19 +106,17 @@ class TotpService
     }
 
     /**
-     * Encrypt a TOTP secret with authenticated encryption.
+     * Encrypt a TOTP secret under the current key of the key ring.
      *
-     * Uses defuse/php-encryption (AES-256-CTR + HMAC-SHA256, Encrypt-then-MAC) with a key
-     * derived from the configured passphrase via PBKDF2. A fresh random salt/IV is used per
-     * call, and the authentication tag lets {@see decryptSecret()} detect any tampering —
-     * closing the integrity gap of the previous unauthenticated AES-256-CBC scheme (WC-158).
+     * Authenticated encryption (defuse/php-encryption via {@see EncryptedSecretStore}),
+     * stored as `"<keyId>:<ciphertext>"`.
      *
      * @param string $secret The TOTP secret to encrypt
      * @return string Opaque authenticated-ciphertext token safe for storage
      */
     public function encryptSecret(string $secret): string
     {
-        return Crypto::encryptWithPassword($secret, $this->encryptionKey);
+        return $this->store->encrypt($secret);
     }
 
     /**
@@ -112,10 +132,35 @@ class TotpService
     public function decryptSecret(string $encrypted): string
     {
         try {
-            return Crypto::decryptWithPassword($encrypted, $this->encryptionKey);
-        } catch (CryptoException $e) {
+            return $this->store->hasKeyIdPrefix($encrypted)
+                ? $this->store->decrypt($encrypted)
+                : $this->store->decryptUnprefixed($encrypted);
+        } catch (\RuntimeException $e) {
             throw new \RuntimeException('Failed to decrypt TOTP secret', 0, $e);
         }
+    }
+
+    /**
+     * Whether a stored secret is already under the current key, in the key-ring format.
+     */
+    public function isOnCurrentKey(string $encrypted): bool
+    {
+        return $this->store->isEncryptedWithCurrentKey($encrypted);
+    }
+
+    /**
+     * Re-encrypt a stored secret under the current key.
+     *
+     * @return string|null The new stored value, or null when it is already on the current key.
+     * @throws \RuntimeException If the stored value does not decrypt.
+     */
+    public function rewrapForCurrentKey(string $encrypted): ?string
+    {
+        if ($this->isOnCurrentKey($encrypted)) {
+            return null;
+        }
+
+        return $this->encryptSecret($this->decryptSecret($encrypted));
     }
 
     /**

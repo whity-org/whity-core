@@ -2452,6 +2452,7 @@ class AuthHandler
                 // rejected exactly like a replayed backup code.
                 if ($matchedStep !== null && $this->consumeTotpStep($profileId, $matchedStep)) {
                     $isValid = true;
+                    $this->moveTotpSecretToCurrentKey($totpService, $profileId, (string) $twoFactorSecret);
                 }
             } catch (\Exception) {
                 // Continue to backup code validation
@@ -2558,6 +2559,31 @@ class AuthHandler
     }
 
     /**
+     * Move a profile's stored TOTP secret onto the current key of the key ring,
+     * after it has just verified a code. Rows still in the older format, or under
+     * a retired key, are rewritten here so a rotation finishes without a sweep.
+     *
+     * Compare-and-set on the old value so a concurrent re-enrolment is never
+     * overwritten. Best effort: a failure here never fails the sign-in.
+     */
+    private function moveTotpSecretToCurrentKey(TotpService $totpService, int $profileId, string $stored): void
+    {
+        try {
+            $rewrapped = $totpService->rewrapForCurrentKey($stored);
+            if ($rewrapped === null) {
+                return;
+            }
+            // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1); PK-targeted write of the caller's own profile
+            $stmt = $this->db->prepare(
+                'UPDATE profiles SET two_factor_secret = ? WHERE id = ? AND two_factor_secret = ?'
+            );
+            $stmt->execute([$rewrapped, $profileId, $stored]);
+        } catch (\Throwable) {
+            // Left as it is; it still decrypts, and the next sign-in tries again.
+        }
+    }
+
+    /**
      * Get the TotpService used for login-path 2FA validation.
      *
      * Prefers the instance injected via the constructor (the same one the setup/confirm path uses).
@@ -2570,7 +2596,7 @@ class AuthHandler
     private function getTotpService(): TotpService
     {
         if ($this->totpService === null) {
-            $this->totpService = new TotpService(TotpService::resolveEncryptionKey());
+            $this->totpService = TotpService::fromEnv();
         }
         return $this->totpService;
     }
