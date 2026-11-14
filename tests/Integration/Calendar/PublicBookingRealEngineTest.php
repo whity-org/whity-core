@@ -10,6 +10,7 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Api\PublicBookingApiHandler;
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Calendar\BookingReminderJob;
@@ -123,6 +124,7 @@ final class PublicBookingRealEngineTest extends TestCase
             new HostResolver($tenants, ''),
             new BotCheck($globals, new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'), new HttpFetcher()),
             new DatabaseSharedStore($this->pdo),
+            new BrandingService($this->settings),
         );
     }
 
@@ -183,6 +185,49 @@ final class PublicBookingRealEngineTest extends TestCase
         $unknown = $this->handler->page(self::request('GET', '/api/v1/public/booking/nobody'), ['workspace' => 'nobody']);
         self::assertSame(404, $off->getStatusCode());
         self::assertSame($off->getBody(), $unknown->getBody(), 'a page that is off and one that does not exist look the same');
+    }
+
+    public function testThePageCarriesTheWorkspacesOwnBrandAndNothingElse(): void
+    {
+        // WHIT-1014: the instance has its own name and colour; the bakery sets its own colour and logo.
+        $this->settings->setGlobal('site_name', 'Platform');
+        $this->settings->setGlobal('branding_main_color', '#c53829');
+        $this->settings->setTenant(1, 'branding_main_color', '#b74c05');
+        $this->settings->setTenantAsset(1, 'branding_logo_square', 'tenants/1/branding/logo_square-abc.png');
+        $this->settings->setTenant(1, 'support_email', 'owner@example.com');
+
+        $brand = self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data']['brand'];
+        self::assertSame(['name', 'logo_wide_url', 'logo_square_url', 'main_color', 'theme'], array_keys($brand), 'only public brand fields');
+        self::assertSame('Example Bakery', $brand['name'], 'the workspace name, not the instance name');
+        self::assertSame('#b74c05', $brand['main_color']);
+        self::assertSame('/api/v1/branding/asset/1/logo_square-abc.png', $brand['logo_square_url']);
+        self::assertNull($brand['logo_wide_url']);
+        self::assertSame('#b74c05', $brand['theme']['light']['primary']);
+        self::assertArrayHasKey('primary-foreground', $brand['theme']['light'], 'the label colour derived for contrast comes too');
+        self::assertStringNotContainsString('owner@example.com', (string) json_encode($brand));
+
+        $this->settings->setTenant(1, 'site_name', 'Example Bakery & Cafe');
+        $named = self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data']['brand'];
+        self::assertSame('Example Bakery & Cafe', $named['name'], 'its own site name when it set one');
+    }
+
+    public function testWithoutItsOwnColourThePageKeepsTheDefault(): void
+    {
+        $brand = self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data']['brand'];
+        self::assertNull($brand['main_color']);
+        self::assertNull($brand['theme']);
+        self::assertSame('Example Bakery', $brand['name']);
+    }
+
+    public function testTheManageLinkCarriesTheWorkspacesBrand(): void
+    {
+        $this->settings->setTenant(1, 'branding_main_color', '#00792f');
+        $made = self::data($this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']))['data'];
+        self::assertArrayNotHasKey('brand', $made, 'booking answers only the manage link adds it to');
+
+        $shown = self::data($this->handler->showBooking(self::request('GET', '/x', [], '198.51.100.1'), ['token' => (string) $made['manage_token']]))['data'];
+        self::assertSame('#00792f', $shown['brand']['main_color']);
+        self::assertSame('Example Bakery', $shown['brand']['name']);
     }
 
     public function testABookingIsMadeConfirmedAndEmailedWithItsLink(): void

@@ -10198,7 +10198,26 @@ final class CoreApiSchemas
                 ], ['id', 'name', 'duration_minutes', 'price_minor', 'currency', 'staff_profile_ids'])],
                 'staff' => ['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'display_name' => self::str()], ['profile_id', 'display_name'])],
                 'bot_check' => ['type' => 'object', 'nullable' => true, 'properties' => ['provider' => self::str(), 'site_key' => self::str()]],
+                'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'The brand of the workspace, for the page (WHIT-1014).'],
             ], ['workspace', 'settings', 'services', 'staff', 'bot_check']),
+            // WHIT-1014: what a workspace's public pages show of its brand. Only
+            // public values: the name, logo addresses and the main colour.
+            'PublicWorkspaceBrand' => self::object([
+                'name' => self::str() + ['description' => 'The site name the workspace set, else its name.'],
+                'logo_wide_url' => ['type' => 'string', 'nullable' => true],
+                'logo_square_url' => ['type' => 'string', 'nullable' => true],
+                'main_color' => ['type' => 'string', 'nullable' => true, 'description' => 'The workspace main colour as #rrggbb, or null for Whity Blue.'],
+                'theme' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'description' => 'Token values derived from the main colour (decision 2.8), keyed by token name without the leading dashes; null when no main colour is set.',
+                    'properties' => [
+                        'light' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                        'dark' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                    ],
+                    'required' => ['light', 'dark'],
+                ],
+            ], ['name', 'logo_wide_url', 'logo_square_url', 'main_color', 'theme']),
             'PublicBookingRequest' => self::object([
                 'service_id' => self::int() + ['description' => 'The service.'],
                 'profile_id' => self::int() + ['description' => 'One person; leave out for anyone.'],
@@ -10234,6 +10253,7 @@ final class CoreApiSchemas
                     'hold_expires_at' => self::str(),
                 ]],
                 'workspace' => self::object(['name' => self::str()], ['name']),
+                'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'Only on the manage link: the brand of the workspace (WHIT-1014).'],
                 'time_zone' => self::str(),
             ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
             'CalendarSettings' => self::object([
