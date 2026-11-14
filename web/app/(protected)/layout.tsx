@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/sidebar';
 import { TopBar } from '@/components/shell/top-bar';
 import { AppCommandPalette } from '@/components/shell/app-command-palette';
 import { MaintenanceNotice } from '@/components/shell/maintenance-notice';
+import { PlanLimitBanner } from '@/components/billing/plan-limit-banner';
 
 /**
  * The standard app shell: sidebar + a padded, max-width content column.
@@ -40,6 +41,8 @@ export default function ProtectedLayout({
           {/* WHIT-147: the top bar holds search (⌘K); the palette mounts once per shell. */}
           <TopBar />
           <MaintenanceNotice />
+          {/* TplPlanLimit (BM.11): past a plan limit, for people who can change the plan. */}
+          <PlanLimitBanner />
           {/* Gutters 16px on phones, 24 from 640, 32 from 768 (register 4.5). */}
           <div className="p-4 sm:p-6 md:p-8 max-w-7xl">{children}</div>
         </main>
