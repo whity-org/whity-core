@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { AuthShell } from '@/components/auth-shell';
 import { MAIN_COLOUR_SWATCHES } from '@/components/branding-main-colour';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 /**
  * "No workspace yet" (WHIT-994, decision M.29): where somebody lands after

@@ -73,7 +73,7 @@ curl -si https://<host>/api/login \
 
 - [ ] **[BLOCKER] Release image built and smoke-tested** — the tagged GHCR image boots against a throwaway Postgres, runs migrate+seed, and serves `GET /api/health` = 200 before the GitHub Release is published (enforced by the `smoke` job in `release.yml`).
 - [ ] **Worker mode enabled in the runtime** — `FRANKENPHP_CONFIG="worker /app/public/index.php <N>"`, `SERVER_NAME` set, `auto_https` configured for your TLS setup. (A plain `docker run` without `FRANKENPHP_CONFIG` will NOT run in worker mode — the project Caddyfile is only bind-mounted in dev compose.)
-- [ ] **Generated artifacts committed and drift-free** — `public/openapi.json` matches `CoreApiSchemas` (`generate:openapi`) and `web/lib/api/schema.d.ts` matches it (`generate:api`). CI's drift gates confirm this.
+- [ ] **Generated artifacts committed and drift-free** — `public/openapi.json` matches `CoreApiSchemas` (`generate:openapi`) and `packages/api-client/src/schema.d.ts` matches it (`npm run generate` in `packages/api-client`). CI's drift gates confirm this.
 - [ ] **Tag matches `CoreVersion::VERSION`** — enforced by `release.yml`'s verify job.
 - [ ] **Worker recycling configured** — `MAX_REQUESTS` / memory limits set so persistent workers recycle before leaking (FrankenPHP worker-pool safety).
 

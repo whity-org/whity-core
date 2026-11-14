@@ -10,7 +10,7 @@ import { useDateDisplay } from '@whity/features/datetime';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { useFetch } from '@/hooks/useFetch';
 import { useAuth } from '@/lib/auth-context';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { localized, type WorkspaceAgent } from './workspace-agents';
 
 type Item = components['schemas']['AgentActivityItem'];

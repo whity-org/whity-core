@@ -27,7 +27,7 @@ import { useNavigation } from '@/lib/navigation-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { LICENSING_VIEW } from '@/lib/capabilities';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 type SettingsTab = components['schemas']['SettingsTab'];
 

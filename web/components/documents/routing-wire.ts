@@ -4,7 +4,7 @@
  * Mirrors `RoutingPresenter` (`src/Core/Document/Routing/RoutingPresenter.php`)
  * and `InboxItem` (`src/Core/Inbox/InboxItem.php`) field for field.
  *
- * Hand-written rather than taken from `@/lib/api/schema`, matching the
+ * Hand-written rather than taken from `@whity/api-client`, matching the
  * convention its nearest neighbour states — see
  * `web/app/(protected)/admin/document-library/types.ts`: the generated client is
  * built from the DYNAMIC `/api/openapi.json`, which describes whatever plugin
