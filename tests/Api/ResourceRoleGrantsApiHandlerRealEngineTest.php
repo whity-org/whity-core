@@ -1014,6 +1014,9 @@ final class ResourceRoleGrantsApiHandlerRealEngineTest extends TestCase
         return $decoded['data'];
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
     private function listGrants(string $resourceType, int $resourceId): array
     {
         $response = $this->handler()->list($this->req(
