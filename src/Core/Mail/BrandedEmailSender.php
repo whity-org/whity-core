@@ -166,7 +166,7 @@ final class BrandedEmailSender
         $branding = $options->branding ?? $this->branding($tenantId);
         $rendered = $this->layout->render($content, $branding);
         // EM.1: from "the workspace, via Whity"; a white-label plan drops "via Whity".
-        $fromName = $tenantId > 0 ? self::fromName($branding, $content->language) : null;
+        $fromName = $options->fromName ?? ($tenantId > 0 ? self::fromName($branding, $content->language) : null);
 
         if ($this->mailer instanceof ThreadedMailer && ($fromName !== null || ($options?->needsHeaders() ?? false))) {
             $this->mailer->sendThreaded(new OutgoingEmail(

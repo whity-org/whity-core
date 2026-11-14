@@ -71,6 +71,16 @@ final class EmailContent
         public readonly ?array $linkLine = null,
         /** A smaller soft line after that ("A calendar file is attached …"). */
         public readonly ?string $smallNote = null,
+        /**
+         * A first line with one name in 600, before the paragraphs ("**Awss
+         * Haddad** from Example Bakery replied:"; "**Amro** sent you **the
+         * contract**" uses `after` for the rest).
+         *
+         * @var array{before: string, strong: string, after: string}|null
+         */
+        public readonly ?array $leadLine = null,
+        /** A quoted block (a reply's text): a line on its start side, line breaks kept. */
+        public readonly ?string $quote = null,
     ) {
     }
 
