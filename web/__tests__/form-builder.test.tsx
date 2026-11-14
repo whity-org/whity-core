@@ -322,6 +322,23 @@ describe('FormBuilderScreen', () => {
     expect(await screen.findByRole('switch', { name: 'Open to members' })).toBeChecked();
   });
 
+  it('says when the reference is given, and keeps the choice on a save (WHIT-1017)', async () => {
+    const calls: Array<{ method: string; path: string; body?: unknown }> = [];
+    const env = fakeEnv(calls, { ...FORM, reference_format: 'IRB {SEQ}/{STEP:meeting_no}', reference_assign: 'approval' });
+    render(<FormBuilderScreen env={env} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    await userEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+
+    expect(await screen.findByText('When it is approved')).toBeInTheDocument();
+    expect(screen.getByText(/finishes approved, before the final document is made/)).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText('Reference number'), '-X');
+    await userEvent.click(await screen.findByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'PATCH')).toBe(true));
+    const patch = calls.find((c) => c.method === 'PATCH');
+    expect(patch?.body).toMatchObject({ reference_format: 'IRB {SEQ}/{STEP:meeting_no}-X', reference_assign: 'approval' });
+  });
+
   it('does not show the switch while the server does not offer it', async () => {
     render(<FormBuilderScreen env={fakeEnv([])} formId={7} canManage />);
     await screen.findByText(/Supplier name/);

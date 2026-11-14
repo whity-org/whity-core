@@ -884,6 +884,8 @@ final class DocumentRouter
 
             // In this transaction: the approval and the number it earned commit together.
             $number = $this->numberOnFinalApproval($tenantId, $documentId, $routeId);
+            // WHIT-1017: and what the subject itself earns, such as a reference.
+            $this->subjectOnFinalApproval($tenantId, $subjectType, $subjectId, $routeId);
 
             if ($ownTransaction) {
                 $this->db->commit();
@@ -1507,6 +1509,22 @@ final class DocumentRouter
      * Null unless this call handed it out, so a replay or a second approver finishing
      * at the same moment announces nothing; {@see DocumentNumbering} makes it once.
      */
+    /**
+     * WHIT-1017: tell a subject that cares that its route finished approved
+     * (nothing left open, and the last verdict an approval), inside the act's
+     * transaction and before its final document is made.
+     */
+    private function subjectOnFinalApproval(int $tenantId, string $subjectType, int $subjectId, int $routeId): void
+    {
+        $provider = $this->subjects?->get($subjectType);
+        if (!$provider instanceof RouteSubjectApprovedInterface
+            || $this->recipients->hasOpenOnRoute($tenantId, $routeId)
+            || $this->events->latestVerdictOnRoute($routeId, $tenantId) !== RouteVerdict::APPROVED) {
+            return;
+        }
+        $provider->approved($tenantId, $subjectId, $routeId);
+    }
+
     private function numberOnFinalApproval(int $tenantId, ?int $documentId, int $routeId): ?string
     {
         // WHIT-920: a subject with no document has no number to wait for.

@@ -50,7 +50,7 @@ final class FormRepository
      * Written once and shared by every read, so a column added to the table
      * cannot reach one caller and not another.
      */
-    private const COLUMNS = 'id, tenant_id, form_key, name, title, description, submit_label, sections, banner, reference_format, status, version,
+    private const COLUMNS = 'id, tenant_id, form_key, name, title, description, submit_label, sections, banner, reference_format, reference_assign, status, version,
                              route_template_id,
                              (SELECT t.name FROM document_route_templates t
                                WHERE t.id = forms.route_template_id AND t.tenant_id = forms.tenant_id) AS route_template_name,
@@ -502,7 +502,7 @@ final class FormRepository
      * Returns false when the form does not exist in this tenant.
      *
      * @param array<string, mixed> $changes Any of: name, title, description, route_template_id,
-     *                                     submit_label, sections, reference_format, banner.
+     *                                     submit_label, sections, reference_format, reference_assign, banner.
      */
     public function update(int $tenantId, int $id, array $changes): bool
     {
@@ -553,6 +553,11 @@ final class FormRepository
         if (array_key_exists('reference_format', $changes)) {
             $sets[] = 'reference_format = :reference_format';
             $params[':reference_format'] = $changes['reference_format'];
+        }
+        // WHIT-1017: `submit` or `approval`, checked by the caller and the column's CHECK.
+        if (array_key_exists('reference_assign', $changes)) {
+            $sets[] = 'reference_assign = :reference_assign';
+            $params[':reference_assign'] = $changes['reference_assign'];
         }
         if (array_key_exists('submit_label', $changes)) {
             $sets[] = 'submit_label = :submit_label';
@@ -738,6 +743,10 @@ final class FormRepository
             ) ?: new \stdClass(),
             'submit_label' => isset($row['submit_label']) ? LocalizedLabel::decode((string) $row['submit_label']) : null,
             'reference_format' => isset($row['reference_format']) ? (string) $row['reference_format'] : null,
+            // WHIT-1017: when the reference is given: on submit, or when the route finishes approved.
+            'reference_assign' => ($row['reference_assign'] ?? null) === FormReferenceAssign::APPROVAL
+                ? FormReferenceAssign::APPROVAL
+                : FormReferenceAssign::SUBMIT,
             'sections' => self::decodeSections($row['sections'] ?? null),
             'status' => $status,
             'version' => (int) $row['version'],

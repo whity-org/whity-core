@@ -26,6 +26,8 @@ export interface FormRow {
   description_i18n: LocalizedMap | []
   submit_label: LocalizedMap | null
   reference_format: string | null
+  /** WHIT-1017: when the reference is given. Absent on an older server, which meant on submit. */
+  reference_assign?: "submit" | "approval"
   sections: FormSectionDef[]
   status: FormStatus
   version: number

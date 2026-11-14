@@ -81480,6 +81480,14 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "reference_assign": {
+                        "type": "string",
+                        "enum": [
+                            "submit",
+                            "approval"
+                        ],
+                        "description": "`submit`: when the form is sent. `approval`: when its route finishes approved."
+                    },
                     "submission_count": {
                         "type": "integer"
                     },
@@ -83257,9 +83265,17 @@
                     },
                     "reference_format": {
                         "type": "string",
-                        "maxLength": 64,
+                        "maxLength": 160,
                         "nullable": true,
-                        "description": "The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none."
+                        "description": "The reference each submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}` or `{ANSWER:subject|human=IRB-AAU|animal=AUB-AAU} {SEQ}/{STEP:meeting_no}/{AY:9}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}; {AY:m}, the academic year starting in month m, as 2026-2027; {ANSWER:question}, an answer, optionally looked up in a list (`|answer=text`, `|*=text` for any other); {STEP:key}, a value entered during review (only with `reference_assign` `approval`). {SEQ} is required, and each different prefix, year or answer counts on its own. Dates are UTC. Null gives none."
+                    },
+                    "reference_assign": {
+                        "type": "string",
+                        "enum": [
+                            "submit",
+                            "approval"
+                        ],
+                        "description": "When the reference is given: `submit` (default) when the form is sent, or `approval` when its route finishes approved, before the final document is made."
                     },
                     "public_requires_sign_in": {
                         "type": "boolean",
