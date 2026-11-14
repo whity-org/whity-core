@@ -100,7 +100,9 @@ html {
 .ff-a { margin-block: 1mm 0; margin-inline: 9mm 0; font-size: 9.5pt; }
 .ff-a p { margin: 0 0 2mm; }
 .ff-a p:last-child { margin-bottom: 0; }
-.ff-a-p { margin-inline-start: 9mm; }
+.ff-a-p { margin-inline-start: 9mm; text-align: start; }
+/* Answers are set ragged like the card, not justified like a letter's paragraphs. */
+.ff-a p { text-align: start; }
 .ff-empty { color: var(--ff-faint); }
 .ff-wc { color: var(--ff-grey2); font-size: 8pt; margin-inline-start: 9mm; margin-top: 1mm; }
 .ff-wc-unit { margin-bottom: 3.6mm; }
