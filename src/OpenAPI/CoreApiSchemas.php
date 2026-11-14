@@ -6378,6 +6378,8 @@ final class CoreApiSchemas
                 // WHIT-921: the template a `finalise` step renders the final
                 // document with. Null on every other step.
                 'final_template_id' => self::int(true),
+                // WHIT-1016: the values a person letting it through here fills in.
+                'inputs' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepInput')],
                 // #1037. HOW MANY TIMES A REJECTION HAS SENT THE DOCUMENT BACK
                 // FROM HERE. A backwards reject edge - "to the author, to fix" -
                 // is the most common approval design there is, and nothing
@@ -6434,7 +6436,28 @@ final class CoreApiSchemas
                 // without this a client could not tell an approver whether their
                 // single approval carries the gate or is one of four hundred.
                 'default_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority']],
+                // WHIT-1016: what people entered at the steps that ask for
+                // values, each key's latest. On the route lists; absent on the
+                // response that issues a route, where nothing is entered yet.
+                'values' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepValue')],
             ], ['id', 'document_id', 'title', 'created_at', 'steps', 'edges', 'default_quorum']),
+            // WHIT-1016: one value a step asks the person letting it through for.
+            'RouteStepInput' => self::object([
+                'key' => self::str() + ['description' => 'Small letters, digits and _, up to 40 characters. Templates print it as `route.value.<key>`.'],
+                'label' => self::str() + ['description' => 'What the person filling it in reads. At most 80 characters.'],
+                'label_ar' => self::str(true) + ['description' => 'The label in Arabic, when it differs.'],
+                'required' => self::bool() + ['description' => 'Whether approving needs it. True when absent.'],
+                'max_length' => self::int() + ['description' => 'Longest value, 1 to 200. 100 when absent.'],
+            ], ['key', 'label']),
+            // WHIT-1016: a value entered on a route.
+            'RouteStepValue' => self::object([
+                'key' => self::str(),
+                'value' => self::str(),
+                'step_id' => self::int(),
+                'event_id' => self::int() + ['description' => 'The trail entry it was entered with.'],
+                'entered_by' => self::int(true),
+                'entered_at' => self::str(),
+            ], ['key', 'value', 'step_id', 'event_id', 'entered_by', 'entered_at']),
             'DocumentRouteListResponse' => self::listEnvelope('DocumentRoute'),
             // `resolved` and `delivered` are on the envelope rather than on the
             // route, because they describe what THIS request did rather than a
@@ -6495,6 +6518,8 @@ final class CoreApiSchemas
                         // WHIT-919: false turns off sending back to the author
                         // at this step. True when absent.
                         'allow_send_back' => self::bool(),
+                        // WHIT-1016: values the person letting it through fills in.
+                        'inputs' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepInput'), 'maxItems' => 5],
                         // WHIT-922: `sign` makes the step a signing step, answered
                         // by signing or declining. Its quorum is `all` (the
                         // default) or `any`; it takes no edges.
@@ -6618,6 +6643,8 @@ final class CoreApiSchemas
                 // WHIT-919.
                 'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true, 'description' => 'With `sent_back` only: where the route resumes when the author resubmits. `sender` (this step, the default) or `start` (step 1).'],
                 'to_author' => self::bool() + ['description' => 'With `noted`: the note is meant for the author. Notes are internal by default.'],
+                // WHIT-1016.
+                'values' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'The values the step asks for, by key. Only with an approval, `acknowledged` or `forwarded`; required ones must be filled in.'],
             ], ['action']),
             'DocumentRouteActionResponse' => self::object([
                 'data' => SchemaBuilder::ref('DocumentTrailEvent'),
@@ -7643,6 +7670,9 @@ final class CoreApiSchemas
                 // (last, at most one, no rule); null on every other stage.
                 'kind' => ['type' => 'string', 'enum' => ['finalise'], 'nullable' => true],
                 'final_template_id' => self::int(true),
+                // WHIT-1016: values the person letting it through fills in. Not
+                // on a delivery or final document stage.
+                'inputs' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepInput'), 'maxItems' => 5],
                 'canvas_x' => self::int(),
                 'canvas_y' => self::int(),
                 // NOT in the required list, unlike `DocumentRouteStep` above.
@@ -9688,6 +9718,8 @@ final class CoreApiSchemas
                                 ], ['key'])],
                             ], ['seen_version', 'current_version', 'changes']),
                             'can_send_back' => self::bool(),
+                            // WHIT-1016: what people entered at the steps that ask for values.
+                            'values' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepValue')],
                             // WHIT-921: what the finalise step did - the engine's
                             // own act, so not a trail entry. Null until reached.
                             'finalisation' => SchemaBuilder::ref('RouteFinalisation') + ['nullable' => true],

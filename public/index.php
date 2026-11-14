@@ -3682,6 +3682,8 @@ $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentFieldP
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\CompanyFieldProvider($settingsService, $documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\TodayFieldProvider($documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentNumberFieldProvider($documentFieldLabels));
+// WHIT-1016: values entered at route steps (`route.value.<key>`), filled by the final document stage.
+$documentFieldRegistry->add(new \Whity\Core\Document\Fields\RouteValueFieldProvider($db->getPdo(), $documentFieldLabels));
 // WHIT-954: contacts as a record type, with the workspace's own fields (`{{contact.<key>}}`).
 $documentFieldRegistry->add(new \Whity\Core\Contacts\ContactFieldProvider($db->getPdo(), $documentFieldLabels));
 // WHIT-742: each workspace plugin's record types, in the workspaces where

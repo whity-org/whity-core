@@ -78475,6 +78475,12 @@
                             "any",
                             "majority"
                         ]
+                    },
+                    "values": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RouteStepValue"
+                        }
                     }
                 },
                 "required": [
@@ -78529,6 +78535,13 @@
                     "to_author": {
                         "type": "boolean",
                         "description": "With `noted`: the note is meant for the author. Notes are internal by default."
+                    },
+                    "values": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The values the step asks for, by key. Only with an approval, `acknowledged` or `forwarded`; required ones must be filled in."
                     }
                 },
                 "required": [
@@ -78616,6 +78629,13 @@
                                 },
                                 "allow_send_back": {
                                     "type": "boolean"
+                                },
+                                "inputs": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/RouteStepInput"
+                                    },
+                                    "maxItems": 5
                                 },
                                 "kind": {
                                     "type": "string",
@@ -78874,6 +78894,12 @@
                     "final_template_id": {
                         "type": "integer",
                         "nullable": true
+                    },
+                    "inputs": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RouteStepInput"
+                        }
                     },
                     "rejection_count": {
                         "type": "integer"
@@ -92639,6 +92665,69 @@
                     "data"
                 ]
             },
+            "RouteStepInput": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "Small letters, digits and _, up to 40 characters. Templates print it as `route.value.<key>`."
+                    },
+                    "label": {
+                        "type": "string",
+                        "description": "What the person filling it in reads. At most 80 characters."
+                    },
+                    "label_ar": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The label in Arabic, when it differs."
+                    },
+                    "required": {
+                        "type": "boolean",
+                        "description": "Whether approving needs it. True when absent."
+                    },
+                    "max_length": {
+                        "type": "integer",
+                        "description": "Longest value, 1 to 200. 100 when absent."
+                    }
+                },
+                "required": [
+                    "key",
+                    "label"
+                ]
+            },
+            "RouteStepValue": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": "string"
+                    },
+                    "step_id": {
+                        "type": "integer"
+                    },
+                    "event_id": {
+                        "type": "integer",
+                        "description": "The trail entry it was entered with."
+                    },
+                    "entered_by": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "entered_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "key",
+                    "value",
+                    "step_id",
+                    "event_id",
+                    "entered_by",
+                    "entered_at"
+                ]
+            },
             "RouteTemplate": {
                 "type": "object",
                 "properties": {
@@ -92911,6 +93000,13 @@
                         "type": "integer",
                         "nullable": true
                     },
+                    "inputs": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RouteStepInput"
+                        },
+                        "maxItems": 5
+                    },
                     "canvas_x": {
                         "type": "integer"
                     },
@@ -93049,6 +93145,12 @@
                                                 },
                                                 "can_send_back": {
                                                     "type": "boolean"
+                                                },
+                                                "values": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/RouteStepValue"
+                                                    }
                                                 },
                                                 "finalisation": {
                                                     "$ref": "#/components/schemas/RouteFinalisation",

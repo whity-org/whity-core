@@ -177,6 +177,8 @@ final class DocumentRouter
 
     private readonly RouteFinalisationRepository $finalisations;
 
+    private readonly RouteStepValueRepository $stepValues;
+
     public function __construct(
         private readonly PDO $db,
         private readonly RouteRepository $routes,
@@ -198,6 +200,7 @@ final class DocumentRouter
     ) {
         $this->numbering = new DocumentNumbering($db);
         $this->finalisations = new RouteFinalisationRepository($db);
+        $this->stepValues = new RouteStepValueRepository($db);
     }
 
     /**
@@ -345,6 +348,7 @@ final class DocumentRouter
                     $step['sign_capacity'],
                     $step['sign_on_behalf_of'],
                     $step['final_template_id'],
+                    inputs: $step['inputs'],
                 );
             }
 
@@ -506,6 +510,9 @@ final class DocumentRouter
      * @param array<string, mixed> $route   A normalized `document_routes` row.
      * @param string|null          $verdict `approved` / `rejected` on a decision
      *        step, null everywhere else. {@see RouteVerdict}.
+     * @param array<string, string> $values WHIT-1016: what the step asks the
+     *        person letting it through to fill in ({@see RouteStepInputs}). Only an
+     *        approval, an acknowledgement or a forward carries values.
      *
      * @return array{event: array<string, mixed>, resolved: int, delivered: int, decided: ?string}
      *
@@ -523,11 +530,22 @@ final class DocumentRouter
         ?string $verdict = null,
         ?string $resumeFrom = null,
         bool $toAuthor = false,
+        array $values = [],
     ): array {
         $routeId = (int) $route['id'];
         [$documentId, $subjectType, $subjectId] = self::routeSubject($route);
 
         $this->assertOpen($tenantId, $documentId, $subjectType, $subjectId);
+
+        // WHIT-1016: values go with letting the item through, never with
+        // stopping it, so the value a route holds is one entered on the way on.
+        $carriesValues = $verdict !== RouteVerdict::REJECTED
+            && in_array($action, [RouteAction::FORWARDED, RouteAction::ACKNOWLEDGED], true);
+        if ($values !== [] && !$carriesValues) {
+            throw RoutingRejectedException::because(
+                'Values are filled in when you approve or pass it on. Leave them out here.'
+            );
+        }
 
         if ($action === RouteAction::NOTED) {
             if ($verdict !== null) {
@@ -603,6 +621,16 @@ final class DocumentRouter
         }
 
         $this->assertActMatchesStep($step, $action, $verdict);
+
+        // WHIT-1016: checked before anything is written, like the plan below.
+        $entered = [];
+        if ($carriesValues) {
+            try {
+                $entered = RouteStepInputs::accept(RouteStepInputs::decode($step['inputs'] ?? []), $values);
+            } catch (InvalidArgumentException $e) {
+                throw RoutingRejectedException::because($e->getMessage());
+            }
+        }
 
         if ($signAct) {
             $verdict = $action === RouteAction::SIGNED ? RouteVerdict::APPROVED : RouteVerdict::REJECTED;
@@ -775,6 +803,10 @@ final class DocumentRouter
             ]);
 
             $this->recipients->close($tenantId, (int) $recipient['id'], $eventId);
+
+            // WHIT-1016: kept with the act that entered them, so the trail
+            // event names who entered each value and when.
+            $this->stepValues->record($tenantId, $routeId, (int) $step['id'], $eventId, $actorId, $entered);
 
             if ($decided !== null) {
                 // The step is settled, so the people still holding it are being
@@ -1787,6 +1819,16 @@ final class DocumentRouter
     }
 
     /**
+     * The values entered on a route so far (WHIT-1016): each key's latest.
+     *
+     * @return array<string, array{value: string, step_id: int, event_id: int, entered_by: ?int, entered_at: string}>
+     */
+    public function enteredValues(int $tenantId, int $routeId): array
+    {
+        return $this->stepValues->currentForRoute($tenantId, $routeId);
+    }
+
+    /**
      * The bottom three layers of {@see approvalQuorum()}: what a step that names
      * NO quorum of its own actually does in this tenant.
      *
@@ -2311,7 +2353,7 @@ final class DocumentRouter
      *                    decision: bool, decision_quorum: ?string, satisfied_by: string,
      *                    allow_send_back: bool, edges: array<string, int>, kind: ?string,
      *                    sign_capacity: ?string, sign_on_behalf_of: ?string,
-     *                    final_template_id: ?int}>
+     *                    final_template_id: ?int, inputs: list<array<string, mixed>>}>
      */
     private function validateSteps(int $tenantId, array $steps): array
     {
@@ -2563,6 +2605,14 @@ final class DocumentRouter
                 ));
             }
 
+            // WHIT-1016: values the person acting here fills in before approving.
+            try {
+                $inputs = RouteStepInputs::parse($step['inputs'] ?? null);
+                RouteStepInputs::assertAllowed($inputs, $satisfiedBy, $isSign ? RouteStepKind::SIGN : null);
+            } catch (InvalidArgumentException $e) {
+                throw RoutingRejectedException::because(sprintf('Step %d: %s', $position, $e->getMessage()));
+            }
+
             /** @var array<string, mixed> $config */
             $out[] = [
                 'rule_kind' => $kind,
@@ -2577,6 +2627,7 @@ final class DocumentRouter
                 'sign_capacity' => $signCapacity,
                 'sign_on_behalf_of' => $signOnBehalfOf,
                 'final_template_id' => null,
+                'inputs' => $inputs,
             ];
         }
 
@@ -2606,7 +2657,8 @@ final class DocumentRouter
      * @return array{rule_kind: string, rule_config: array<string, mixed>, label: ?string,
      *               decision: bool, decision_quorum: ?string, satisfied_by: string,
      *               allow_send_back: bool, edges: array<string, int>, kind: ?string,
-     *               sign_capacity: ?string, sign_on_behalf_of: ?string, final_template_id: ?int}
+     *               sign_capacity: ?string, sign_on_behalf_of: ?string, final_template_id: ?int,
+     *               inputs: list<array<string, mixed>>}
      *
      * @throws RoutingRejectedException
      */
@@ -2629,6 +2681,12 @@ final class DocumentRouter
             || ($step['on_approved'] ?? null) !== null || ($step['on_rejected'] ?? null) !== null) {
             throw RoutingRejectedException::because(sprintf(
                 'Step %d makes the final document. Nobody acts on it, so it is not a decision and leads nowhere.',
+                $position,
+            ));
+        }
+        if (($step['inputs'] ?? []) !== [] && ($step['inputs'] ?? null) !== null) {
+            throw RoutingRejectedException::because(sprintf(
+                'Step %d makes the final document. Nobody acts on it, so it cannot ask for values.',
                 $position,
             ));
         }
@@ -2664,6 +2722,7 @@ final class DocumentRouter
             'sign_capacity' => null,
             'sign_on_behalf_of' => null,
             'final_template_id' => $templateId,
+            'inputs' => [],
         ];
     }
 

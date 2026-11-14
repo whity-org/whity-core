@@ -397,6 +397,7 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $documentFieldRegistry->add(new \Whity\Core\Document\Fields\CompanyFieldProvider($settingsService));
         $documentFieldRegistry->add(new \Whity\Core\Document\Fields\TodayFieldProvider());
         $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentNumberFieldProvider());
+        $documentFieldRegistry->add(new \Whity\Core\Document\Fields\RouteValueFieldProvider($db->getPdo()));
         // WHIT-954: contacts and their custom fields, as in public/index.php.
         $documentFieldRegistry->add(new \Whity\Core\Contacts\ContactFieldProvider($db->getPdo()));
         \Whity\register_service(\Whity\Core\Document\Fields\DocumentFieldRegistry::class, $documentFieldRegistry);

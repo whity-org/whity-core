@@ -130,8 +130,23 @@ export interface RouteFlowStep {
    * Null uses the form's "Final document template".
    */
   finalTemplateId?: number | null;
+  /**
+   * WHIT-1016: values the person letting it through here fills in. Held for
+   * the reason {@link satisfiedBy} is: the server reads a missing list as
+   * none, so a model that dropped it would empty it on the next save.
+   */
+  inputs?: RouteFlowStepInput[];
   canvasX: number;
   canvasY: number;
+}
+
+/** WHIT-1016: one value a stage asks for. Templates print it as `route.value.<key>`. */
+export interface RouteFlowStepInput {
+  key: string;
+  label: string;
+  labelAr: string | null;
+  required: boolean;
+  maxLength: number;
 }
 
 /** One STORED transition, keyed by the verdict that takes it. */

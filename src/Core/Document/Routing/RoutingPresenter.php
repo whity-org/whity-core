@@ -210,7 +210,33 @@ final class RoutingPresenter
             'sign_on_behalf_of' => isset($step['sign_on_behalf_of']) ? (string) $step['sign_on_behalf_of'] : null,
             // WHIT-921: the template a finalise step renders with; null elsewhere.
             'final_template_id' => isset($step['final_template_id']) ? (int) $step['final_template_id'] : null,
+            // WHIT-1016: the values a person letting it through here fills in.
+            'inputs' => RouteStepInputs::decode($step['inputs'] ?? null),
         ];
+    }
+
+    /**
+     * The values entered on a route (WHIT-1016): each key's latest value, who
+     * entered it, at which step and when.
+     *
+     * @param array<string, array{value: string, step_id: int, event_id: int, entered_by: ?int, entered_at: string}> $current
+     * @return list<array<string, mixed>>
+     */
+    public static function values(array $current): array
+    {
+        $out = [];
+        foreach ($current as $key => $row) {
+            $out[] = [
+                'key' => (string) $key,
+                'value' => $row['value'],
+                'step_id' => $row['step_id'],
+                'event_id' => $row['event_id'],
+                'entered_by' => $row['entered_by'],
+                'entered_at' => $row['entered_at'],
+            ];
+        }
+
+        return $out;
     }
 
     /**
