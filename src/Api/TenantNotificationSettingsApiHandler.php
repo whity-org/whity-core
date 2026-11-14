@@ -93,6 +93,12 @@ final class TenantNotificationSettingsApiHandler
             ]);
 
             return Response::json(['data' => $this->repo->findForChannel($auth['tenantId'], $channel)], 200);
+        } catch (\InvalidArgumentException) {
+            // A value the settings registry refuses (WHIT-1036): the caller's to
+            // fix. Said in fixed words: exception text never reaches a client (WC-186).
+            return Response::error('Validation failed', 422, [
+                '_' => 'transport must be a transport name, from_name at most 255 characters, and config a JSON object',
+            ]);
         } catch (\Throwable $e) {
             $this->logger->error('[TenantNotificationSettings] update failed: ' . $e->getMessage());
             return Response::error('Failed to save sender configuration', 500);

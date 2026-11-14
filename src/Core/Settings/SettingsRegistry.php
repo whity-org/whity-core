@@ -1381,6 +1381,76 @@ final class SettingsRegistry
         return in_array($key, self::OWN_SCREEN_KEYS, true);
     }
 
+    // ── Notification senders (WHIT-1036) ────────────────────────────────────
+    //
+    // A workspace's sender for each notification channel, kept in the
+    // tenant_notification_settings table until WHIT-1036 folded it in here.
+    // Channels come and go with plugins, so these are a key FAMILY, not fixed
+    // keys: `notifications.<channel>.<field>`, the channel `[a-z0-9_]{1,64}`.
+    // They live per workspace in tenant_settings, are written only through
+    // {@see \Whity\Core\Notification\TenantNotificationSettingsRepository} (the
+    // notification-settings screen, notifications:manage), and are never on the
+    // generic settings API, which knows only the fixed keys above.
+    //
+    // `credentials_encrypted` holds the provider secret as EncryptedSecretStore
+    // wrote it; like mail.smtp.password_encrypted it is never returned by any
+    // read that leaves the server.
+
+    public const NOTIFICATIONS_PREFIX = 'notifications.';
+
+    /** @var list<string> */
+    public const NOTIFICATION_FIELDS = ['enabled', 'transport', 'from_address', 'from_name', 'reply_to', 'config', 'credentials_encrypted'];
+
+    /** `enabled` when a workspace never set it: a channel is on until turned off. */
+    public const NOTIFICATION_ENABLED_DEFAULT = 'true';
+
+    /** The tenant_settings key of one field of one channel's sender. */
+    public static function notificationKey(string $channel, string $field): string
+    {
+        if (preg_match('/^[a-z0-9_]{1,64}$/i', $channel) !== 1 || !in_array($field, self::NOTIFICATION_FIELDS, true)) {
+            throw new \InvalidArgumentException("Not a notification setting: {$channel}.{$field}");
+        }
+
+        return self::NOTIFICATIONS_PREFIX . $channel . '.' . $field;
+    }
+
+    /**
+     * The channel and field a key names, or null when it isn't one.
+     *
+     * @return array{channel: string, field: string}|null
+     */
+    public static function parseNotificationKey(string $key): ?array
+    {
+        if (preg_match('/^notifications\.([a-z0-9_]{1,64})\.([a-z_]+)$/i', $key, $m) !== 1
+            || !in_array($m[2], self::NOTIFICATION_FIELDS, true)) {
+            return null;
+        }
+
+        return ['channel' => $m[1], 'field' => $m[2]];
+    }
+
+    /** Why a value can't be stored for a notification field, or null when it can. */
+    public static function validateNotificationValue(string $field, string $value): ?string
+    {
+        return match ($field) {
+            'enabled' => self::validateBoolean($value, 'enabled'),
+            'transport' => preg_match('/^[a-z0-9_.-]{1,64}$/i', $value) === 1 ? null : 'transport must be a transport name.',
+            'from_address', 'reply_to' => filter_var($value, FILTER_VALIDATE_EMAIL) !== false ? null : "{$field} must be an email address.",
+            'from_name' => mb_strlen($value) <= 255 ? null : 'from_name must be at most 255 characters.',
+            'config' => self::isJsonObject($value) ? null : 'config must be a JSON object.',
+            'credentials_encrypted' => $value !== '' ? null : 'credentials_encrypted must not be empty.',
+            default => "Not a notification setting: {$field}",
+        };
+    }
+
+    /** `{}` or an object with keys; a list or a scalar is not one. */
+    private static function isJsonObject(string $value): bool
+    {
+        $decoded = json_decode($value);
+
+        return $decoded instanceof \stdClass;
+    }
+
     /**
      * Like {@see describe()} but restricted to text-kind keys only.
      *
