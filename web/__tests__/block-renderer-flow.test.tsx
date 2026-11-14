@@ -20,10 +20,10 @@ import { userEvent } from '@testing-library/user-event';
 import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import { buildFlowModel } from '@/components/plugin/blocks/flow-model';
 import { FLOW_MAX_NODES, type Block, type FlowBlock } from '@/lib/plugin-features';
-import { apiClient } from '@/lib/api-client';
+import { apiFetch as apiClient } from '@/lib/api/client';
 import { ToastProvider } from '@/lib/toast-context';
 
-jest.mock('@/lib/api-client', () => ({ apiClient: jest.fn() }));
+jest.mock('@/lib/api/client', () => ({ apiFetch: jest.fn() }));
 
 // The canvas stands in for react-flow and reports what it was given: the nodes
 // in order, the edges, and whether the block gave a node anything to do. Every

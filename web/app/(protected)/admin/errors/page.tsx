@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { NoAccess } from '@/components/no-access';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -104,10 +105,10 @@ export default function ErrorsPage() {
   const load = useCallback(async (status: ErrorStatus) => {
     setLoading(true);
     try {
-      // Plain fetch, not the typed client: these routes are deliberately
+      // apiFetch, not the typed client: these routes are deliberately
       // KNOWN_UNDOCUMENTED for now, so they are absent from the generated
       // OpenAPI schema the typed client is built from.
-      const res = await fetch(`/api/v1/errors?status=${status}`, {
+      const res = await apiFetch(`/api/v1/errors?status=${status}`, {
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       });
       if (res.status === 403) {
@@ -139,7 +140,7 @@ export default function ErrorsPage() {
 
   const setStatus = async (id: number, status: ErrorStatus) => {
     try {
-      const res = await fetch(`/api/v1/errors/${id}`, {
+      const res = await apiFetch(`/api/v1/errors/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

@@ -15,6 +15,7 @@ jest.mock('@/lib/api/client', () => ({
     POST: (...args: unknown[]) => mockApiPost(...args),
     DELETE: (...args: unknown[]) => mockApiDelete(...args),
   },
+  apiFetch: (...args: unknown[]) => mockApiClient(...args),
 }));
 
 const addToast = jest.fn();

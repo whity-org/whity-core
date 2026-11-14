@@ -1,20 +1,19 @@
 /**
  * WC-231: usePluginData hook — fetch + state-machine tests.
  *
- * The hook manages a loading→error/empty/ready state machine over apiClient,
+ * The hook manages a loading→error/empty/ready state machine over apiFetch,
  * guards against setState-after-unmount via AbortController, and supports
- * manual refresh/retry that re-invokes apiClient with the same source.
+ * manual refresh/retry that re-invokes apiFetch with the same source.
  */
 
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { usePluginData } from '@/lib/use-plugin-data';
-import { apiClient } from '@/lib/api-client';
 
-jest.mock('@/lib/api-client', () => ({
-  apiClient: jest.fn(),
+// `source` is a run-time URL, so the hook goes through `apiFetch`.
+const mockApiClient = jest.fn<Promise<Response>, [string, RequestInit?]>();
+jest.mock('@/lib/api/client', () => ({
+  apiFetch: (...a: [string, RequestInit?]) => mockApiClient(...a),
 }));
-
-const mockApiClient = apiClient as jest.MockedFunction<typeof apiClient>;
 
 /** Build a minimal Response stub. */
 function stubResponse(ok: boolean, status: number, body: unknown): Response {

@@ -20,6 +20,7 @@ import { PublicShell } from '@/components/auth/public-shell';
 import { TurnstileWidget } from '@/components/auth/turnstile-widget';
 import { ChatThread, type ChatTransport } from '@/components/messages/chat-thread';
 import type { CustomerMessage, PublicChatInfo } from '@/lib/messages-wire';
+import { api } from '@/lib/api/client';
 
 type Phase = 'loading' | 'closed' | 'ready' | 'error';
 
@@ -59,31 +60,29 @@ export default function PublicChatPage({ params }: { params: Promise<{ workspace
   const [botToken, setBotToken] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
 
-  const base = `/api/v1/public/chat/${encodeURIComponent(workspace)}`;
-
   useEffect(() => {
-    fetch(base, { credentials: 'omit' })
-      .then(async (response) => {
+    api.GET('/api/v1/public/chat/{workspace}', { params: { path: { workspace } }, credentials: 'omit' })
+      .then(({ data: body, response }) => {
         if (response.status === 404) {
           setPhase('closed');
           return;
         }
         if (!response.ok) throw new Error('load');
-        setInfo(((await response.json()) as { data: PublicChatInfo }).data);
+        setInfo((body as unknown as { data: PublicChatInfo }).data);
         setPhase('ready');
       })
       .catch(() => setPhase('error'));
-  }, [base, workspace]);
+  }, [workspace]);
 
   const failure = useCallback(
-    async (response: Response): Promise<Error> => {
+    (response: Response, errorBody: unknown): Error => {
       if (response.status === 429) return new Error(t('chat.error.tooMany', 'Too many messages. Please wait a moment and try again.'));
       if (response.status === 401) {
         writeToken(workspace, null);
         setToken(null);
         return new Error(t('chat.error.ended', 'This chat has ended. Send your message again to start a new one.'));
       }
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (errorBody ?? null) as { error?: string } | null;
       return new Error(response.status === 422 && body?.error ? body.error : t('chat.error.send', 'Your message was not sent. Please try again.'));
     },
     [t, workspace]
@@ -93,41 +92,41 @@ export default function PublicChatPage({ params }: { params: Promise<{ workspace
     () => ({
       started: () => token !== null,
       load: async (afterId) => {
-        const response = await fetch(`${base}/messages${afterId !== null ? `?after=${afterId}` : ''}`, {
+        const { data: body, error, response } = await api.GET('/api/v1/public/chat/{workspace}/messages', {
+          params: { path: { workspace }, query: afterId !== null ? { after: afterId } : {} },
           headers: { Authorization: `Bearer ${token ?? ''}` },
           credentials: 'omit',
         });
-        if (!response.ok) throw await failure(response);
-        return ((await response.json()) as { data: CustomerMessage[] }).data;
+        if (!response.ok) throw failure(response, error);
+        return (body as unknown as { data: CustomerMessage[] }).data;
       },
       send: async (text) => {
         if (token === null) {
-          const response = await fetch(`${base}/conversations`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const { data: body, error, response } = await api.POST('/api/v1/public/chat/{workspace}/conversations', {
+            params: { path: { workspace } },
+            body: { message: text, name, email, website, bot_token: botToken ?? '' } as never,
             credentials: 'omit',
-            body: JSON.stringify({ message: text, name, email, website, bot_token: botToken ?? '' }),
           });
           if (!response.ok) {
             setResetKey((k) => k + 1);
-            throw await failure(response);
+            throw failure(response, error);
           }
-          const data = ((await response.json()) as { data: { token: string; messages: CustomerMessage[] } }).data;
+          const data = (body as unknown as { data: { token: string; messages: CustomerMessage[] } }).data;
           writeToken(workspace, data.token);
           setToken(data.token);
           return data.messages[0] ?? null;
         }
-        const response = await fetch(`${base}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        const { data: body, error, response } = await api.POST('/api/v1/public/chat/{workspace}/messages', {
+          params: { path: { workspace } },
+          headers: { Authorization: `Bearer ${token}` },
           credentials: 'omit',
-          body: JSON.stringify({ message: text, website }),
+          body: { message: text, website } as never,
         });
-        if (!response.ok) throw await failure(response);
-        return ((await response.json()) as { data: CustomerMessage | null }).data;
+        if (!response.ok) throw failure(response, error);
+        return (body as unknown as { data: CustomerMessage | null }).data;
       },
     }),
-    [base, token, name, email, website, botToken, failure, workspace]
+    [token, name, email, website, botToken, failure, workspace]
   );
 
   const firstMessage = token === null;

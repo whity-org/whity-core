@@ -4,14 +4,13 @@ import { useCallback, useState } from 'react';
 import { LoadProblem } from '@/components/load-problem';
 import { throwUnlessOk } from '@/lib/forbidden';
 import { useRouter } from 'next/navigation';
-import { apiClient } from '@/lib/api-client';
 import { api } from '@/lib/api/client';
 import type { components } from '@whity/api-client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { USERS_WRITE, USERS_DELETE, SECURITY_MANAGE, ROLES_READ, OUS_READ } from '@/lib/capabilities';
-import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
 import { FilterMenu } from '@/components/admin/filter-menu';
 import { AdminHeader } from '@/components/admin/admin-header';
 import {
@@ -132,12 +131,16 @@ export default function UsersPage() {
   // rather than offering a short set of choices.
   const roleOptions = useFetch(async () => {
     if (!canReadRoles) return [];
-    const result = await fetchAllPages<{ id: number; name: string }>(apiClient, '/api/v1/roles');
+    const result = await fetchAllPagesTyped<{ id: number; name: string }>((query) =>
+      api.GET('/api/v1/roles', { params: { query } })
+    );
     return result.complete ? result.items : [];
   }, [canReadRoles]);
   const unitOptions = useFetch(async () => {
     if (!canReadUnits) return [];
-    const result = await fetchAllPages<{ id: number } & UnitNames>(apiClient, '/api/v1/ous');
+    const result = await fetchAllPagesTyped<{ id: number } & UnitNames>((query) =>
+      api.GET('/api/v1/ous', { params: { query } })
+    );
     return result.complete ? result.items : [];
   }, [canReadUnits]);
   const units = useLocalizedUnits(unitOptions.data);
@@ -160,9 +163,12 @@ export default function UsersPage() {
   // the refetch carries the page, sort and term the operator was looking at
   // rather than dropping them back to an unfiltered page 1.
   const { data, loading, error, forbidden, refetch: fetchUsers } = useFetch(async () => {
-    const response = await apiClient(`/api/v1/users?${queryString}`);
+    // The table's query and the filters arrive as a query string; the typed client wants an object.
+    const { data: parsed, response } = await api.GET('/api/v1/users', {
+      params: { query: Object.fromEntries(new URLSearchParams(queryString)) as never },
+    });
     throwUnlessOk(response, t('users.error.load', 'Failed to fetch users'));
-    const body: UsersResponse = await response.json();
+    const body = parsed as unknown as UsersResponse;
     const rows = body.data ?? [];
     return {
       rows,
@@ -202,14 +208,14 @@ export default function UsersPage() {
     return t('users.bulk.refused.notFound', '{name} is no longer in this workspace.', { name });
   };
 
-  const submitBulk = async (path: string, body: Record<string, unknown>, failed: string, done: string) => {
-    const response = await apiClient(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+  const submitBulk = async (
+    send: () => Promise<{ response: Response; error?: unknown }>,
+    failed: string,
+    done: string
+  ) => {
+    const { response, error } = await send();
     if (!response.ok) {
-      addToast(refusalMessage(await response.json().catch(() => null), failed), 'error');
+      addToast(refusalMessage(error ?? null, failed), 'error');
       return;
     }
     addToast(done, 'success');
@@ -219,16 +225,14 @@ export default function UsersPage() {
 
   const handleBulkRole = (roleId: number) =>
     submitBulk(
-      '/api/v1/users/bulk/role',
-      { role_id: roleId, targets },
+      () => api.POST('/api/v1/users/bulk/role', { body: { role_id: roleId, targets } }),
       t('users.bulk.role.error', 'The role could not be changed.'),
       t('users.bulk.role.success', 'Role changed.')
     );
 
   const handleBulkTwoStep = () =>
     submitBulk(
-      '/api/v1/users/bulk/require-two-step',
-      { targets },
+      () => api.POST('/api/v1/users/bulk/require-two-step', { body: { targets } }),
       t('users.bulk.twoStep.error', 'Two-step could not be required.'),
       t('users.bulk.twoStep.success', 'Two-step is now required of them.')
     );

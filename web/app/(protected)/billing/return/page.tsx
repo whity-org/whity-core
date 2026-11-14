@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { apiFetch } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { Badge } from '@whity/ui/badge';
@@ -45,7 +45,6 @@ interface BillingReturn {
 }
 
 function BillingReturnContent() {
-  const { apiClient } = useAuth();
   const t = useTranslation('admin');
   const dates = useDateDisplay();
   const searchParams = useSearchParams();
@@ -55,15 +54,17 @@ function BillingReturnContent() {
   const reference = searchParams.get('checkout') ?? '';
 
   const { data, loading, error } = useFetch(async () => {
+    // `checkout` is accepted by the server but missing from the spec, so this goes through apiFetch.
     const query = reference !== '' ? `?checkout=${encodeURIComponent(reference)}` : '';
-    const res = await apiClient(`/api/v1/billing/return${query}`);
+    const res = await apiFetch(`/api/v1/billing/return${query}`);
+    const body = res.ok ? ((await res.json().catch(() => undefined)) as unknown) : undefined;
     if (!res.ok) {
       throw new Error(
         t('billing.return.error.load', 'We could not confirm your payment just now.')
       );
     }
-    return (await res.json()).data as BillingReturn;
-  }, [apiClient, reference]);
+    return (body as { data?: BillingReturn } | undefined)?.data as BillingReturn;
+  }, [reference]);
 
   if (loading) {
     return (

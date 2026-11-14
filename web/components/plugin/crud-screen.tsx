@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api/client';
 import {
   capabilityDenial,
   deriveCrudModel,
@@ -453,7 +453,7 @@ export function CrudScreen({ feature }: { feature: PluginFeature }) {
       try {
         const [spec, listResponse] = await Promise.all([
           fetchSpec(),
-          apiClient(basePath),
+          apiFetch(basePath),
         ]);
 
         if (spec === null) {
@@ -545,7 +545,7 @@ export function CrudScreen({ feature }: { feature: PluginFeature }) {
   const handleCreate = async (
     payload: Record<string, unknown>
   ): Promise<boolean> => {
-    const response = await apiClient(basePath, {
+    const response = await apiFetch(basePath, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -567,7 +567,7 @@ export function CrudScreen({ feature }: { feature: PluginFeature }) {
     if (selected === null) {
       return false;
     }
-    const response = await apiClient(
+    const response = await apiFetch(
       `${basePath}/${encodeURIComponent(String(selected.id))}`,
       { method: 'DELETE' }
     );

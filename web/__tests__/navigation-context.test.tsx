@@ -24,11 +24,22 @@ jest.mock('@/lib/auth-context', () => ({
 }));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
-const mockFetch = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>();
-
-beforeAll(() => {
-  global.fetch = mockFetch as unknown as typeof global.fetch;
-});
+// The typed client, over a fetch-shaped fake: the tests queue `{ ok, json }`
+// answers on `mockFetch`, and this maps each to `{ data, error, response }`.
+const mockFetch = jest.fn<Promise<Response>, [string, RequestInit?]>();
+jest.mock('@/lib/api/client', () => ({
+  api: {
+    GET: async (path: string, init?: RequestInit) => {
+      const res = await mockFetch(path, init);
+      const body: unknown = await res.json();
+      return {
+        data: res.ok ? body : undefined,
+        error: res.ok ? undefined : body,
+        response: { ok: res.ok, status: res.ok ? 200 : 500 },
+      };
+    },
+  },
+}));
 
 function authState(user: { id: number } | null, isLoading = false) {
   return { user, isLoading } as unknown as ReturnType<typeof useAuth>;
@@ -133,7 +144,6 @@ describe('NavigationProvider auth-awareness', () => {
     );
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockFetch).toHaveBeenCalledWith('/api/v1/navigation', {
-      credentials: 'include',
       signal: expect.any(AbortSignal),
     });
   });

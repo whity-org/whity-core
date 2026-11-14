@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   Dialog,
@@ -60,7 +60,6 @@ export function AddRelationModal({
   persons,
   types,
 }: AddRelationModalProps) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const rt = useRichTranslation('admin');
@@ -87,11 +86,10 @@ export function AddRelationModal({
     let cancelled = false;
     void (async () => {
       try {
-        const res = await apiClient('/api/v1/users');
+        const { data, response: res } = await api.GET('/api/v1/users');
         if (!res.ok) {
           return;
         }
-        const data = await res.json();
         if (!cancelled) {
           // `id` IS the profile id on this endpoint — UsersApiHandler
           // documents it as "the canonical profile_id (ADR 0005 hard
@@ -102,8 +100,8 @@ export function AddRelationModal({
           // the picker looked populated while selecting one sent no id at all.
           // There is no longer a profile-less row to filter out: the identity
           // cutover made every membership row carry one.
-          const options = (data.data ?? [] as Array<{ id: number; email: string }>)
-            .map((u: { id: number; email: string }) => ({ profileId: u.id, email: u.email }));
+          const options = ((data as unknown as { data?: Array<{ id: number; email: string }> }).data ?? [])
+            .map((u) => ({ profileId: u.id, email: u.email }));
           setProfiles(options);
         }
       } catch {
@@ -113,7 +111,7 @@ export function AddRelationModal({
     return () => {
       cancelled = true;
     };
-  }, [targetKind, profiles.length, apiClient]);
+  }, [targetKind, profiles.length]);
 
   const handleSubmit = async () => {
     if (!targetId || !typeId) {
@@ -126,19 +124,17 @@ export function AddRelationModal({
 
     try {
       setIsLoading(true);
-      const response = await apiClient('/api/v1/relations', {
-        method: 'POST',
-        body: JSON.stringify({
+      const { response, error } = await api.POST('/api/v1/relations', {
+        body: {
           from: { kind: 'person' as const, id: fromPerson.id },
           to: { kind: targetKind, id: parseInt(targetId, 10) },
           relationshipTypeId: parseInt(typeId, 10),
-        }),
+        },
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
         throw new Error(
-          error.error || t('relations.addRelation.error', 'Failed to add relation')
+          (error as { error?: string } | undefined)?.error || t('relations.addRelation.error', 'Failed to add relation')
         );
       }
 

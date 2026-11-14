@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/lib/toast-context';
+import { api } from '@/lib/api/client';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { ApprovalGatingTabs } from '@/components/admin/approval-gating-tabs';
@@ -68,16 +69,16 @@ export default function PasswordResetApprovalsPage() {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await fetch(`/api/v1/password-resets/pending?page=${page}&per_page=${PER_PAGE}`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'include',
+      // The spec lists no query for this route; the server pages it.
+      const { data, response: res } = await api.GET('/api/v1/password-resets/pending', {
+        params: { query: { page, per_page: PER_PAGE } as never },
       });
       if (!res.ok) {
         setLoadError(true);
         setItems([]);
         return;
       }
-      const body = await res.json().catch(() => ({}));
+      const body = (data ?? {}) as { data?: unknown; pagination?: { total?: unknown } };
       const rows = Array.isArray(body?.data) ? (body.data as PendingPasswordReset[]) : [];
       setItems(rows);
       setTotal(typeof body?.pagination?.total === 'number' ? body.pagination.total : rows.length);
@@ -98,11 +99,11 @@ export default function PasswordResetApprovalsPage() {
   const act = async (item: PendingPasswordReset, action: 'approve' | 'reject') => {
     setBusyId(item.id);
     try {
-      const res = await fetch(`/api/v1/password-resets/${item.id}/${action}`, {
-        method: 'POST',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'include',
-      });
+      const params = { params: { path: { id: item.id } } };
+      const { response: res } =
+        action === 'approve'
+          ? await api.POST('/api/v1/password-resets/{id}/approve', params)
+          : await api.POST('/api/v1/password-resets/{id}/reject', params);
       if (!res.ok) {
         addToast(
           action === 'approve'

@@ -90,7 +90,7 @@
 
 import * as React from 'react';
 import { IconDownload, IconFileText } from '@tabler/icons-react';
-import { apiClient } from '@/lib/api-client';
+import { api, apiFetch } from '@/lib/api/client';
 // NOTE THE IMPORT PATH: the dedicated `record/format` subpath, not the slice's
 // barrel, and it is load-bearing rather than stylistic — the same reason
 // `print-document.tsx` documents for its own subpath. `@whity/features/record`
@@ -173,8 +173,6 @@ type ContentResult =
   | { ok: true; url: string; inlineSupported: boolean }
   | { ok: false };
 
-const DOCUMENTS_PATH = '/api/v1/documents';
-
 /**
  * Whether this browser will display a PDF inline.
  *
@@ -254,7 +252,11 @@ async function loadDocument(
   documentId: string,
   signal: AbortSignal
 ): Promise<LoadResult> {
-  const response = await apiClient(`${DOCUMENTS_PATH}/${encodeURIComponent(documentId)}`, { signal });
+  const { data: payload, response } = await api.GET('/api/v1/documents/{id}', {
+    // The id arrives as the page's string; the client encodes it into the path.
+    params: { path: { id: documentId as unknown as number } },
+    signal,
+  });
 
   if (response.status === 404 || response.status === 403) {
     // Core reports "you may not see this" as 404 deliberately (a 403 confirms
@@ -267,10 +269,9 @@ async function loadDocument(
     return { ok: false, failure: 'temporarily-unavailable', retryable: true };
   }
 
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
+  // A 2xx the client could not parse as JSON leaves `data` undefined.
+  const body: unknown = payload;
+  if (body === undefined) {
     return { ok: false, failure: 'temporarily-unavailable', retryable: true };
   }
 
@@ -570,7 +571,7 @@ function VersionBar({
 /**
  * The bytes.
  *
- * Fetched through `apiClient` (cookies + the CSRF header + the silent-refresh
+ * Fetched through `apiFetch` (cookies + the CSRF header + the silent-refresh
  * retry), wrapped in a same-origin `blob:` URL, and framed. The blob is revoked
  * when the artifact changes or the component unmounts — a viewer left open on a
  * record page would otherwise hold every version the reader flipped through.
@@ -602,7 +603,7 @@ function ArtifactFrame({
     void (async () => {
       let result: ContentResult;
       try {
-        const response = await apiClient(artifact.content_url, { signal: controller.signal });
+        const response = await apiFetch(artifact.content_url, { signal: controller.signal });
         if (!response.ok) {
           // 404 here means the record is visible but its stored object is not;
           // 503 is the storage backend. Both are worth a retry from the reader's

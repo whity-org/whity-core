@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useTranslation } from '@whity/features/i18n';
@@ -84,7 +84,6 @@ interface LoadedTiers {
 }
 
 export function TierFeatures() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
 
@@ -97,9 +96,12 @@ export function TierFeatures() {
   // the lint rule caught it: that pattern cascades renders, and the hook exists
   // so every screen does not re-derive the cancellation and refetch logic.
   const { data, loading, refetch } = useFetch(async () => {
-    const [catRes, plansRes] = await Promise.all([
-      apiClient('/api/v1/plans/entitlement-catalogue'),
-      apiClient('/api/v1/plans'),
+    const [
+      { data: catBody, response: catRes },
+      { data: plansBody, response: plansRes },
+    ] = await Promise.all([
+      api.GET('/api/v1/plans/entitlement-catalogue'),
+      api.GET('/api/v1/plans'),
     ]);
 
     // Not shouted about with a red banner: the commonest reason to land here
@@ -109,8 +111,8 @@ export function TierFeatures() {
       return { catalogue: {}, tiers: [], bundles: {} } as LoadedTiers;
     }
 
-    const catalogue = ((await catRes.json()).data ?? {}) as Record<string, CatalogueEntry>;
-    const all = ((await plansRes.json()).data ?? []) as Tier[];
+    const catalogue = ((catBody as unknown as { data?: Record<string, CatalogueEntry> } | undefined)?.data ?? {}) as Record<string, CatalogueEntry>;
+    const all = ((plansBody as unknown as { data?: Tier[] } | undefined)?.data ?? []) as Tier[];
 
     // ADD-ON PACKS GET A COLUMN TOO, after the tiers and marked as packs
     // (WHIT-932). A pack's numbers are ADDED to the tier's for each pack a
@@ -121,7 +123,9 @@ export function TierFeatures() {
     const bundles: Record<number, Bundle> = {};
     await Promise.all(
       tiers.map(async (tier) => {
-        const res = await apiClient(`/api/v1/plans/${tier.id}`);
+        const { data: tierBody, response: res } = await api.GET('/api/v1/plans/{id}', {
+          params: { path: { id: tier.id } },
+        });
         if (!res.ok) {
           bundles[tier.id] = {};
           return;
@@ -131,7 +135,7 @@ export function TierFeatures() {
         // limits as numbers. The editor works in the text form the API takes
         // back, so it is converted here rather than asking the server for a
         // second representation of the same rows.
-        const typed = ((await res.json()).data?.entitlements ?? {}) as Record<
+        const typed = ((tierBody as unknown as { data?: { entitlements?: unknown } } | undefined)?.data?.entitlements ?? {}) as Record<
           string,
           boolean | number
         >;
@@ -145,7 +149,7 @@ export function TierFeatures() {
     );
 
     return { catalogue, tiers, bundles };
-  }, [apiClient]);
+  }, []);
 
   const catalogue = data?.catalogue ?? {};
   const tiers = data?.tiers ?? [];
@@ -169,24 +173,23 @@ export function TierFeatures() {
 
     setSaving(tierId);
     try {
-      const res = await apiClient(`/api/v1/plans/${tierId}/entitlements`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { data, error: failure, response: res } = await api.PUT('/api/v1/plans/{id}/entitlements', {
+        params: { path: { id: tierId } },
+        body: {
           // An empty string means "say nothing about this", which the API takes
           // as null and removes — so the tier inherits the baseline again.
           entitlements: Object.fromEntries(
             Object.entries(changed).map(([k, v]) => [k, v === '' ? null : v])
           ),
           confirm_reduction: confirmReduction,
-        }),
+        },
       });
 
       if (res.status === 409) {
         // The server refused because this takes something away from live
         // workspaces, and its message carries the count. Shown as-is rather
         // than reworded: the number is the whole point.
-        const body = await res.json();
+        const body = (failure ?? data) as { details?: unknown; error?: unknown } | null | undefined;
         const reason =
           typeof body?.details === 'object' && body.details !== null
             ? String(Object.values(body.details)[0] ?? '')

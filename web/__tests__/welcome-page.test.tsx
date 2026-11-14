@@ -28,6 +28,8 @@ jest.mock('@/components/auth-shell', () => ({
   ),
 }));
 
+jest.mock('@/lib/api/client', () => require('./helpers/fetch-like-api').fetchLikeClient());
+
 import WelcomePage from '@/app/welcome/page';
 
 function json(status: number, body: unknown) {
@@ -68,7 +70,7 @@ test('offers to create a workspace, prefilled with their name, and goes straight
   const [url, init] = (global.fetch as jest.Mock).mock.calls[1];
   expect(url).toBe('/api/v1/auth/sso/workspace');
   expect(init.method).toBe('POST');
-  expect(init.headers['X-Requested-With']).toBe('XMLHttpRequest');
+  // The typed client sends the CSRF header itself.
   expect(JSON.parse(init.body)).toEqual({ name: 'Example Bakery', locale: 'en', main_color: '#b74c05' });
 });
 

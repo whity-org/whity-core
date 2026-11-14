@@ -118,7 +118,7 @@ import { Textarea } from '@whity/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { IconCheck, IconX } from '@tabler/icons-react';
 import { useLanguageDirection, useTranslation } from '@whity/features/i18n';
-import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   effectiveQuorum,
@@ -206,7 +206,6 @@ export function RouteActPanel({
   actionsUrl,
 }: RouteActPanelProps) {
   const t = useTranslation('documents');
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
 
   const [note, setNote] = useState('');
@@ -461,32 +460,43 @@ export function RouteActPanel({
     setOutcome(null);
     try {
       const trimmed = note.trim();
-      const response = await apiClient(
-        actionsUrl ?? `/api/v1/documents/${documentId}/routes/${route.id}/actions`,
-        {
+      const payload = {
+        action,
+        // Omitted rather than sent empty: the column is nullable and a
+        // zero-length note is a row in an append-only table that says
+        // nothing.
+        ...(trimmed === '' ? {} : { note: trimmed }),
+        // Likewise omitted on a circulation step, where the engine refuses a
+        // verdict outright rather than storing one nothing routes on.
+        ...(verdict === undefined ? {} : { verdict }),
+        // WHIT-1016: the step's values go only with letting it through;
+        // the engine refuses them on a rejection, a return or a note.
+        ...(stepInputs.length > 0 && carriesValues(action, verdict)
+          ? { values: Object.fromEntries(stepInputs.map((input) => [input.key, values[input.key] ?? ''])) }
+          : {}),
+      };
+
+      let ok: boolean;
+      let body: unknown;
+      if (actionsUrl === undefined) {
+        const result = await api.POST('/api/v1/documents/{id}/routes/{routeId}/actions', {
+          params: { path: { id: documentId, routeId: route.id } },
+          body: payload as never,
+        });
+        ok = result.response.ok;
+        body = (ok ? result.data : result.error) ?? null;
+      } else {
+        // A plugin hands this panel its own action route as a prop.
+        const response = await apiFetch(actionsUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action,
-            // Omitted rather than sent empty: the column is nullable and a
-            // zero-length note is a row in an append-only table that says
-            // nothing.
-            ...(trimmed === '' ? {} : { note: trimmed }),
-            // Likewise omitted on a circulation step, where the engine refuses a
-            // verdict outright rather than storing one nothing routes on.
-            ...(verdict === undefined ? {} : { verdict }),
-            // WHIT-1016: the step's values go only with letting it through;
-            // the engine refuses them on a rejection, a return or a note.
-            ...(stepInputs.length > 0 && carriesValues(action, verdict)
-              ? { values: Object.fromEntries(stepInputs.map((input) => [input.key, values[input.key] ?? ''])) }
-              : {}),
-          }),
-        }
-      );
+          body: JSON.stringify(payload),
+        });
+        ok = response.ok;
+        body = await response.json().catch(() => null);
+      }
 
-      const body: unknown = await response.json().catch(() => null);
-
-      if (!response.ok) {
+      if (!ok) {
         // The server's own sentence, verbatim. Never re-keyed: the engine's
         // refusals are written for the person who hit them and name the thing to
         // do instead.

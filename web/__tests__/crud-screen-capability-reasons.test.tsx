@@ -23,8 +23,8 @@ import type { CapabilityDenial, PluginFeature } from '@/lib/plugin-features';
 const mockApiClient = jest.fn();
 const recordPush = jest.fn();
 
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
+jest.mock('@/lib/api/client', () => ({
+  apiFetch: (...args: unknown[]) => mockApiClient(...args),
 }));
 
 // Module-level, so `addToast` keeps a STABLE identity: it is a dependency of

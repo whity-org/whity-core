@@ -32,7 +32,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { FormHeader, type FormBannerValue } from '@whity/features/forms';
 import { Button } from '@whity/ui/button';
 import { useDirection } from '@/lib/direction-context';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useTranslation } from '@whity/features/i18n';
 import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
@@ -156,10 +156,10 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     if (!asksForUnit || !mayListUnits) return;
     let cancelled = false;
 
-    apiClient('/api/v1/ous', { headers: { Accept: 'application/json' } })
-      .then(async (response) => {
+    api.GET('/api/v1/ous')
+      .then(({ data, response }) => {
         if (!response.ok) return;
-        const body = (await response.json().catch(() => ({}))) as {
+        const body = (data ?? {}) as {
           data?: Array<Partial<UnitRow>>;
         };
         if (cancelled) return;
@@ -184,20 +184,24 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     const mayFillAnyForm = hasPermission('forms:submit');
 
     const renderAt = (base: string) =>
-      apiClient(`${base}/${encodeURIComponent(id)}/render`, { headers: { Accept: 'application/json' } });
+      base === '/api/v1/forms'
+        ? api.GET('/api/v1/forms/{id}/render', { params: { path: { id: Number(id) } } })
+        : api.GET('/api/v1/me/forms/{id}/render', { params: { path: { id: Number(id) } } });
 
     // Without `forms:submit` the first address would only refuse them. The fallback
     // stays for somebody whose permission changed after this page learned it.
     renderAt(mayFillAnyForm ? '/api/v1/forms' : '/api/v1/me/forms')
-      .then(async (first) => {
-        let response = first;
+      .then(async (firstResult) => {
+        const first = firstResult.response;
+        let result = firstResult;
         if (mayFillAnyForm && first.status === 403) {
-          response = await renderAt('/api/v1/me/forms');
+          result = await renderAt('/api/v1/me/forms');
         }
+        const response = result.response;
         if (!cancelled && response.ok && (!mayFillAnyForm || first.status === 403)) {
           setApiBase('/api/v1/me/forms');
         }
-        const body = (await response.json().catch(() => ({}))) as { data?: RenderedForm; error?: string };
+        const body = ((result.data ?? result.error ?? {}) as unknown) as { data?: RenderedForm; error?: string };
         if (cancelled) return;
         if (!response.ok || !body.data) {
           // Only a 404 or a permission refusal reaches here, and neither says
@@ -220,8 +224,9 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
         // not carried: a new submission attaches its own, and an edit keeps the
         // one already attached unless a new one is given.
         if (seedId !== null) {
-          const own = await apiClient(`/api/v1/me/form-submissions/${seedId}`, { headers: { Accept: 'application/json' } });
-          const ownBody = (await own.json().catch(() => ({}))) as { data?: OwnSubmission };
+          const ownResult = await api.GET('/api/v1/me/form-submissions/{id}', { params: { path: { id: Number(seedId) } } });
+          const own = ownResult.response;
+          const ownBody = ((ownResult.data ?? ownResult.error ?? {}) as unknown) as { data?: OwnSubmission };
           if (cancelled) return;
           if (!own.ok || ownBody.data === undefined || (editId !== null && ownBody.data.progress?.can_resubmit !== true)) {
             setLoadError(editId !== null ? 'notSentBack' : 'notOpened');
@@ -318,12 +323,16 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     const body = new FormData();
     body.append('file', file);
 
-    const response = await apiClient(`${apiBase}/${encodeURIComponent(id)}/uploads`, {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    const upload = {
+      params: { path: { id: Number(id) } },
       body,
-    });
-    const payload = (await response.json().catch(() => ({}))) as RefusalBody & { data?: UploadedFileRef };
+      bodySerializer: (b: unknown) => b as FormData,
+    } as never;
+    const { data: uploaded, error: uploadError, response } =
+      apiBase === '/api/v1/forms'
+        ? await api.POST('/api/v1/forms/{id}/uploads', upload)
+        : await api.POST('/api/v1/me/forms/{id}/uploads', upload);
+    const payload = ((uploaded ?? uploadError ?? {}) as unknown) as RefusalBody & { data?: UploadedFileRef };
     if (!response.ok || payload.data === undefined) {
       throw new Error(
         refusalMessage(payload, labelOf, t('field.uploadFailed', 'That file could not be uploaded. Please try again.'))
@@ -339,22 +348,16 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     // as it takes the answers.
     await draft.pause();
     // WHIT-920: an edit sends the sent-back submission again rather than a new one.
-    const address = editId !== null ? `/api/v1/me/form-submissions/${editId}` : `${apiBase}/${encodeURIComponent(id)}/submissions`;
-    const response = await apiClient(address, {
-      method: editId !== null ? 'PUT' : 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        // The CSRF guard requires this on a cookie-authenticated write. It is
-        // NOT optional here: a bearer token is exempt from the guard, so every
-        // curl check of this endpoint passed while the browser — which has a
-        // session cookie and no token — was refused with "cross-site request
-        // rejected". The uploader already sent it; the submit did not.
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: JSON.stringify({ data: toSend }),
-    });
-    const body = (await response.json().catch(() => ({}))) as RefusalBody & { data?: { reference?: string | null } };
+    // The client sends the CSRF header (`X-Requested-With`) a cookie-authenticated write needs.
+    const payload = { body: { data: toSend } as never };
+    const sent =
+      editId !== null
+        ? await api.PUT('/api/v1/me/form-submissions/{id}', { params: { path: { id: Number(editId) } }, ...payload })
+        : apiBase === '/api/v1/forms'
+          ? await api.POST('/api/v1/forms/{id}/submissions', { params: { path: { id: Number(id) } }, ...payload })
+          : await api.POST('/api/v1/me/forms/{id}/submissions', { params: { path: { id: Number(id) } }, ...payload });
+    const response = sent.response;
+    const body = ((sent.data ?? sent.error ?? {}) as unknown) as RefusalBody & { data?: { reference?: string | null } };
     if (!response.ok) {
       draft.resume();
 

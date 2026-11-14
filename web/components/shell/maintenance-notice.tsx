@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api/client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -23,7 +24,7 @@ export function MaintenanceNotice() {
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch('/api/v1/status?days=1', { headers: { Accept: 'application/json' } });
+      const response = await apiFetch('/api/v1/status?days=1', { headers: { Accept: 'application/json' } });
       if (!response.ok) return;
       const body = (await response.json()) as { maintenance?: { active: boolean; until: string | null } };
       setMaintenance(body.maintenance ?? null);

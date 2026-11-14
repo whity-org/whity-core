@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   Dialog,
@@ -23,7 +23,6 @@ interface DeleteOuModalProps {
 }
 
 export function DeleteOuModal({ isOpen, onClose, onSuccess, ou }: DeleteOuModalProps) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const [isLoading, setIsLoading] = useState(false);
@@ -31,14 +30,13 @@ export function DeleteOuModal({ isOpen, onClose, onSuccess, ou }: DeleteOuModalP
   const handleDelete = async () => {
     try {
       setIsLoading(true);
-      const response = await apiClient(`/api/v1/ous/${ou.id}`, {
-        method: 'DELETE',
+      const { response, error } = await api.DELETE('/api/v1/ous/{id}', {
+        params: { path: { id: ou.id } },
       });
 
       if (!response.ok) {
-        const error = await response.json();
         throw new Error(
-          error.error || t('ous.delete.error', 'Failed to delete organizational unit')
+          (error as { error?: string } | undefined)?.error || t('ous.delete.error', 'Failed to delete organizational unit')
         );
       }
 

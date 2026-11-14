@@ -23,6 +23,7 @@
  * standard shell only.
  */
 
+import { api } from '@/lib/api/client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import * as TablerIcons from '@tabler/icons-react';
@@ -162,11 +163,11 @@ export function AppCommandPalette() {
     timer.current = setTimeout(() => {
       void (async () => {
         try {
-          const response = await fetch(`/api/v1/search?q=${encodeURIComponent(q)}&limit=5`, {
-            credentials: 'include',
+          const { data, response } = await api.GET('/api/v1/search', {
+            params: { query: { q, limit: 5 } },
           });
           if (!response.ok) return;
-          const body = (await response.json()) as { data?: SearchGroup[] };
+          const body = (data ?? {}) as { data?: SearchGroup[] };
           // Only the latest query's answer lands; a slow earlier one is dropped.
           if (id === request.current) setGroups(body.data ?? []);
         } catch {

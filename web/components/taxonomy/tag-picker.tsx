@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { TagInput, type TagOption } from '@/components/ui/tag-input';
 import { Button } from '@whity/ui/button';
 import { useTranslation } from '@whity/features/i18n';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { TAGS_MANAGE } from '@/lib/capabilities';
 
@@ -40,7 +40,6 @@ export interface TagPickerProps {
  * optimistically and rolled back if the mutation fails.
  */
 export function TagPicker({ entityType, entityId, className }: TagPickerProps) {
-  const { apiClient } = useAuth();
   const t = useTranslation('common');
   const { hasPermission } = useCapabilities();
   const canManage = hasPermission(TAGS_MANAGE);
@@ -61,18 +60,18 @@ export function TagPicker({ entityType, entityId, className }: TagPickerProps) {
       setStatus('loading');
       try {
         const [tagsRes, currentRes] = await Promise.all([
-          apiClient('/api/v1/tags'),
-          apiClient(
-            `/api/v1/entity-tags?entity_type=${encodeURIComponent(entityType)}&entity_id=${encodeURIComponent(String(entityId))}`
-          ),
+          api.GET('/api/v1/tags'),
+          api.GET('/api/v1/entity-tags', {
+            params: { query: { entity_type: entityType, entity_id: entityId } as never },
+          }),
         ]);
         if (cancelled) return;
-        if (!tagsRes.ok || !currentRes.ok) {
+        if (!tagsRes.response.ok || !currentRes.response.ok) {
           setStatus('error');
           return;
         }
-        const tagsBody: unknown = await tagsRes.json();
-        const currentBody: unknown = await currentRes.json();
+        const tagsBody: unknown = tagsRes.data;
+        const currentBody: unknown = currentRes.data;
         if (cancelled) return;
         // Named `tag`, not `t`: `t` is the translate function in this scope.
         setOptions(extractRows(tagsBody).map((tag) => ({ value: String(tag.id), label: tag.name })));
@@ -86,7 +85,7 @@ export function TagPicker({ entityType, entityId, className }: TagPickerProps) {
     return () => {
       cancelled = true;
     };
-  }, [apiClient, entityType, entityId, reloadKey]);
+  }, [entityType, entityId, reloadKey]);
 
   const handleChange = useCallback(
     async (next: string[]) => {
@@ -96,15 +95,15 @@ export function TagPicker({ entityType, entityId, className }: TagPickerProps) {
 
       // One POST/DELETE per toggle against the core entity-tags endpoint.
       const mutate = async (method: 'POST' | 'DELETE', tagValue: string) => {
-        const res = await apiClient('/api/v1/entity-tags', {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            entity_type: entityType,
-            entity_id: entityId,
-            tag_id: Number(tagValue),
-          }),
-        });
+        const body = {
+          entity_type: entityType,
+          entity_id: entityId,
+          tag_id: Number(tagValue),
+        } as never;
+        const { response: res } =
+          method === 'POST'
+            ? await api.POST('/api/v1/entity-tags', { body })
+            : await api.DELETE('/api/v1/entity-tags', { body });
         if (!res.ok) {
           throw new Error(`entity-tags ${method} failed`);
         }
@@ -126,7 +125,7 @@ export function TagPicker({ entityType, entityId, className }: TagPickerProps) {
         setBusy(false);
       }
     },
-    [apiClient, entityType, entityId, selected]
+    [entityType, entityId, selected]
   );
 
   if (status === 'loading') {

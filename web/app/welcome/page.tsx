@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { Button } from '@whity/ui/button';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
@@ -47,7 +48,6 @@ type FieldError = 'name_required' | 'name_too_long' | null;
 
 const NAME_MAX = 120;
 
-const ENDPOINT = '/api/v1/auth/sso/workspace';
 
 function fieldErrorMessage(t: TranslateFn, code: FieldError): string | null {
   if (code === 'name_required') {
@@ -87,7 +87,7 @@ export default function WelcomePage() {
 
   const load = async () => {
     try {
-      const response = await fetch(ENDPOINT, { credentials: 'include', cache: 'no-store' });
+      const { data: setupBody, response } = await api.GET('/api/v1/auth/sso/workspace', { cache: 'no-store' });
       if (response.status === 401) {
         setStatus('expired');
         return;
@@ -96,7 +96,7 @@ export default function WelcomePage() {
         setStatus('error');
         return;
       }
-      const body = (await response.json()) as { data?: Setup };
+      const body = (setupBody ?? {}) as unknown as { data?: Setup };
       if (!body.data) {
         setStatus('error');
         return;
@@ -142,17 +142,11 @@ export default function WelcomePage() {
         // Whity Blue is the default: leave the setting empty for it.
         main_color: colour === MAIN_COLOUR_SWATCHES[0] ? '' : colour,
       };
-      const response = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // CSRF defense (WC-160): required on state-changing POSTs.
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify(request),
-        credentials: 'include',
+      // The client sends the CSRF header (WC-160) on state-changing requests.
+      const { data: createdBody, error: createError, response } = await api.POST('/api/v1/auth/sso/workspace', {
+        body: request,
       });
-      const body = (await response.json().catch(() => ({}))) as {
+      const body = ((createdBody ?? createError ?? {}) as unknown) as {
         user?: unknown;
         requires_tenant_selection?: boolean;
         details?: { code?: string };

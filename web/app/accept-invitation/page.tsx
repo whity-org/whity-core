@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useTranslation } from '@whity/features/i18n';
+import { api } from '@/lib/api/client';
 
 /**
  * Invitation landing page (WHIT-417). This is where the link a tenant
@@ -76,16 +77,14 @@ function AcceptInvitationInner() {
 
     void (async () => {
       try {
-        const response = await fetch(
-          `/api/v1/invitations/accept?token=${encodeURIComponent(token)}`,
-          { credentials: 'include' }
-        );
+        const { data: body, response } = await api.GET('/api/v1/invitations/accept', {
+          params: { query: { token } },
+        });
         if (!response.ok) {
           setStatus('error');
           return;
         }
-        const body = await response.json();
-        const data = body?.data;
+        const data = (body as { data?: Record<string, unknown> } | undefined)?.data;
         setInvitation({
           email: typeof data?.email === 'string' ? data.email : '',
           tenantName: typeof data?.tenant_name === 'string' ? data.tenant_name : '',
@@ -122,17 +121,9 @@ function AcceptInvitationInner() {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/v1/invitations/accept', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // CSRF defense (WC-160): required on state-changing POSTs.
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify(
-          invitation.requiresPassword ? { token, password } : { token }
-        ),
-        credentials: 'include',
+      // The client sends the CSRF header (WC-160) on state-changing requests.
+      const { error: failure, response } = await api.POST('/api/v1/invitations/accept', {
+        body: (invitation.requiresPassword ? { token, password } : { token }) as never,
       });
 
       if (response.status === 200) {
@@ -144,7 +135,7 @@ function AcceptInvitationInner() {
         return;
       }
       if (response.status === 422) {
-        const body = await response.json().catch(() => ({}));
+        const body = (failure ?? {}) as { error?: unknown };
         setError(
           typeof body?.error === 'string'
             ? body.error

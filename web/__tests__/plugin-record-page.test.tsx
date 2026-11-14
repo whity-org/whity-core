@@ -52,8 +52,8 @@ jest.mock('@/lib/plugin-features-context', () => ({
 }));
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
+jest.mock('@/lib/api/client', () => ({
+  apiFetch: (...args: unknown[]) => mockApiClient(...args),
 }));
 
 const addToast = jest.fn();

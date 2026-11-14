@@ -7,8 +7,7 @@
  * environment because openapi-fetch builds real `Request` objects.
  */
 
-import { apiClient } from '@/lib/api-client';
-import { createApiClient, SESSION_EXPIRED_EVENT } from '@/lib/api/client';
+import { apiFetch, createApiClient, SESSION_EXPIRED_EVENT } from '@/lib/api/client';
 import { refreshSession } from '@/lib/session-refresh';
 
 const REFRESH = '/api/v1/auth/refresh';
@@ -75,7 +74,7 @@ describe('renewing a session', () => {
     const server = serverWithExpiredAccessToken();
     global.fetch = jest.fn(server.handler) as typeof fetch;
 
-    const responses = await Promise.all([apiClient('/api/v1/a'), apiClient('/api/v1/b'), apiClient('/api/v1/c')]);
+    const responses = await Promise.all([apiFetch('/api/v1/a'), apiFetch('/api/v1/b'), apiFetch('/api/v1/c')]);
 
     expect(server.stats.refreshes).toBe(1);
     expect(server.stats.refused).toBe(0);
@@ -103,7 +102,7 @@ describe('renewing a session', () => {
     global.fetch = jest.fn(server.handler) as typeof fetch;
     const api = createApiClient({ baseUrl: 'http://localhost', fetch: (request) => server.handler(request) });
 
-    await Promise.all([apiClient('/api/v1/a'), api.GET('/api/v1/navigation' as never)]);
+    await Promise.all([apiFetch('/api/v1/a'), api.GET('/api/v1/navigation' as never)]);
 
     expect(server.stats.refreshes).toBe(1);
     expect(server.stats.refused).toBe(0);

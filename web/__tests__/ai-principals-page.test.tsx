@@ -9,9 +9,15 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AiPrincipalsPage from '@/app/(protected)/admin/ai-principals/page';
 
-const mockApiClient = jest.fn();
+// The MCP routes are not in the spec, so they go through `apiFetch`; users go through the typed client.
+const mockApiFetch = jest.fn();
+const mockGet = jest.fn();
+jest.mock('@/lib/api/client', () => ({
+  api: { GET: (...a: unknown[]) => mockGet(...a) },
+  apiFetch: (...a: unknown[]) => mockApiFetch(...a),
+}));
 jest.mock('@/lib/auth-context', () => ({
-  useAuth: () => ({ apiClient: mockApiClient, user: { id: 7 } }),
+  useAuth: () => ({ user: { id: 7 } }),
 }));
 const mockAddToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast: mockAddToast }) }));
@@ -43,7 +49,17 @@ const OWN = {
 };
 
 function api(calls: string[]) {
-  mockApiClient.mockImplementation(async (path: string, init?: RequestInit) => {
+  mockGet.mockImplementation(async (path: string) => {
+    calls.push(`GET ${path}`);
+    if (path === '/api/v1/users') {
+      return {
+        data: { data: [{ id: 9, name: 'Rana Haddad' }], pagination: { page: 1, perPage: 100, total: 1, totalPages: 1 } },
+        response: new Response(null, { status: 200 }),
+      };
+    }
+    throw new Error(`unexpected request ${path}`);
+  });
+  mockApiFetch.mockImplementation(async (path: string, init?: RequestInit) => {
     calls.push(`${init?.method ?? 'GET'} ${path}`);
     if (path === '/api/v1/mcp/tokens') return json({ tokens: [OWN] });
     if (path === '/api/v1/mcp/tokens/j-own' && init?.method === 'DELETE') return { ok: true, status: 204, json: async () => ({}) } as Response;
@@ -53,13 +69,13 @@ function api(calls: string[]) {
         pagination: { page: 1, perPage: 100, total: 1, totalPages: 1 },
       });
     }
-    if (path.startsWith('/api/v1/users')) return json({ data: [{ id: 9, name: 'Rana Haddad' }], pagination: { page: 1, perPage: 100, total: 1, totalPages: 1 } });
     throw new Error(`unexpected request ${path}`);
   });
 }
 
 beforeEach(() => {
-  mockApiClient.mockReset();
+  mockApiFetch.mockReset();
+  mockGet.mockReset();
   mockAddToast.mockReset();
   mockManage = false;
 });

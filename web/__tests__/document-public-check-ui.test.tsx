@@ -6,6 +6,8 @@ import { Suspense } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+jest.mock('@/lib/api/client', () => require('./helpers/fetch-like-api').fetchLikeClient());
+
 import VerifyDocumentPage from '@/app/verify/[token]/page';
 import { PublicNameDialog } from '@/app/(protected)/admin/document-templates/public-name-dialog';
 import type { TemplateRow } from '@/app/(protected)/admin/document-templates/types';
@@ -97,16 +99,18 @@ describe('the verify page at the described level', () => {
 
 describe('the public name dialog', () => {
   function setup(publicName: string | null = null, ok = true) {
+    // The dialog saves through the typed client, which the mock forwards to `fetch`.
     const apiClient = jest.fn(async () => ({
       ok,
+      status: ok ? 200 : 403,
       json: async () => ({ error: 'Naming a template for the public check requires documents:publish' }),
-    })) as unknown as Parameters<typeof PublicNameDialog>[0]['apiClient'];
+    }));
+    global.fetch = apiClient as unknown as typeof fetch;
     const onSaved = jest.fn();
     render(
       <PublicNameDialog
         row={{ ...template, public_name: publicName }}
         name="Handover for Example Bakery"
-        apiClient={apiClient}
         addToast={jest.fn()}
         onClose={jest.fn()}
         onSaved={onSaved}

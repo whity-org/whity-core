@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -89,9 +89,9 @@ function codeText(t: TranslateFn, details: Record<string, unknown>): string | nu
   }
 }
 
-async function readError(res: Response, fallback: string, t: TranslateFn): Promise<string> {
+function readError(parsed: unknown, fallback: string, t: TranslateFn): string {
   try {
-    const body = (await res.json()) as { error?: unknown; details?: Record<string, unknown> };
+    const body = (parsed ?? {}) as { error?: unknown; details?: Record<string, unknown> };
     if (body.details) {
       const translated = codeText(t, body.details);
       if (translated !== null) return translated;
@@ -142,15 +142,15 @@ export default function PublicFormsPage() {
   const isOperator = has(SETTINGS_MANAGE) && user?.tenant_id === SYSTEM_TENANT_ID;
 
   const { data, error: loadError, refetch } = useFetch<KeysPayload>(async () => {
-    const res = await apiClient('/api/v1/public-form-keys');
+    const { data: body, response: res, error } = await api.GET('/api/v1/public-form-keys');
     if (!res.ok) {
-      throw new Error(await readError(res, t('settings.publicForms.loadFailed', 'The keys could not be loaded'), t));
+      throw new Error(readError(error, t('settings.publicForms.loadFailed', 'The keys could not be loaded'), t));
     }
-    const body = (await res.json()) as {
+    const payload = body as unknown as {
       data: FormKey[];
       meta: { forms: FormRoute[]; bot_check_ready: boolean };
     };
-    return { keys: body.data, forms: body.meta.forms, botCheckReady: body.meta.bot_check_ready };
+    return { keys: payload.data, forms: payload.meta.forms, botCheckReady: payload.meta.bot_check_ready };
   }, []);
 
   if (!capabilitiesLoading && !canManage) {
@@ -171,9 +171,11 @@ export default function PublicFormsPage() {
 
   const handleRevoke = async () => {
     if (revoking === null) return;
-    const res = await apiClient(`/api/v1/public-form-keys/${revoking.id}/revoke`, { method: 'POST' });
+    const { response: res, error } = await api.POST('/api/v1/public-form-keys/{id}/revoke', {
+      params: { path: { id: revoking.id } },
+    });
     if (!res.ok && res.status !== 204) {
-      addToast(await readError(res, t('settings.publicForms.revoke.failed', 'The key could not be revoked'), t), 'error');
+      addToast(readError(error, t('settings.publicForms.revoke.failed', 'The key could not be revoked'), t), 'error');
       return;
     }
     addToast(
@@ -436,17 +438,15 @@ function IssueCard({
   const submit = async () => {
     const [plugin, name] = form.split('/');
     setBusy(true);
-    const res = await apiClient('/api/v1/public-form-keys', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plugin, form: name, label, allowed_origins: splitOrigins(origins) }),
+    const { data: issued, response: res, error } = await api.POST('/api/v1/public-form-keys', {
+      body: { plugin, form: name, label, allowed_origins: splitOrigins(origins) },
     });
     setBusy(false);
     if (!res.ok) {
-      addToast(await readError(res, t('settings.publicForms.issue.failed', 'The key could not be issued'), t), 'error');
+      addToast(readError(error, t('settings.publicForms.issue.failed', 'The key could not be issued'), t), 'error');
       return;
     }
-    const body = (await res.json()) as { data: { key: string; plugin: string; form: string; kind: RouteKind } };
+    const body = issued as unknown as { data: { key: string; plugin: string; form: string; kind: RouteKind } };
     const segment = body.data.kind === 'read' ? 'public' : 'forms';
     onIssued({
       key: body.data.key,
@@ -569,14 +569,13 @@ function EditCard({
 
   const save = async () => {
     setBusy(true);
-    const res = await apiClient(`/api/v1/public-form-keys/${formKey.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label, allowed_origins: splitOrigins(origins) }),
+    const { response: res, error } = await api.PATCH('/api/v1/public-form-keys/{id}', {
+      params: { path: { id: formKey.id } },
+      body: { label, allowed_origins: splitOrigins(origins) },
     });
     setBusy(false);
     if (!res.ok) {
-      addToast(await readError(res, t('settings.publicForms.edit.failed', 'The key could not be changed'), t), 'error');
+      addToast(readError(error, t('settings.publicForms.edit.failed', 'The key could not be changed'), t), 'error');
       return;
     }
     addToast(t('settings.publicForms.edit.done', 'Key changed.'), 'success');
@@ -609,11 +608,11 @@ const NO_PROVIDER = 'none';
 function BotCheckCard({ onSaved }: { onSaved: () => void }) {
   const t = useTranslation('admin');
   const { data, error, refetch } = useFetch<BotSettings>(async () => {
-    const res = await apiClient('/api/v1/settings/public-forms/bot-check');
+    const { data: body, response: res, error } = await api.GET('/api/v1/settings/public-forms/bot-check');
     if (!res.ok) {
-      throw new Error(await readError(res, t('settings.publicForms.bot.loadFailed', 'The bot check settings could not be loaded'), t));
+      throw new Error(readError(error, t('settings.publicForms.bot.loadFailed', 'The bot check settings could not be loaded'), t));
     }
-    return ((await res.json()) as { data: BotSettings }).data;
+    return (body as unknown as { data: BotSettings }).data;
   }, []);
 
   return (
@@ -658,19 +657,17 @@ function BotCheckForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
 
   const save = async () => {
     setBusy(true);
-    const res = await apiClient('/api/v1/settings/public-forms/bot-check', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const { response: res, error } = await api.PUT('/api/v1/settings/public-forms/bot-check', {
+      body: {
         provider: provider === NO_PROVIDER ? null : provider,
         site_key: siteKey,
         allow_without_bot_check: provider === NO_PROVIDER && allowNone,
         ...(secret.trim() !== '' ? { secret } : {}),
-      }),
+      },
     });
     setBusy(false);
     if (!res.ok) {
-      addToast(await readError(res, t('settings.publicForms.bot.saveFailed', 'The bot check settings could not be saved'), t), 'error');
+      addToast(readError(error, t('settings.publicForms.bot.saveFailed', 'The bot check settings could not be saved'), t), 'error');
       return;
     }
     addToast(t('settings.publicForms.bot.saved', 'Bot check settings saved.'), 'success');

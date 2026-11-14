@@ -28,6 +28,7 @@ import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { useAuth } from '@/lib/auth-context';
+import { api, type components } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useToast } from '@/lib/toast-context';
@@ -45,13 +46,17 @@ import {
   type Message,
 } from '@/lib/messages-wire';
 
+/** `errorText` reads a body; the typed client has already parsed it into `error`. */
+function rebuilt(response: Response, error: unknown): Response {
+  return new Response(JSON.stringify(error ?? null), { status: response.status });
+}
+
 const STATUSES: ConversationStatus[] = ['open', 'pending', 'closed'];
 type AssigneeFilter = 'all' | 'me' | 'none';
 const POLL_MS = 15000;
 
 export default function MessagesPage() {
   const t = useTranslation('admin');
-  const { apiClient } = useAuth();
   const { has } = useCapabilities();
   const canReply = has('messages:reply');
   const canManage = has('messages:manage');
@@ -76,13 +81,19 @@ export default function MessagesPage() {
   }, []);
 
   const list = useFetch<ConversationList>(async () => {
-    const params = new URLSearchParams({ status, limit: '50' });
-    if (assignee !== 'all') params.set('assignee', assignee);
-    if (search !== '') params.set('q', search);
-    const response = await apiClient(`/api/v1/messages/conversations?${params.toString()}`);
+    const { data, response } = await api.GET('/api/v1/messages/conversations', {
+      params: {
+        query: {
+          status,
+          limit: 50,
+          ...(assignee !== 'all' ? { assignee } : {}),
+          ...(search !== '' ? { q: search } : {}),
+        },
+      },
+    });
     throwUnlessOk(response, t('messages.error.list', 'Your conversations could not be loaded.'));
-    return (await response.json()) as ConversationList;
-  }, [apiClient, status, assignee, search]);
+    return data as unknown as ConversationList;
+  }, [status, assignee, search]);
 
   const refetchList = list.refetch;
   useEffect(() => {
@@ -312,7 +323,7 @@ function Thread({
   onChanged: () => void;
 }) {
   const t = useTranslation('admin');
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const { addToast } = useToast();
   const { dateTime } = useDateDisplay();
   const [mode, setMode] = useState<'reply' | 'note'>('reply');
@@ -321,10 +332,10 @@ function Thread({
   const bottom = useRef<HTMLDivElement>(null);
 
   const detail = useFetch<ConversationDetail>(async () => {
-    const response = await apiClient(`/api/v1/messages/conversations/${id}`);
+    const { data, response } = await api.GET('/api/v1/messages/conversations/{id}', { params: { path: { id } } });
     if (!response.ok) throw new Error(t('messages.error.thread', 'This conversation could not be loaded.'));
-    return ((await response.json()) as { data: ConversationDetail }).data;
-  }, [apiClient, id]);
+    return (data as unknown as { data: ConversationDetail }).data;
+  }, [id]);
 
   const refetch = detail.refetch;
   useEffect(() => {
@@ -340,14 +351,13 @@ function Thread({
   const conversation = detail.data;
   const myId = typeof user?.id === 'number' ? user.id : null;
 
-  const patch = async (body: Record<string, unknown>, done: string): Promise<void> => {
-    const response = await apiClient(`/api/v1/messages/conversations/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+  const patch = async (body: components['schemas']['MessagingUpdateRequest'], done: string): Promise<void> => {
+    const { response, error } = await api.PATCH('/api/v1/messages/conversations/{id}', {
+      params: { path: { id } },
+      body,
     });
     if (!response.ok) {
-      addToast(await errorText(response, t('messages.error.update', 'That change was not saved.')), 'error');
+      addToast(await errorText(rebuilt(response, error), t('messages.error.update', 'That change was not saved.')), 'error');
       return;
     }
     addToast(done, 'success');
@@ -360,13 +370,13 @@ function Thread({
     if (text === '' || sending) return;
     setSending(true);
     try {
-      const response = await apiClient(`/api/v1/messages/conversations/${id}/${mode === 'reply' ? 'replies' : 'notes'}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: text }),
-      });
+      const options = { params: { path: { id } }, body: { body: text } };
+      const { response, error } =
+        mode === 'reply'
+          ? await api.POST('/api/v1/messages/conversations/{id}/replies', options)
+          : await api.POST('/api/v1/messages/conversations/{id}/notes', options);
       if (!response.ok) {
-        addToast(await errorText(response, t('messages.error.send', 'Your message was not sent. Please try again.')), 'error');
+        addToast(await errorText(rebuilt(response, error), t('messages.error.send', 'Your message was not sent. Please try again.')), 'error');
         return;
       }
       setDraft('');
@@ -378,7 +388,7 @@ function Thread({
   };
 
   const cancel = async (message: Message): Promise<void> => {
-    const response = await apiClient(`/api/v1/messages/${message.id}/cancel`, { method: 'POST' });
+    const { response } = await api.POST('/api/v1/messages/{id}/cancel', { params: { path: { id: message.id } } });
     if (!response.ok) {
       addToast(t('messages.error.cancel', 'It has already been sent.'), 'error');
     } else {

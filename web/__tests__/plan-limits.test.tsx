@@ -18,6 +18,20 @@ jest.mock('@/lib/auth-context', () => ({
   useAuth: () => mockAuth,
 }));
 
+// Both screens read the limits through the typed client (WHIT-1046): route its
+// GET to the same mock and answer in its { data, response } shape.
+jest.mock('@/lib/api/client', () => ({
+  api: {
+    GET: async (path: string) => {
+      const res = (await apiClient(path)) as { ok: boolean; status?: number; json: () => Promise<unknown> };
+      return {
+        data: res.ok ? await res.json() : undefined,
+        response: { ok: res.ok, status: res.status ?? (res.ok ? 200 : 500) },
+      };
+    },
+  },
+}));
+
 const granted = new Set<string>();
 jest.mock('@/hooks/useCapabilities', () => ({
   useCapabilities: () => ({ loading: false, hasPermission: (p: string) => granted.has(p) }),

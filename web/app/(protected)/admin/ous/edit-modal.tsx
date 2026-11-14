@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api, type components } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   Dialog,
@@ -35,7 +35,6 @@ interface EditOuModalProps {
 }
 
 export function EditOuModal({ isOpen, onClose, onSuccess, ou, ous }: EditOuModalProps) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const [isLoading, setIsLoading] = useState(false);
@@ -64,7 +63,7 @@ export function EditOuModal({ isOpen, onClose, onSuccess, ou, ous }: EditOuModal
 
     try {
       setIsLoading(true);
-      const payload: Record<string, unknown> = {
+      const payload: components['schemas']['OuUpdateRequest'] = {
         name: original,
         names: cleaned,
         name_language: nameLanguage,
@@ -80,15 +79,14 @@ export function EditOuModal({ isOpen, onClose, onSuccess, ou, ous }: EditOuModal
         payload.parent_id = nextParentId;
       }
 
-      const response = await apiClient(`/api/v1/ous/${ou.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(payload),
+      const { response, error } = await api.PATCH('/api/v1/ous/{id}', {
+        params: { path: { id: ou.id } },
+        body: payload,
       });
 
       if (!response.ok) {
-        const error = await response.json();
         throw new Error(
-          error.error || t('ous.edit.error', 'Failed to update organizational unit')
+          (error as { error?: string } | undefined)?.error || t('ous.edit.error', 'Failed to update organizational unit')
         );
       }
 

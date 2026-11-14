@@ -31,7 +31,7 @@ import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import {
@@ -59,7 +59,6 @@ export default function ApprovalsPage() {
   // Times through the shared date display: local, and nothing at all when the
   // workspace hides dates.
   const clock = (value: string): string => dates.time(value) ?? '';
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const [tab, setTab] = useState('waiting');
   const [currentId, setCurrentId] = useState<string | undefined>(undefined);
@@ -78,22 +77,22 @@ export default function ApprovalsPage() {
   }, []);
 
   const proposals = useFetch<AgentProposal[]>(async () => {
-    const response = await apiClient('/api/v1/me/agent-proposals');
+    const { data, response } = await api.GET('/api/v1/me/agent-proposals');
     if (!response.ok) {
       throw new Error(t('approvals.error.list', 'Your approvals could not be loaded.'));
     }
-    const body = (await response.json()) as { data?: AgentProposal[] };
+    const body = data as unknown as { data?: AgentProposal[] };
     return body.data ?? [];
-  }, [apiClient]);
+  }, []);
 
   // What agents did, Allowed calls included (WHIT-812). A failed read leaves the
   // timeline to the proposals rather than failing the page.
   const actions = useFetch<AgentAction[]>(async () => {
-    const response = await apiClient('/api/v1/me/agent-actions');
+    const { data, response } = await api.GET('/api/v1/me/agent-actions');
     if (!response.ok) return [];
-    const body = (await response.json()) as { data?: AgentAction[] };
+    const body = data as unknown as { data?: AgentAction[] };
     return body.data ?? [];
-  }, [apiClient]);
+  }, []);
 
   const all = useMemo(() => proposals.data ?? [], [proposals.data]);
   const waiting = useMemo(() => oldestFirst(all.filter((p) => p.status === 'waiting')), [all]);
@@ -149,12 +148,12 @@ export default function ApprovalsPage() {
   const undo = async (action: AgentAction) => {
     setUndoingId(action.id);
     try {
-      const response = await apiClient(`/api/v1/me/agent-actions/${action.id}/undo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+      const { data, error, response } = await api.POST('/api/v1/me/agent-actions/{id}/undo', {
+        params: { path: { id: action.id } },
+        // The spec lists no body here; the server has always been sent an empty one.
+        body: {} as never,
       });
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (data ?? error ?? null) as { error?: string } | null;
       if (!response.ok) {
         addToast(body?.error ?? t('approvals.error.undo', 'That could not be undone.'), 'error', 8000);
       } else {
@@ -202,12 +201,12 @@ export default function ApprovalsPage() {
   const decide = async (proposal: AgentProposal, verdict: 'approve' | 'decline', args?: Record<string, unknown>) => {
     setBusyId(proposal.id);
     try {
-      const response = await apiClient(`/api/v1/me/agent-proposals/${proposal.id}/${verdict}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(args ? { arguments: args } : {}),
-      });
-      const body = (await response.json().catch(() => null)) as
+      const path = { params: { path: { id: proposal.id } }, body: (args ? { arguments: args } : {}) as never };
+      const { data, error, response } =
+        verdict === 'approve'
+          ? await api.POST('/api/v1/me/agent-proposals/{id}/approve', path)
+          : await api.POST('/api/v1/me/agent-proposals/{id}/decline', path);
+      const body = ((data ?? error ?? null) as unknown) as
         | { data?: AgentProposal | null; error?: string }
         | null;
       if (!response.ok) {
@@ -257,12 +256,10 @@ export default function ApprovalsPage() {
   const approveTogether = async (chosen: AgentProposal[]) => {
     setBulkBusy(true);
     try {
-      const response = await apiClient('/api/v1/me/agent-proposals/bulk-approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: chosen.map((p) => p.id) }),
+      const { data, error, response } = await api.POST('/api/v1/me/agent-proposals/bulk-approve', {
+        body: { ids: chosen.map((p) => p.id) },
       });
-      const body = (await response.json().catch(() => null)) as
+      const body = ((data ?? error ?? null) as unknown) as
         | { data?: { approved: AgentProposal[]; refused: { id: number; reason: string }[] }; error?: string }
         | null;
       if (!response.ok || !body?.data) {
@@ -310,10 +307,9 @@ export default function ApprovalsPage() {
     let declined = 0;
     try {
       for (const proposal of chosen) {
-        const response = await apiClient(`/api/v1/me/agent-proposals/${proposal.id}/decline`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{}',
+        const { response } = await api.POST('/api/v1/me/agent-proposals/{id}/decline', {
+          params: { path: { id: proposal.id } },
+          body: {} as never,
         });
         if (response.ok) declined += 1;
       }

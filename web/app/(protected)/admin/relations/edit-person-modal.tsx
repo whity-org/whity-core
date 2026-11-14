@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api, type components } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   Dialog,
@@ -28,7 +28,6 @@ interface EditPersonModalProps {
  * here (the backend returns 409); the page only opens this for non-user persons.
  */
 export function EditPersonModal({ isOpen, onClose, onSuccess, person }: EditPersonModalProps) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const [isLoading, setIsLoading] = useState(false);
@@ -48,22 +47,21 @@ export function EditPersonModal({ isOpen, onClose, onSuccess, person }: EditPers
 
     try {
       setIsLoading(true);
-      const payload: Record<string, unknown> = {
+      const payload: components['schemas']['PersonUpdateRequest'] = {
         displayName: displayName.trim(),
         birthDate: birthDate || null,
         deceased,
         notes: notes.trim() || null,
       };
 
-      const response = await apiClient(`/api/v1/persons/${person.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(payload),
+      const { response, error } = await api.PATCH('/api/v1/persons/{id}', {
+        params: { path: { id: person.id } },
+        body: payload,
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
         throw new Error(
-          error.error || t('relations.editPerson.error', 'Failed to update person')
+          (error as { error?: string } | undefined)?.error || t('relations.editPerson.error', 'Failed to update person')
         );
       }
 

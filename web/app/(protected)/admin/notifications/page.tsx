@@ -31,6 +31,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { NoAccess } from '@/components/no-access';
 import Link from 'next/link';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useTranslation } from '@whity/features/i18n';
 import { Button } from '@whity/ui/button';
@@ -115,12 +116,9 @@ export default function NotificationsAdminPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/notification-metrics', {
-        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      const body = (await res.json()) as { data: Metrics };
-      setMetrics(body.data);
+      const { data, response } = await api.GET('/api/v1/notification-metrics');
+      if (!response.ok) throw new Error(String(response.status));
+      setMetrics((data as unknown as { data: Metrics }).data);
     } catch {
       addToast(
         t('notifications.toast.loadFailed', 'Could not load notification metrics'),

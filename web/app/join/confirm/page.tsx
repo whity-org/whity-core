@@ -18,6 +18,7 @@ import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTranslation } from '@whity/features/i18n';
 import { PublicShell } from '@/components/auth/public-shell';
+import { api } from '@/lib/api/client';
 
 type Phase = 'loading' | 'form' | 'joined' | 'pending' | 'already' | 'refused' | 'closed' | 'invalid';
 
@@ -45,14 +46,14 @@ function ConfirmInner() {
 
     void (async () => {
       try {
-        const res = await fetch(`/api/v1/public/signup/confirm?token=${encodeURIComponent(token)}`, {
-          headers: { Accept: 'application/json' },
+        const { data: previewBody, response: res } = await api.GET('/api/v1/public/signup/confirm', {
+          params: { query: { token } },
         });
         if (!res.ok) {
           setPhase('invalid');
           return;
         }
-        const body = (await res.json()) as {
+        const body = (previewBody as unknown) as {
           data: { workspace_name: string; email: string; requires_password: boolean };
         };
         setPreview({
@@ -85,21 +86,19 @@ function ConfirmInner() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/v1/public/signup/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        body: JSON.stringify(preview.requiresPassword ? { token, password } : { token }),
+      const { data: joinBody, error: refusal, response: res } = await api.POST('/api/v1/public/signup/confirm', {
+        body: (preview.requiresPassword ? { token, password } : { token }) as never,
       });
 
       if (res.status === 200) {
-        const body = (await res.json()) as { data: { status: string } };
+        const body = (joinBody as unknown) as { data: { status: string } };
         setPhase(
           body.data.status === 'joined' ? 'joined' : body.data.status === 'pending_approval' ? 'pending' : 'already'
         );
         return;
       }
       if (res.status === 409) {
-        const body = (await res.json().catch(() => ({}))) as { details?: { reason?: string } };
+        const body = ((refusal ?? {}) as unknown) as { details?: { reason?: string } };
         setPhase(body.details?.reason === 'closed' ? 'closed' : 'refused');
         return;
       }

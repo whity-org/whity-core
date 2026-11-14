@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useTranslation } from '@whity/features/i18n';
+import { api } from '@/lib/api/client';
 
 /**
  * Self-service "forgot password" entry point (WC-password-reset-2fa-recovery).
@@ -43,15 +44,9 @@ export default function ForgotPasswordPage() {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/v1/auth/password/forgot', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // CSRF defense (WC-160): mirrors every other state-changing POST.
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ email: trimmed }),
-        credentials: 'include',
+      // The client sends the CSRF header (WC-160) on state-changing requests.
+      const { response } = await api.POST('/api/v1/auth/password/forgot', {
+        body: { email: trimmed } as never,
       });
 
       if (response.status === 422) {

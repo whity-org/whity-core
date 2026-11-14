@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { Button } from '@whity/ui/button';
 import { Badge } from '@whity/ui/badge';
@@ -30,7 +30,6 @@ interface ProfileEmail {
 }
 
 export function EmailAddressesSettings() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('auth');
   const [emails, setEmails] = useState<ProfileEmail[]>([]);
@@ -44,13 +43,13 @@ export function EmailAddressesSettings() {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await apiClient('/api/v1/me/emails', { method: 'GET' });
+      const { data, response: res } = await api.GET('/api/v1/me/emails');
       if (!res.ok) {
         setLoadError(true);
         setEmails([]);
         return;
       }
-      const body = (await res.json().catch(() => ({}))) as { data?: ProfileEmail[] };
+      const body = (data ?? {}) as { data?: ProfileEmail[] };
       setEmails(Array.isArray(body.data) ? body.data : []);
     } catch {
       setLoadError(true);
@@ -58,7 +57,7 @@ export function EmailAddressesSettings() {
     } finally {
       setLoading(false);
     }
-  }, [apiClient]);
+  }, []);
 
   useEffect(() => {
     // Deferred off the synchronous effect tick, matching SessionsSettings.
@@ -74,13 +73,9 @@ export function EmailAddressesSettings() {
 
     setAdding(true);
     try {
-      const res = await apiClient('/api/v1/me/emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
+      const { error, response: res } = await api.POST('/api/v1/me/emails', { body: { email } });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const body = (error ?? {}) as { error?: string };
         addToast(
           body.error ||
             t('emails.add.errorWithStatus', 'Failed to add email address ({status}).', {
@@ -106,9 +101,11 @@ export function EmailAddressesSettings() {
   const resendVerification = async (item: ProfileEmail) => {
     setBusyId(item.id);
     try {
-      const res = await apiClient(`/api/v1/me/emails/${item.id}/resend-verification`, { method: 'POST' });
+      const { error, response: res } = await api.POST('/api/v1/me/emails/{id}/resend-verification', {
+        params: { path: { id: item.id } },
+      });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const body = (error ?? {}) as { error?: string };
         addToast(
           body.error || t('emails.resend.error', 'Failed to resend verification email.'),
           'error'
@@ -126,9 +123,11 @@ export function EmailAddressesSettings() {
   const setPrimary = async (item: ProfileEmail) => {
     setBusyId(item.id);
     try {
-      const res = await apiClient(`/api/v1/me/emails/${item.id}/set-primary`, { method: 'POST' });
+      const { error, response: res } = await api.POST('/api/v1/me/emails/{id}/set-primary', {
+        params: { path: { id: item.id } },
+      });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const body = (error ?? {}) as { error?: string };
         addToast(body.error || t('emails.setPrimary.error', 'Failed to set as primary.'), 'error');
         return;
       }
@@ -144,9 +143,11 @@ export function EmailAddressesSettings() {
   const remove = async (item: ProfileEmail) => {
     setBusyId(item.id);
     try {
-      const res = await apiClient(`/api/v1/me/emails/${item.id}`, { method: 'DELETE' });
+      const { error, response: res } = await api.DELETE('/api/v1/me/emails/{id}', {
+        params: { path: { id: item.id } },
+      });
       if (!res.ok && res.status !== 404) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const body = (error ?? {}) as { error?: string };
         addToast(body.error || t('emails.remove.error', 'Failed to remove email address.'), 'error');
         return;
       }

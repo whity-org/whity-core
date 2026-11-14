@@ -3,7 +3,7 @@
  *
  * Characterization tests for the typed API client (WC-168).
  *
- * These pin the auth behavior of the legacy `lib/api-client.ts` wrapper —
+ * These pin the auth behavior the legacy `lib/api-client.ts` wrapper had (deleted in WHIT-1046) —
  * `credentials: 'include'`, the X-Requested-With CSRF header (WC-160), and the
  * 401 → silent-refresh → single-retry flow — onto the openapi-fetch based
  * typed client, so the migration cannot regress auth or introduce refresh
@@ -364,5 +364,30 @@ describe('apiFetch — the same rules for a URL the spec cannot name', () => {
     expect(response.status).toBe(401);
     expect(seen).toHaveBeenCalledTimes(1);
     window.removeEventListener(SESSION_EXPIRED_EVENT, seen);
+  });
+});
+
+describe('typed api client — the payment wall', () => {
+  const replace = jest.fn();
+  beforeAll(() => {
+    const target = new EventTarget() as EventTarget & { location: { pathname: string; replace: jest.Mock } };
+    target.location = { pathname: '/dashboard', replace };
+    (globalThis as unknown as { window: unknown }).window = target;
+  });
+
+  afterAll(() => {
+    delete (globalThis as unknown as { window?: unknown }).window;
+  });
+
+  it('sends a walled workspace to Billing once, however many calls come back 402', async () => {
+    const { fn } = scriptedFetch(jsonResponse(402, {}), jsonResponse(402, {}));
+    const api = client(fn);
+
+    const [first, second] = await Promise.all([api.GET('/api/v1/users'), api.GET('/api/v1/roles')]);
+
+    expect(first.response.status).toBe(402);
+    expect(second.response.status).toBe(402);
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenCalledWith('/billing');
   });
 });

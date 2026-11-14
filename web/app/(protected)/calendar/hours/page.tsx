@@ -36,7 +36,7 @@ import { useCalendarAccess, useCalendarBasics } from '@/components/calendar/use-
 import { useCalendarWords } from '@/components/calendar/use-calendar-words';
 import { useFetch } from '@/hooks/useFetch';
 import { useAuth } from '@/lib/auth-context';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
@@ -669,10 +669,10 @@ function AddPersonDialog({
 
   const { data, error, forbidden } = useFetch<Member[]>(async () => {
     if (!open) return [];
-    const res = await apiClient('/api/v1/users?per_page=100');
+    const { data: body, response: res } = await api.GET('/api/v1/users', { params: { query: { per_page: 100 } } });
     if (res.status === 403) throw new ForbiddenError();
     if (!res.ok) throw new Error('members');
-    return ((await res.json()) as { data?: Member[] }).data ?? [];
+    return ((body as { data?: Member[] } | undefined)?.data) ?? [];
   }, [open]);
 
   const candidates = (data ?? []).filter((m) => !existing.includes(m.id));

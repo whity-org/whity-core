@@ -20,7 +20,7 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import {
   SignatureDrawing,
   type SignatureAppearance,
@@ -86,7 +86,6 @@ export default function Page() {
   const documentId = Number(rawId);
   const t = useTranslation('documents');
   const { hidden, dateTime } = useDateDisplay();
-  const { apiClient } = useAuth();
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [people, setPeople] = useState<Record<string, string>>({});
 
@@ -96,7 +95,9 @@ export default function Page() {
       return;
     }
     try {
-      const response = await apiClient(`/api/v1/documents/${documentId}/audit`);
+      const { data, response } = await api.GET('/api/v1/documents/{id}/audit', {
+        params: { path: { id: documentId } },
+      });
       if (response.status === 404) {
         setState({ status: 'missing' });
         return;
@@ -105,17 +106,19 @@ export default function Page() {
         setState({ status: 'error' });
         return;
       }
-      const body = (await response.json()) as { data: AuditData };
+      const body = data as unknown as { data: AuditData };
       setState({ status: 'ready', data: body.data });
-      const names = await apiClient(`/api/v1/documents/${documentId}/people`);
+      const { data: namesBody, response: names } = await api.GET('/api/v1/documents/{id}/people', {
+        params: { path: { id: documentId } },
+      });
       if (names.ok) {
-        const named = (await names.json()) as { data: Record<string, string> };
+        const named = namesBody as unknown as { data: Record<string, string> };
         setPeople(named.data ?? {});
       }
     } catch {
       setState({ status: 'error' });
     }
-  }, [apiClient, documentId]);
+  }, [documentId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loads once per document

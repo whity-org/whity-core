@@ -12,6 +12,7 @@ import React from 'react';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const push = jest.fn();
+jest.mock('@/lib/api/client', () => require('./helpers/fetch-like-api').fetchLikeClient());
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
 let mockNav: { id: string; href: string; label: string; icon?: string }[] = [];

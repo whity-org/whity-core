@@ -5,8 +5,12 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
-const mockApiClient = jest.fn();
-jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient: mockApiClient, user: { id: 1 } }) }));
+const mockGet = jest.fn();
+const mockDelete = jest.fn();
+jest.mock('@/lib/api/client', () => ({
+  api: { GET: (...a: unknown[]) => mockGet(...a), DELETE: (...a: unknown[]) => mockDelete(...a) },
+}));
+jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ user: { id: 1 } }) }));
 const mockAddToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast: mockAddToast }) }));
 
@@ -25,20 +29,19 @@ const PERIOD = {
   createdAt: '2026-11-12 08:00:00',
 };
 
-function json(status: number, body: unknown) {
-  return Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) });
+function result(status: number, body: unknown) {
+  return Promise.resolve({ data: body, error: undefined, response: new Response(null, { status }) });
 }
 
 beforeEach(() => {
-  mockApiClient.mockReset();
+  mockGet.mockReset();
+  mockDelete.mockReset();
   mockAddToast.mockReset();
 });
 
 it('shows who decides while away, and comes back early', async () => {
-  mockApiClient.mockImplementation((url: string, init?: RequestInit) => {
-    if (init?.method === 'DELETE') return json(200, { data: null });
-    return json(200, { data: PERIOD });
-  });
+  mockGet.mockImplementation(() => result(200, { data: PERIOD }));
+  mockDelete.mockImplementation(() => result(200, { data: null }));
   const onChanged = jest.fn();
   render(<AwayCard people={[{ id: 1, name: 'Amro Saleh' }, { id: 2, name: 'Emad Nasser' }]} onChanged={onChanged} />);
 
@@ -47,13 +50,13 @@ it('shows who decides while away, and comes back early', async () => {
   expect(screen.getByText('Emad is deciding for me.')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'I’m back' }));
-  await waitFor(() => expect(mockApiClient).toHaveBeenCalledWith('/api/v1/me/away', { method: 'DELETE' }));
+  await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('/api/v1/me/away'));
   await waitFor(() => expect(onChanged).toHaveBeenCalled());
   expect(await screen.findByTestId('away-card')).toBeInTheDocument();
 });
 
 it('needs someone to hand over to', async () => {
-  mockApiClient.mockImplementation(() => json(200, { data: null }));
+  mockGet.mockImplementation(() => result(200, { data: null }));
   render(<AwayCard people={[{ id: 1, name: 'Amro Saleh' }, { id: 2, name: 'Emad Nasser' }]} />);
 
   const handOver = await screen.findByRole('button', { name: /Hand over from/ });
