@@ -34,6 +34,16 @@ jest.mock('@whity/features/i18n', () => ({
   }),
 }));
 const switchTenant = jest.fn(async () => undefined);
+/** The signed-in client: `/api/me/*` and Chat's directory, by path. */
+let apiRoutes: Record<string, unknown> = {};
+/** The typed client's GET, answered from `apiRoutes` by path and query. */
+const apiMock = jest.fn(async (path: string, init?: { params?: { query?: Record<string, string | number> } }) => {
+  const query = init?.params?.query;
+  const url = query ? `${path}?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)]))}` : path;
+  const body = apiRoutes[url];
+  return body === undefined ? { data: undefined, error: {}, response: { status: 404 } } : { data: body, response: { status: 200 } };
+});
+jest.mock('@/lib/api/client', () => ({ api: { GET: (...args: Parameters<typeof apiMock>) => apiMock(...args) } }));
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({
     user: { id: 1, tenant_id: 1 },
@@ -62,6 +72,9 @@ beforeEach(() => {
   setLanguage.mockReset();
   switchTenant.mockClear();
   clearNewIntent();
+  apiMock.mockClear();
+  apiRoutes = {};
+  window.localStorage.clear();
   mockPermissions = ['tasks:write', 'users:write'];
   fetchMock.mockReset();
   global.fetch = fetchMock as unknown as typeof fetch;
@@ -236,7 +249,109 @@ describe('AppCommandPalette commands', () => {
 
   it('reads out how many rows there are', () => {
     openWith('/');
-    expect(screen.getByTestId('command-palette-count')).toHaveTextContent('7 commands');
+    expect(screen.getByTestId('command-palette-count')).toHaveTextContent('9 commands');
+  });
+});
+
+/** WHIT-1070: recent items, /approve (opens, never decides) and /ask. */
+describe('AppCommandPalette recent, approve and ask', () => {
+  const press = (key: string) => fireEvent.keyDown(screen.getByTestId('command-palette-input'), { key });
+  const type = (value: string) => fireEvent.change(screen.getByTestId('command-palette-input'), { target: { value } });
+  const openPalette = () => fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+
+  it('leads the empty box with what was opened and run lately, without the words typed', () => {
+    render(<AppCommandPalette />);
+    openPalette();
+    expect(screen.queryByText('Recent')).not.toBeInTheDocument();
+
+    type('/go users');
+    press('Enter');
+    openPalette();
+    type('/new task Order flour for Example Bakery');
+    press('Enter');
+
+    openPalette();
+    expect(screen.getByText('Recent')).toBeInTheDocument();
+    expect(screen.getByTestId('command-item-recent-page-users')).toHaveTextContent('Users');
+    expect(screen.getByTestId('command-item-recent-command-/new task')).toBeInTheDocument();
+    expect(window.localStorage.getItem('whity:palette-recent:1:1')).not.toContain('Order flour');
+
+    fireEvent.click(screen.getByTestId('command-item-recent-command-/new task'));
+    expect((screen.getByTestId('command-palette-input') as HTMLInputElement).value).toBe('/new task ');
+  });
+
+  it('adds the server’s recent documents for someone who may read them', async () => {
+    mockPermissions = ['documents:read'];
+    apiRoutes['/api/v1/me/recent-documents'] = { data: [{ kind: 'document', id: 42, title: 'INV-1042 Example Clinic' }] };
+    render(<AppCommandPalette />);
+    openPalette();
+    fireEvent.click(await screen.findByText('INV-1042 Example Clinic'));
+    expect(push).toHaveBeenCalledWith('/admin/document-library/42');
+  });
+
+  it('lists what is waiting under /approve and only opens it', async () => {
+    mockNav = [...mockNav, { id: 'approvals', href: '/admin/approvals', label: 'Approvals' }];
+    apiRoutes['/api/v1/me/waiting?limit=20'] = {
+      data: [
+        {
+          key: 'proposal:7',
+          kind: 'proposal',
+          at: '2026-11-14 09:00:00',
+          proposal: { id: 7, summary: 'Send INV-1042 to Example Clinic', agent: { name: 'Finance clerk', nameAr: 'كاتب المالية' } },
+        },
+      ],
+      counts: { inbox: 0, proposals: 1, total: 1 },
+      unavailable: [],
+    };
+    render(<AppCommandPalette />);
+    openPalette();
+    type('/approve ');
+    const row = await screen.findByText('Send INV-1042 to Example Clinic');
+    expect(screen.getByText('Finance clerk')).toBeInTheDocument();
+    fireEvent.click(row);
+    expect(push).toHaveBeenCalledWith('/admin/approvals');
+    expect(apiMock.mock.calls.map(([url]) => url)).not.toContainEqual(expect.stringContaining('/approve'));
+  });
+
+  it('says so when nothing is waiting', async () => {
+    apiRoutes['/api/v1/me/waiting?limit=20'] = { data: [], counts: { inbox: 0, proposals: 0, total: 0 }, unavailable: [] };
+    render(<AppCommandPalette />);
+    openPalette();
+    type('/approve');
+    type('/approve ');
+    expect(await screen.findByText('Nothing is waiting for you')).toBeInTheDocument();
+  });
+
+  it('hands /ask to the chat with the chosen agent, unsent', async () => {
+    mockNav = [...mockNav, { id: 'chat', href: '/chat', label: 'Chat' }];
+    apiRoutes['/api/v1/chat/directory?q='] = {
+      data: { people: [], agents: [{ type: 'agent', id: 3, name: 'Finance clerk', name_ar: 'كاتب المالية', role: 'Invoices', role_ar: 'الفواتير' }] },
+    };
+    const seen: NewIntent[] = [];
+    function ChatScreenStub() {
+      useNewIntent('ask', (intent) => seen.push(intent));
+      return null;
+    }
+    render(<AppCommandPalette />);
+    openPalette();
+    type('/ask draft the reminder for INV-1042');
+    fireEvent.click(await screen.findByText('Ask Finance clerk: draft the reminder for INV-1042'));
+    expect(push).toHaveBeenCalledWith('/chat');
+    render(<ChatScreenStub />);
+    expect(seen).toEqual([{ kind: 'ask', text: 'draft the reminder for INV-1042', target: 3 }]);
+  });
+
+  it('turns the last row into Ask an agent once there is an agent to ask', async () => {
+    mockNav = [...mockNav, { id: 'chat', href: '/chat', label: 'Chat' }];
+    apiRoutes['/api/v1/chat/directory?q='] = {
+      data: { people: [], agents: [{ type: 'agent', id: 3, name: 'Finance clerk', name_ar: '', role: '', role_ar: '' }] },
+    };
+    render(<AppCommandPalette />);
+    openPalette();
+    type('overdue invoices');
+    fireEvent.click(await screen.findByText('Ask an agent: overdue invoices'));
+    expect((screen.getByTestId('command-palette-input') as HTMLInputElement).value).toBe('/ask overdue invoices');
+    expect(screen.queryByText('Connect an agent')).not.toBeInTheDocument();
   });
 });
 

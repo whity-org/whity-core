@@ -72,6 +72,9 @@ export function ChatScreen() {
   const [newOpen, setNewOpen] = useState(false);
   // ⌘K `/new message` (WHIT-1069) opens New chat.
   useNewIntent('message', () => setNewOpen(true));
+  // ⌘K `/ask` (WHIT-1070): the direct chat with that agent, the words in the
+  // message box and not sent. The agent answers here, proposing; you approve.
+  const [askDraft, setAskDraft] = useState<{ chatId: number; text: string } | null>(null);
 
   const loadList = useCallback(async () => {
     try {
@@ -102,6 +105,21 @@ export function ChatScreen() {
     },
     [router]
   );
+
+  useNewIntent('ask', ({ text, target }) => {
+    if (target === undefined) return;
+    void (async () => {
+      try {
+        // Opens the direct chat, or starts it: one per person and agent, as New chat does.
+        const started = await api.direct({ agent_id: target });
+        setAskDraft({ chatId: started.id, text });
+        void loadList();
+        open(started.id);
+      } catch (e) {
+        setListError(chatErrorText(e, ''));
+      }
+    })();
+  });
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -138,7 +156,16 @@ export function ChatScreen() {
         hidden={selected !== null}
       />
       {selected !== null ? (
-        <OpenChat key={selected} t={t} api={api} chatId={selected} myId={myId} onBack={() => open(null)} onChanged={() => void loadList()} />
+        <OpenChat
+          key={selected}
+          t={t}
+          api={api}
+          chatId={selected}
+          myId={myId}
+          initialDraft={askDraft?.chatId === selected ? askDraft.text : undefined}
+          onBack={() => open(null)}
+          onChanged={() => void loadList()}
+        />
       ) : (
         <div className="hidden place-items-center p-8 md:grid xl:col-span-2">
           <EmptyState
@@ -334,6 +361,7 @@ function OpenChat({
   api,
   chatId,
   myId,
+  initialDraft,
   onBack,
   onChanged,
 }: {
@@ -341,6 +369,8 @@ function OpenChat({
   api: ChatApi;
   chatId: number;
   myId: number;
+  /** Words to start the message box with (⌘K `/ask`). */
+  initialDraft?: string;
   onBack: () => void;
   onChanged: () => void;
 }) {
@@ -458,7 +488,7 @@ function OpenChat({
             {notice || t('error.generic', 'Something went wrong with Chat. Please try again.')}
           </p>
         )}
-        <Composer t={t} api={api} chat={chat} onSent={(m) => merge([m])} onError={setNotice} />
+        <Composer t={t} api={api} chat={chat} initialDraft={initialDraft} onSent={(m) => merge([m])} onError={setNotice} />
       </section>
       <SidePanel
         t={t}
@@ -822,16 +852,18 @@ function Composer({
   t,
   api,
   chat,
+  initialDraft,
   onSent,
   onError,
 }: {
   t: TranslateFn;
   api: ChatApi;
   chat: ChatDetail;
+  initialDraft?: string;
   onSent: (m: ChatMessage) => void;
   onError: (s: string | null) => void;
 }) {
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(initialDraft ?? '');
   const [sending, setSending] = useState(false);
   const [picked, setPicked] = useState<ChatMention[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);

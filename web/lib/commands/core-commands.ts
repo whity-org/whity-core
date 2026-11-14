@@ -23,6 +23,9 @@ export function useCommandTranslation(): TranslateFn {
   return t;
 }
 
+/** What `/approve` answers to; the palette loads the waiting list only once one is typed. */
+export const APPROVE_NAMES: readonly string[] = ['approve', 'waiting', 'inbox', 'موافقة', 'اعتماد', 'بانتظاري', 'الوارد'];
+
 /** One row under a command once its name is typed: a screen, a kind, a language. */
 export interface CommandOption {
   id: string;
@@ -34,6 +37,29 @@ export interface CommandOption {
   keepOpen?: boolean;
   /** The query Tab completes this option into. */
   complete?: string;
+  /** Shown greyed: "not right now" (still loading, nothing waiting). */
+  disabled?: boolean;
+  /** An agent row: dashed, because nothing happens until a person approves. */
+  agent?: boolean;
+  /** Remembered as a recent place (a screen) rather than as a command run. */
+  place?: { id: string; label: string; href: string };
+}
+
+/** One thing waiting for the person (`GET /api/me/waiting`), ready to open. */
+export interface WaitingEntry {
+  key: string;
+  title: string;
+  hint: string;
+  /** Null when the person has nowhere to open it. */
+  href: string | null;
+  proposal: boolean;
+}
+
+/** An agent the person can write to in Chat. */
+export interface ChatAgent {
+  id: number;
+  name: string;
+  role?: string;
 }
 
 export interface PaletteCommand {
@@ -62,9 +88,17 @@ export interface CommandContext {
   language: string;
   setLanguage: (code: string) => void;
   go: (href: string) => void;
-  newThing: (kind: NewKind, text: string, href: string) => void;
+  newThing: (kind: NewKind, text: string, href: string, target?: number) => void;
   /** Rewrites the query, for options that move on to the next step. */
   setQuery: (query: string) => void;
+  /** What is waiting for the person; null while it loads or if it failed. */
+  waiting: readonly WaitingEntry[] | null;
+  /** True once the waiting list has answered (even with nothing). */
+  waitingLoaded: boolean;
+  /** Agents the person can write to in Chat; null while they load. */
+  agents: readonly ChatAgent[] | null;
+  /** Where to connect an agent, for someone who may; null otherwise. */
+  connectAgentHref: string | null;
 }
 
 interface Kind {
@@ -133,6 +167,7 @@ export function buildCoreCommands(t: TranslateFn, ctx: CommandContext): PaletteC
         id: `go-${p.id}`,
         label: p.label,
         icon: p.icon,
+        place: { id: `page-${p.id}`, label: p.label, href: p.href },
         run: () => ctx.go(p.href),
       })),
   });
@@ -209,6 +244,82 @@ export function buildCoreCommands(t: TranslateFn, ctx: CommandContext): PaletteC
           icon: 'language',
           run: () => ctx.setLanguage(l.code),
         })),
+    });
+  }
+
+  commands.push({
+    name: 'approve',
+    names: APPROVE_NAMES,
+    description: t('palette.command.approve', 'What is waiting for you; opens it, never decides'),
+    icon: 'approval',
+    options: (rest) => {
+      if (ctx.waiting === null) {
+        return [
+          {
+            id: 'approve-state',
+            label: ctx.waitingLoaded
+              ? t('palette.approve.failed', 'What is waiting could not be loaded.')
+              : t('palette.approve.loading', 'Loading what is waiting for you…'),
+            disabled: true,
+            run: () => undefined,
+          },
+        ];
+      }
+      if (ctx.waiting.length === 0) {
+        return [{ id: 'approve-none', label: t('palette.approve.none', 'Nothing is waiting for you'), icon: 'check', disabled: true, run: () => undefined }];
+      }
+      return rank(rest.trim(), ctx.waiting, (w) => [w.title, w.hint]).map((w) => ({
+        id: `approve-${w.key}`,
+        label: w.title,
+        hint: w.hint,
+        icon: w.proposal ? 'robot' : 'inbox',
+        agent: w.proposal,
+        disabled: w.href === null,
+        run: () => {
+          if (w.href !== null) ctx.go(w.href);
+        },
+      }));
+    },
+  });
+
+  if (ctx.pages.some((p) => p.href === '/chat') || ctx.connectAgentHref !== null) {
+    commands.push({
+      name: 'ask',
+      names: ['ask', 'agent', 'اسأل', 'مساعد', 'وكيل'],
+      description: t('palette.command.ask', 'Ask an agent; it proposes, you approve'),
+      icon: 'robot',
+      options: (rest) => {
+        const words = rest.trim();
+        const agents = ctx.agents;
+        if (agents === null) {
+          return [{ id: 'ask-loading', label: t('palette.ask.loading', 'Loading your agents…'), disabled: true, agent: true, run: () => undefined }];
+        }
+        if (agents.length === 0) {
+          const connect = ctx.connectAgentHref;
+          return [
+            {
+              id: 'ask-connect',
+              label: t('palette.agent.connect', 'Connect an agent'),
+              hint: t('palette.agent.hint', 'It proposes; you approve'),
+              icon: 'robot',
+              agent: true,
+              disabled: connect === null,
+              run: () => {
+                if (connect !== null) ctx.go(connect);
+              },
+            },
+          ];
+        }
+        // Every agent is offered the words; the arrows pick which one.
+        return agents.map((a) => ({
+          id: `ask-${a.id}`,
+          label: words !== '' ? t('palette.ask.with', 'Ask {name}: {words}', { name: a.name, words }) : t('palette.ask.agent', 'Ask {name}', { name: a.name }),
+          hint: [a.role, t('palette.ask.hint', 'Opens your chat with it; nothing is sent yet')].filter(Boolean).join(' · '),
+          icon: 'robot',
+          agent: true,
+          run: () => ctx.newThing('ask', words, '/chat', a.id),
+        }));
+      },
     });
   }
 
