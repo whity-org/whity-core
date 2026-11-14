@@ -80,7 +80,7 @@ final class TenantSettingsRepository
 
         $names = [];
         $params = [':tenant_id' => $tenantId];
-        foreach (array_values($keys) as $i => $key) {
+        foreach ($keys as $i => $key) {
             $names[] = ":key{$i}";
             $params[":key{$i}"] = $key;
         }
