@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Whity\Core\Signup;
 
 use PDO;
+use Whity\Core\Settings\SettingsRegistry;
+use Whity\Core\Settings\TenantSettingsRepository;
 
 /**
- * A workspace's customer sign-up settings (WHIT-915, migration 222).
+ * A workspace's customer sign-up settings (WHIT-915).
  *
- * One row per workspace in `workspace_signup_settings`; a workspace with no row
- * is Off. Every statement binds tenant_id.
+ * Kept as the `signup.*` keys of the settings registry in `tenant_settings`
+ * (WHIT-1035; until then the `workspace_signup_settings` table). A workspace
+ * that never saved them is Off. Every statement binds tenant_id.
  */
 final class WorkspaceSignupSettings
 {
@@ -23,81 +26,102 @@ final class WorkspaceSignupSettings
     /** How many allowed domains a workspace may list. */
     public const MAX_DOMAINS = 50;
 
+    /** The registry keys this class reads and writes. */
+    private const KEYS = [
+        SettingsRegistry::SIGNUP_MODE,
+        SettingsRegistry::SIGNUP_ROLE_ID,
+        SettingsRegistry::SIGNUP_ALLOWED_DOMAINS,
+        SettingsRegistry::SIGNUP_CUSTOMER_INVITES,
+    ];
+
+    private readonly TenantSettingsRepository $store;
+
     public function __construct(private readonly PDO $db)
     {
+        $this->store = new TenantSettingsRepository($db);
     }
 
     /**
-     * `customer_invites` (#1872, migration 266): whether this workspace's
-     * customers may invite colleagues into their own role. Off unless an admin
-     * turned it on.
+     * `customer_invites` (#1872): whether this workspace's customers may invite
+     * colleagues into their own role. Off unless an admin turned it on.
+     *
+     * Stored as the `signup.*` keys of the settings registry (WHIT-1035); a
+     * workspace that never saved them reads the registry defaults: Off, no
+     * role, every domain, no customer invites.
      *
      * @return array{mode: string, role_id: int|null, allowed_domains: list<string>, customer_invites: bool, updated_at: string|null}
      */
     public function get(int $tenantId): array
     {
-        $stmt = $this->db->prepare(
-            'SELECT mode, role_id, allowed_domains, customer_invites, updated_at
-               FROM workspace_signup_settings WHERE tenant_id = :tid'
-        );
-        $stmt->execute([':tid' => $tenantId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stored = array_intersect_key($this->store->allForTenant($tenantId), array_flip(self::KEYS));
+        $value = static fn (string $key): string => $stored[$key] ?? SettingsRegistry::defaultFor($key);
 
-        if (!is_array($row)) {
-            return ['mode' => self::MODE_OFF, 'role_id' => null, 'allowed_domains' => [], 'customer_invites' => false, 'updated_at' => null];
-        }
-
-        $mode = in_array($row['mode'], self::MODES, true) ? (string) $row['mode'] : self::MODE_OFF;
-        $domains = json_decode((string) $row['allowed_domains'], true);
+        $mode = $value(SettingsRegistry::SIGNUP_MODE);
+        $roleId = (int) $value(SettingsRegistry::SIGNUP_ROLE_ID);
+        $domains = json_decode($value(SettingsRegistry::SIGNUP_ALLOWED_DOMAINS), true);
 
         return [
-            'mode' => $mode,
-            'role_id' => $row['role_id'] !== null ? (int) $row['role_id'] : null,
+            'mode' => in_array($mode, self::MODES, true) ? $mode : self::MODE_OFF,
+            // A deleted role reads as "not chosen", as the old table's
+            // ON DELETE SET NULL did, so sign-ups are refused until an admin
+            // chooses again.
+            'role_id' => $roleId > 0 && $this->roleExists($tenantId, $roleId) ? $roleId : null,
             'allowed_domains' => is_array($domains) ? array_values(array_filter($domains, 'is_string')) : [],
-            // PDO hands booleans back as bool, int or '0'/'1'/'t'/'f' depending on the driver.
-            'customer_invites' => in_array($row['customer_invites'], [true, 1, '1', 't', 'true'], true),
-            'updated_at' => $row['updated_at'] !== null ? (string) $row['updated_at'] : null,
+            'customer_invites' => $value(SettingsRegistry::SIGNUP_CUSTOMER_INVITES) === 'true',
+            'updated_at' => $stored === [] ? null : $this->store->lastUpdatedAt($tenantId, self::KEYS),
         ];
     }
 
     /**
+     * Saves all four values at once, so a reader never sees a new mode with an
+     * old role.
+     *
      * @param list<string> $allowedDomains Already normalised by {@see self::normaliseDomains()}.
-     * @param bool|null    $customerInvites Null keeps what is saved (off for a new row).
+     * @param int|null     $actorId        Recorded by the caller's audit entry; kept for callers.
+     * @param bool|null    $customerInvites Null keeps what is saved (off for a new workspace).
      */
     public function save(int $tenantId, string $mode, ?int $roleId, array $allowedDomains, ?int $actorId, ?bool $customerInvites = null): void
     {
         $customerInvites ??= $this->get($tenantId)['customer_invites'];
-        $params = [
-            ':tid' => $tenantId,
-            ':mode' => $mode,
-            ':role_id' => $roleId,
-            ':domains' => (string) json_encode($allowedDomains),
-            ':actor' => $actorId,
-            ':invites' => $customerInvites ? 'on' : 'off',
-            ':on' => 'on',
+        $values = [
+            SettingsRegistry::SIGNUP_MODE => $mode,
+            SettingsRegistry::SIGNUP_ROLE_ID => (string) ($roleId ?? 0),
+            SettingsRegistry::SIGNUP_ALLOWED_DOMAINS => (string) json_encode($allowedDomains),
+            SettingsRegistry::SIGNUP_CUSTOMER_INVITES => $customerInvites ? 'true' : 'false',
         ];
-
-        $update = $this->db->prepare(
-            'UPDATE workspace_signup_settings
-                SET mode = :mode, role_id = :role_id, allowed_domains = :domains,
-                    customer_invites = (CASE WHEN CAST(:invites AS VARCHAR(3)) = CAST(:on AS VARCHAR(3)) THEN TRUE ELSE FALSE END),
-                    updated_by = :actor, updated_at = NOW()
-              WHERE tenant_id = :tid'
-        );
-        $update->execute($params);
-        if ($update->rowCount() > 0) {
-            return;
+        foreach ($values as $key => $text) {
+            $problem = SettingsRegistry::validate($key, $text);
+            if ($problem !== null) {
+                throw new \InvalidArgumentException($problem);
+            }
         }
 
-        $this->db->prepare(
-            'INSERT INTO workspace_signup_settings (tenant_id, mode, role_id, allowed_domains, customer_invites, updated_by, updated_at)
-             VALUES (:tid, :mode, :role_id, :domains, (CASE WHEN CAST(:invites AS VARCHAR(3)) = CAST(:on AS VARCHAR(3)) THEN TRUE ELSE FALSE END), :actor, NOW())
-             ON CONFLICT (tenant_id) DO UPDATE
-                SET mode = EXCLUDED.mode, role_id = EXCLUDED.role_id,
-                    allowed_domains = EXCLUDED.allowed_domains,
-                    customer_invites = EXCLUDED.customer_invites,
-                    updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at'
-        )->execute($params);
+        $own = !$this->db->inTransaction();
+        if ($own) {
+            $this->db->beginTransaction();
+        }
+        try {
+            foreach ($values as $key => $text) {
+                $this->store->set($tenantId, $key, $text);
+            }
+            if ($own) {
+                $this->db->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($own && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /** The role still exists and this workspace can use it: its own, or one shared by every workspace. */
+    private function roleExists(int $tenantId, int $roleId): bool
+    {
+        $stmt = $this->db->prepare('SELECT 1 FROM roles WHERE id = :id AND (tenant_id = :tenant_id OR tenant_id IS NULL)');
+        $stmt->execute([':id' => $roleId, ':tenant_id' => $tenantId]);
+
+        return $stmt->fetchColumn() !== false;
     }
 
     /**
