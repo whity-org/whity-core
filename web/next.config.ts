@@ -119,6 +119,7 @@ const nextConfig: NextConfig = {
   // features actually live; react-table only re-exports them.
   transpilePackages: [
     "@whity/ui",
+    "@whity/api-client",
     "@tanstack/react-table",
     "@tanstack/table-core",
   ],

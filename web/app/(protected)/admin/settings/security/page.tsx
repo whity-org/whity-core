@@ -25,7 +25,7 @@ import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { useLocalizedUnits } from '@/hooks/useLocalizedUnits';
 import { useDateDisplay } from '@whity/features/datetime';
 import { SECURITY_MANAGE, errorMessage, type AddToast } from '../settings-shared';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 type TwoFactorPolicy = components['schemas']['TwoFactorPolicy'];
 type StatusEntry = components['schemas']['TwoFactorPolicyStatusEntry'];

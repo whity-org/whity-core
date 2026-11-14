@@ -213,8 +213,8 @@ jobs:
 
       - name: Regenerate the OpenAPI spec and typed clients
         run: |
-          # The spec embeds the version, and both typed clients are generated
-          # from the spec, so all three drift gates fail unless they are
+          # The spec embeds the version, and the typed client is generated
+          # from the spec, so both drift gates fail unless they are
           # regenerated here.
           #
           # Doing this in CI rather than on a laptop is deliberate: the
@@ -223,7 +223,6 @@ jobs:
           # only the in-tree plugins, which is exactly what the spec should
           # describe.
           php public/index.php generate:openapi
-          npx openapi-typescript public/openapi.json -o web/lib/api/schema.d.ts
           npx openapi-typescript public/openapi.json -o packages/api-client/src/schema.d.ts
 
       - name: Verify the version is consistent everywhere

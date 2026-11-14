@@ -9,7 +9,7 @@ import type {
   DocumentEditorAdapter,
 } from '@whity/features/document-editor';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 /**
  * Comments and suggestions on a document source (editor M5): the web half of

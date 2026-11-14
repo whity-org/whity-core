@@ -39,7 +39,7 @@
 import { useCallback, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { useTranslation } from '@whity/features/i18n';
 import {
   RecordCollectionPanel,

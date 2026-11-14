@@ -11,7 +11,12 @@
  * `Request` objects (jsdom provides none).
  */
 
-import { createApiClient, SESSION_EXPIRED_EVENT } from '@/lib/api/client';
+import {
+  createApiClient,
+  latestErrorReference,
+  requestWith,
+  SESSION_EXPIRED_EVENT,
+} from '@/lib/api/client';
 
 /** Build a JSON Response the way the backend shapes it. */
 function jsonResponse(status: number, body: unknown): Response {
@@ -285,5 +290,79 @@ describe('typed api client — a refused refresh ends the session', () => {
 
     expect(seen).not.toHaveBeenCalled();
     stop();
+  });
+});
+
+describe('typed api client — the reference of the last server error', () => {
+  it('keeps the X-Error-Reference of a 5xx for the error page', async () => {
+    const failed = new Response('{}', {
+      status: 500,
+      headers: { 'X-Error-Reference': 'ERR-7F3A' },
+    });
+    const { fn } = scriptedFetch(failed);
+
+    await client(fn).GET('/api/v1/users');
+
+    expect(latestErrorReference()).toBe('ERR-7F3A');
+  });
+});
+
+describe('apiFetch — the same rules for a URL the spec cannot name', () => {
+  beforeAll(() => {
+    (globalThis as unknown as { window: EventTarget }).window = new EventTarget();
+  });
+
+  afterAll(() => {
+    delete (globalThis as unknown as { window?: EventTarget }).window;
+  });
+
+  it('sends the CSRF header and cookies, and returns the response', async () => {
+    const { fn, calls } = scriptedFetch(jsonResponse(200, { data: [1] }));
+
+    const response = await requestWith(fn, '/api/v1/plugins/notes/items?page=2');
+
+    expect(calls[0].url).toBe('http://localhost/api/v1/plugins/notes/items?page=2');
+    expect(calls[0].credentials).toBe('include');
+    expect(calls[0].headers.get('X-Requested-With')).toBe('XMLHttpRequest');
+    expect(await response.json()).toEqual({ data: [1] });
+  });
+
+  it('refreshes once on a 401 and replays the body', async () => {
+    const { fn, calls } = scriptedFetch(
+      jsonResponse(401, {}),
+      jsonResponse(200, {}),
+      jsonResponse(201, { id: 3 })
+    );
+
+    const response = await requestWith(fn, '/api/v1/plugins/notes/items', {
+      method: 'POST',
+      body: JSON.stringify({ title: 'Flour order' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    expect(response.status).toBe(201);
+    expect(calls[1].url).toBe('http://localhost/api/v1/auth/refresh');
+    expect(await calls[2].text()).toBe(JSON.stringify({ title: 'Flour order' }));
+  });
+
+  it('never refreshes for a sign-in route', async () => {
+    const { fn } = scriptedFetch(jsonResponse(401, { error: 'Wrong password' }));
+
+    const response = await requestWith(fn, '/api/v1/login', { method: 'POST', body: '{}' });
+
+    expect(response.status).toBe(401);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('announces a refused refresh', async () => {
+    const seen = jest.fn();
+    window.addEventListener(SESSION_EXPIRED_EVENT, seen);
+    const { fn } = scriptedFetch(jsonResponse(401, {}), jsonResponse(401, {}));
+
+    const response = await requestWith(fn, '/api/v1/plugins/notes/items');
+
+    expect(response.status).toBe(401);
+    expect(seen).toHaveBeenCalledTimes(1);
+    window.removeEventListener(SESSION_EXPIRED_EVENT, seen);
   });
 });

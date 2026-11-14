@@ -1,5 +1,5 @@
 import { parseWireDate } from '@whity/features/datetime';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import type { ActionProposalChange, ActionProposalStatus } from '@whity/ui/action-proposal';
 import type { AgentActivityItem } from '@whity/ui/agent-activity';
 

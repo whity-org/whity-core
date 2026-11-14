@@ -7,7 +7,7 @@
  * import surface stable.
  */
 
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 export type Delegation = components['schemas']['Delegation'];
 

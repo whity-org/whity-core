@@ -19,7 +19,7 @@
  * without a frontend change.
  */
 import * as React from 'react';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import type { useToast } from '@/lib/toast-context';
 import { Badge } from '@whity/ui/badge';
 import { Input } from '@/components/ui/input';

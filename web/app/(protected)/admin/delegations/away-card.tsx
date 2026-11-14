@@ -24,7 +24,7 @@ import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 export type AwayPeriod = components['schemas']['AwayPeriod'];
 type Cover = AwayPeriod['covers'][number];

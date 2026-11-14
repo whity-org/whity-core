@@ -8,7 +8,7 @@
  * sentence, which says which value is wrong; anything else gets our own words.
  */
 
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { apiClient } from '@/lib/api-client';
 import { ForbiddenError } from '@/lib/forbidden';
 

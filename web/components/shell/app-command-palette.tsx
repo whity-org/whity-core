@@ -28,7 +28,7 @@ import { useCurrentLanguage, useTranslation } from '@whity/features/i18n';
 import { useNavigation } from '@/lib/navigation-context';
 import { useNavItemLabels } from '@/lib/nav-item-labels';
 import { useThemeMode } from '@/lib/theme-mode-context';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 type SearchGroup = components['schemas']['SearchGroup'];
 

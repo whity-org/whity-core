@@ -13,7 +13,7 @@ import type {
 } from '@whity/features/document-editor';
 import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { agentsAdapter } from './agents';
 import { savedBlocksAdapter } from './saved-blocks';
 import { collabAdapter } from './collab';

@@ -171,7 +171,7 @@ job_unit() {
   if ! diff -q <(tr -d '\r' < "$CI_LOCAL_SRC/public/openapi.json.ci-local-orig") \
                <(tr -d '\r' < "$CI_LOCAL_SRC/public/openapi.json") >/dev/null; then
     mv "$CI_LOCAL_SRC/public/openapi.json.ci-local-orig" "$CI_LOCAL_SRC/public/openapi.json"
-    fail "public/openapi.json is stale — run generate:openapi, commit it, and regenerate web/lib/api/schema.d.ts (cd web && npm run generate:api)"
+    fail "public/openapi.json is stale — run generate:openapi, commit it, and regenerate packages/api-client/src/schema.d.ts (cd packages/api-client && npm run generate)"
   fi
   # Put the ORIGINAL back even on success. generate:openapi rewrote the file
   # in place, and on Windows that silently swaps its CRLF endings for LF —

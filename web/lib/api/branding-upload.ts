@@ -16,7 +16,7 @@
  */
 
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 /** The effective branding shape returned by every branding mutation. */
 export type Branding = components['schemas']['Branding'];

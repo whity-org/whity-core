@@ -9,7 +9,7 @@
  * similar names and different lifetimes, and a `RouteStep` and a
  * `RouteTemplateStep` are not interchangeable however alike they read.
  *
- * Hand-written rather than taken from `@/lib/api/schema`, for the reason
+ * Hand-written rather than taken from `@whity/api-client`, for the reason
  * `routing-wire.ts` records in full: the generated client is built from the
  * DYNAMIC `/api/openapi.json`, which describes whatever plugin routes a given
  * install happens to have loaded, so depending on it would make a core screen's

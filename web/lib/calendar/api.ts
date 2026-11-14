@@ -10,7 +10,7 @@
  * sentence says which value is wrong, falls back to the server's text.
  */
 
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { apiClient } from '@/lib/api-client';
 import { ForbiddenError } from '@/lib/forbidden';
 

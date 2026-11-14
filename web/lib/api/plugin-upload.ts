@@ -23,7 +23,7 @@
  */
 
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 /** The success envelope: the staged plugin (lands `disabled` for review). */
 export type PluginUploadResponse =

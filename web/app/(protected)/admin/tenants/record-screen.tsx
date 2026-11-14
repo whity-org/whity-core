@@ -34,7 +34,7 @@ import { useCallback, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import {
