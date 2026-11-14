@@ -65,7 +65,7 @@ final class WorkspaceSignupSettings
             // A deleted role reads as "not chosen", as the old table's
             // ON DELETE SET NULL did, so sign-ups are refused until an admin
             // chooses again.
-            'role_id' => $roleId > 0 && $this->roleExists($roleId) ? $roleId : null,
+            'role_id' => $roleId > 0 && $this->roleExists($tenantId, $roleId) ? $roleId : null,
             'allowed_domains' => is_array($domains) ? array_values(array_filter($domains, 'is_string')) : [],
             'customer_invites' => $value(SettingsRegistry::SIGNUP_CUSTOMER_INVITES) === 'true',
             'updated_at' => $stored === [] ? null : $this->store->lastUpdatedAt($tenantId, self::KEYS),
@@ -115,10 +115,11 @@ final class WorkspaceSignupSettings
         }
     }
 
-    private function roleExists(int $roleId): bool
+    /** The role still exists and this workspace can use it: its own, or one shared by every workspace. */
+    private function roleExists(int $tenantId, int $roleId): bool
     {
-        $stmt = $this->db->prepare('SELECT 1 FROM roles WHERE id = :id');
-        $stmt->execute([':id' => $roleId]);
+        $stmt = $this->db->prepare('SELECT 1 FROM roles WHERE id = :id AND (tenant_id = :tenant_id OR tenant_id IS NULL)');
+        $stmt->execute([':id' => $roleId, ':tenant_id' => $tenantId]);
 
         return $stmt->fetchColumn() !== false;
     }
