@@ -834,6 +834,9 @@ final class SettingsRegistry
     public const SIGNUP_ROLE_ID = 'signup.role_id';
     public const SIGNUP_ALLOWED_DOMAINS = 'signup.allowed_domains';
     public const SIGNUP_CUSTOMER_INVITES = 'signup.customer_invites';
+    //   - invites_per_customer: how many people one customer may invite (open,
+    //     accepted and not sent count); 0 is no limit (WHIT-1043, SC.11).
+    public const SIGNUP_INVITES_PER_CUSTOMER = 'signup.invites_per_customer';
 
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
@@ -848,6 +851,7 @@ final class SettingsRegistry
         self::SIGNUP_ROLE_ID,
         self::SIGNUP_ALLOWED_DOMAINS,
         self::SIGNUP_CUSTOMER_INVITES,
+        self::SIGNUP_INVITES_PER_CUSTOMER,
     ];
 
     /**
@@ -1335,6 +1339,8 @@ final class SettingsRegistry
         self::SIGNUP_ROLE_ID => '0',
         self::SIGNUP_ALLOWED_DOMAINS => '[]',
         self::SIGNUP_CUSTOMER_INVITES => 'false',
+        // No limit, as before the setting existed.
+        self::SIGNUP_INVITES_PER_CUSTOMER => '0',
     ];
 
     /**
@@ -1750,6 +1756,7 @@ final class SettingsRegistry
                 : self::SIGNUP_ROLE_ID . ' must be a role id, or 0 for none.',
             self::SIGNUP_ALLOWED_DOMAINS => self::validateSignupDomains($value),
             self::SIGNUP_CUSTOMER_INVITES => self::validateBoolean($value, self::SIGNUP_CUSTOMER_INVITES),
+            self::SIGNUP_INVITES_PER_CUSTOMER => self::validateWholeNumberBetween($value, self::SIGNUP_INVITES_PER_CUSTOMER, 0, 1000),
             default => "Unknown setting key: {$key}",
         };
     }

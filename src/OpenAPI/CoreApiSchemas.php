@@ -11512,6 +11512,7 @@ final class CoreApiSchemas
                 'role_customer_safe' => self::bool(true),
                 'allowed_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'customer_invites' => self::bool(),
+                'invites_per_customer' => self::int() + ['description' => 'How many people one customer may invite; 0 is no limit (WHIT-1043).'],
                 'eligible_roles' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupEligibleRole')],
                 'pending_count' => self::int(),
                 'workspace_slug' => self::str(true),
@@ -11520,7 +11521,7 @@ final class CoreApiSchemas
                 'join_providers' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupJoinProvider')],
                 'updated_at' => self::str(true),
             ], [
-                'mode', 'role_id', 'role_name', 'role_customer_safe', 'allowed_domains', 'customer_invites',
+                'mode', 'role_id', 'role_name', 'role_customer_safe', 'allowed_domains', 'customer_invites', 'invites_per_customer',
                 'eligible_roles', 'pending_count', 'workspace_slug', 'bot_check_ready',
                 'email_signup_ready', 'join_providers', 'updated_at',
             ]),
@@ -11542,6 +11543,9 @@ final class CoreApiSchemas
                 'customer_invites' => self::bool() + [
                     'description' => 'Whether customers may invite colleagues into their own role, as customers (POST /api/v1/team-invitations). Off by default.',
                 ],
+                'invites_per_customer' => self::int() + [
+                    'description' => 'How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043).',
+                ],
             ], []),
             'TeamInvitationItem' => self::object([
                 'id' => self::int(),
@@ -11552,8 +11556,10 @@ final class CoreApiSchemas
             ], ['id', 'email', 'status', 'expires_at', 'created_at']),
             'TeamInvitationListResponse' => self::dataEnvelope(self::object([
                 'enabled' => self::bool(),
+                'limit' => self::int() + ['description' => 'How many people you may invite; 0 is no limit (WHIT-1043).'],
+                'used' => self::int() + ['description' => 'How many places your invitations take: open, accepted and not sent.'],
                 'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('TeamInvitationItem')],
-            ], ['enabled', 'items'])),
+            ], ['enabled', 'limit', 'used', 'items'])),
             'TeamInvitationCreateRequest' => self::object([
                 'email' => self::str() + ['description' => 'The colleague\'s email address. They join in your own role, as a customer.'],
             ], ['email']),

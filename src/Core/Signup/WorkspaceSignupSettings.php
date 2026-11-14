@@ -32,6 +32,7 @@ final class WorkspaceSignupSettings
         SettingsRegistry::SIGNUP_ROLE_ID,
         SettingsRegistry::SIGNUP_ALLOWED_DOMAINS,
         SettingsRegistry::SIGNUP_CUSTOMER_INVITES,
+        SettingsRegistry::SIGNUP_INVITES_PER_CUSTOMER,
     ];
 
     private readonly TenantSettingsRepository $store;
@@ -49,7 +50,7 @@ final class WorkspaceSignupSettings
      * workspace that never saved them reads the registry defaults: Off, no
      * role, every domain, no customer invites.
      *
-     * @return array{mode: string, role_id: int|null, allowed_domains: list<string>, customer_invites: bool, updated_at: string|null}
+     * @return array{mode: string, role_id: int|null, allowed_domains: list<string>, customer_invites: bool, invites_per_customer: int, updated_at: string|null}
      */
     public function get(int $tenantId): array
     {
@@ -68,6 +69,7 @@ final class WorkspaceSignupSettings
             'role_id' => $roleId > 0 && $this->roleExists($tenantId, $roleId) ? $roleId : null,
             'allowed_domains' => is_array($domains) ? array_values(array_filter($domains, 'is_string')) : [],
             'customer_invites' => $value(SettingsRegistry::SIGNUP_CUSTOMER_INVITES) === 'true',
+            'invites_per_customer' => max(0, (int) $value(SettingsRegistry::SIGNUP_INVITES_PER_CUSTOMER)),
             'updated_at' => $stored === [] ? null : $this->store->lastUpdatedAt($tenantId, self::KEYS),
         ];
     }
@@ -79,15 +81,19 @@ final class WorkspaceSignupSettings
      * @param list<string> $allowedDomains Already normalised by {@see self::normaliseDomains()}.
      * @param int|null     $actorId        Recorded by the caller's audit entry; kept for callers.
      * @param bool|null    $customerInvites Null keeps what is saved (off for a new workspace).
+     * @param int|null     $invitesPerCustomer How many people one customer may invite, 0 for no limit; null keeps what is saved.
      */
-    public function save(int $tenantId, string $mode, ?int $roleId, array $allowedDomains, ?int $actorId, ?bool $customerInvites = null): void
+    public function save(int $tenantId, string $mode, ?int $roleId, array $allowedDomains, ?int $actorId, ?bool $customerInvites = null, ?int $invitesPerCustomer = null): void
     {
-        $customerInvites ??= $this->get($tenantId)['customer_invites'];
+        $saved = $this->get($tenantId);
+        $customerInvites ??= $saved['customer_invites'];
+        $invitesPerCustomer ??= $saved['invites_per_customer'];
         $values = [
             SettingsRegistry::SIGNUP_MODE => $mode,
             SettingsRegistry::SIGNUP_ROLE_ID => (string) ($roleId ?? 0),
             SettingsRegistry::SIGNUP_ALLOWED_DOMAINS => (string) json_encode($allowedDomains),
             SettingsRegistry::SIGNUP_CUSTOMER_INVITES => $customerInvites ? 'true' : 'false',
+            SettingsRegistry::SIGNUP_INVITES_PER_CUSTOMER => (string) $invitesPerCustomer,
         ];
         foreach ($values as $key => $text) {
             $problem = SettingsRegistry::validate($key, $text);

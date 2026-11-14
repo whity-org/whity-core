@@ -142,8 +142,17 @@ final class WorkspaceSignupApiHandler
             ]);
         }
 
+        // WHIT-1043 (SC.11): how many people one customer may invite; 0 is no limit.
+        $perCustomer = array_key_exists('invites_per_customer', $body) ? $body['invites_per_customer'] : $current['invites_per_customer'];
+        if (!is_int($perCustomer) || $perCustomer < 0 || $perCustomer > 1000) {
+            return Response::error('Validation failed', 422, [
+                'invites_per_customer' => 'Enter a whole number from 0 to 1000 (0 is no limit).',
+                'code' => 'invites_per_customer_invalid',
+            ]);
+        }
+
         try {
-            $this->settings->save($tenantId, $mode, $roleId, $domains, $ctx['userId'], $customerInvites);
+            $this->settings->save($tenantId, $mode, $roleId, $domains, $ctx['userId'], $customerInvites, $perCustomer);
         } catch (\Throwable $e) {
             error_log('[customer-signup] settings save failed: ' . $e->getMessage());
 
@@ -160,6 +169,7 @@ final class WorkspaceSignupApiHandler
                 'role_id' => $roleId,
                 'allowed_domains' => $domains,
                 'customer_invites' => $customerInvites,
+                'invites_per_customer' => $perCustomer,
                 'previous_mode' => $current['mode'],
             ],
         ]);
@@ -314,6 +324,8 @@ final class WorkspaceSignupApiHandler
             'allowed_domains' => $current['allowed_domains'],
             // #1872: customers may invite colleagues into their own role.
             'customer_invites' => $current['customer_invites'],
+            // WHIT-1043: 0 is no limit.
+            'invites_per_customer' => $current['invites_per_customer'],
             'eligible_roles' => $roles,
             'pending_count' => $this->service->pendingCount($tenantId),
             'workspace_slug' => $slug,

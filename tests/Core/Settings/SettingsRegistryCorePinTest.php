@@ -204,6 +204,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'signup.role_id',
             'signup.allowed_domains',
             'signup.customer_invites',
+            // WHIT-1043: how many people one customer may invite.
+            'signup.invites_per_customer',
         ];
     }
 
@@ -430,6 +432,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'signup.role_id' => '0',
             'signup.allowed_domains' => '[]',
             'signup.customer_invites' => 'false',
+            'signup.invites_per_customer' => '0',
         ];
     }
 
