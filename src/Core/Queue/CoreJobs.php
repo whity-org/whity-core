@@ -143,12 +143,8 @@ final class CoreJobs
                 $pdo,
                 $calendarSettings,
                 null,
-                new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
-                    $calendarSettings,
-                    new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
-                    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
-                    $calendarLogger
-                )),
+                // E2: the same sender as every core email: the workspace's brand and gate.
+                $coreSender,
                 \Whity\Core\Http\FrontendUrls::fromEnv(),
                 $calendarQueue,
                 $calendarLogger
@@ -193,12 +189,7 @@ final class CoreJobs
                         $pdo,
                         $calendarSettings,
                         null,
-                        new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
-                            $calendarSettings,
-                            new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
-                            \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
-                            $calendarLogger
-                        )),
+                        $coreSender,
                         \Whity\Core\Http\FrontendUrls::fromEnv(),
                         $calendarQueue,
                         $calendarLogger

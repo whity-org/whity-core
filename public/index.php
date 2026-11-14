@@ -5237,7 +5237,7 @@ $calendarBookingService = \Whity\Core\Calendar\CalendarServices::bookingService(
     $db->getPdo(),
     $settingsService,
     $hookManager,
-    $mailer,
+    $brandedEmailSender,
     $frontendUrls,
     $queueService,
     $logger,

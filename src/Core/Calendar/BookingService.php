@@ -247,7 +247,10 @@ final class BookingService
      */
     public function move(int $tenantId, int $bookingId, DateTimeImmutable $start, ?int $profileId, bool $enforceHours): array
     {
+        $before = $this->bookings->find($tenantId, $bookingId);
         $booking = $this->moveUnderLock($tenantId, $bookingId, $start, $profileId, $enforceHours);
+        // E2 `booking-moved`: the email says what the time was.
+        $booking['previous_starts_at'] = is_string($before['starts_at'] ?? null) ? Interval::toApi(Interval::fromDb($before['starts_at'])) : null;
         if ($booking['status'] === BookingRepository::STATUS_REQUESTED) {
             // The customer (or staff) changed the time of a request: it is
             // still a request, and no longer staff's suggestion.
