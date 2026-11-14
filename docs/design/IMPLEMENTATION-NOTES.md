@@ -36,7 +36,7 @@ What it changes:
 - **Contract:** `packages/ui/src/editor/contract.ts` to the 3.4 `whity-document.ts`: `PerDocumentKey`, the mark's `key`, `FieldRef.perDocument` as a key, `SavedBlock.perDocumentParts` (label in English and Arabic, `kind`, `required`, placeholder) with `perDocumentKeys` read for one release, `SavedBlockVersionChange`.
 - **Editor:** mint `pd_` + 8-character nanoid when a part is marked; keep it through edits, moves and translation; copying inside the block mints a new key, pasting elsewhere drops the mark. `saved-parts.ts`, `convert.ts`, `schema-rich.ts`, `saved-block-view.tsx`, `gutter.tsx`, `catalogue.ts`, `services.tsx`; the saved block page and `web/lib/documents/saved-blocks.ts`.
 - **Server:** `SavedBlockExpander` fills by key and reports `orphanedParts` instead of dropping them; `SavedBlockRepository`, `SavedBlocksApiHandler` and the OpenAPI schema take `perDocumentParts`; `required` parts block issuing like E.27. Tests in `tests/Api/SavedBlocksApiRealEngineTest.php` and the editor's saved-parts tests.
-- **Migration (number from the orchestrator):** for each saved block, mint keys for its parts in reading order and write them into the marks and fields of `saved_blocks.blocks` and every `saved_block_versions.blocks`; set `perDocumentParts[i].key`; then rewrite every `savedBlock` node's `overrides` in `document_sources.blocks` from `<blockId>#i` to `perDocumentParts[i].key`. Frozen published copies in `document_source_versions` are **Q19**. Idempotent, one transaction per tenant.
+- **Migration 270 (reserved):** for each saved block, mint keys for its parts in reading order and write them into the marks and fields of `saved_blocks.blocks` and every `saved_block_versions.blocks`; set `perDocumentParts[i].key`; then rewrite every `savedBlock` node's `overrides` in `document_sources.blocks` from `<blockId>#i` to `perDocumentParts[i].key`. Frozen published copies in `document_source_versions` stay as they are (owner, Q19): the expander maps their old `<blockId>#i` keys to `perDocumentParts[i].key` when reading. Idempotent, one transaction per tenant.
 
 `web/__tests__/editor-contract.test.ts` holds `contract.ts` byte-equal to `handoff/editor/whity-document.ts`. 3.4 changed the handoff (E.23a, and `FormPrintoutStyle` for P1), so that one check is skipped in this pull request; the E.23a pull request copies the contract and turns it back on.
 
@@ -93,7 +93,7 @@ Order: `PwNav` first (every other phone screen sits on it), then `PwShortSidebar
 | `TplSignInTwoColumn` | Done before the card (WHIT-956, #1734) | `/login`, `sign-in-brand-panel.tsx` | — |
 | `TplVerifyDocument`, `TplPaymentReturn` | Done before the card | `verify/[token]`, `billing/return` | — |
 | `TplCalendarStaff` | Done before the card (WHIT-944, WHIT-946) | `/calendar/*` | Rooms and branches are the 3.3 Calendar extras lane (Q7) |
-| `TplAgentPersona` | Done before the card (WHIT-820) | `/admin/agents/[id]` with `persona-editor.tsx`; the app map says `agents/[id]/persona` (**Q22**) | — |
+| `TplAgentPersona` | Done before the card (WHIT-820) | `/admin/agents/[id]` with `persona-editor.tsx`; this is the route (owner, Q23), and the app map's `agents/[id]/persona` is wrong | — |
 | `TplBookingManage` | Done before the card (WHIT-945) | `/booking/[token]` | Brand colour and logo: WHIT-1014 |
 | `SiteShareCards` | **Missing**: no Open Graph metadata anywhere | `generateMetadata` and `opengraph-image` on `f/[slug]`, `book/[workspace]`, `join/[workspace]`, `verify/[token]` and the sign-in | **Yes**: generated images in the workspace's colour and logo; shared documents never preview content |
 | `SiteInstallerTerminal` | Exists, not compared: `install.sh` at the repo root | `install.sh` | — |
@@ -187,9 +187,25 @@ Numbered after 3.3's Q1-Q17. Each keeps its default until answered.
 | Q28 | SC.11 adds **Team invites** (a customer company inviting its own people up to a number), which isn't in the asks or the code. In A15? | In A15, after the gaps, with its own server PR |
 | Q29 | Where do A14, A15, P1 and E2 sit against the 3.3 lanes still open? | Run alongside them as four more lanes; E.23a first |
 
+### Owner's answers (14 Nov 2026)
+
+The owner approved every default above ("Yes, go"), with these specifics:
+
+- **Q18:** E.23a is its own pull request (WHIT-992), next, on migration **270**.
+- **Q19:** published template versions stay frozen; their old position keys are read, not rewritten.
+- **Q20:** the size-token rule stays in `CLAUDE.md` and goes to the brand team as an ask.
+- **Q21, Q22:** brand-team fixes to the package: the icon count is 163; the second SU.1 is renumbered. Both are asks below.
+- **Q23:** the persona editor stays at `/admin/agents/[id]`. The app map's `agents/[id]/persona` (A15 row `TplAgentPersona`) should read `/admin/agents/[id]`; asked of the brand team below, since the app map is theirs.
+- **Q24:** PW.11 ships the install offer now; the notifications ask and web push are a later milestone. A14 drops to 11-12 PRs.
+- **Q25:** WhatsApp and SMS templates stay in the paid plugins.
+- **Q26:** P1's approvals block builds on WHIT-1016-1018; P1 starts after #1903 and #1905 merge.
+- **Q27:** the owner sends the four briefs to the brand team.
+- **Q28:** Team invites is built in A15.
+- **Q29:** the new lanes run after the open 3.3 work; E.23a goes first.
+
 ## For the design team to pick up
 
-`HANDOFF.md`'s icon count (Q21); renumbering the 3.4 SU table (Q22); the size-token rule in the snippet (Q20); `ANSWERS-3.4.md` skips its part 3 and its PW range stops at PW.10 while the register has PW.11; `13-app-map.md`'s persona route (Q23).
+Asks approved by the owner on 14 Nov: `HANDOFF.md`'s icon count is 163 (Q21); renumber the 3.4 "Every surface" table so it doesn't reuse SU.1 (Q22); add the size-token rule ("Use the size tokens and `text-xs`, `text-sm` and the control sizes, never fixed sizes; the 13px floor and Larger text depend on it") to `CLAUDE-snippet.md` (Q20); the persona route in `13-app-map.md` is `/admin/agents/[id]` (Q23). Also: `ANSWERS-3.4.md` skips its part 3 and its PW range stops at PW.10 while the register has PW.11.
 
 ---
 
