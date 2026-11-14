@@ -4611,6 +4611,16 @@ $router->register('POST', '/api/forms/{id:\d+}/submissions', [$formSubmissionsHa
 $router->register('GET', '/api/form-submissions', [$formSubmissionsHandler, 'list'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/form-submissions/{id:\d+}/files/{fileId:\d+}', [$formSubmissionsHandler, 'fileContent'], null, null, CorePermissions::FORMS_READ);
+// Design 3.4 (P1): a response in the automatic printout layout, and the
+// Form printouts tab's live preview of unsaved theme options.
+$formPrintoutsHandler = new \Whity\Api\FormPrintoutsApiHandler(
+    $db->getPdo(),
+    new \Whity\Core\Form\Print\FormPrintoutService($db->getPdo(), $sourceDocumentPrinter, $entitlementService, $settingsService),
+    $flowDocumentRenderer,
+    $documentRenderMeters,
+);
+$router->register('GET', '/api/form-submissions/{id:\d+}/printout', [$formPrintoutsHandler, 'submission'], null, null, CorePermissions::FORMS_READ);
+$router->register('POST', '/api/document-themes/form-printout-preview', [$formPrintoutsHandler, 'themePreview'], null, null, CorePermissions::DOCUMENTS_THEMES);
 // The office's record on a submission (migration 194). Somebody who can read a
 // submission can read what became of it; recording takes `forms:review`.
 $router->register('GET', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'show'], null, null, CorePermissions::FORMS_READ);

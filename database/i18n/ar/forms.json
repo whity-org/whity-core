@@ -139,6 +139,8 @@
         "builder.panel.maxFiles.hint": "من 1 إلى 20.",
         "builder.panel.maxLength": "أطول إجابة",
         "builder.panel.maxLength.hint": "بالأحرف. اتركه فارغاً لعدم وضع حد.",
+        "builder.panel.maxWords": "أقصى عدد للكلمات",
+        "builder.panel.maxWords.hint": "يُطبع تحت الإجابة بصيغة «142 من 300 كلمة». اتركه فارغاً لعدم وضع حد.",
         "builder.panel.maxRows": "أكبر عدد من الصفوف",
         "builder.panel.min": "الأصغر",
         "builder.panel.minRows": "أقل عدد من الصفوف",

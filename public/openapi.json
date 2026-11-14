@@ -23273,6 +23273,134 @@
                 ]
             }
         },
+        "/api/v1/document-themes/form-printout-preview": {
+            "post": {
+                "operationId": "post_api_v1_document_themes_form_printout_preview",
+                "summary": "Preview form printouts with unsaved theme options",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Design 3.4 (`TplFormPrintStyle`): the workspace\u2019s latest form response (or `submissionId`) printed with the `form`, `letterhead` and `accent` options in the body over the workspace theme. A free workspace previews the standard layout, as it would print. One render against the limits.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FormPrintoutPreviewRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The PDF",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No form response to preview yet",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Some options are not valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "The document render limit has been reached",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "PDFs are turned off, or the render service is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/document-themes/resolve": {
             "post": {
                 "operationId": "post_api_v1_document_themes_resolve",
@@ -28936,6 +29064,136 @@
                     },
                     "503": {
                         "description": "The file could not be read from storage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/form-submissions/{id}/printout": {
+            "get": {
+                "operationId": "get_api_v1_form_submissions_id_printout",
+                "summary": "Print a response in the automatic layout",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Design 3.4 (P1): the response laid out from its form\u2019s sections and questions in the workspace theme\u2019s form printout options, as it would print now. Not stored: the record is the PDF its route\u2019s final step makes. `lang` is `en` or `ar`; left out, the language of the person who sent it. One render against the workspace\u2019s limits.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "lang",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "en",
+                                "ar"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The PDF",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Submission not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The render service refused the printout",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "The document render limit has been reached",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "PDFs are turned off, or the render service is unavailable",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -80536,7 +80794,8 @@
                                             "properties": {
                                                 "src": {
                                                     "type": "string",
-                                                    "pattern": "^/api/files/[0-9]{1,12}/content$"
+                                                    "pattern": "^data:image/(png|jpeg|webp);base64,",
+                                                    "description": "The image embedded as a data: URI, at most 300 KB."
                                                 },
                                                 "alt": {
                                                     "type": "string",
@@ -80864,7 +81123,8 @@
                                             "properties": {
                                                 "src": {
                                                     "type": "string",
-                                                    "pattern": "^/api/files/[0-9]{1,12}/content$"
+                                                    "pattern": "^data:image/(png|jpeg|webp);base64,",
+                                                    "description": "The image embedded as a data: URI, at most 300 KB."
                                                 },
                                                 "alt": {
                                                     "type": "string",
@@ -81051,6 +81311,10 @@
                                 "labelAr"
                             ]
                         }
+                    },
+                    "form": {
+                        "type": "object",
+                        "description": "The Form printouts tab (design 3.4): the entitlement that unlocks it, each option with its standard value and English and Arabic labels, the footer parts and the marks limit."
                     }
                 },
                 "required": [
@@ -81278,7 +81542,8 @@
                                     "properties": {
                                         "src": {
                                             "type": "string",
-                                            "pattern": "^/api/files/[0-9]{1,12}/content$"
+                                            "pattern": "^data:image/(png|jpeg|webp);base64,",
+                                            "description": "The image embedded as a data: URI, at most 300 KB."
                                         },
                                         "alt": {
                                             "type": "string",
@@ -82890,6 +83155,36 @@
                 "required": [
                     "data"
                 ]
+            },
+            "FormPrintoutPreviewRequest": {
+                "type": "object",
+                "properties": {
+                    "form": {
+                        "type": "object",
+                        "description": "Unsaved `form` options (FormPrintoutStyle) to preview."
+                    },
+                    "letterhead": {
+                        "type": "object",
+                        "description": "Unsaved letterhead options, `layout` among them."
+                    },
+                    "accent": {
+                        "type": "string",
+                        "pattern": "^#[0-9A-Fa-f]{6}$",
+                        "description": "An unsaved print colour."
+                    },
+                    "submissionId": {
+                        "type": "integer",
+                        "description": "The response to print. Left out, the workspace\u2019s latest."
+                    },
+                    "lang": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "ar"
+                        ],
+                        "description": "The printout\u2019s language. Left out, the language of the person who sent it."
+                    }
+                }
             },
             "FormPublicLinkClosedResponse": {
                 "type": "object",
@@ -92736,7 +93031,8 @@
                                             "properties": {
                                                 "src": {
                                                     "type": "string",
-                                                    "pattern": "^/api/files/[0-9]{1,12}/content$"
+                                                    "pattern": "^data:image/(png|jpeg|webp);base64,",
+                                                    "description": "The image embedded as a data: URI, at most 300 KB."
                                                 },
                                                 "alt": {
                                                     "type": "string",

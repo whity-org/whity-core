@@ -44,7 +44,7 @@ final class RouteApprovals
     /**
      * The approvals that stand on a route, oldest first.
      *
-     * @return list<array{profile_id: ?int, name: string, date: string, position: int, step: ?string}>
+     * @return list<array{profile_id: ?int, name: string, date: string, at: string, position: int, step: ?string}>
      */
     public function forRoute(int $tenantId, int $routeId): array
     {
@@ -75,6 +75,8 @@ final class RouteApprovals
                 'profile_id' => $row['actor_profile_id'] !== null ? (int) $row['actor_profile_id'] : null,
                 'name' => (string) ($row['display_name'] ?? ''),
                 'date' => substr((string) $row['occurred_at'], 0, 10),
+                // The moment, for a printout's "12 Nov 2026, 10:14" (design 3.4, FP.6).
+                'at' => (string) $row['occurred_at'],
                 'position' => (int) $row['position'],
                 'step' => $row['label'] !== null ? (string) $row['label'] : null,
             ];
@@ -106,7 +108,7 @@ final class RouteApprovals
     }
 
     /**
-     * @param list<array{profile_id: ?int, name: string, date: string, position: int, step: ?string}> $approvals
+     * @param list<array{profile_id: ?int, name: string, date: string, at: string, position: int, step: ?string}> $approvals
      * @return array<string, string|null>
      */
     private static function list(string $prefix, array $approvals, string $approvedMark): array

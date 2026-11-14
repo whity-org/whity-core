@@ -1449,8 +1449,9 @@ final class DocumentRouter
 
     /**
      * A finalise step that names no template takes its subject's default: a
-     * form's "Final document template", or a document's own template. Refused
-     * when there is none, or it is not a published template of this workspace,
+     * form's "Final document template", or a document's own template. A form
+     * with neither prints its response in the automatic layout (design 3.4).
+     * Otherwise refused when there is none, or it is not a published template of this workspace,
      * so a route never starts that could not make its final document.
      *
      * @param list<array<string, mixed>> $declared
@@ -1471,6 +1472,11 @@ final class DocumentRouter
                 );
             }
             $templateId = $step['final_template_id'] ?? $provider->finalTemplateId($tenantId, $subjectId);
+            if ($templateId === null && $subjectType === \Whity\Core\Form\FormSubmissionRouteSubject::TYPE) {
+                // Design 3.4 (FP.1): a form response prints in the automatic
+                // layout when nothing names a template.
+                continue;
+            }
             if ($templateId === null) {
                 throw RoutingRejectedException::because(
                     'This route ends with a final document, but no template is chosen for it. '
@@ -2304,12 +2310,27 @@ final class DocumentRouter
             return $resolved;
         }
         $subjectId = (int) ($route['subject_id'] ?? $route['document_id'] ?? 0);
-        $named = array_flip($provider->peopleNamedIn($tenantId, $subjectId, $keys));
+        // Key by key, so the printout can say through which question (P1).
+        $named = [];
+        foreach ($keys as $key) {
+            foreach ($provider->peopleNamedIn($tenantId, $subjectId, [$key]) as $profileId) {
+                $named[$profileId] ??= $key;
+            }
+        }
 
-        return array_values(array_filter(
-            $resolved,
-            static fn (ResolvedRecipient $recipient): bool => !isset($named[$recipient->profileId]),
-        ));
+        $kept = [];
+        $left = [];
+        foreach ($resolved as $recipient) {
+            if (isset($named[$recipient->profileId])) {
+                $left[$recipient->profileId] = ['profile_id' => $recipient->profileId, 'key' => $named[$recipient->profileId]];
+                continue;
+            }
+            $kept[] = $recipient;
+        }
+        // Design 3.4 P1: who was left out, for the printed "Not counted" line.
+        (new RouteLeftOut($this->db))->record($tenantId, (int) $step['id'], array_values($left));
+
+        return $kept;
     }
 
     /**

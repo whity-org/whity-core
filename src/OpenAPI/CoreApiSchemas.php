@@ -2196,6 +2196,22 @@ final class CoreApiSchemas
                     503 => self::errorResponse('The file could not be read from storage'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/printout', 'forms:read', [
+                'summary' => 'Print a response in the automatic layout',
+                'description' => 'Design 3.4 (P1): the response laid out from its form’s sections and questions in the '
+                    . 'workspace theme’s form printout options, as it would print now. Not stored: the record is the '
+                    . 'PDF its route’s final step makes. `lang` is `en` or `ar`; left out, the language of the person '
+                    . 'who sent it. One render against the workspace’s limits.',
+                'tags' => ['forms'],
+                'parameters' => [['name' => 'lang', 'in' => 'query', 'required' => false, 'schema' => ['type' => 'string', 'enum' => ['en', 'ar']]]],
+                'responses' => [
+                    200 => ['description' => 'The PDF', 'content' => ['application/pdf' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                    404 => self::errorResponse('Submission not found'),
+                    422 => self::errorResponse('The render service refused the printout'),
+                    429 => self::errorResponse('The document render limit has been reached'),
+                    503 => self::errorResponse('PDFs are turned off, or the render service is unavailable'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/review', 'forms:read', [
                 'summary' => 'What the office recorded about a submission',
                 'description' => 'The current review, every earlier one, and the staff fields they answer. '
@@ -8394,7 +8410,15 @@ final class CoreApiSchemas
                         'labelAr' => self::str(),
                     ], ['value', 'label', 'labelAr'])],
                 ], ['key', 'type', 'overridable', 'label', 'labelAr'])],
+                'form' => ['type' => 'object', 'description' => 'The Form printouts tab (design 3.4): the entitlement that unlocks it, each option with its standard value and English and Arabic labels, the footer parts and the marks limit.'],
             ], ['tokens']),
+            'FormPrintoutPreviewRequest' => self::object([
+                'form' => ['type' => 'object', 'description' => 'Unsaved `form` options (FormPrintoutStyle) to preview.'],
+                'letterhead' => ['type' => 'object', 'description' => 'Unsaved letterhead options, `layout` among them.'],
+                'accent' => self::str() + ['pattern' => '^#[0-9A-Fa-f]{6}$', 'description' => 'An unsaved print colour.'],
+                'submissionId' => self::int() + ['description' => 'The response to print. Left out, the workspace’s latest.'],
+                'lang' => ['type' => 'string', 'enum' => ['en', 'ar'], 'description' => 'The printout’s language. Left out, the language of the person who sent it.'],
+            ], []),
             'DocumentThemeUsage' => self::object([
                 'drafts' => ['type' => 'array', 'items' => self::object([
                     'id' => self::int(),
@@ -17467,6 +17491,21 @@ final class CoreApiSchemas
                     422 => self::errorResponse('Invalid ref, overrides or kind'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('POST', '/api/document-themes/form-printout-preview', 'documents:themes', [
+                'summary' => 'Preview form printouts with unsaved theme options',
+                'description' => 'Design 3.4 (`TplFormPrintStyle`): the workspace’s latest form response (or `submissionId`) '
+                    . 'printed with the `form`, `letterhead` and `accent` options in the body over the workspace theme. '
+                    . 'A free workspace previews the standard layout, as it would print. One render against the limits.',
+                'tags' => ['documents'],
+                'request' => 'FormPrintoutPreviewRequest',
+                'responses' => [
+                    200 => ['description' => 'The PDF', 'content' => ['application/pdf' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                    404 => self::errorResponse('No form response to preview yet'),
+                    422 => self::errorResponse('Some options are not valid'),
+                    429 => self::errorResponse('The document render limit has been reached'),
+                    503 => self::errorResponse('PDFs are turned off, or the render service is unavailable'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('POST', '/api/document-themes', 'documents:themes', [
                 'summary' => 'Create a workspace document theme',
                 'description' =>
@@ -17661,7 +17700,7 @@ final class CoreApiSchemas
                 'additionalProperties' => false,
                 'required' => ['src'],
                 'properties' => [
-                    'src' => ['type' => 'string', 'pattern' => '^/api/files/[0-9]{1,12}/content$'],
+                    'src' => ['type' => 'string', 'pattern' => '^data:image/(png|jpeg|webp);base64,', 'description' => 'The image embedded as a data: URI, at most 300 KB.'],
                     'alt' => ['type' => 'string', 'maxLength' => 80],
                 ],
             ],

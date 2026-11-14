@@ -187,7 +187,7 @@ final class DocumentThemesRealEngineTest extends TestCase
         $this->themes->update(self::TENANT, 'irb', 1, ['tokens' => [
             'accent' => '#7a1f3d',
             'letterhead' => ['layout' => 'centred'],
-            'form' => ['sectionStyle' => 'number', 'marks' => [['src' => '/api/files/7/content', 'alt' => 'ISO 9001:2015']]],
+            'form' => ['sectionStyle' => 'number', 'marks' => [['src' => 'data:image/png;base64,iVBORw0KGgo=', 'alt' => 'ISO 9001:2015']]],
         ]], self::OWNER);
         $theme = $this->resolver->resolve(self::TENANT, ['ref' => 'tenant.irb', 'overrides' => ['letterhead' => ['layout' => 'bilingual']]]);
 

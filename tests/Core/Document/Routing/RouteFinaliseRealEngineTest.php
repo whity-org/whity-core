@@ -520,6 +520,45 @@ final class RouteFinaliseRealEngineTest extends TestCase
             ['Awss Haddad', 'Approved ' . $today],
             ['Total', '2'],
         ], $table['rows']);
+
+        // Design 3.4 (P1): the step records who it left out, for "Not counted".
+        $left = (new \Whity\Core\Document\Routing\RouteLeftOut($this->pdo))->forRoute(self::TENANT, (int) $route['id']);
+        self::assertSame([self::SUPERVISOR], array_column($left, 'profile_id'));
+        self::assertSame('supervisor', $left[0]['key']);
+    }
+
+    /**
+     * Design 3.4 (FP.1): a form whose route makes a final document with no
+     * template prints the response in the automatic layout, with the decision
+     * and the approvals, instead of failing for want of a template.
+     */
+    public function testAFormWithNoTemplatePrintsTheResponseInTheAutomaticLayout(): void
+    {
+        $formId = $this->form($this->clerkThenFinalise(null), null);
+        $submissionId = $this->approve($formId, ['supplier' => 'Example Mill']);
+
+        $fresh = $this->submissions->find(self::TENANT, $submissionId);
+        self::assertNotNull($fresh);
+        self::assertIsInt($fresh['document_id'], 'a document with no template');
+        $payload = $this->render->flowCalls[0];
+        $types = array_column($payload['content'], 'type');
+        self::assertContains('formTitle', $types);
+        self::assertContains('decisionLine', $types);
+        self::assertContains('decisionBlock', $types);
+        $answer = null;
+        foreach ($payload['content'] as $block) {
+            if (($block['type'] ?? null) === 'formQuestion' && str_contains((string) json_encode($block), 'Example Mill')) {
+                $answer = $block;
+            }
+            if (($block['type'] ?? null) === 'decisionBlock') {
+                self::assertSame('approved', $block['status']);
+            }
+            if (($block['type'] ?? null) === 'approvals') {
+                self::assertSame(['Clerk Rana'], array_column($block['rows'], 'name'));
+            }
+        }
+        self::assertNotNull($answer, 'the answer is on the page');
+        self::assertSame('Page {{page}} of {{pages}}', $payload['footer']['start'] === 'Page {{page}} of {{pages}}' ? $payload['footer']['start'] : substr($payload['footer']['start'], -strlen('Page {{page}} of {{pages}}')));
     }
 
     public function testASupervisorTheOfficeNamesAtPreCheckIsLeftOutOfTheCommittee(): void
@@ -743,16 +782,12 @@ final class RouteFinaliseRealEngineTest extends TestCase
         self::assertSame($other, $this->finalisations->findForRoute(self::TENANT, (int) $route['id'])['template_id'] ?? null);
         self::assertContains('Other: B', EditorTemplateFixture::texts($this->render->flowCalls[1]));
 
-        // Neither names one: the submission is refused, and nothing is written.
+        // Neither names one: since design 3.4 the response prints in the
+        // automatic layout (FP.1), so the route starts.
         $formId = $this->form($this->clerkThenFinalise(null), null, 'third');
-        $before = $this->scalar('SELECT COUNT(*) FROM form_submissions');
-        try {
-            $this->send($formId, ['supplier' => 'C']);
-            self::fail('a route that could not make its final document must not start');
-        } catch (FormRejectedException $e) {
-            self::assertStringContainsString('no template is chosen', $e->clientMessage);
-        }
-        self::assertSame($before, $this->scalar('SELECT COUNT(*) FROM form_submissions'));
+        $route = $this->routeOf((int) $this->send($formId, ['supplier' => 'C'])['id']);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertNull($this->finalisations->findForRoute(self::TENANT, (int) $route['id'])['template_id'] ?? null);
     }
 
     public function testAFormSubmissionsFinalDocumentFiresTheIssueEvents(): void

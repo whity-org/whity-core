@@ -284,6 +284,12 @@ final class SubmissionValidator
             throw self::refuse($field, 'too_long', " must be {$limit} characters or fewer", ['limit' => $limit]);
         }
 
+        // Design 3.4 (FP.8): a limit in words, which the printout counts under the answer.
+        $maxWords = self::intRule($rules, 'maxWords');
+        if ($maxWords !== null && $maxWords > 0 && \Whity\Core\Form\Print\FormPrintout::words($value) > $maxWords) {
+            throw self::refuse($field, 'too_many_words', " must be {$maxWords} words or fewer", ['limit' => $maxWords]);
+        }
+
         $pattern = $rules['pattern'] ?? null;
         if (is_string($pattern) && $pattern !== '') {
             if (!self::matchesPattern($pattern, $value)) {

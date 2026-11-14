@@ -279,6 +279,12 @@ final class SettingsRegistry
     public const COMPANY_TAX_ID = 'company.tax_id';
     public const COMPANY_PHONE = 'company.phone';
     public const COMPANY_EMAIL = 'company.email';
+    /**
+     * The company's name and address in Arabic, for a letterhead printed in
+     * English and Arabic (design 3.4, `letterhead.layout: bilingual`).
+     */
+    public const COMPANY_NAME_AR = 'company.name_ar';
+    public const COMPANY_ADDRESS_AR = 'company.address_ar';
 
     // THE WEBSITE (WS.5, WS.19): what whity.dev reads from this instance.
     // Global-only: the operator's own marketing site, not any workspace's.
@@ -1155,6 +1161,8 @@ final class SettingsRegistry
         self::COMPANY_TAX_ID => '',
         self::COMPANY_PHONE => '',
         self::COMPANY_EMAIL => '',
+        self::COMPANY_NAME_AR => '',
+        self::COMPANY_ADDRESS_AR => '',
         self::BILLING_INVOICE_NUMBER_FORMAT => 'INV-{YYYY}-{SEQ:5}',
         self::BILLING_INVOICE_NUMBER_SCOPE => 'shared',
         self::BILLING_INVOICE_NUMBER_RESET => 'yearly',
@@ -1678,7 +1686,9 @@ final class SettingsRegistry
             self::COMPANY_NAME,
             self::COMPANY_ADDRESS,
             self::COMPANY_TAX_ID,
-            self::COMPANY_PHONE => null,
+            self::COMPANY_PHONE,
+            self::COMPANY_NAME_AR,
+            self::COMPANY_ADDRESS_AR => null,
             self::COMPANY_EMAIL => $value === '' || filter_var($value, FILTER_VALIDATE_EMAIL) !== false
                 ? null
                 : self::COMPANY_EMAIL . ' must be an email address.',
