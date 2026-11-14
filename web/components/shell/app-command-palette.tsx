@@ -40,7 +40,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { buildCoreCommands, useCommandTranslation, type CommandContext, type PaletteCommand } from '@/lib/commands/core-commands';
 import { requestNew } from '@/lib/commands/new-intent';
 import { fold, parseCommand, rank } from '@/lib/commands/parse';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 type SearchGroup = components['schemas']['SearchGroup'];
 
