@@ -1,0 +1,81 @@
+name: Publish an npm package
+description: >
+  Shared steps for the publish-*.yml workflows: set up Node and a current npm,
+  install, optionally test and guard against Next.js-only imports, then publish
+  the package if its version is not in the registry yet.
+
+  This is a composite action, not a reusable workflow, on purpose: its steps run
+  inside the calling job, so the GitHub OIDC token npm trusted publishing checks
+  (WHIT-834) still names the calling publish-<package>.yml file, which is what
+  each package's trusted-publisher setting on npmjs.com points at. The caller
+  must check out the repository first and grant `id-token: write`.
+
+inputs:
+  package:
+    description: Folder under packages/ (for example ui, tokens, cli).
+    required: true
+  install:
+    description: Run npm install first.
+    default: "true"
+  test:
+    description: Run npm test before publishing.
+    default: "false"
+  forbid-next-imports:
+    description: Fail if src imports a Next.js-only module (next/*).
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version: "24"
+        registry-url: "https://registry.npmjs.org"
+
+    # Trusted publishing needs npm 11.5.1 or newer; the npm bundled with
+    # Node may be older.
+    - name: Use a current npm
+      shell: bash
+      run: npm install -g npm@latest
+
+    - name: Install dependencies
+      if: inputs.install == 'true'
+      shell: bash
+      working-directory: packages/${{ inputs.package }}
+      run: npm install
+
+    - name: Test
+      if: inputs.test == 'true'
+      shell: bash
+      working-directory: packages/${{ inputs.package }}
+      run: npm test
+
+    # Keeps the package usable from a plain Vite/Tauri SPA, not just Next.js:
+    # fails the build if a Next-only import sneaks in.
+    - name: Guard against Next.js-only imports
+      if: inputs.forbid-next-imports == 'true'
+      shell: bash
+      working-directory: packages/${{ inputs.package }}
+      run: |
+        if grep -rEn "from ['\"]next/" src --include="*.tsx" --include="*.ts"; then
+          echo "::error::A packages/${{ inputs.package }} file imports a Next.js-only module (next/*). This package must stay usable from a plain Vite/Tauri SPA; remove the Next-specific dependency (inject it as a prop or adapter instead)."
+          exit 1
+        fi
+        echo "No Next.js-only imports found."
+
+    # Idempotent publish: the workflow runs on any push touching the package,
+    # but a change without a version bump must not fail (npm returns 409
+    # "cannot publish over existing version"). Publish only when the current
+    # version is not in the registry yet; otherwise skip with a notice.
+    - name: Publish if the version is new
+      shell: bash
+      working-directory: packages/${{ inputs.package }}
+      run: |
+        NAME=$(node -p "require('./package.json').name")
+        VERSION=$(node -p "require('./package.json').version")
+        if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+          echo "::notice::$NAME@$VERSION is already published, skipping. Bump the version in packages/${{ inputs.package }}/package.json to publish a new release."
+        else
+          echo "Publishing $NAME@$VERSION"
+          npm publish --provenance --access public
+        fi
