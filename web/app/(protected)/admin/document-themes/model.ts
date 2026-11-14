@@ -92,6 +92,8 @@ export interface ThemeRow {
   key: string;
   name: string;
   name_ar: string;
+  /** The theme this one is based on; null for Whity's standard. */
+  extends?: string | null;
   tokens: ThemeTokens;
   version: number;
   archived: boolean;
@@ -241,4 +243,47 @@ export function trialDaysLeft(end: string | null | undefined, now: Date = new Da
   const at = Date.parse(end);
   if (Number.isNaN(at)) return null;
   return Math.max(0, Math.ceil((at - now.getTime()) / 86_400_000));
+}
+
+/** Relative luminance of a #RRGGBB colour (WCAG 2), or null for anything else. */
+function luminance(hex: string): number | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  const channel = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel((n >> 16) & 255) + 0.7152 * channel((n >> 8) & 255) + 0.0722 * channel(n & 255);
+}
+
+/**
+ * How well a print colour reads on white paper, as the contrast ratio rounded
+ * down to one decimal (5.1 for "5.1:1"), or null when it isn't a hex colour. 4.5 is
+ * the line text needs (the server darkens a lighter accent for print).
+ */
+export function contrastOnWhite(hex: string | undefined | null): number | null {
+  if (!hex) return null;
+  const l = luminance(hex);
+  if (l === null) return null;
+  // Rounded down, so a colour just under the line never reads as passing it.
+  return Math.floor((1.05 / (l + 0.05)) * 10 + 1e-9) / 10;
+}
+
+export const READABLE_ON_WHITE = 4.5;
+
+/** A theme's name in the reader's language, falling back to the other one. */
+export function themeName(row: Pick<ThemeRow, 'name' | 'name_ar'>, ar: boolean): string {
+  return ar ? row.name_ar || row.name : row.name || row.name_ar;
+}
+
+/**
+ * A key for a new theme from its English name: lowercase letters, digits and
+ * underscores, at most 40, never one the workspace already has.
+ */
+export function newThemeKey(name: string, taken: string[]): string {
+  const base = (name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'theme').slice(0, 34);
+  let key = base;
+  for (let n = 2; taken.includes(key); n++) key = `${base}_${n}`;
+  return key;
 }
