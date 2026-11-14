@@ -665,9 +665,9 @@ final class FormPrintout
         } else {
             $row['waiting'] = $t->get('notConfirmed');
         }
-        $drawing = is_array($answer) ? ($answer['drawing'] ?? null) : null;
-        if (is_array($drawing) && is_array($drawing['paths'] ?? null) && is_array($drawing['viewBox'] ?? null)) {
-            $row['drawing'] = ['viewBox' => array_values($drawing['viewBox']), 'paths' => array_values($drawing['paths'])];
+        $drawing = self::drawing(is_array($answer) ? ($answer['drawing'] ?? null) : null);
+        if ($drawing !== null) {
+            $row['drawing'] = $drawing;
         } else {
             $row['noDrawing'] = $t->get('noDrawing');
         }
@@ -832,6 +832,45 @@ final class FormPrintout
         $words = trim(str_replace(['_', '-'], ' ', $key));
 
         return $words === '' ? $key : mb_strtoupper(mb_substr($words, 0, 1)) . mb_substr($words, 1);
+    }
+
+    /**
+     * A drawn signature as Whity Render takes it: the strokes as SVG path data
+     * in their own box ({@see \Whity\Core\Document\Signing\SignatureAppearance}).
+     *
+     * @return array{viewBox: array{0: int|float, 1: int|float}, paths: list<string>}|null
+     */
+    private static function drawing(mixed $drawing): ?array
+    {
+        if (!is_array($drawing)) {
+            return null;
+        }
+        if (is_array($drawing['paths'] ?? null) && is_array($drawing['viewBox'] ?? null)) {
+            /** @var array{0: int|float, 1: int|float} $box */
+            $box = array_values($drawing['viewBox']);
+
+            return ['viewBox' => $box, 'paths' => array_values(array_map('strval', $drawing['paths']))];
+        }
+        $w = $drawing['width'] ?? null;
+        $h = $drawing['height'] ?? null;
+        if (!is_int($w) || !is_int($h) || !is_array($drawing['strokes'] ?? null)) {
+            return null;
+        }
+        $paths = [];
+        foreach (array_slice($drawing['strokes'], 0, 200) as $stroke) {
+            $d = '';
+            foreach (is_array($stroke) ? $stroke : [] as $i => $point) {
+                if (is_array($point) && count($point) === 2 && is_numeric($point[0]) && is_numeric($point[1])) {
+                    $d .= ($d === '' ? 'M' : ' L') . round((float) $point[0], 1) . ' ' . round((float) $point[1], 1);
+                }
+            }
+            if ($d !== '') {
+                // A single point is a dot: a zero-length line with round caps.
+                $paths[] = str_contains($d, 'L') ? $d : $d . ' l0.1 0';
+            }
+        }
+
+        return $paths === [] ? null : ['viewBox' => [$w, $h], 'paths' => $paths];
     }
 
     /** Words as a reader counts them: runs of letters and digits, in any script. */

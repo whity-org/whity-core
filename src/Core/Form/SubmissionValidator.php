@@ -561,7 +561,7 @@ final class SubmissionValidator
      * time the body claimed is ignored, so nobody can backdate what they signed.
      *
      * @param array<string, mixed> $field
-     * @return array{name: string, signed_at: string}
+     * @return array{name: string, signed_at: string, drawing?: array{width: int, height: int, strokes: list<list<array{0: float|int, 1: float|int}>>}}
      */
     private static function signature(array $field, mixed $raw): array
     {
@@ -570,7 +570,20 @@ final class SubmissionValidator
             throw self::refuse($field, 'bad_signature', ' must be your full name');
         }
 
-        return ['name' => trim($name), 'signed_at' => gmdate('Y-m-d\TH:i:s\Z')];
+        $signed = ['name' => trim($name), 'signed_at' => gmdate('Y-m-d\TH:i:s\Z')];
+        // Design 3.4 (FP.7): the signature drawn on a touch screen, when there
+        // is one. Optional: a typed name still signs, and prints "No drawn
+        // signature" beside it.
+        $drawing = is_array($raw) ? ($raw['drawing'] ?? null) : null;
+        if ($drawing !== null) {
+            try {
+                $signed['drawing'] = \Whity\Core\Document\Signing\SignatureAppearance::normalise($drawing);
+            } catch (\InvalidArgumentException $e) {
+                throw self::refuse($field, 'bad_drawing', ': ' . lcfirst($e->getMessage()));
+            }
+        }
+
+        return $signed;
     }
 
     /**
