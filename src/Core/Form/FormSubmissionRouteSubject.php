@@ -34,6 +34,11 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface,
      * people pickers, such as a supervisor), from its answers as they are now.
      * A key that is not a people question names nobody.
      *
+     * WHIT-1028: an office (staff-audience) question is answered at review, not
+     * by the applicant, so its answer is read from the current review. That is
+     * how a public form, which cannot ask the applicant to pick people, still
+     * names a supervisor: the office records one at pre-check.
+     *
      * @param list<string> $keys
      * @return list<int>
      */
@@ -47,12 +52,18 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface,
             return [];
         }
         $answers = is_array($submission['data']) ? $submission['data'] : [];
+        $office = null;
         $people = [];
         foreach ((new FormFieldRepository($this->db))->listForForm($tenantId, (int) $submission['form_id']) as $field) {
             if (($field['field_type'] ?? null) !== 'profile_ref' || !in_array((string) $field['field_key'], $keys, true)) {
                 continue;
             }
-            $answer = $answers[(string) $field['field_key']] ?? null;
+            if (($field['audience'] ?? FormFieldRepository::AUDIENCE_APPLICANT) === FormFieldRepository::AUDIENCE_STAFF) {
+                $office ??= (new FormSubmissionReviewRepository($this->db))->currentAnswers($tenantId, $subjectId);
+                $answer = $office[(string) $field['field_key']] ?? null;
+            } else {
+                $answer = $answers[(string) $field['field_key']] ?? null;
+            }
             foreach (is_array($answer) ? $answer : [$answer] as $id) {
                 if (is_int($id) || (is_string($id) && ctype_digit($id))) {
                     $people[(int) $id] = (int) $id;

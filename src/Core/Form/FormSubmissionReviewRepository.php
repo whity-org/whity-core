@@ -70,6 +70,27 @@ final class FormSubmissionReviewRepository
     }
 
     /**
+     * The office's answers as they stand: the newest review's, or none when the
+     * submission has not been reviewed.
+     *
+     * @return array<string, mixed>
+     */
+    public function currentAnswers(int $tenantId, int $submissionId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT data FROM form_submission_reviews
+              WHERE tenant_id = :tenant_id AND submission_id = :submission_id
+              ORDER BY id DESC
+              LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':submission_id' => $submissionId]);
+        $data = $stmt->fetchColumn();
+        $decoded = $data === false ? null : json_decode((string) $data, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
      * @param array<string, mixed> $row
      * @return array<string, mixed>
      */

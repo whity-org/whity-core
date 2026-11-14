@@ -52,6 +52,7 @@ use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormSubmissionFieldProvider;
 use Whity\Core\Form\FormSubmissionRepository;
+use Whity\Core\Form\FormSubmissionReviewRepository;
 use Whity\Core\Form\FormSubmissionRouteSubject;
 use Whity\Core\Form\FormTemplateDraft;
 use Whity\Core\Form\FormUploadRepository;
@@ -519,6 +520,99 @@ final class RouteFinaliseRealEngineTest extends TestCase
             ['Awss Haddad', 'Approved ' . $today],
             ['Total', '2'],
         ], $table['rows']);
+    }
+
+    public function testASupervisorTheOfficeNamesAtPreCheckIsLeftOutOfTheCommittee(): void
+    {
+        // WHIT-1028: a public form cannot ask the applicant to pick people, so
+        // the supervisor is an office question the coordinator answers at
+        // pre-check. The committee, reached after that, leaves them out.
+        $cell = static fn (array ...$runs): array => $runs;
+        $text = static fn (string $t): array => ['type' => 'text', 'text' => $t];
+        $id = $this->editor->sourceRepo->create(self::TENANT, [
+            'kind' => 'template',
+            'title' => 'Approval certificate',
+            'lang' => 'en',
+            'default_view' => 'page',
+            'blocks' => [[
+                'id' => 't1',
+                'type' => 'table',
+                'headerRow' => true,
+                'rows' => [
+                    [$cell($text('Member')), $cell($text('Approved'))],
+                    [$cell($this->editor->field('route.step.2.approvals.*.name')), $cell($this->editor->field('route.step.2.approvals.*.mark'))],
+                ],
+            ]],
+            'scope' => 'tenant',
+            'created_by' => self::APPLICANT,
+        ]);
+        $this->editor->publish(self::TENANT, $id, self::APPLICANT);
+
+        $design = $this->routeTemplates->create(self::TENANT, 'Ethics review with pre-check', null, null);
+        $this->routeTemplates->replaceGraph($design, self::TENANT, [
+            [
+                'position' => 1,
+                'rule_kind' => 'explicit',
+                'rule_config' => ['profile_ids' => [self::CLERK]],
+                'label' => 'Pre-check',
+                'decision' => true,
+                'decision_quorum' => null,
+                'satisfied_by' => 'act',
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+            [
+                'position' => 2,
+                'rule_kind' => 'explicit',
+                'rule_config' => ['profile_ids' => [self::MEMBER, self::SUPERVISOR]],
+                'label' => 'Ethics committee',
+                'decision' => true,
+                'decision_quorum' => 'all',
+                'satisfied_by' => 'act',
+                'exclude_named_in' => ['supervisor', 'co_supervisor'],
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+            [
+                'position' => 3,
+                'rule_kind' => RouteStepKind::FINALISE_RULE,
+                'rule_config' => [],
+                'label' => 'Certificate',
+                'decision' => false,
+                'decision_quorum' => null,
+                'satisfied_by' => 'act',
+                'allow_send_back' => false,
+                'kind' => RouteStepKind::FINALISE,
+                'final_template_id' => null,
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+        ], []);
+
+        $formId = $this->form($design, $id);
+        $this->fields->create(self::TENANT, $formId, 'supervisor', 'profile_ref', ['en' => 'Supervisor'], null, false, [], [], null, null, null, null, FormFieldRepository::AUDIENCE_STAFF);
+        $submission = $this->send($formId, ['supplier' => 'Example Mill']);
+        $route = $this->routeOf((int) $submission['id']);
+
+        // The coordinator records the supervisor at pre-check, then passes it on.
+        (new FormSubmissionReviewRepository($this->pdo))->record(self::TENANT, (int) $submission['id'], ['supervisor' => self::SUPERVISOR], self::CLERK);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+
+        $route = $this->routeOf((int) $submission['id']);
+        self::assertNull($this->open((int) $route['id'], self::SUPERVISOR), 'the supervisor the office named is not asked');
+        self::assertNotNull($this->open((int) $route['id'], self::MEMBER));
+
+        $decided = $this->router->act(self::TENANT, self::MEMBER, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertSame('approved', $decided['decided'], 'all who were asked approved; the supervisor does not count');
+
+        $table = null;
+        foreach ($this->render->flowCalls[0]['content'] ?? [] as $block) {
+            if (($block['type'] ?? null) === 'table') {
+                $table = $block;
+            }
+        }
+        self::assertNotNull($table);
+        self::assertSame([['Awss Haddad', 'Approved ' . gmdate('Y-m-d')]], $table['rows'], 'the supervisor is not on the certificate');
     }
 
     public function testATemplateMadeFromTheFormIssuesACorrectDocumentFromARealSubmission(): void
