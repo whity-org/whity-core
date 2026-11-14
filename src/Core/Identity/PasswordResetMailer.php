@@ -7,7 +7,6 @@ namespace Whity\Core\Identity;
 use Whity\Core\Mail\BrandedEmailSender;
 use Whity\Core\Mail\EmailContent;
 use Whity\Core\Settings\SettingsRegistry;
-use Whity\Core\Settings\SettingsService;
 
 /**
  * Sends the forgotten-password transactional emails
@@ -33,7 +32,6 @@ final class PasswordResetMailer
     public function __construct(
         private readonly BrandedEmailSender $sender,
         private readonly string $resetUrlBase,
-        private readonly SettingsService $settings,
     ) {}
 
     /**
@@ -138,13 +136,7 @@ final class PasswordResetMailer
 
     private function eventEnabled(): bool
     {
-        try {
-            $global = $this->settings->getGlobal();
-        } catch (\Throwable) {
-            return false;
-        }
-
-        return (string) ($global[SettingsRegistry::MAIL_EVENT_PASSWORD_RESET] ?? 'false') === 'true';
+        return $this->sender->gate()->instanceEvent(SettingsRegistry::MAIL_EVENT_PASSWORD_RESET);
     }
 
     private function buildLink(string $token): string

@@ -7,6 +7,7 @@ namespace Whity\Core\Notification;
 use Psr\Log\LoggerInterface;
 use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Core\Hooks\HookManager;
+use Whity\Core\Mail\EmailGate;
 use Whity\Core\Notification\Jobs\SendNotificationDeliveryJob;
 use Whity\Core\Queue\QueueService;
 
@@ -48,6 +49,7 @@ final class NotificationDispatcher
     private ?LoggerInterface $logger;
     private ?NotificationPreferenceResolver $preferences;
     private ?AuditLoggerInterface $audit;
+    private ?EmailGate $emailGate;
 
     public function __construct(
         NotificationRepository $repo,
@@ -56,7 +58,8 @@ final class NotificationDispatcher
         ?NotificationRenderer $renderer = null,
         ?LoggerInterface $logger = null,
         ?NotificationPreferenceResolver $preferences = null,
-        ?AuditLoggerInterface $audit = null
+        ?AuditLoggerInterface $audit = null,
+        ?EmailGate $emailGate = null
     ) {
         $this->repo = $repo;
         $this->transports = $transports;
@@ -65,6 +68,7 @@ final class NotificationDispatcher
         $this->logger = $logger;
         $this->preferences = $preferences;
         $this->audit = $audit;
+        $this->emailGate = $emailGate;
     }
 
     /**
@@ -96,6 +100,13 @@ final class NotificationDispatcher
         // persisted below regardless, so the in-app inbox stays the complete record.
         if ($this->preferences !== null) {
             $channels = $this->preferences->filterChannels($tenantId, $recipientProfileId, $type, $channels);
+        }
+        // E2: email goes only where every core email may go: not when the
+        // workspace turned its email off, nor when the person turned this kind
+        // (or all email) off. Security types always go.
+        if ($this->emailGate !== null && in_array(EmailGate::CHANNEL, $channels, true)
+            && !$this->emailGate->allows($tenantId, $recipientProfileId, $type)) {
+            $channels = array_values(array_diff($channels, [EmailGate::CHANNEL]));
         }
 
         // Persist the logical notification (also the in-app inbox row). The

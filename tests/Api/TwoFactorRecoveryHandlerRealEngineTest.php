@@ -86,7 +86,7 @@ final class TwoFactorRecoveryHandlerRealEngineTest extends TestCase
             }
         };
 
-        $mailer = new TwoFactorRecoveryMailer(new \Whity\Core\Mail\BrandedEmailSender($this->mailer, new EmailLayout(), $this->settings), 'https://app.test/account-recovery', $this->settings);
+        $mailer = new TwoFactorRecoveryMailer(new \Whity\Core\Mail\BrandedEmailSender($this->mailer, new EmailLayout(), $this->settings), 'https://app.test/account-recovery');
 
         $this->handler = new TwoFactorRecoveryHandler(
             $this->service,

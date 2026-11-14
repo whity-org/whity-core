@@ -9,7 +9,6 @@ use Whity\Core\Mail\EmailBranding;
 use Whity\Core\Mail\EmailContent;
 use Whity\Core\Mail\EmailOptions;
 use Whity\Core\Settings\SettingsRegistry;
-use Whity\Core\Settings\SettingsService;
 
 /**
  * Sends the tenant-invitation email (WHIT-417).
@@ -41,7 +40,6 @@ final class InvitationMailer
     public function __construct(
         private readonly BrandedEmailSender $sender,
         private readonly string $acceptUrlBase,
-        private readonly SettingsService $settings,
     ) {}
 
     /**
@@ -88,13 +86,7 @@ final class InvitationMailer
 
     private function eventEnabled(): bool
     {
-        try {
-            $global = $this->settings->getGlobal();
-        } catch (\Throwable) {
-            return false;
-        }
-
-        return (string) ($global[SettingsRegistry::MAIL_EVENT_INVITATION] ?? 'false') === 'true';
+        return $this->sender->gate()->instanceEvent(SettingsRegistry::MAIL_EVENT_INVITATION);
     }
 
     private function buildLink(string $token): string

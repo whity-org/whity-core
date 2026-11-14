@@ -7,7 +7,6 @@ namespace Whity\Core\Identity;
 use Whity\Core\Mail\BrandedEmailSender;
 use Whity\Core\Mail\EmailContent;
 use Whity\Core\Settings\SettingsRegistry;
-use Whity\Core\Settings\SettingsService;
 
 /**
  * Sends the "I lost my 2FA device" recovery-request transactional emails
@@ -27,7 +26,6 @@ final class TwoFactorRecoveryMailer
     public function __construct(
         private readonly BrandedEmailSender $sender,
         private readonly string $confirmUrlBase,
-        private readonly SettingsService $settings,
     ) {}
 
     /**
@@ -88,13 +86,7 @@ final class TwoFactorRecoveryMailer
 
     private function eventEnabled(): bool
     {
-        try {
-            $global = $this->settings->getGlobal();
-        } catch (\Throwable) {
-            return false;
-        }
-
-        return (string) ($global[SettingsRegistry::MAIL_EVENT_PASSWORD_RESET] ?? 'false') === 'true';
+        return $this->sender->gate()->instanceEvent(SettingsRegistry::MAIL_EVENT_PASSWORD_RESET);
     }
 
     private function buildLink(string $token): string

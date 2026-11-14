@@ -33,6 +33,7 @@ final class BrandedEmailSender
 {
     private LoggerInterface $logger;
     private ?BrandingService $branding = null;
+    private ?EmailGate $gate = null;
 
     public function __construct(
         private readonly Mailer $mailer,
@@ -50,6 +51,21 @@ final class BrandedEmailSender
     public function useBranding(BrandingService $branding): void
     {
         $this->branding = $branding;
+    }
+
+    /**
+     * The one gate every email asks before it goes ({@see EmailGate}). Set
+     * after boot with the database; until then only the operator's
+     * `mail.events.*` switches apply.
+     */
+    public function useGate(EmailGate $gate): void
+    {
+        $this->gate = $gate;
+    }
+
+    public function gate(): EmailGate
+    {
+        return $this->gate ??= new EmailGate($this->settings);
     }
 
     /** 'ar' or 'en', from the workspace's locale. */

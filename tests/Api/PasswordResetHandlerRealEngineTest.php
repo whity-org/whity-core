@@ -69,7 +69,7 @@ final class PasswordResetHandlerRealEngineTest extends TestCase
             }
         };
 
-        $mailer = new PasswordResetMailer(new \Whity\Core\Mail\BrandedEmailSender($this->mailer, new EmailLayout(), $this->settings), 'https://app.test/reset-password', $this->settings);
+        $mailer = new PasswordResetMailer(new \Whity\Core\Mail\BrandedEmailSender($this->mailer, new EmailLayout(), $this->settings), 'https://app.test/reset-password');
 
         $this->store = new DatabaseSharedStore($this->pdo);
 

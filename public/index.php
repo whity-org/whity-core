@@ -1768,6 +1768,8 @@ $verifyUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::EMAIL_
 // and language, the instance's own (tenant 0) in the instance's brand. The
 // workspace branding source is handed over once the entitlement service exists (below).
 $brandedEmailSender = new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService, $logger);
+// E2: the one gate every email asks (operator, workspace, agent and person switches).
+$brandedEmailSender->useGate(new \Whity\Core\Mail\EmailGate($settingsService, $db->getPdo()));
 $emailVerificationProvider = new TokenEmailVerificationProvider(
     $emailVerificationService,
     $profileEmailRepository,
@@ -1909,7 +1911,6 @@ $resetUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::PASSWOR
 $passwordResetMailer = new \Whity\Core\Identity\PasswordResetMailer(
     $brandedEmailSender,
     $resetUrlBase,
-    $settingsService
 );
 $passwordResetHandler = new \Whity\Api\PasswordResetHandler(
     $passwordResetService,
@@ -1959,7 +1960,6 @@ $twoFactorRecoveryConfirmUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\Fr
 $twoFactorRecoveryMailer = new \Whity\Core\Identity\TwoFactorRecoveryMailer(
     $brandedEmailSender,
     $twoFactorRecoveryConfirmUrlBase,
-    $settingsService
 );
 $twoFactorRecoveryHandler = new \Whity\Api\TwoFactorRecoveryHandler(
     $twoFactorRecoveryService,
@@ -2011,7 +2011,6 @@ $invitationUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::IN
 $invitationMailer = new \Whity\Core\Identity\InvitationMailer(
     $brandedEmailSender,
     $invitationUrlBase,
-    $settingsService
 );
 $invitationsHandler = new \Whity\Api\InvitationsApiHandler(
     $db->getPdo(),
@@ -5011,7 +5010,8 @@ $router->register('POST',   '/api/data-types/{type}/bulk',           [$dataTypes
 // records a per-channel delivery, and enqueues the durable send job. Also
 // subscribed on the HookManager, so firing the `notification.dispatch` hook (from
 // core or a plugin) dispatches a notification (hook-subscriber mode).
-$transportRegistry = \Whity\Core\Notification\CoreTransports::make($logger);
+// E2: the `email` channel is delivered through core mail, not only logged.
+$transportRegistry = \Whity\Core\Notification\CoreTransports::make($logger, $brandedEmailSender, $profileEmailRepository);
 $notificationRepository = new \Whity\Core\Notification\NotificationRepository($db->getPdo());
 // Per-user preference resolver — the dispatcher consults it to filter a
 // recipient's channels (transactional types always bypass; #c56a6455).
@@ -5026,7 +5026,8 @@ $notificationDispatcher = new \Whity\Core\Notification\NotificationDispatcher(
     ),
     $logger,
     $notificationPreferenceResolver,
-    $auditLogger
+    $auditLogger,
+    $brandedEmailSender->gate()
 );
 $notificationDispatcher->subscribe($hookManager);
 \Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger, $logger);
@@ -6154,7 +6155,6 @@ $agentProposals = new \Whity\Core\Agent\AgentProposalRepository(
 (new \Whity\Core\Notification\AgentEmailNotifier(
     $db->getPdo(),
     $agentProposals,
-    new \Whity\Core\Notification\NotificationPreferenceRepository($db->getPdo()),
     $profileEmailRepository,
     new DatabaseSharedStore($db->getPdo()),
     $brandedEmailSender,

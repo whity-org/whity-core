@@ -298,13 +298,7 @@ final class EmailNotifications
      */
     private function eventEnabled(string $key): bool
     {
-        try {
-            $global = $this->settings->getGlobal();
-        } catch (\Throwable) {
-            return false;
-        }
-
-        return (string) ($global[$key] ?? 'false') === 'true';
+        return $this->sender->gate()->instanceEvent($key);
     }
 
     /**
