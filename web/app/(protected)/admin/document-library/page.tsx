@@ -50,6 +50,7 @@ import type {
   LibraryLayout,
   SortDirection,
 } from './types';
+import { useNewIntent } from '@/lib/commands/new-intent';
 
 /**
  * The document library (#947 item 5) — a Drive-shaped browser over documents
@@ -203,6 +204,8 @@ export default function DocumentLibraryPage() {
   const [layout, setLayout] = useState<LibraryLayout>(storedLayout);
 
   const [creatingDocument, setCreatingDocument] = useState(false);
+  // ⌘K `/new document` (WHIT-1069) opens the same dialog as New document.
+  useNewIntent('document', () => setCreatingDocument(true));
   const [creatingCollection, setCreatingCollection] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [renamingCollection, setRenamingCollection] = useState<DocumentCollection | null>(null);

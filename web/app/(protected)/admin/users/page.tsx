@@ -41,6 +41,7 @@ import { CreateUserModal } from './create-modal';
 import { DeleteUserModal } from './delete-modal';
 import { InvitationsPanel } from './invitations-panel';
 import { MembershipsModal } from './memberships-modal';
+import { useNewIntent } from '@/lib/commands/new-intent';
 
 /**
  * The user row shape, derived from the OpenAPI schema (WC-168) so it tracks
@@ -73,6 +74,14 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [tab, setTab] = useState('people');
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  // ⌘K `/invite` and `/new person` (WHIT-1069): the invite form, filled in
+  // with the first address typed. Nothing is sent until Invite is pressed.
+  useNewIntent('person', ({ text }) => {
+    setInviteEmail(text.split(/[\s,;]+/).find((part) => part.includes('@')) ?? '');
+    setTab('invitations');
+    setIsInviteOpen(true);
+  });
   const canReadRoles = hasPermission(ROLES_READ);
   const canReadUnits = hasPermission(OUS_READ);
   const canRequireTwoStep = hasPermission(SECURITY_MANAGE);
@@ -600,7 +609,7 @@ export default function UsersPage() {
         </TabsContent>
 
         <TabsContent value="invitations" className="mt-6">
-          <InvitationsPanel inviteOpen={isInviteOpen} onInviteOpenChange={setIsInviteOpen} />
+          <InvitationsPanel inviteOpen={isInviteOpen} onInviteOpenChange={setIsInviteOpen} inviteEmail={inviteEmail} />
         </TabsContent>
       </Tabs>
 
