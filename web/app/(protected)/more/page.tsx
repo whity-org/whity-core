@@ -140,7 +140,7 @@ export default function MorePage() {
               data-testid="more-sign-out"
             >
               <Icon name="logout" size={20} />
-              <span className="flex-1">{t('sidebar.logout', 'Logout')}</span>
+              <span className="flex-1">{t('sidebar.logout', 'Sign out')}</span>
             </button>
           </li>
         </ul>

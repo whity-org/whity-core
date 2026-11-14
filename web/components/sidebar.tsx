@@ -19,6 +19,9 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@whity/ui/dropdown-menu';
 import { TenantSwitcher as WorkspaceSwitcher } from '@whity/ui/tenant-switcher';
@@ -32,9 +35,13 @@ import {
   IconSelector,
   IconSun,
   IconMoon,
+  IconLanguage,
 } from '@tabler/icons-react';
 import { useState, useCallback, useMemo } from 'react';
 import { useShellNav } from '@/components/shell/use-shell-nav';
+
+/** Settings stays at the foot with the account row on short windows (PW.10). */
+const PINNED_GROUP_IDS = ['settings'];
 
 /** The installation's name when nobody has renamed it: the header shows the lockup. */
 const DEFAULT_SITE_NAME = 'Whity';
@@ -124,7 +131,7 @@ export function Sidebar() {
   const router = useRouter();
   const { logout, user, memberships } = useAuth();
   const branding = useBranding();
-  const { resolved: resolvedTheme, toggle: toggleTheme } = useThemeMode();
+  const { resolved: resolvedTheme, setPreference } = useThemeMode();
   const t = useTranslation('common');
   // Whether this instance offers a language choice at all (`i18n.enabled`).
   const isI18nEnabled = useI18nEnabled();
@@ -217,11 +224,14 @@ export function Sidebar() {
           </>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="top" align="start" className="w-60">
-        <DropdownMenuLabel className="font-normal text-muted-foreground">
-          <span className="block text-xs">{t('sidebar.loggedInAs', 'Logged in as')}</span>
-          <span className="block truncate text-sm text-foreground">{user?.email}</span>
+      <DropdownMenuContent side="top" align="start" className="w-72">
+        <DropdownMenuLabel className="font-normal">
+          <span className="block truncate text-sm font-medium text-foreground">{displayName}</span>
+          {user?.email && user.email !== displayName && (
+            <span className="block truncate text-xs text-muted-foreground">{user.email}</span>
+          )}
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/settings" onClick={() => setIsMobileOpen(false)}>
             <IconUserCog />
@@ -229,39 +239,61 @@ export function Sidebar() {
           </Link>
         </DropdownMenuItem>
         {isI18nEnabled && availableLanguages.length > 1 && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-              {t('sidebar.language', 'Language')}
-            </DropdownMenuLabel>
-            {/*
-              The language is also the direction (lib/direction-context.tsx):
-              choosing Arabic mirrors the interface. Stored on the profile, so
-              it follows the person across devices.
-            */}
-            <DropdownMenuRadioGroup
-              value={currentLanguage || 'en'}
-              onValueChange={(code) => void setLanguage(code)}
-              data-testid="language-switcher"
-            >
-              {availableLanguages.map((language) => (
-                <DropdownMenuRadioItem key={language.code} value={language.code} lang={language.code}>
-                  {language.name}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </>
+          // The language is also the direction (lib/direction-context.tsx):
+          // choosing Arabic mirrors the interface. Stored on the profile, so it
+          // follows the person across devices.
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger data-testid="language-switcher">
+              <IconLanguage />
+              <span className="flex-1">{t('sidebar.language', 'Language')}</span>
+              <span className="text-xs text-muted-foreground">
+                {availableLanguages.find((language) => language.code === (currentLanguage || 'en'))?.name}
+              </span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuRadioGroup
+                value={currentLanguage || 'en'}
+                onValueChange={(code) => void setLanguage(code)}
+              >
+                {availableLanguages.map((language) => (
+                  <DropdownMenuRadioItem key={language.code} value={language.code} lang={language.code}>
+                    {language.name}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
         )}
+        {/* Appearance as two choices, as on PwShortSidebar: Light or Dark. */}
+        <div
+          role="group"
+          aria-label={t('sidebar.appearance', 'Appearance')}
+          data-testid="theme-toggle"
+          className="flex min-h-9 items-center gap-2 px-2 py-1 text-sm"
+        >
+          <IconSun className="size-4 text-muted-foreground" aria-hidden />
+          <span className="flex-1">{t('sidebar.appearance', 'Appearance')}</span>
+          <span className="flex rounded-md bg-muted p-0.5">
+            {(['light', 'dark'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={resolvedTheme === mode}
+                onClick={() => setPreference(mode)}
+                className={`flex min-h-7 items-center gap-1 rounded px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  resolvedTheme === mode ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
+                }`}
+              >
+                {mode === 'light' ? <IconSun className="size-3.5" aria-hidden /> : <IconMoon className="size-3.5" aria-hidden />}
+                {mode === 'light' ? t('sidebar.theme.lightShort', 'Light') : t('sidebar.theme.darkShort', 'Dark')}
+              </button>
+            ))}
+          </span>
+        </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={toggleTheme} data-testid="theme-toggle">
-          {resolvedTheme === 'dark' ? <IconSun /> : <IconMoon />}
-          {resolvedTheme === 'dark'
-            ? t('sidebar.theme.light', 'Light mode')
-            : t('sidebar.theme.dark', 'Dark mode')}
-        </DropdownMenuItem>
         <DropdownMenuItem onSelect={handleLogout}>
           <IconLogout className="rtl:-scale-x-100" />
-          {t('sidebar.logout', 'Logout')}
+          {t('sidebar.logout', 'Sign out')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -286,6 +318,7 @@ export function Sidebar() {
       onMobileOpenChange={setIsMobileOpen}
       linkComponent={Link}
       phoneTabBar
+      pinnedGroupIds={PINNED_GROUP_IDS}
       collapsibleGroups
       searchable
       searchPlaceholder={t('sidebar.search.placeholder', 'Search pages')}

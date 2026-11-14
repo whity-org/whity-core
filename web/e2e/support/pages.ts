@@ -223,9 +223,9 @@ export class AppShell {
     return this.page.getByRole('menuitem', { name: 'Account settings' });
   }
 
-  /** "Logout", inside the account menu (open it first). */
+  /** "Sign out", inside the account menu (open it first). */
   get logoutButton(): Locator {
-    return this.page.getByRole('menuitem', { name: 'Logout' });
+    return this.page.getByRole('menuitem', { name: 'Sign out' });
   }
 
   /** Opens the account menu from the person's row, if it isn't open already. */
