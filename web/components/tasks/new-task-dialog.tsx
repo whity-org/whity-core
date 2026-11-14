@@ -22,11 +22,11 @@ interface AgentOption {
   name: string;
 }
 
-export function NewTaskDialog({ board, onClose, onCreated }: { board?: string; onClose: () => void; onCreated: () => void }) {
+export function NewTaskDialog({ board, initialTitle = '', onClose, onCreated }: { board?: string; initialTitle?: string; onClose: () => void; onCreated: () => void }) {
   const t = useTranslation('tasks');
   const { user } = useAuth();
   const [boardId, setBoardId] = useState(board ?? '');
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initialTitle);
   const [due, setDue] = useState('');
   const [who, setWho] = useState('me');
   const [busy, setBusy] = useState(false);

@@ -24,6 +24,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { useActionPermission } from '@/hooks/useActionPermission';
 import { api } from '@/lib/api/client';
 import { NewTaskDialog } from './new-task-dialog';
+import { useNewIntent } from '@/lib/commands/new-intent';
 import { TaskaatConnection } from './taskaat-connection';
 import { TaskaatUpdateNote } from './taskaat-update-note';
 import { TaskPanel } from './task-panel';
@@ -62,6 +63,12 @@ export function TasksScreen() {
   const [view, setView] = useState<View>('mine');
   const [open, setOpen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  // ⌘K `/new task <title>` (WHIT-1069) opens New task with the title typed.
+  useNewIntent('task', ({ text }) => {
+    setNewTitle(text);
+    setCreating(true);
+  });
 
   const loaded = useTaskaat<TaskRecord[]>(async () => {
     const result = tasksResult(
@@ -175,7 +182,7 @@ export function TasksScreen() {
       })}
 
       <TaskPanel taskId={open} onClose={() => setOpen(null)} onChanged={loaded.refetch} />
-      {creating && <NewTaskDialog onClose={() => setCreating(false)} onCreated={() => { setCreating(false); loaded.refetch(); }} />}
+      {creating && <NewTaskDialog initialTitle={newTitle} onClose={() => { setCreating(false); setNewTitle(''); }} onCreated={() => { setCreating(false); loaded.refetch(); }} />}
     </div>
   );
 }

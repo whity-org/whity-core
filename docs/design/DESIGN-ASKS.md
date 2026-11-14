@@ -29,6 +29,12 @@ Every ask needs both languages (English and Arabic, RTL) and both themes, and fo
 
 The Whity ID consent line for acting as an agent ("Claude Code wants to act as Finance clerk for you") is built with Whity ID's existing consent screen (whity-id #26), so it needs a look rather than a new design. Background for the agents asks: `AGENT-PERSONAS-AND-WHITY-AGENT.md` §8.
 
+## After design 3.4
+
+| Task | Ask | What the screen does | States to draw | Built meanwhile |
+| --- | --- | --- | --- | --- |
+| WHIT-1069 | **Command mode in ⌘K** (the `CommandPalette` card) | Typing `/` turns the palette into commands (owner-approved 14 Nov 2026): `/new`, `/go`, `/invite`, `/switch`, `/theme`, `/lang`, `/help`, then `/approve` and `/ask` (WHIT-1070). Each opens the screen the person would use, filled in; nothing is created or sent from the palette. Ask: `D:\Projects\Whity\brand-ask-command-mode.md`. | The box in command mode; the command list; a command picked with its details being typed; no match; `/help`; the phone version (full screen, box at the bottom, with the Create sheet); recent items, `/approve`, `/ask` | The card as it is, with a "Commands" chip on the tint before the input and Tab in the footer keys |
+
 ## The web app on a phone (WHIT-1006)
 
 The 3.3 package draws the phone as the Flutter app (`Tm*`, section 26), which is not in 0.2.29, and the web app's phone layout only as the shell (`AppShellMobile`). The web pass (WHIT-999 to WHIT-1006) made every main route usable at 375px from existing patterns: the drawer, stacked rows like the "Your fields" rows in `TmOpsMobile`, dialogs as bottom sheets, the save bar docked at the bottom (M.4). These screens still need a web phone design; each needs English and Arabic, light and dark.

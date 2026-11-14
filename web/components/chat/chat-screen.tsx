@@ -34,6 +34,7 @@ import type { ChatAgentMember, ChatDetail, ChatMember, ChatMention, ChatMessage,
 import { chatApi, chatErrorText, type ChatApi } from './chat-api';
 import { AddMemberDialog } from './add-member-dialog';
 import { NewChatDialog } from './new-chat-dialog';
+import { useNewIntent } from '@/lib/commands/new-intent';
 
 const THREAD_MS = 5000;
 const LIST_MS = 15000;
@@ -69,6 +70,8 @@ export function ChatScreen() {
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
   const [newOpen, setNewOpen] = useState(false);
+  // ⌘K `/new message` (WHIT-1069) opens New chat.
+  useNewIntent('message', () => setNewOpen(true));
 
   const loadList = useCallback(async () => {
     try {

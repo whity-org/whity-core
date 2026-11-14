@@ -13,6 +13,11 @@
  *   reads "Connect an agent" and opens AI principals. Handing the words to a
  *   connected agent, whose answer arrives as a proposal in Approvals, waits
  *   for the whity-agent request channel (WHIT-814).
+ * - Typing `/` switches to commands (WHIT-1069): `/new`, `/go`, `/invite`,
+ *   `/switch`, `/theme`, `/lang`, `/help` ({@see buildCoreCommands}). Tab
+ *   takes the highlighted command and moves on to its details; Enter runs.
+ *   The slash KEY works on any layout, since the Arabic layout types "ظ"
+ *   there. Words without the slash still find a command ("invite").
  *
  * The editor keeps its own palette (decision E.36); this one is mounted by the
  * standard shell only.
@@ -28,6 +33,13 @@ import { useCurrentLanguage, useTranslation } from '@whity/features/i18n';
 import { useNavigation } from '@/lib/navigation-context';
 import { useNavItemLabels } from '@/lib/nav-item-labels';
 import { useThemeMode } from '@/lib/theme-mode-context';
+import { useAuth } from '@/lib/auth-context';
+import { useToast } from '@/lib/toast-context';
+import { localizedName } from '@/lib/localized-name';
+import { useCapabilities } from '@/hooks/useCapabilities';
+import { buildCoreCommands, useCommandTranslation, type CommandContext, type PaletteCommand } from '@/lib/commands/core-commands';
+import { requestNew } from '@/lib/commands/new-intent';
+import { fold, parseCommand, rank } from '@/lib/commands/parse';
 import type { components } from '@/lib/api/schema';
 
 type SearchGroup = components['schemas']['SearchGroup'];
@@ -53,12 +65,22 @@ const DEBOUNCE_MS = 200;
 
 export function AppCommandPalette() {
   const t = useTranslation('common');
+  const commandT = useCommandTranslation();
   const router = useRouter();
-  const { currentLanguage } = useCurrentLanguage();
-  const { items: navItems } = useNavigation();
+  const { currentLanguage, availableLanguages, setLanguage } = useCurrentLanguage();
+  const { items: navItems, refresh: refreshNav } = useNavigation();
   const navLabels = useNavItemLabels();
-  const { resolved: theme, toggle: toggleTheme } = useThemeMode();
+  const {
+    resolved: theme,
+    preference: themePreference,
+    setPreference: setThemePreference,
+    toggle: toggleTheme,
+  } = useThemeMode();
+  const { user, memberships, switchTenant } = useAuth();
+  const { has } = useCapabilities();
+  const { addToast } = useToast();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const [groups, setGroups] = useState<SearchGroup[]>([]);
   const request = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,9 +91,13 @@ export function AppCommandPalette() {
       if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setOpen((was) => !was);
+        setQuery('');
       }
     };
-    const onOpen = () => setOpen(true);
+    const onOpen = () => {
+      setOpen(true);
+      setQuery('');
+    };
     window.addEventListener('keydown', onKey);
     window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpen);
     return () => {
@@ -82,14 +108,16 @@ export function AppCommandPalette() {
 
   const onOpenChange = useCallback((next: boolean) => {
     setOpen(next);
+    setQuery('');
     if (!next) setGroups([]);
   }, []);
 
-  const search = useCallback((query: string) => {
+  const search = useCallback((text: string) => {
     if (timer.current) clearTimeout(timer.current);
-    const q = query.trim();
+    const q = text.trim();
     const id = ++request.current;
-    if (q.length < MIN_QUERY) {
+    // A command is not a record: `/new` asks nothing of the server.
+    if (q.length < MIN_QUERY || q.startsWith('/')) {
       setGroups([]);
       return;
     }
@@ -113,6 +141,108 @@ export function AppCommandPalette() {
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
+
+  const onQueryChange = useCallback(
+    (text: string) => {
+      setQuery(text);
+      search(text);
+    },
+    [search],
+  );
+
+  const commands = useMemo<PaletteCommand[]>(() => {
+    const ctx: CommandContext = {
+      can: has,
+      pages: navItems
+        .filter((item) => item.href)
+        .map((item) => ({ id: item.id, href: item.href, label: navLabels[item.id] ?? item.label })),
+      workspaces: memberships.map((m) => ({
+        id: m.tenant_id,
+        name: localizedName(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
+      })),
+      activeWorkspaceId: user?.tenant_id,
+      switchWorkspace: (id) => {
+        void (async () => {
+          try {
+            await switchTenant(id);
+            await refreshNav();
+          } catch (err) {
+            addToast(
+              err instanceof Error ? err.message : t('sidebar.tenantSwitcher.error', 'Couldn’t switch tenant'),
+              'error',
+            );
+          }
+        })();
+      },
+      theme: themePreference,
+      setTheme: setThemePreference,
+      languages: availableLanguages.map((l) => ({ code: l.code, name: l.name })),
+      language: currentLanguage ?? '',
+      setLanguage: (code) => void setLanguage(code),
+      go: (href) => router.push(href),
+      newThing: (kind, text, href) => {
+        requestNew({ kind, text });
+        router.push(href);
+      },
+      // A command only rewrites the query into another command, which never
+      // searches, so the plain setter is enough.
+      setQuery,
+    };
+    return buildCoreCommands(commandT, ctx);
+  }, [
+    t,
+    commandT,
+    has,
+    navItems,
+    navLabels,
+    memberships,
+    currentLanguage,
+    user?.tenant_id,
+    switchTenant,
+    refreshNav,
+    addToast,
+    themePreference,
+    setThemePreference,
+    availableLanguages,
+    setLanguage,
+    router,
+  ]);
+
+  /** A command as a row: picking it (or Tab) moves on to its details. */
+  const commandRow = useCallback(
+    (c: PaletteCommand, withKeywords: boolean): CommandPaletteItem => ({
+      id: `command-${c.name}`,
+      group: t('palette.group.commands', 'Commands'),
+      label: `/${c.name}`,
+      hint: c.description,
+      keywords: withKeywords ? c.names.join(' ') : undefined,
+      icon: <Icon name={c.icon} size={16} />,
+      keepOpen: true,
+      onComplete: () => setQuery(`/${c.name} `),
+      onSelect: () => setQuery(`/${c.name} `),
+    }),
+    [t],
+  );
+
+  /** Command mode: the commands, or once one is named, its options. Null outside it. */
+  const commandItems = useMemo<CommandPaletteItem[] | null>(() => {
+    const parsed = parseCommand(query);
+    if (parsed === null) return null;
+    if (!parsed.named) return rank(parsed.name, commands, (c) => c.names).map((c) => commandRow(c, false));
+    const typed = fold(parsed.name);
+    const command = commands.find((c) => c.names.some((n) => fold(n) === typed));
+    if (command === undefined) return [];
+    return command.options(parsed.rest).map((o) => ({
+      id: `option-${o.id}`,
+      group: `/${command.name}`,
+      label: o.label,
+      hint: o.hint,
+      icon: o.icon !== undefined ? <Icon name={o.icon} size={16} /> : undefined,
+      keepOpen: o.keepOpen,
+      onComplete: o.complete !== undefined ? () => setQuery(o.complete as string) : undefined,
+      onSelect: o.run,
+    }));
+  }, [query, commands, commandRow]);
 
   const items = useMemo<CommandPaletteItem[]>(() => {
     const ar = currentLanguage === 'ar';
@@ -170,6 +300,12 @@ export function AppCommandPalette() {
       },
     ];
 
+    // Typing "invite" without the slash still finds the command; its names
+    // in both languages are what it matches on. Hidden on an empty box, which
+    // would otherwise list every command twice over.
+    const commandRows: CommandPaletteItem[] =
+      query.trim() === '' ? [] : commands.filter((c) => c.name !== 'help').map((c) => commandRow(c, true));
+
     // D2: only for people who may open AI principals, where an agent is connected.
     const aiPage = navItems.find((item) => item.id === 'ai-principals');
     const agent: CommandPaletteItem[] = aiPage
@@ -187,21 +323,37 @@ export function AppCommandPalette() {
         ]
       : [];
 
-    return [...records, ...pages, ...actions, ...agent];
-  }, [groups, navItems, navLabels, currentLanguage, theme, toggleTheme, router, t]);
+    return [...records, ...pages, ...actions, ...commandRows, ...agent];
+  }, [groups, navItems, navLabels, currentLanguage, theme, toggleTheme, router, t, query, commands, commandRow]);
+
+  const commandMode = commandItems !== null;
 
   return (
     <CommandPalette
       open={open}
       onOpenChange={onOpenChange}
-      items={items}
-      onQueryChange={search}
+      items={commandItems ?? items}
+      query={query}
+      onQueryChange={onQueryChange}
+      filter={!commandMode}
+      mode={commandMode ? t('palette.mode.commands', 'Commands') : undefined}
+      slashKey
+      countLabel={(count) =>
+        commandMode
+          ? t('palette.count.commands', '{count} commands', { count })
+          : t('palette.count.results', '{count} results', { count })
+      }
       label={t('palette.label', 'Search and commands')}
-      placeholder={t('palette.placeholder', 'Search records, pages and actions')}
-      emptyLabel={t('palette.empty', 'Nothing matches')}
+      placeholder={t('palette.placeholder', 'Search, or type / for commands')}
+      emptyLabel={
+        commandMode
+          ? t('palette.empty.command', 'No command matches. Type /help to see them all.')
+          : t('palette.empty', 'Nothing matches')
+      }
       footer={{
         move: t('palette.footer.move', 'to move'),
         open: t('palette.footer.open', 'to open'),
+        complete: commandMode ? t('palette.footer.complete', 'to pick') : undefined,
         close: t('palette.footer.close', 'to close'),
       }}
     />
