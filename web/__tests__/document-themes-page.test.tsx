@@ -11,10 +11,14 @@ import userEvent from '@testing-library/user-event';
 const mockApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({
-    apiClient: mockApiClient,
     user: { id: 10, email: 'amro@example.com', role: '', tenant_id: 1 },
     memberships: [{ tenant_id: 1, tenant_name: 'Example Bakery', role: 'owner' }],
   }),
+}));
+
+// The screen calls the API through apiFetch (WHIT-1046); route it to the same mock.
+jest.mock('@/lib/api/client', () => ({
+  apiFetch: (...args: unknown[]) => mockApiClient(...args),
 }));
 
 const addToast = jest.fn();

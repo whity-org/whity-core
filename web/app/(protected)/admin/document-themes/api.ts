@@ -1,8 +1,8 @@
-import type { useAuth } from '@/lib/auth-context';
 import { ForbiddenError } from '@/lib/forbidden';
 import { STANDARD_REF, WORKSPACE_KEY, type ThemeRow, type ThemeSchema, type ThemeTokens } from './model';
 
-export type ApiClient = ReturnType<typeof useAuth>['apiClient'];
+/** `apiFetch` from `@/lib/api/client`, or a test's stand-in. */
+export type ApiClient = (url: string, init?: RequestInit) => Promise<Response>;
 
 const BASE = '/api/v1/document-themes';
 
