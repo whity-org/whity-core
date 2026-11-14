@@ -16,5 +16,7 @@ export type {
   RecordChoice,
   SaveResult,
   TemplateSetup,
+  ThemeChoice,
   VersionContent,
 } from './types';
+export { ThemePicker } from './theme-picker';
