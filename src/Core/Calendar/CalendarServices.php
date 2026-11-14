@@ -9,6 +9,7 @@ use Psr\Log\LoggerInterface;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Http\FrontendUrls;
+use Whity\Core\Mail\BrandedEmailSender;
 use Whity\Core\Mail\EmailLayout;
 use Whity\Core\Mail\Mailer;
 use Whity\Core\Queue\QueueService;
@@ -45,8 +46,7 @@ final class CalendarServices
             $service->setPlugins($plugins);
         }
         $service->setMessenger(new EmailBookingMessenger(
-            $mailer,
-            new EmailLayout(),
+            new BrandedEmailSender($mailer, new EmailLayout(), $settings, $logger),
             $settings,
             new TenantHostRepository($pdo),
             $urls->linkOrPath(FrontendUrls::BOOKING_MANAGE),

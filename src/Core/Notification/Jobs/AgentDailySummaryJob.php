@@ -37,7 +37,6 @@ final class AgentDailySummaryJob implements JobInterface
         private readonly PDO $db,
         private readonly SettingsService $settings,
         private readonly AgentStatsRepository $stats,
-        private readonly NotificationPreferenceRepository $preferences,
         private readonly ProfileEmailRepository $emails,
         private readonly SharedStoreInterface $store,
         private readonly BrandedEmailSender $sender,
@@ -68,7 +67,7 @@ final class AgentDailySummaryJob implements JobInterface
     {
         $sent = 0;
         foreach ($this->peopleWithAgents($tenantId) as $profileId => $name) {
-            if (!$this->wants($tenantId, $profileId)) {
+            if (!$this->sender->gate()->allows($tenantId, $profileId, self::TYPE)) {
                 continue;
             }
             $perAgent = $this->stats->forWorkspace($tenantId, $todayFrom, $profileId);
@@ -174,17 +173,6 @@ final class AgentDailySummaryJob implements JobInterface
         }
 
         return $names;
-    }
-
-    private function wants(int $tenantId, int $profileId): bool
-    {
-        foreach ($this->preferences->listForProfile($tenantId, $profileId) as $pref) {
-            if ($pref['type'] === self::TYPE && $pref['channel'] === 'email') {
-                return $pref['enabled'];
-            }
-        }
-
-        return true;
     }
 
     private function zone(int $tenantId): \DateTimeZone

@@ -65,6 +65,43 @@ final class TenantSettingsRepository
     }
 
     /**
+     * The stored overrides for some keys of one tenant, as a key => value map.
+     * Keys the tenant never set are absent.
+     *
+     * @param int          $tenantId The owning tenant.
+     * @param list<string> $keys     The setting keys to read.
+     * @return array<string, string>
+     */
+    public function valuesFor(int $tenantId, array $keys): array
+    {
+        if ($keys === []) {
+            return [];
+        }
+
+        $names = [];
+        $params = [':tenant_id' => $tenantId];
+        foreach ($keys as $i => $key) {
+            $names[] = ":key{$i}";
+            $params[":key{$i}"] = $key;
+        }
+        $stmt = $this->db->prepare(
+            'SELECT setting_key, value FROM tenant_settings WHERE tenant_id = :tenant_id AND setting_key IN ('
+            . implode(', ', $names) . ')'
+        );
+        $stmt->execute($params);
+
+        /** @var array<int, array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(string) $row['setting_key']] = (string) ($row['value'] ?? '');
+        }
+
+        return $out;
+    }
+
+    /**
      * Upsert a single override for one tenant (insert or update value + timestamp).
      *
      * @param int    $tenantId The owning tenant.

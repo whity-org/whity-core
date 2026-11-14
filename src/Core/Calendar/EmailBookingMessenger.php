@@ -7,12 +7,10 @@ namespace Whity\Core\Calendar;
 use DateTimeImmutable;
 use Psr\Log\LoggerInterface;
 use Whity\Core\Branding\TenantHostRepository;
-use Whity\Core\Mail\EmailBranding;
+use Whity\Core\Mail\BrandedEmailSender;
 use Whity\Core\Mail\EmailContent;
-use Whity\Core\Mail\EmailLayout;
+use Whity\Core\Mail\EmailOptions;
 use Whity\Core\Mail\MailAttachment;
-use Whity\Core\Mail\Mailer;
-use Whity\Core\Mail\OutgoingEmail;
 use Whity\Core\Mail\ThreadedMailer;
 use Whity\Core\Money\Currency;
 use Whity\Core\Settings\SettingsRegistry;
@@ -23,8 +21,8 @@ use Whity\Core\Settings\SettingsService;
  * move, cancellation and the reminder, in the workspace's language (English
  * or Arabic), with times in the workspace's zone named in the text.
  *
- * Sends through the Mailer. The confirmation and the move carry the booking
- * as an `.ics` attachment when the mailer can send one ({@see ThreadedMailer},
+ * Sends through {@see BrandedEmailSender}. The confirmation and the move carry
+ * the booking as an `.ics` attachment when the mailer can send one ({@see ThreadedMailer},
  * WHIT-947); a mailer that cannot sends the same email without it, and the
  * manage page still serves the file.
  *
@@ -37,8 +35,7 @@ final class EmailBookingMessenger implements BookingMessenger
     private const AR_DAYS = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
 
     public function __construct(
-        private readonly Mailer $mailer,
-        private readonly EmailLayout $layout,
+        private readonly BrandedEmailSender $sender,
         private readonly SettingsService $settings,
         private readonly TenantHostRepository $tenants,
         private readonly string $manageUrlBase,
@@ -89,6 +86,22 @@ final class EmailBookingMessenger implements BookingMessenger
      */
     public function render(int $tenantId, array $booking, string $kind): ?array
     {
+        $message = $this->content($tenantId, $booking, $kind);
+        if ($message === null) {
+            return null;
+        }
+        // Tenant 0: the instance's brand and from name, as booking emails have always had.
+        $rendered = $this->sender->render(0, $message['content']);
+
+        return ['subject' => $message['subject'], 'text' => $rendered->text, 'html' => $rendered->html];
+    }
+
+    /**
+     * @param array<string, mixed> $booking
+     * @return array{subject: string, content: EmailContent}|null
+     */
+    private function content(int $tenantId, array $booking, string $kind): ?array
+    {
         $customer = is_array($booking['customer'] ?? null) ? $booking['customer'] : [];
         $email = is_string($customer['email'] ?? null) ? $customer['email'] : '';
         if ($email === '') {
@@ -132,8 +145,9 @@ final class EmailBookingMessenger implements BookingMessenger
                 $paragraphs[] = $line;
             }
         }
-        $rendered = $this->layout->render(
-            new EmailContent(
+        return [
+            'subject' => $heading . ($workspace !== '' ? ' · ' . $workspace : ''),
+            'content' => new EmailContent(
                 heading: $heading,
                 paragraphs: $paragraphs,
                 ctaLabel: $link !== null ? $t['cta'] : null,
@@ -141,35 +155,24 @@ final class EmailBookingMessenger implements BookingMessenger
                 footnote: $link !== null ? $t['footnote'] : null,
                 language: $arabic ? 'ar' : 'en',
             ),
-            EmailBranding::fromSettings($this->settings),
-        );
-
-        return ['subject' => $heading . ($workspace !== '' ? ' · ' . $workspace : ''), 'text' => $rendered->text, 'html' => $rendered->html];
+        ];
     }
 
     /** @param array<string, mixed> $booking */
     private function send(int $tenantId, array $booking, string $kind): void
     {
         try {
-            $message = $this->render($tenantId, $booking, $kind);
+            $message = $this->content($tenantId, $booking, $kind);
             if ($message === null) {
                 return;
             }
             $customer = is_array($booking['customer'] ?? null) ? $booking['customer'] : [];
             $to = (string) ($customer['email'] ?? '');
             $ics = in_array($kind, ['confirmed', 'rescheduled'], true) ? $this->icsFor($tenantId, $booking) : null;
-            if ($ics !== null && $this->mailer instanceof ThreadedMailer) {
-                $this->mailer->sendThreaded(new OutgoingEmail(
-                    $to,
-                    $message['subject'],
-                    $message['text'],
-                    $message['html'],
-                    attachments: [new MailAttachment('booking.ics', 'text/calendar; charset=utf-8; method=PUBLISH', $ics)],
-                ));
-
-                return;
-            }
-            $this->mailer->send($to, $message['subject'], $message['text'], $message['html']);
+            // Tenant 0: the instance's brand and from name, as booking emails have always had.
+            $this->sender->deliver(0, $to, $message['subject'], $message['content'], $ics !== null
+                ? new EmailOptions(attachments: [new MailAttachment('booking.ics', 'text/calendar; charset=utf-8; method=PUBLISH', $ics)])
+                : null);
         } catch (\Throwable $e) {
             $this->logger?->warning('[calendar] could not send a booking email', ['kind' => $kind, 'booking' => $booking['id'] ?? null, 'error' => $e->getMessage()]);
         }

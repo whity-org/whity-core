@@ -13549,7 +13549,7 @@ export interface components {
                     labelAr: string;
                 }[];
             }[];
-            /** @description The Form printouts tab (design 3.4): the entitlement that unlocks it, each option with its standard value and English and Arabic labels, the footer parts and the marks limit. */
+            /** @description The Form printouts tab (design 3.4): the entitlement that unlocks it, whether this workspace holds it (allowed), each option with its standard value and English and Arabic labels, the footer parts and the marks limit. */
             form?: Record<string, never>;
         };
         DocumentThemeSchemaResponse: {
