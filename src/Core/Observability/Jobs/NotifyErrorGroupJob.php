@@ -39,6 +39,14 @@ final class NotifyErrorGroupJob implements JobInterface
     /** The operator tenant. */
     private const SYSTEM_TENANT_ID = 0;
 
+    /**
+     * Error alerts emailed per hour, instance-wide (E2 follow-up to WHIT-1031).
+     * A bad deploy can raise dozens of new groups at once; past this cap the
+     * alerts still land in the operators' in-app inbox, and the email that
+     * reaches the cap says so, so nothing is lost and inboxes aren't flooded.
+     */
+    public const EMAILS_PER_HOUR = 5;
+
     public function __construct(
         private readonly PDO $pdo,
         private readonly ErrorGroupRepository $groups,
@@ -50,6 +58,8 @@ final class NotifyErrorGroupJob implements JobInterface
          * omits the Details line.
          */
         private readonly ?string $errorDetailsUrl = null,
+        /** Counts emailed alerts per hour; without one, every alert is emailed. */
+        private readonly ?\Whity\Core\Store\SharedStoreInterface $store = null,
     ) {
     }
 
@@ -92,6 +102,17 @@ final class NotifyErrorGroupJob implements JobInterface
 
         $body = $this->body($group, $reason);
 
+        // The hourly email cap: one count per alert, not per operator.
+        $channels = ['email', 'in_app'];
+        if ($this->store !== null) {
+            $count = $this->store->increment('error-alert-email:' . gmdate('YmdH'), 3600);
+            if ($count > self::EMAILS_PER_HOUR) {
+                $channels = ['in_app'];
+            } elseif ($count === self::EMAILS_PER_HOUR) {
+                $body .= "\n\nThis is the last error alert emailed this hour. Any more go to your inbox in Whity only.";
+            }
+        }
+
         $sent = 0;
         foreach ($recipients as $profileId) {
             try {
@@ -102,7 +123,7 @@ final class NotifyErrorGroupJob implements JobInterface
                     [
                         'subject' => $subject,
                         'body' => $body,
-                        'channels' => ['email', 'in_app'],
+                        'channels' => $channels,
                         'data' => [
                             'group_id' => $groupId,
                             'reason' => $reason,
