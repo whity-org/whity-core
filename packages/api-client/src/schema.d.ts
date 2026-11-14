@@ -13549,6 +13549,11 @@ export interface components {
                 en?: string;
             } | null;
             reference_format?: string | null;
+            /**
+             * @description `submit`: when the form is sent. `approval`: when its route finishes approved.
+             * @enum {string}
+             */
+            reference_assign?: "submit" | "approval";
             submission_count?: number;
             open_to_members?: boolean;
             members_opened_at?: string | null;
@@ -14043,8 +14048,13 @@ export interface components {
             banner?: components["schemas"]["FormBannerInput"];
             /** @description The title and description of each section, by `section_key`. */
             sections?: components["schemas"]["FormSectionText"][];
-            /** @description The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none. */
+            /** @description The reference each submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}` or `{ANSWER:subject|human=IRB-AAU|animal=AUB-AAU} {SEQ}/{STEP:meeting_no}/{AY:9}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}; {AY:m}, the academic year starting in month m, as 2026-2027; {ANSWER:question}, an answer, optionally looked up in a list (`|answer=text`, `|*=text` for any other); {STEP:key}, a value entered during review (only with `reference_assign` `approval`). {SEQ} is required, and each different prefix, year or answer counts on its own. Dates are UTC. Null gives none. */
             reference_format?: string | null;
+            /**
+             * @description When the reference is given: `submit` (default) when the form is sent, or `approval` when its route finishes approved, before the final document is made.
+             * @enum {string}
+             */
+            reference_assign?: "submit" | "approval";
             /** @description The public link asks visitors to sign in: only the workspace's members and customers can send it, under their own name, so it can be sent back to them for changes. */
             public_requires_sign_in?: boolean;
             /** @description The document template a route's final document stage uses when it names none; null for none. */

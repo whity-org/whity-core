@@ -6,7 +6,9 @@ namespace Whity\Core\Form;
 
 use PDO;
 use Whity\Core\Document\Routing\RouteSubjectFinaliseInterface;
+use Whity\Core\Document\Routing\RouteSubjectApprovedInterface;
 use Whity\Core\Document\Routing\RouteSubjectProviderInterface;
+use Whity\Core\Document\Routing\RoutingRejectedException;
 
 /**
  * The `form_submission` route subject (WHIT-920, #1724).
@@ -24,8 +26,26 @@ use Whity\Core\Document\Routing\RouteSubjectProviderInterface;
  *
  * Stateless apart from the injected handle — worker-safe.
  */
-final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface, RouteSubjectFinaliseInterface
+final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface, RouteSubjectFinaliseInterface, RouteSubjectApprovedInterface
 {
+    /**
+     * WHIT-1017: a submission whose form gives references on approval takes
+     * its reference now, printing its answers and the values entered on the
+     * route.
+     */
+    public function approved(int $tenantId, int $subjectId, int $routeId): void
+    {
+        try {
+            (new FormReferences($this->db))->onApproval($tenantId, $subjectId, $routeId);
+        } catch (FormRejectedException $e) {
+            // Refused rather than approved without the reference it was owed:
+            // the approval rolls back and can simply be given again.
+            throw RoutingRejectedException::because(
+                'The reference for this submission could not be made, so it was not approved. Try again.'
+            );
+        }
+    }
+
     public const TYPE = 'form_submission';
 
     public function __construct(private readonly PDO $db)

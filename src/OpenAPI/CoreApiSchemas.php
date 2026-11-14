@@ -9012,6 +9012,8 @@ final class CoreApiSchemas
                 'banner' => SchemaBuilder::ref('FormBanner') + ['nullable' => true],
                 'submit_label' => self::localizedText() + ['nullable' => true],
                 'reference_format' => self::str(true),
+                // WHIT-1017: when the reference is given.
+                'reference_assign' => ['type' => 'string', 'enum' => ['submit', 'approval'], 'description' => '`submit`: when the form is sent. `approval`: when its route finishes approved.'],
                 // Off on every form until somebody with `forms:manage` opens it.
                 // On the list, and on one form's detail.
                 'submission_count' => self::int(),
@@ -9321,7 +9323,8 @@ final class CoreApiSchemas
                 'title' => self::localizedText() + ['nullable' => true, 'description' => 'The heading the person filling it in reads; null shows the name.'],
                 'banner' => SchemaBuilder::ref('FormBannerInput') + ['nullable' => true, 'description' => 'A drawn pattern, `{"kind": "image"}` to keep the uploaded picture, or null for none. Upload a picture with POST /api/v1/forms/{id}/banner.'],
                 'sections' => ['type' => 'array', 'maxItems' => 100, 'items' => SchemaBuilder::ref('FormSectionText'), 'description' => 'The title and description of each section, by `section_key`.'],
-                'reference_format' => ['type' => 'string', 'maxLength' => 64, 'nullable' => true, 'description' => 'The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none.'],
+                'reference_format' => ['type' => 'string', 'maxLength' => 160, 'nullable' => true, 'description' => 'The reference each submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}` or `{ANSWER:subject|human=IRB-AAU|animal=AUB-AAU} {SEQ}/{STEP:meeting_no}/{AY:9}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}; {AY:m}, the academic year starting in month m, as 2026-2027; {ANSWER:question}, an answer, optionally looked up in a list (`|answer=text`, `|*=text` for any other); {STEP:key}, a value entered during review (only with `reference_assign` `approval`). {SEQ} is required, and each different prefix, year or answer counts on its own. Dates are UTC. Null gives none.'],
+                'reference_assign' => ['type' => 'string', 'enum' => ['submit', 'approval'], 'description' => 'When the reference is given: `submit` (default) when the form is sent, or `approval` when its route finishes approved, before the final document is made.'],
                 'public_requires_sign_in' => self::bool() + ['description' => 'The public link asks visitors to sign in: only the workspace\'s members and customers can send it, under their own name, so it can be sent back to them for changes.'],
                 'final_template_id' => self::int(true) + ['description' => 'The document template a route\'s final document stage uses when it names none; null for none.'],
                 'final_document_to_applicant' => self::bool() + ['description' => 'Whether the person who sent the form can open its final document from My submissions.'],

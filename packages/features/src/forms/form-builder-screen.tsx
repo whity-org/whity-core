@@ -79,6 +79,7 @@ function settingsOf(
     description: asMap(form.description_i18n),
     submit_label: asMap(form.submit_label),
     reference_format: form.reference_format ?? "",
+    reference_assign: form.reference_assign === "approval" ? "approval" : "submit",
     sections,
   }
 }
@@ -247,6 +248,7 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
                 ? { kind: "image" }
                 : { kind: "pattern", style: settings.banner.style, seed: settings.banner.seed },
           reference_format: settings.reference_format.trim() === "" ? null : settings.reference_format.trim(),
+          reference_assign: settings.reference_assign,
           sections: settings.sections,
         },
         failed

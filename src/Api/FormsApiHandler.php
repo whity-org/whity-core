@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use Whity\Core\Form\FormBanner;
 use Whity\Core\Form\FormFieldRepository;
+use Whity\Core\Form\FormReferenceAssign;
 use Whity\Core\Form\FormReferenceFormat;
 use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormRenderer;
@@ -325,6 +326,22 @@ final class FormsApiHandler
             }
             if (array_key_exists('reference_format', $body)) {
                 $changes['reference_format'] = FormReferenceFormat::parse($body['reference_format']);
+            }
+            // WHIT-1017: when the reference is given. A value entered during
+            // review exists only on approval, so a format printing one needs it.
+            if (array_key_exists('reference_assign', $body)) {
+                $changes['reference_assign'] = FormReferenceAssign::parse($body['reference_assign']);
+            }
+            if (array_key_exists('reference_format', $changes) || array_key_exists('reference_assign', $changes)) {
+                $format = array_key_exists('reference_format', $changes) ? $changes['reference_format'] : ($form['reference_format'] ?? null);
+                $assign = $changes['reference_assign'] ?? ($form['reference_assign'] ?? FormReferenceAssign::SUBMIT);
+                if (is_string($format) && $assign !== FormReferenceAssign::APPROVAL && FormReferenceFormat::usesStepValues($format)) {
+                    return Response::error(
+                        'A reference that prints a value entered during review can only be given on approval. '
+                        . "Set reference_assign to 'approval'.",
+                        422
+                    );
+                }
             }
             if (array_key_exists('route_template_id', $body)) {
                 $routeTemplateId = self::routeTemplateId($tenantId, $body);

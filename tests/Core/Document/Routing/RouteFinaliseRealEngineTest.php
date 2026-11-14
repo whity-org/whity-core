@@ -47,8 +47,10 @@ use Whity\Core\Document\Routing\RouteVerdict;
 use Whity\Core\Document\Routing\RoutingRejectedException;
 use Whity\Core\Document\Routing\RoutingRuleRegistry;
 use Whity\Core\Form\FormFieldRepository;
+use Whity\Core\Form\FormReferenceAssign;
 use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormRepository;
+use Whity\Core\Form\FormSubmissionFieldProvider;
 use Whity\Core\Form\FormSubmissionRepository;
 use Whity\Core\Form\FormSubmissionRouteSubject;
 use Whity\Core\Form\FormTemplateDraft;
@@ -379,6 +381,53 @@ final class RouteFinaliseRealEngineTest extends TestCase
         $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED, null, false, ['meeting_no' => '14']);
 
         self::assertContains('Meeting: 14', EditorTemplateFixture::texts($this->render->flowCalls[0]));
+    }
+
+    public function testAReferenceGivenOnApprovalPrintsTheAnswerAndTheMeetingAndIsOnTheFinalDocument(): void
+    {
+        // WHIT-1017: the AAU IRB shape. The prefix follows an answer, the
+        // middle part is the meeting number the clerk enters while approving,
+        // and the year is the academic year starting in September.
+        $id = $this->editor->sourceRepo->create(self::TENANT, [
+            'kind' => 'template',
+            'title' => 'Approval certificate',
+            'lang' => 'en',
+            'default_view' => 'page',
+            'blocks' => [$this->editor->para('Approval No.: ', $this->editor->field(FormSubmissionFieldProvider::REFERENCE))],
+            'scope' => 'tenant',
+            'created_by' => self::APPLICANT,
+        ]);
+        $this->editor->publish(self::TENANT, $id, self::APPLICANT);
+
+        $formId = $this->form($this->clerkThenFinalise(null, [['key' => 'meeting_no', 'label' => 'Committee meeting number']]), $id);
+        $this->forms->update(self::TENANT, $formId, [
+            'reference_format' => '{ANSWER:supplier|Example Mill=MILL|*=OTHER} {SEQ}/{STEP:meeting_no}/{AY:9}',
+            'reference_assign' => FormReferenceAssign::APPROVAL,
+        ]);
+        self::assertSame(FormReferenceAssign::APPROVAL, $this->forms->find(self::TENANT, $formId)['reference_assign'] ?? null);
+
+        $first = $this->send($formId, ['supplier' => 'Example Mill']);
+        self::assertNull($first['reference'], 'nothing is given at submit');
+        $route = $this->routeOf((int) $first['id']);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED, null, false, ['meeting_no' => '14']);
+
+        $year = (int) gmdate('Y') - ((int) gmdate('n') < 9 ? 1 : 0);
+        $expected = 'MILL 1/14/' . $year . '-' . ($year + 1);
+        self::assertSame($expected, $this->submissions->find(self::TENANT, (int) $first['id'])['reference'] ?? null);
+        self::assertContains('Approval No.: ' . $expected, EditorTemplateFixture::texts($this->render->flowCalls[0]));
+
+        // Another answer counts on its own; the same answer carries on.
+        $other = $this->send($formId, ['supplier' => 'Example Oven']);
+        $this->router->act(self::TENANT, self::CLERK, $this->routeOf((int) $other['id']), RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED, null, false, ['meeting_no' => '15']);
+        self::assertStringStartsWith('OTHER 1/15/', (string) ($this->submissions->find(self::TENANT, (int) $other['id'])['reference'] ?? ''));
+        $again = $this->send($formId, ['supplier' => 'Example Mill']);
+        $this->router->act(self::TENANT, self::CLERK, $this->routeOf((int) $again['id']), RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED, null, false, ['meeting_no' => '15']);
+        self::assertStringStartsWith('MILL 2/15/', (string) ($this->submissions->find(self::TENANT, (int) $again['id'])['reference'] ?? ''));
+
+        // A submission that is not approved takes no number.
+        $refused = $this->send($formId, ['supplier' => 'Example Mill']);
+        $this->router->act(self::TENANT, self::CLERK, $this->routeOf((int) $refused['id']), RouteAction::ACKNOWLEDGED, 'No.', RouteVerdict::REJECTED);
+        self::assertNull($this->submissions->find(self::TENANT, (int) $refused['id'])['reference'] ?? null);
     }
 
     public function testATemplateMadeFromTheFormIssuesACorrectDocumentFromARealSubmission(): void

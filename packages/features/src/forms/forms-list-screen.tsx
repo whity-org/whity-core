@@ -143,6 +143,8 @@ export function FormsListScreen({ env, canManage }: { env: FormsScreenEnv; canMa
         submit_label: form.submit_label,
         sections: form.sections.map((s) => ({ key: s.key, title: asMap(s.title), description: asMap(s.description) })),
         reference_format: form.reference_format,
+        // WHIT-1017: copied with the format, which may need it.
+        reference_assign: form.reference_assign ?? "submit",
       },
       ""
     )
