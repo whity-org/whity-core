@@ -5562,6 +5562,7 @@ $publicBookingHandler = new \Whity\Api\PublicBookingApiHandler(
     $hostResolver,
     $publicFormBotCheck,
     new DatabaseSharedStore($db->getPdo()),
+    $brandingService,
 );
 $router->register('GET',  '/api/public/booking/{workspace}',                       [$publicBookingHandler, 'page'],        null);
 $router->register('GET',  '/api/public/booking/{workspace}/slots',                 [$publicBookingHandler, 'slots'],       null);

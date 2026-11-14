@@ -15879,6 +15879,8 @@ export interface components {
             workspace?: {
                 name: string;
             };
+            /** @description Only on the manage link: the brand of the workspace (WHIT-1014). */
+            brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
             time_zone?: string;
         };
         PublicBookingMoveRequest: {
@@ -15916,6 +15918,8 @@ export interface components {
                 provider?: string;
                 site_key?: string;
             } | null;
+            /** @description The brand of the workspace, for the page (WHIT-1014). */
+            brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
         };
         PublicBookingRequest: {
             /** @description The service. */
@@ -16194,6 +16198,23 @@ export interface components {
             email: string;
             display_name: string;
             bot_token?: string;
+        };
+        PublicWorkspaceBrand: {
+            /** @description The site name the workspace set, else its name. */
+            name: string;
+            logo_wide_url: string | null;
+            logo_square_url: string | null;
+            /** @description The workspace main colour as #rrggbb, or null for Whity Blue. */
+            main_color: string | null;
+            /** @description Token values derived from the main colour (decision 2.8), keyed by token name without the leading dashes; null when no main colour is set. */
+            theme: {
+                light: {
+                    [key: string]: string;
+                };
+                dark: {
+                    [key: string]: string;
+                };
+            } | null;
         };
         PublishWorkspacePluginRequest: {
             /** @description The plugin.json object (format whity.plugin/1). See sdk/resources/plugin-manifest.schema.json. */
