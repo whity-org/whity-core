@@ -159,7 +159,9 @@ export class AppShell {
     // the hidden link, so absence keeps meaning what those specs read it to
     // mean. VISIBILITY is a separate question and still needs the group open —
     // call revealNavLink() before asserting it.
-    const nav = this.sidebar.getByRole('navigation');
+    // Settings is pinned at the foot, outside the scrolling list (PwShortSidebar),
+    // so the pinned area counts as part of the nav here.
+    const nav = this.sidebar.locator('[data-slot="app-sidebar-nav"], [data-slot="app-sidebar-pinned"]');
     const section = SIDEBAR_SECTIONS.find((s) => s.label === label);
     if (section) {
       return nav.locator(`a[href="${section.href}"]`);
@@ -244,6 +246,8 @@ export class AppShell {
   /** Chooses an interface language in the account menu, by its own name ("English", "العربية"). */
   async chooseLanguage(name: string): Promise<void> {
     await this.openAccountMenu();
+    // Language is a row that opens the languages beside it (PwShortSidebar).
+    await this.page.getByTestId('language-switcher').click();
     await this.page.getByRole('menuitemradio', { name }).click();
   }
 
