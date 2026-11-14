@@ -98,4 +98,33 @@ final class TenantSettingsRepository
 
         return $stmt->rowCount();
     }
+
+    /**
+     * When any of these keys of one tenant last changed, or null when the
+     * tenant has set none of them.
+     *
+     * @param int          $tenantId The owning tenant.
+     * @param list<string> $keys     The setting keys to look at.
+     */
+    public function lastUpdatedAt(int $tenantId, array $keys): ?string
+    {
+        if ($keys === []) {
+            return null;
+        }
+
+        $names = [];
+        $params = [':tenant_id' => $tenantId];
+        foreach ($keys as $i => $key) {
+            $names[] = ":k{$i}";
+            $params[":k{$i}"] = $key;
+        }
+        $stmt = $this->db->prepare(
+            'SELECT MAX(updated_at) FROM tenant_settings WHERE tenant_id = :tenant_id AND setting_key IN ('
+            . implode(', ', $names) . ')'
+        );
+        $stmt->execute($params);
+        $value = $stmt->fetchColumn();
+
+        return $value === false || $value === null ? null : (string) $value;
+    }
 }

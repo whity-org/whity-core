@@ -820,6 +820,36 @@ final class SettingsRegistry
      */
     public const APP_INSTALLABLE = 'app.installable';
 
+    // Customer sign-up for one workspace (WHIT-915, #1872), kept in the
+    // workspace_signup_settings table until WHIT-1035 folded it in here. Set on
+    // the workspace's own Customer sign-up screen (signup:manage), which checks
+    // the starting role is customer-safe, so these are OWN-SCREEN keys: never
+    // published or writable on the generic settings API. Per workspace only;
+    // the global layer is just the default.
+    //   - mode: off, approval (an admin approves each request) or open.
+    //   - role_id: the starting role; 0 is "not chosen", which refuses sign-ups.
+    //   - allowed_domains: a JSON list of email domains; [] allows every address.
+    //   - customer_invites: whether customers may invite colleagues.
+    public const SIGNUP_MODE = 'signup.mode';
+    public const SIGNUP_ROLE_ID = 'signup.role_id';
+    public const SIGNUP_ALLOWED_DOMAINS = 'signup.allowed_domains';
+    public const SIGNUP_CUSTOMER_INVITES = 'signup.customer_invites';
+
+    /**
+     * Keys a dedicated screen and endpoint manage, with checks the generic
+     * settings API cannot make (a customer-safe role, a permission other than
+     * settings:write). Stored and resolved like every other key, but left out
+     * of {@see textKeys()} and refused by the generic settings write.
+     *
+     * @var list<string>
+     */
+    private const OWN_SCREEN_KEYS = [
+        self::SIGNUP_MODE,
+        self::SIGNUP_ROLE_ID,
+        self::SIGNUP_ALLOWED_DOMAINS,
+        self::SIGNUP_CUSTOMER_INVITES,
+    ];
+
     /**
      * The asset-kind keys (Tenant Branding). Their stored value is a storage
      * key (or '' when unset). They are NEVER writable via the text PATCH path —
@@ -928,6 +958,7 @@ final class SettingsRegistry
      * @var list<string>
      */
     private const BOOL_KEYS = [
+        self::SIGNUP_CUSTOMER_INVITES,
         self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_NOTIFY_ADMINS,
@@ -1026,6 +1057,7 @@ final class SettingsRegistry
      * @var array<string, list<string>>
      */
     private const ENUM_OPTIONS = [
+        self::SIGNUP_MODE => ['off', 'approval', 'open'],
         self::MAIL_TRANSPORT => ['none', 'log', 'smtp'],
         self::MAIL_SMTP_ENCRYPTION => ['none', 'tls', 'ssl'],
         self::MAIL_SMTP_AUTH_MODE => ['password', 'oauth2'],
@@ -1297,6 +1329,12 @@ final class SettingsRegistry
         // contact form is off until a workspace is named.
         self::WEBSITE_PLANS => '',
         self::WEBSITE_CONTACT_WORKSPACE => '',
+        // Off with no starting role and no domain limit: a workspace that never
+        // opened sign-up takes nobody.
+        self::SIGNUP_MODE => 'off',
+        self::SIGNUP_ROLE_ID => '0',
+        self::SIGNUP_ALLOWED_DOMAINS => '[]',
+        self::SIGNUP_CUSTOMER_INVITES => 'false',
     ];
 
     /**
@@ -1330,7 +1368,17 @@ final class SettingsRegistry
         return array_values(array_filter(
             self::keys(),
             static fn (string $k): bool => !in_array($k, self::ASSET_KEYS, true)
+                && !in_array($k, self::OWN_SCREEN_KEYS, true)
         ));
+    }
+
+    /**
+     * Whether the key is managed only on its own screen and endpoint, never on
+     * the generic settings API. See {@see OWN_SCREEN_KEYS}.
+     */
+    public static function isOwnScreen(string $key): bool
+    {
+        return in_array($key, self::OWN_SCREEN_KEYS, true);
     }
 
     /**
@@ -1696,8 +1744,30 @@ final class SettingsRegistry
             self::WEBSITE_CONTACT_WORKSPACE => $value === '' || preg_match('/^[a-z0-9][a-z0-9-]{0,254}$/', $value) === 1
                 ? null
                 : self::WEBSITE_CONTACT_WORKSPACE . ' must be a workspace slug (lowercase letters, digits and hyphens).',
+            self::SIGNUP_MODE => self::validateEnum(self::SIGNUP_MODE, $value),
+            self::SIGNUP_ROLE_ID => preg_match('/^(0|[1-9][0-9]{0,9})$/', $value) === 1
+                ? null
+                : self::SIGNUP_ROLE_ID . ' must be a role id, or 0 for none.',
+            self::SIGNUP_ALLOWED_DOMAINS => self::validateSignupDomains($value),
+            self::SIGNUP_CUSTOMER_INVITES => self::validateBoolean($value, self::SIGNUP_CUSTOMER_INVITES),
             default => "Unknown setting key: {$key}",
         };
+    }
+
+    /**
+     * A JSON list of plain email domains, already normalised, at most
+     * {@see \Whity\Core\Signup\WorkspaceSignupSettings::MAX_DOMAINS}.
+     */
+    private static function validateSignupDomains(string $value): ?string
+    {
+        $list = json_decode($value, true);
+        $normalised = is_array($list) && array_is_list($list)
+            ? \Whity\Core\Signup\WorkspaceSignupSettings::normaliseDomains($list)
+            : null;
+
+        return $normalised !== null && $normalised === $list
+            ? null
+            : self::SIGNUP_ALLOWED_DOMAINS . ' must be a JSON list of lowercase email domains.';
     }
 
     /**

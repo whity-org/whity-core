@@ -133,7 +133,9 @@ final class SettingsRegistryTest extends TestCase
              'calendar.instant_booking',
              'app.installable',
              'website.plans',
-             'website.contact_workspace'],
+             'website.contact_workspace',
+             // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
+             'signup.mode', 'signup.role_id', 'signup.allowed_domains', 'signup.customer_invites'],
             SettingsRegistry::keys()
         );
     }
@@ -466,7 +468,8 @@ final class SettingsRegistryTest extends TestCase
         // 114 since WHIT-941: eight calendar.* keys.
         // 117 since WHIT-960: website.plans and website.contact_workspace.
         // 120 since design 3.4 (P1): company.name_ar and company.address_ar.
-        self::assertCount(120, $describe);
+        // 124 since WHIT-1035: the four signup.* keys.
+        self::assertCount(124, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
@@ -729,5 +732,36 @@ final class SettingsRegistryTest extends TestCase
         self::assertNull(SettingsRegistry::validate('documents.render_max_template_bytes', (string) (20 * 1024 * 1024)));
         self::assertNotNull(SettingsRegistry::validate('documents.render_max_template_bytes', '1023'));
         self::assertNotNull(SettingsRegistry::validate('documents.render_max_template_bytes', (string) (20 * 1024 * 1024 + 1)));
+    }
+
+    public function testSignupKeysHaveTheirOwnScreenAndStayOffTheSettingsApi(): void
+    {
+        foreach (['signup.mode', 'signup.role_id', 'signup.allowed_domains', 'signup.customer_invites'] as $key) {
+            self::assertTrue(SettingsRegistry::isOwnScreen($key), $key);
+            self::assertNotContains($key, SettingsRegistry::textKeys(), $key);
+            self::assertNotContains($key, SettingsRegistry::tenantTextKeys(), $key);
+            self::assertFalse((new \Whity\Core\Settings\SettingsCatalog())->isAdminVisible($key), $key);
+        }
+        self::assertFalse(SettingsRegistry::isOwnScreen('company.name'));
+    }
+
+    public function testSignupValuesAreChecked(): void
+    {
+        self::assertSame('off', SettingsRegistry::defaultFor('signup.mode'));
+        self::assertSame('enum', SettingsRegistry::typeFor('signup.mode'));
+        self::assertSame('bool', SettingsRegistry::typeFor('signup.customer_invites'));
+        self::assertNull(SettingsRegistry::validate('signup.mode', 'approval'));
+        self::assertNotNull(SettingsRegistry::validate('signup.mode', 'closed'));
+        self::assertNull(SettingsRegistry::validate('signup.role_id', '0'));
+        self::assertNull(SettingsRegistry::validate('signup.role_id', '42'));
+        self::assertNotNull(SettingsRegistry::validate('signup.role_id', '-1'));
+        self::assertNotNull(SettingsRegistry::validate('signup.role_id', '07'));
+        self::assertNull(SettingsRegistry::validate('signup.allowed_domains', '[]'));
+        self::assertNull(SettingsRegistry::validate('signup.allowed_domains', '["example-bakery.com"]'));
+        self::assertNotNull(SettingsRegistry::validate('signup.allowed_domains', '["Example-Bakery.com"]'), 'stored normalised');
+        self::assertNotNull(SettingsRegistry::validate('signup.allowed_domains', '["10.0.0.1"]'));
+        self::assertNotNull(SettingsRegistry::validate('signup.allowed_domains', '{"a":"example.com"}'));
+        self::assertNull(SettingsRegistry::validate('signup.customer_invites', 'true'));
+        self::assertNotNull(SettingsRegistry::validate('signup.customer_invites', '1'));
     }
 }
