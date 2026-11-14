@@ -47,8 +47,13 @@ final class FormPrintStyle
     public const MAX_MARKS = 3;
     private const MAX_ALT = 80;
 
-    /** A file of this workspace, as the editor stores an image's src. */
-    private const FILE_SRC = '#^/api/files/\d{1,12}/content$#';
+    /**
+     * A mark is stored in the theme as an embedded image: a theme is data the
+     * render service prints without fetching anything, and three small marks
+     * are a few tens of kilobytes.
+     */
+    private const IMAGE_SRC = '#^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$#';
+    public const MAX_MARK_BYTES = 300 * 1024;
 
     /**
      * What is wrong with a `form` value, keyed by the token's path; empty when
@@ -228,8 +233,9 @@ final class FormPrintStyle
             return 'form.marks must list at most ' . self::MAX_MARKS . ' images.';
         }
         foreach ($marks as $mark) {
-            if (!is_array($mark) || !is_string($mark['src'] ?? null) || preg_match(self::FILE_SRC, $mark['src']) !== 1) {
-                return 'Each mark must be a file of this workspace, as /api/files/{id}/content.';
+            if (!is_array($mark) || !is_string($mark['src'] ?? null) || strlen($mark['src']) > (int) ceil(self::MAX_MARK_BYTES * 4 / 3) + 40
+                || preg_match(self::IMAGE_SRC, $mark['src']) !== 1) {
+                return 'Each mark must be a PNG, JPEG or WebP image of at most 300 KB, embedded as a data: URI.';
             }
             $alt = $mark['alt'] ?? '';
             if (!is_string($alt) || mb_strlen($alt) > self::MAX_ALT || array_diff(array_keys($mark), ['src', 'alt']) !== []) {

@@ -94,6 +94,8 @@ export interface FieldValidation {
   min?: number
   max?: number
   maxLength?: number
+  /** Design 3.4 (FP.8): a limit in words, printed as "142 of 300 words". */
+  maxWords?: number
   pattern?: string
   maxFiles?: number
   ou_type?: string

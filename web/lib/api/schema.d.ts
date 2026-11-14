@@ -3417,6 +3417,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/document-themes/form-printout-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview form printouts with unsaved theme options
+         * @description Design 3.4 (`TplFormPrintStyle`): the workspace’s latest form response (or `submissionId`) printed with the `form`, `letterhead` and `accent` options in the body over the workspace theme. A free workspace previews the standard layout, as it would print. One render against the limits.
+         */
+        post: operations["post_api_v1_document_themes_form_printout_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/document-themes/resolve": {
         parameters: {
             query?: never;
@@ -4227,6 +4247,26 @@ export interface paths {
          * @description Always sent as an attachment with `nosniff`. Only a file attached to this submission, in this workspace, and named by one of its answers.
          */
         get: operations["get_api_v1_form_submissions_id_files_fileid"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-submissions/{id}/printout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print a response in the automatic layout
+         * @description Design 3.4 (P1): the response laid out from its form’s sections and questions in the workspace theme’s form printout options, as it would print now. Not stored: the record is the PDF its route’s final step makes. `lang` is `en` or `ar`; left out, the language of the person who sent it. One render against the workspace’s limits.
+         */
+        get: operations["get_api_v1_form_submissions_id_printout"];
         put?: never;
         post?: never;
         delete?: never;
@@ -13306,6 +13346,7 @@ export interface components {
                     };
                     /** @description Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan. */
                     marks?: {
+                        /** @description The image embedded as a data: URI, at most 300 KB. */
                         src: string;
                         alt?: string;
                     }[];
@@ -13444,6 +13485,7 @@ export interface components {
                     };
                     /** @description Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan. */
                     marks?: {
+                        /** @description The image embedded as a data: URI, at most 300 KB. */
                         src: string;
                         alt?: string;
                     }[];
@@ -13507,6 +13549,8 @@ export interface components {
                     labelAr: string;
                 }[];
             }[];
+            /** @description The Form printouts tab (design 3.4): the entitlement that unlocks it, each option with its standard value and English and Arabic labels, the footer parts and the marks limit. */
+            form?: Record<string, never>;
         };
         DocumentThemeSchemaResponse: {
             data: components["schemas"]["DocumentThemeSchema"];
@@ -13610,6 +13654,7 @@ export interface components {
                 };
                 /** @description Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan. */
                 marks?: {
+                    /** @description The image embedded as a data: URI, at most 300 KB. */
                     src: string;
                     alt?: string;
                 }[];
@@ -14057,6 +14102,21 @@ export interface components {
         };
         FormListResponse: {
             data: components["schemas"]["Form"][];
+        };
+        FormPrintoutPreviewRequest: {
+            /** @description Unsaved `form` options (FormPrintoutStyle) to preview. */
+            form?: Record<string, never>;
+            /** @description Unsaved letterhead options, `layout` among them. */
+            letterhead?: Record<string, never>;
+            /** @description An unsaved print colour. */
+            accent?: string;
+            /** @description The response to print. Left out, the workspace’s latest. */
+            submissionId?: number;
+            /**
+             * @description The printout’s language. Left out, the language of the person who sent it.
+             * @enum {string}
+             */
+            lang?: "en" | "ar";
         };
         FormPublicLinkClosedResponse: {
             data: components["schemas"]["Form"];
@@ -16706,6 +16766,7 @@ export interface components {
                     };
                     /** @description Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan. */
                     marks?: {
+                        /** @description The image embedded as a data: URI, at most 300 KB. */
                         src: string;
                         alt?: string;
                     }[];
@@ -36756,6 +36817,111 @@ export interface operations {
             };
         };
     };
+    post_api_v1_document_themes_form_printout_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormPrintoutPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description The PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No form response to preview yet */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Some options are not valid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The document render limit has been reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description PDFs are turned off, or the render service is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_document_themes_resolve: {
         parameters: {
             query?: never;
@@ -41068,6 +41234,103 @@ export interface operations {
                 };
             };
             /** @description The file could not be read from storage */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_form_submissions_id_printout: {
+        parameters: {
+            query?: {
+                /** @description The printout language, `en` or `ar`. Left out, the language of the person who sent the response. */
+                lang?: "en" | "ar";
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Submission not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The render service refused the printout */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The document render limit has been reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description PDFs are turned off, or the render service is unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

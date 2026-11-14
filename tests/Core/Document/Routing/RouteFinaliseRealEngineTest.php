@@ -520,6 +520,45 @@ final class RouteFinaliseRealEngineTest extends TestCase
             ['Awss Haddad', 'Approved ' . $today],
             ['Total', '2'],
         ], $table['rows']);
+
+        // Design 3.4 (P1): the step records who it left out, for "Not counted".
+        $left = (new \Whity\Core\Document\Routing\RouteLeftOut($this->pdo))->forRoute(self::TENANT, (int) $route['id']);
+        self::assertSame([self::SUPERVISOR], array_column($left, 'profile_id'));
+        self::assertSame('supervisor', $left[0]['key']);
+    }
+
+    /**
+     * Design 3.4 (FP.1): a form whose route makes a final document with no
+     * template prints the response in the automatic layout, with the decision
+     * and the approvals, instead of failing for want of a template.
+     */
+    public function testAFormWithNoTemplatePrintsTheResponseInTheAutomaticLayout(): void
+    {
+        $formId = $this->form($this->clerkThenFinalise(null), null);
+        $submissionId = $this->approve($formId, ['supplier' => 'Example Mill']);
+
+        $fresh = $this->submissions->find(self::TENANT, $submissionId);
+        self::assertNotNull($fresh);
+        self::assertIsInt($fresh['document_id'], 'a document with no template');
+        $payload = $this->render->flowCalls[0];
+        $types = array_column($payload['content'], 'type');
+        self::assertContains('formTitle', $types);
+        self::assertContains('decisionLine', $types);
+        self::assertContains('decisionBlock', $types);
+        $answer = null;
+        foreach ($payload['content'] as $block) {
+            if (($block['type'] ?? null) === 'formQuestion' && str_contains((string) json_encode($block), 'Example Mill')) {
+                $answer = $block;
+            }
+            if (($block['type'] ?? null) === 'decisionBlock') {
+                self::assertSame('approved', $block['status']);
+            }
+            if (($block['type'] ?? null) === 'approvals') {
+                self::assertSame(['Clerk Rana'], array_column($block['rows'], 'name'));
+            }
+        }
+        self::assertNotNull($answer, 'the answer is on the page');
+        self::assertSame('Page {{page}} of {{pages}}', $payload['footer']['start'] === 'Page {{page}} of {{pages}}' ? $payload['footer']['start'] : substr($payload['footer']['start'], -strlen('Page {{page}} of {{pages}}')));
     }
 
     public function testASupervisorTheOfficeNamesAtPreCheckIsLeftOutOfTheCommittee(): void
@@ -724,6 +763,48 @@ final class RouteFinaliseRealEngineTest extends TestCase
         self::assertNull($stored[0]['kind']);
     }
 
+    /**
+     * Design 3.4 (P1): staff open a response as it would print, and the theme's
+     * Form printouts tab previews unsaved options; neither stores anything.
+     */
+    public function testTheResponseAndThemePreviewsRenderWithoutStoringAnything(): void
+    {
+        $printouts = new \Whity\Core\Form\Print\FormPrintoutService(
+            $this->pdo,
+            new \Whity\Core\Document\Print\SourceDocumentPrinter(new \Whity\Core\Document\Fields\DocumentFieldRegistry(), new \Whity\Core\Document\Embed\DocumentEmbedRegistry(), $this->settings),
+            null,
+            $this->settings,
+        );
+        $api = new \Whity\Api\FormPrintoutsApiHandler($this->pdo, $printouts, new FlowDocumentRenderer($this->settings, $this->render));
+
+            $none = $api->themePreview(new \Whity\Core\Request('POST', '/x', [], '{}'));
+            self::assertSame(404, $none->getStatusCode(), 'nothing to preview yet');
+
+            $formId = $this->form($this->clerkThenFinalise(null), null);
+            $submission = $this->send($formId, ['supplier' => 'Example Mill']);
+            $documents = $this->scalar('SELECT COUNT(*) FROM documents');
+
+            $response = $api->submission(new \Whity\Core\Request('GET', '/x?lang=ar'), ['id' => (string) $submission['id']]);
+            self::assertSame(200, $response->getStatusCode());
+            self::assertSame('application/pdf', array_change_key_case($response->getHeaders())['content-type'] ?? null);
+            $payload = $this->render->flowCalls[count($this->render->flowCalls) - 1];
+            self::assertSame('rtl', $payload['direction']);
+            $types = array_column($payload['content'], 'type');
+            self::assertContains('decisionLine', $types, 'waiting for a decision, on top');
+            self::assertNotContains('decisionBlock', $types, 'no full block before a decision');
+
+            $preview = $api->themePreview(new \Whity\Core\Request('POST', '/x', [], (string) json_encode(['form' => ['sectionStyle' => 'tab']])));
+            self::assertSame(200, $preview->getStatusCode());
+            $payload = $this->render->flowCalls[count($this->render->flowCalls) - 1];
+            $sections = array_values(array_filter($payload['content'], static fn (array $b): bool => $b['type'] === 'formSection'));
+            self::assertTrue($sections === [] || $sections[0]['style'] === 'tab', 'the unsaved option is used');
+
+            $bad = $api->themePreview(new \Whity\Core\Request('POST', '/x', [], (string) json_encode(['form' => ['sectionStyle' => 'G']])));
+            self::assertSame(422, $bad->getStatusCode());
+            self::assertSame(404, $api->submission(new \Whity\Core\Request('GET', '/x'), ['id' => '999999'])->getStatusCode());
+            self::assertSame($documents, $this->scalar('SELECT COUNT(*) FROM documents'), 'previews make no documents');
+    }
+
     public function testTheTemplateDefaultsToTheFormSettingAndIsRequiredSomewhere(): void
     {
         $other = $this->editor->published(self::TENANT, self::APPLICANT, 'Other letter', [
@@ -743,16 +824,12 @@ final class RouteFinaliseRealEngineTest extends TestCase
         self::assertSame($other, $this->finalisations->findForRoute(self::TENANT, (int) $route['id'])['template_id'] ?? null);
         self::assertContains('Other: B', EditorTemplateFixture::texts($this->render->flowCalls[1]));
 
-        // Neither names one: the submission is refused, and nothing is written.
+        // Neither names one: since design 3.4 the response prints in the
+        // automatic layout (FP.1), so the route starts.
         $formId = $this->form($this->clerkThenFinalise(null), null, 'third');
-        $before = $this->scalar('SELECT COUNT(*) FROM form_submissions');
-        try {
-            $this->send($formId, ['supplier' => 'C']);
-            self::fail('a route that could not make its final document must not start');
-        } catch (FormRejectedException $e) {
-            self::assertStringContainsString('no template is chosen', $e->clientMessage);
-        }
-        self::assertSame($before, $this->scalar('SELECT COUNT(*) FROM form_submissions'));
+        $route = $this->routeOf((int) $this->send($formId, ['supplier' => 'C'])['id']);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertNull($this->finalisations->findForRoute(self::TENANT, (int) $route['id'])['template_id'] ?? null);
     }
 
     public function testAFormSubmissionsFinalDocumentFiresTheIssueEvents(): void

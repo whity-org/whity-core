@@ -15,7 +15,7 @@ use Whity\Core\Document\Theme\FormPrintStyle;
  */
 final class FormPrintStyleTest extends TestCase
 {
-    private const MARK = ['src' => '/api/files/12/content', 'alt' => 'ISO 9001:2015'];
+    private const MARK = ['src' => 'data:image/png;base64,iVBORw0KGgo=', 'alt' => 'ISO 9001:2015'];
 
     public function testTheStandardLayoutIsWhatMissingKeysTake(): void
     {
@@ -86,6 +86,8 @@ final class FormPrintStyleTest extends TestCase
         yield 'turning page x of y off' => [['footer' => ['pageCount' => false]], 'form.footer.pageCount'];
         yield 'four marks' => [['marks' => array_fill(0, 4, self::MARK)], 'form.marks'];
         yield 'a mark from the web' => [['marks' => [['src' => 'https://example.com/iso.png', 'alt' => '']]], 'form.marks'];
+        yield 'an SVG mark' => [['marks' => [['src' => 'data:image/svg+xml;base64,PHN2Zz4=', 'alt' => '']]], 'form.marks'];
+        yield 'a mark over 300 KB' => [['marks' => [['src' => 'data:image/png;base64,' . str_repeat('A', 420000), 'alt' => '']]], 'form.marks'];
         yield 'a mark with extra keys' => [['marks' => [self::MARK + ['width' => 3]]], 'form.marks'];
     }
 

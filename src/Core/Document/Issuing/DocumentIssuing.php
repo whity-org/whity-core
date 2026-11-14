@@ -758,6 +758,79 @@ final class DocumentIssuing
     }
 
     /**
+     * Design 3.4 (P1): the form printouts service over this issuing stack's
+     * printer and settings, with the plan gate read from `$db`.
+     */
+    public function formPrintouts(\PDO $db): \Whity\Core\Form\Print\FormPrintoutService
+    {
+        return new \Whity\Core\Form\Print\FormPrintoutService(
+            $db,
+            $this->print,
+            new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($db)),
+            $this->settings,
+        );
+    }
+
+    /**
+     * Render and store a payload built in code for a document with no template:
+     * a form response's automatic printout (design 3.4, P1). Same gates as a
+     * template's print (rendering and storing on, the render limits) and the
+     * same verification code, which `$build` receives so the printout's
+     * decision block can carry it. `document.rendered` names no template.
+     *
+     * @param array<string, mixed> $document The `documents` row.
+     * @param \Closure(?DocumentQrStamp): ?array<string, mixed> $build
+     * @return array{0: array{attempted: bool, stored: bool, reason: string|null}, 1: array<string, mixed>|null}
+     */
+    public function renderBuiltPayload(ActingAs $actor, array $document, \Closure $build): array
+    {
+        [$tenantId, $callerId] = [$actor->tenantId, $actor->issuerId()];
+        $effective = $this->settings->effective($tenantId);
+        if ($this->renderer === null || !$this->renderer->isEnabled($tenantId)) {
+            return [['attempted' => false, 'stored' => false, 'reason' => 'disabled'], null];
+        }
+        if (($effective[SettingsRegistry::DOCUMENTS_PERSIST_ENABLED] ?? 'true') !== 'true') {
+            return [['attempted' => false, 'stored' => false, 'reason' => 'persist_disabled'], null];
+        }
+        $payload = $build($this->stamp($tenantId, $callerId, (int) $document['id'], $effective));
+        if ($payload === null) {
+            return [['attempted' => false, 'stored' => false, 'reason' => 'rejected'], null];
+        }
+
+        $metered = false;
+        if ($this->meters !== null) {
+            if (!$this->meters->consume($tenantId, self::RENDER_METERS)->allowed) {
+                return [['attempted' => false, 'stored' => false, 'reason' => 'limit'], null];
+            }
+            $metered = true;
+        }
+        try {
+            $rendered = $this->renderer->render($tenantId, $payload);
+        } catch (DocumentRenderRejectedException $e) {
+            $this->refund($tenantId, $metered);
+            error_log('[DocumentIssuing] the printout render was refused: ' . $e->clientMessage);
+
+            return [['attempted' => true, 'stored' => false, 'reason' => 'rejected'], null];
+        } catch (RenderServiceUnavailableException $e) {
+            $this->refund($tenantId, $metered);
+            error_log('[DocumentIssuing] the printout render failed: ' . $e->getMessage());
+
+            return [['attempted' => true, 'stored' => false, 'reason' => 'unavailable'], null];
+        }
+        try {
+            $pages = $rendered->pageCount > 0 ? $rendered->pageCount : null;
+            $artifact = $this->issuer->appendArtifact($tenantId, $callerId, $document, $rendered->bytes, pages: $pages);
+        } catch (StorageException $e) {
+            error_log('[DocumentIssuing] storing the printout failed: ' . $e->getMessage());
+
+            return [['attempted' => true, 'stored' => false, 'reason' => 'storage_unavailable'], null];
+        }
+        $this->storedBuilt($tenantId, (int) $document['id'], $artifact);
+
+        return [['attempted' => true, 'stored' => true, 'reason' => null], $artifact];
+    }
+
+    /**
      * @param array<string, mixed>   $source
      * @param array<string, ?string> $values
      */

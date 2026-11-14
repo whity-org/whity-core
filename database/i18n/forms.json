@@ -138,6 +138,8 @@
         "builder.panel.maxFiles.hint": "From 1 to 20.",
         "builder.panel.maxLength": "Longest answer",
         "builder.panel.maxLength.hint": "In characters. Leave empty for no limit.",
+        "builder.panel.maxWords": "Most words",
+        "builder.panel.maxWords.hint": "Printed under the answer as \"142 of 300 words\". Leave empty for no limit.",
         "builder.panel.maxRows": "Most rows",
         "builder.panel.min": "Smallest",
         "builder.panel.minRows": "Fewest rows",

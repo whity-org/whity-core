@@ -117,6 +117,8 @@ export const COMPANY_SETTING_KEYS: readonly string[] = [
   'company.tax_id',
   'company.phone',
   'company.email',
+  'company.name_ar',
+  'company.address_ar',
 ];
 
 /**
@@ -124,12 +126,14 @@ export const COMPANY_SETTING_KEYS: readonly string[] = [
  * number must not read backwards. A name or an address can be in either
  * language, so it follows its own text.
  */
-const COMPANY_INPUT_DIR: Readonly<Record<string, 'ltr' | 'auto'>> = {
+const COMPANY_INPUT_DIR: Readonly<Record<string, 'ltr' | 'rtl' | 'auto'>> = {
   'company.name': 'auto',
   'company.address': 'auto',
   'company.tax_id': 'ltr',
   'company.phone': 'ltr',
   'company.email': 'ltr',
+  'company.name_ar': 'rtl',
+  'company.address_ar': 'rtl',
 };
 
 /**
@@ -233,6 +237,14 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
     'company.email': {
       label: t('settings.meta.company.email.label', 'Email'),
       help: t('settings.meta.company.email.help', 'Printed on the letterhead when the document theme lists it.'),
+    },
+    'company.name_ar': {
+      label: t('settings.meta.company.name_ar.label', 'Company name in Arabic'),
+      help: t('settings.meta.company.name_ar.help', 'Printed beside the English name when a letterhead is in English and Arabic.'),
+    },
+    'company.address_ar': {
+      label: t('settings.meta.company.address_ar.label', 'Address in Arabic'),
+      help: t('settings.meta.company.address_ar.help', 'Printed under the Arabic name on a letterhead in English and Arabic.'),
     },
     site_name: {
       label: t('settings.meta.site_name.label', 'Site name'),

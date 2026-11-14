@@ -54,7 +54,7 @@ final class SettingsRegistryTest extends TestCase
              'billing.tax_label', 'billing.tax_inclusive',
              'billing.payment_terms_days',
              'company.name', 'company.address',
-             'company.tax_id', 'company.phone', 'company.email',
+             'company.tax_id', 'company.phone', 'company.email', 'company.name_ar', 'company.address_ar',
              // Numbering is GLOBAL-ONLY: a per-tenant override would make the
              // (series, number) uniqueness index mean something a tenant admin
              // can change, which is how a sequence starts issuing duplicates.
@@ -300,7 +300,8 @@ final class SettingsRegistryTest extends TestCase
         // of whether applicants see who reviewed their form.
         // 51 since WHIT-941: eight calendar.* keys.
         // 52 since WHIT-966: calendar.instant_booking.
-        self::assertCount(52, SettingsRegistry::tenantTextKeys());
+        // 54 since design 3.4 (P1): company.name_ar and company.address_ar.
+        self::assertCount(54, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -464,8 +465,8 @@ final class SettingsRegistryTest extends TestCase
         // 106 since WHIT-925: meters.enforcement and billing.default_plan.
         // 114 since WHIT-941: eight calendar.* keys.
         // 117 since WHIT-960: website.plans and website.contact_workspace.
-        // 118 since WHIT-985: plugins.billing_email_senders.
-        self::assertCount(118, $describe);
+        // 120 since design 3.4 (P1): company.name_ar and company.address_ar.
+        self::assertCount(120, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
