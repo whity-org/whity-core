@@ -55,6 +55,22 @@ final class EmailContent
         public readonly string $language = 'en',
         /** Draw the rows above the paragraphs (`new-sign-in`: the facts, then what to do). */
         public readonly bool $rowsFirst = false,
+        /**
+         * How a row's value is drawn, by row index: 'strong' (600, what was
+         * booked, the new time) or 'struck' (the old time). Others are plain.
+         *
+         * @var array<int, 'strong'|'struck'>
+         */
+        public readonly array $rowStyles = [],
+        /**
+         * A soft line under the button with one link inside it ("Need to change
+         * it? Move or cancel before it starts."). Plain strings; the layout escapes them.
+         *
+         * @var array{before: string, label: string, url: string, after: string}|null
+         */
+        public readonly ?array $linkLine = null,
+        /** A smaller soft line after that ("A calendar file is attached …"). */
+        public readonly ?string $smallNote = null,
     ) {
     }
 

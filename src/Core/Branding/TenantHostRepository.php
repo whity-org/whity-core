@@ -36,6 +36,16 @@ final class TenantHostRepository
         return $id === false ? null : (int) $id;
     }
 
+    /** The workspace's slug, for a link to one of its public pages (E2: "Book another time"). */
+    public function findSlugById(int $tenantId): ?string
+    {
+        $stmt = $this->db->prepare('SELECT slug FROM tenants WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $tenantId]);
+        $slug = $stmt->fetchColumn();
+
+        return is_string($slug) && $slug !== '' ? $slug : null;
+    }
+
     /** The workspace's display name, for a public page that names it (WHIT-915). */
     public function findNameById(int $tenantId): ?string
     {

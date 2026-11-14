@@ -77,9 +77,14 @@ final class EmailLayout
             $rows = '';
             foreach ($c->rows as $i => [$label, $value]) {
                 $border = $i === 0 ? '0' : '1px solid ' . self::LINE;
+                $weight = match ($c->rowStyles[$i] ?? null) {
+                    'strong' => 'font-weight:600;',
+                    'struck' => 'text-decoration:line-through;',
+                    default => '',
+                };
                 $rows .= '<tr><td style="padding:10px 16px;font-size:16px;color:' . self::SOFT . ';border-top:' . $border . '">'
                     . self::esc($label) . '</td>'
-                    . '<td style="padding:10px 16px;font-size:16px;color:' . self::TEXT . ';text-align:' . $end
+                    . '<td style="padding:10px 16px;font-size:16px;' . $weight . 'color:' . self::TEXT . ';text-align:' . $end
                     . ';border-top:' . $border . '"><span dir="auto">' . self::esc($value) . '</span></td></tr>';
             }
             $body .= '<table role="presentation" class="rows" width="100%" cellpadding="0" cellspacing="0" border="0" '
@@ -131,6 +136,20 @@ final class EmailLayout
 
         if ($c->footnote !== null && $c->footnote !== '') {
             $body .= self::para($c->footnote, self::SOFT, 'soft');
+        }
+
+        $lineUrl = $c->linkLine !== null ? self::safeUrl($c->linkLine['url']) : null;
+        if ($c->linkLine !== null) {
+            $link = $lineUrl !== null
+                ? '<a href="' . self::esc($lineUrl) . '" style="color:' . $brand . '">' . self::esc($c->linkLine['label']) . '</a>'
+                : self::esc($c->linkLine['label']);
+            $body .= '<p class="soft" style="margin:0 0 16px;font-size:17px;line-height:1.6;color:' . self::SOFT . '">'
+                . self::esc($c->linkLine['before']) . $link . self::esc($c->linkLine['after']) . '</p>';
+        }
+
+        if ($c->smallNote !== null && $c->smallNote !== '') {
+            $body .= '<p class="soft" style="margin:0 0 16px;font-size:15px;line-height:1.6;color:' . self::SOFT . '">'
+                . self::esc($c->smallNote) . '</p>';
         }
 
         $foot = '';
@@ -227,6 +246,15 @@ HTML;
         }
         if ($c->footnote !== null && $c->footnote !== '') {
             $lines[] = $c->footnote;
+            $lines[] = '';
+        }
+        if ($c->linkLine !== null) {
+            $url = self::safeUrl($c->linkLine['url']);
+            $lines[] = $c->linkLine['before'] . $c->linkLine['label'] . ($url !== null ? ' (' . $url . ')' : '') . $c->linkLine['after'];
+            $lines[] = '';
+        }
+        if ($c->smallNote !== null && $c->smallNote !== '') {
+            $lines[] = $c->smallNote;
             $lines[] = '';
         }
         $lines[] = '--';

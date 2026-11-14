@@ -82,6 +82,34 @@ final class BrandedEmailSender
         return str_starts_with(strtolower(trim($locale)), 'ar') ? 'ar' : 'en';
     }
 
+    /**
+     * The workspace's own contact details for its emails' footers (3.4:
+     * "{{tenant_name}} · {{tenant_address}} · Reply to this email to reach
+     * them"): its address in the email's language (Settings › Company), and
+     * its email as the reply-to when it has a valid one. Nulls when unset.
+     *
+     * @return array{address: ?string, replyTo: ?string}
+     */
+    public function workspaceContact(int $tenantId, string $language): array
+    {
+        try {
+            $effective = $tenantId > 0 ? $this->settings->effective($tenantId) : $this->settings->getGlobal();
+        } catch (\Throwable) {
+            return ['address' => null, 'replyTo' => null];
+        }
+        $text = static function (mixed $value): ?string {
+            return is_string($value) && trim($value) !== '' ? trim(str_replace(["\r", "\n"], ' ', $value)) : null;
+        };
+        $address = ($language === 'ar' ? $text($effective[SettingsRegistry::COMPANY_ADDRESS_AR] ?? null) : null)
+            ?? $text($effective[SettingsRegistry::COMPANY_ADDRESS] ?? null);
+        $email = $text($effective[SettingsRegistry::COMPANY_EMAIL] ?? null);
+
+        return [
+            'address' => $address,
+            'replyTo' => $email !== null && filter_var($email, FILTER_VALIDATE_EMAIL) !== false ? $email : null,
+        ];
+    }
+
     public function branding(int $tenantId): EmailBranding
     {
         return $this->branding !== null
