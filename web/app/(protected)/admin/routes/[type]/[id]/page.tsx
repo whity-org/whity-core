@@ -283,6 +283,8 @@ export default function RouteSubjectPage({ params }: { params: Promise<{ type: s
               onSent={() => setVersion((current) => current + 1)}
             />
 
+            <EnteredValues route={route} preferArabic={preferArabic} nameOf={nameOf} />
+
             <section className="space-y-2">
               <h3 className="text-sm font-medium">{t('subject.trail', 'What happened')}</h3>
               <RecordTimeline>
@@ -353,6 +355,52 @@ export default function RouteSubjectPage({ params }: { params: Promise<{ type: s
         </Card>
       ))}
     </div>
+  );
+}
+
+/**
+ * WHIT-1016: the values people entered at the stages that ask for them, such
+ * as a committee meeting number, with who entered each and when.
+ */
+function EnteredValues({
+  route,
+  preferArabic,
+  nameOf,
+}: {
+  route: SubjectRoute;
+  preferArabic: boolean;
+  nameOf: (profileId: number | null) => string;
+}) {
+  const t = useTranslation('documents');
+  const { dateTime } = useDateDisplay();
+  const entered = route.values ?? [];
+  if (entered.length === 0) return null;
+  const labels = new Map<string, string>();
+  for (const step of route.steps) {
+    for (const input of step.inputs ?? []) {
+      labels.set(input.key, (preferArabic && input.label_ar) || input.label);
+    }
+  }
+
+  return (
+    <section className="space-y-2" aria-labelledby={`route-values-${route.id}`}>
+      <h3 id={`route-values-${route.id}`} className="text-sm font-medium">
+        {t('subject.values', 'Entered during review')}
+      </h3>
+      <dl className="space-y-2">
+        {entered.map((value) => (
+          <div key={value.key} className="space-y-0.5">
+            <dt className="text-sm text-muted-foreground">{labels.get(value.key) ?? value.key}</dt>
+            <dd className="text-sm">
+              <span className="font-medium">{value.value}</span>
+              <span className="ms-2 text-muted-foreground">
+                {nameOf(value.entered_by)} · {dateTime(value.entered_at) ?? ''}
+              </span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 

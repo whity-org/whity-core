@@ -89,6 +89,7 @@ final class RouteStepRepository
      *
      * @param array<string, mixed> $ruleConfig Validated by the rule's own resolver
      *                                         before this is called.
+     * @param list<array<string, mixed>> $inputs WHIT-1016, from {@see RouteStepInputs::parse()}.
      */
     public function create(
         int $tenantId,
@@ -105,16 +106,17 @@ final class RouteStepRepository
         ?string $signCapacity = null,
         ?string $signOnBehalfOf = null,
         ?int $finalTemplateId = null,
+        array $inputs = [],
     ): int {
         $isFinalise = $kind === RouteStepKind::FINALISE;
         $stmt = $this->db->prepare(
             'INSERT INTO document_route_steps
                  (tenant_id, route_id, position, rule_kind, rule_config, label,
                   decision, decision_quorum, satisfied_by, kind, allow_send_back,
-                  sign_capacity, sign_on_behalf_of, final_template_id, created_at)
+                  sign_capacity, sign_on_behalf_of, final_template_id, inputs, created_at)
              VALUES (:tenant_id, :route_id, :position, :rule_kind, :rule_config, :label,
                      :decision, :decision_quorum, :satisfied_by, :kind, :allow_send_back,
-                     :sign_capacity, :sign_on_behalf_of, :final_template_id, NOW())'
+                     :sign_capacity, :sign_on_behalf_of, :final_template_id, :inputs, NOW())'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
@@ -151,6 +153,9 @@ final class RouteStepRepository
             ':sign_on_behalf_of' => $kind === RouteStepKind::SIGN ? $signOnBehalfOf : null,
             // WHIT-921: the template a finalise step renders with; nothing else has one.
             ':final_template_id' => $isFinalise ? $finalTemplateId : null,
+            // WHIT-1016: what the person acting here fills in, validated by
+            // RouteStepInputs before this is called. NULL asks for nothing.
+            ':inputs' => RouteStepInputs::encode($inputs),
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -166,7 +171,7 @@ final class RouteStepRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
                     decision, decision_quorum, satisfied_by, kind, allow_send_back,
-                    sign_capacity, sign_on_behalf_of, final_template_id, created_at
+                    sign_capacity, sign_on_behalf_of, final_template_id, inputs, created_at
                FROM document_route_steps
               WHERE id = :id AND tenant_id = :tenant_id'
         );
@@ -186,7 +191,7 @@ final class RouteStepRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
                     decision, decision_quorum, satisfied_by, kind, allow_send_back,
-                    sign_capacity, sign_on_behalf_of, final_template_id, created_at
+                    sign_capacity, sign_on_behalf_of, final_template_id, inputs, created_at
                FROM document_route_steps
               WHERE tenant_id = :tenant_id AND route_id = :route_id
               ORDER BY position ASC'
@@ -229,7 +234,7 @@ final class RouteStepRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
                     decision, decision_quorum, satisfied_by, kind, allow_send_back,
-                    sign_capacity, sign_on_behalf_of, final_template_id, created_at
+                    sign_capacity, sign_on_behalf_of, final_template_id, inputs, created_at
                FROM document_route_steps
               WHERE tenant_id = :tenant_id AND route_id = :route_id AND position > :position
               ORDER BY position ASC
@@ -297,6 +302,8 @@ final class RouteStepRepository
             'sign_on_behalf_of' => isset($row['sign_on_behalf_of']) ? (string) $row['sign_on_behalf_of'] : null,
             // WHIT-921: the template a finalise step renders with, or null.
             'final_template_id' => isset($row['final_template_id']) ? (int) $row['final_template_id'] : null,
+            // WHIT-1016: the values a person acting here fills in; [] for none.
+            'inputs' => RouteStepInputs::decode($row['inputs'] ?? null),
             'created_at' => (string) $row['created_at'],
         ];
     }

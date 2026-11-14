@@ -80,6 +80,7 @@ import {
   type RouteFlowOrientation,
   type RouteFlowQuorum,
   type RouteFlowStep,
+  type RouteFlowStepInput,
 } from '@whity/ui/route-flow/model';
 import { IconDeviceFloppy, IconFileCheck, IconPencil, IconPlus } from '@tabler/icons-react';
 import { useLeaveGuard } from '@whity/ui/save-bar';
@@ -799,6 +800,139 @@ function FinalStageInspector({
  * cannot fetch. The canvas reports which stage is selected; this decides what
  * that means.
  */
+/** WHIT-1016: the most values one stage may ask for; the server refuses more. */
+const MAX_STAGE_VALUES = 5;
+
+/**
+ * A key for a new value, from its English label: small letters, digits and _,
+ * starting with a letter, unique on this stage. Templates print it as
+ * `route.value.<key>`, so it never changes once made, even if the label does.
+ */
+export function stageValueKey(label: string, taken: readonly string[]): string {
+  const slug = label
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^[^a-z]+/, '')
+    .replace(/_+$/, '')
+    .slice(0, 32);
+  const base = slug === '' ? 'value' : slug;
+  if (!taken.includes(base)) return base;
+  for (let n = 2; ; n++) {
+    const key = `${base}_${n}`;
+    if (!taken.includes(key)) return key;
+  }
+}
+
+/**
+ * The values a stage asks the person letting it through to fill in
+ * (WHIT-1016), in English and Arabic. The key is made from the English label
+ * when the value is added and is not shown: templates offer the label.
+ */
+function StageValuesEditor({
+  inputs,
+  readOnly,
+  onChange,
+  t,
+}: {
+  inputs: RouteFlowStepInput[];
+  readOnly: boolean;
+  onChange: (inputs: RouteFlowStepInput[]) => void;
+  t: ReturnType<typeof useTranslation>;
+}) {
+  const [draft, setDraft] = useState('');
+  const update = (index: number, patch: Partial<RouteFlowStepInput>) =>
+    onChange(inputs.map((input, i) => (i === index ? { ...input, ...patch } : input)));
+  const add = () => {
+    const label = draft.trim();
+    if (label === '') return;
+    onChange([
+      ...inputs,
+      { key: stageValueKey(label, inputs.map((input) => input.key)), label, labelAr: null, required: true, maxLength: 100 },
+    ]);
+    setDraft('');
+  };
+
+  return (
+    <section className="space-y-2" aria-labelledby="stage-values-heading">
+      <h3 id="stage-values-heading" className="text-sm font-medium">
+        {t('routeTemplates.inspector.values', 'Values to fill in')}
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        {t(
+          'routeTemplates.inspector.valuesHelp',
+          'The person approving here fills these in, such as a meeting number. Documents and reference numbers can print them.'
+        )}
+      </p>
+      {inputs.map((input, index) => (
+        <div key={input.key} className="space-y-2 rounded-control border border-border p-2">
+          <label className="block space-y-1">
+            <span className="text-xs font-medium">{t('routeTemplates.inspector.valueLabel', 'Name')}</span>
+            <Input
+              value={input.label}
+              maxLength={80}
+              disabled={readOnly}
+              onChange={(e) => update(index, { label: e.target.value })}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-medium">{t('routeTemplates.inspector.valueLabelAr', 'Name in Arabic')}</span>
+            <Input
+              dir="rtl"
+              value={input.labelAr ?? ''}
+              maxLength={80}
+              disabled={readOnly}
+              onChange={(e) => update(index, { labelAr: e.target.value === '' ? null : e.target.value })}
+            />
+          </label>
+          <div className="flex items-center justify-between gap-2">
+            <label className="flex items-center gap-2 text-sm">
+              <Switch
+                checked={input.required}
+                disabled={readOnly}
+                onCheckedChange={(checked) => update(index, { required: checked })}
+              />
+              {t('routeTemplates.inspector.valueRequired', 'Needed to approve')}
+            </label>
+            {!readOnly && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onChange(inputs.filter((_, i) => i !== index))}
+              >
+                {t('routeTemplates.inspector.valueRemove', 'Remove')}
+              </Button>
+            )}
+          </div>
+        </div>
+      ))}
+      {!readOnly && inputs.length < MAX_STAGE_VALUES && (
+        <div className="flex items-end gap-2">
+          <label className="block flex-1 space-y-1">
+            <span className="text-xs font-medium">{t('routeTemplates.inspector.valueNew', 'New value')}</span>
+            <Input
+              value={draft}
+              maxLength={80}
+              placeholder={t('routeTemplates.inspector.valueNewPlaceholder', 'For example: Meeting number')}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  add();
+                }
+              }}
+            />
+          </label>
+          <Button type="button" variant="outline" disabled={draft.trim() === ''} onClick={add}>
+            {t('routeTemplates.inspector.valueAdd', 'Add')}
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function StageInspector({
   step,
   graph,
@@ -1067,6 +1201,17 @@ function StageInspector({
           onCheckedChange={(checked) => onChange({ allowSendBack: checked })}
         />
       </label>
+
+      {/* WHIT-1016: values the person letting it through fills in, such as a
+          committee meeting number. Nobody acts on a stage that only tells. */}
+      {step.satisfiedBy !== 'delivery' && (
+        <StageValuesEditor
+          inputs={step.inputs ?? []}
+          readOnly={readOnly}
+          onChange={(inputs) => onChange({ inputs })}
+          t={t}
+        />
+      )}
 
       {/* Said once, under whichever switch is on, rather than as a warning that
           appears after a refusal. An author turning one on needs to know why the

@@ -12594,6 +12594,7 @@ export interface components {
             edges: components["schemas"]["DocumentRouteEdge"][];
             /** @enum {string} */
             default_quorum: "all" | "any" | "majority";
+            values?: components["schemas"]["RouteStepValue"][];
         };
         DocumentRouteActionRequest: {
             /**
@@ -12615,6 +12616,10 @@ export interface components {
             resume_from?: "sender" | "start" | null;
             /** @description With `noted`: the note is meant for the author. Notes are internal by default. */
             to_author?: boolean;
+            /** @description The values the step asks for, by key. Only with an approval, `acknowledged` or `forwarded`; required ones must be filled in. */
+            values?: {
+                [key: string]: string;
+            };
         };
         DocumentRouteActionResponse: {
             data: components["schemas"]["DocumentTrailEvent"];
@@ -12641,6 +12646,7 @@ export interface components {
                 /** @enum {string} */
                 satisfied_by?: "act" | "delivery";
                 allow_send_back?: boolean;
+                inputs?: components["schemas"]["RouteStepInput"][];
                 /** @enum {string|null} */
                 kind?: "sign" | "finalise" | null;
                 /** @description On a signing step: the capacity the signer signs in, such as "Director". At most 200 characters. */
@@ -12712,6 +12718,7 @@ export interface components {
             sign_capacity?: string | null;
             sign_on_behalf_of?: string | null;
             final_template_id?: number | null;
+            inputs?: components["schemas"]["RouteStepInput"][];
             rejection_count: number;
         };
         DocumentSignature: {
@@ -16543,6 +16550,27 @@ export interface components {
         RouteFinalisationResponse: {
             data: components["schemas"]["RouteFinalisation"];
         };
+        RouteStepInput: {
+            /** @description Small letters, digits and _, up to 40 characters. Templates print it as `route.value.<key>`. */
+            key: string;
+            /** @description What the person filling it in reads. At most 80 characters. */
+            label: string;
+            /** @description The label in Arabic, when it differs. */
+            label_ar?: string | null;
+            /** @description Whether approving needs it. True when absent. */
+            required?: boolean;
+            /** @description Longest value, 1 to 200. 100 when absent. */
+            max_length?: number;
+        };
+        RouteStepValue: {
+            key: string;
+            value: string;
+            step_id: number;
+            /** @description The trail entry it was entered with. */
+            event_id: number;
+            entered_by: number | null;
+            entered_at: string;
+        };
         RouteTemplate: {
             id: number;
             name: string;
@@ -16614,6 +16642,7 @@ export interface components {
             /** @enum {string|null} */
             kind?: "finalise" | null;
             final_template_id?: number | null;
+            inputs?: components["schemas"]["RouteStepInput"][];
             canvas_x?: number;
             canvas_y?: number;
         };
@@ -16649,6 +16678,7 @@ export interface components {
                         }[];
                     };
                     can_send_back?: boolean;
+                    values?: components["schemas"]["RouteStepValue"][];
                     finalisation?: components["schemas"]["RouteFinalisation"];
                 })[];
                 /** @description Display names by profile id, for the people on these routes. */

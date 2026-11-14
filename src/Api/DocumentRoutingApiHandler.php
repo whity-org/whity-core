@@ -13,6 +13,7 @@ use Whity\Core\Document\RouteTemplate\RouteTemplateRepository;
 use Whity\Core\Document\Routing\DocumentRouter;
 use Whity\Core\Document\Routing\RouteAction;
 use Whity\Core\Document\Routing\RouteResume;
+use Whity\Core\Document\Routing\RouteStepInputs;
 use Whity\Core\Document\Routing\RouteEdgeRepository;
 use Whity\Core\Document\Routing\RouteEventRepository;
 use Whity\Core\Document\Routing\RouteRecipientRepository;
@@ -377,7 +378,10 @@ final class DocumentRoutingApiHandler
                 // exactly the cohorts its first act opened, and reporting that
                 // as history would be reporting the present as the past.
                 $this->recipients->cohortCountsByStep((int) $route['id'], $tenantId),
-            ),
+            ) + [
+                // WHIT-1016: what people entered at the steps that ask for values.
+                'values' => RoutingPresenter::values($this->router->enteredValues($tenantId, (int) $route['id'])),
+            ],
             $this->routes->listForDocument($documentId, $tenantId)
         );
 
@@ -497,7 +501,7 @@ final class DocumentRoutingApiHandler
         if ($parsed instanceof Response) {
             return $parsed;
         }
-        ['action' => $action, 'note' => $note, 'verdict' => $verdict, 'resume_from' => $resumeFrom, 'to_author' => $toAuthor] = $parsed;
+        ['action' => $action, 'note' => $note, 'verdict' => $verdict, 'resume_from' => $resumeFrom, 'to_author' => $toAuthor, 'values' => $values] = $parsed;
 
         try {
             $outcome = $this->router->act(
@@ -509,6 +513,7 @@ final class DocumentRoutingApiHandler
                 $verdict,
                 $resumeFrom,
                 $toAuthor,
+                $values,
             );
         } catch (RoutingRejectedException $e) {
             return Response::error($e->clientMessage, 422);
@@ -531,7 +536,7 @@ final class DocumentRoutingApiHandler
      * Read and shape-check an act's body (shared with the subject-neutral
      * {@see RoutesApiHandler}, WHIT-920). Shape here, fitness in the engine.
      *
-     * @return array{action: string, note: ?string, verdict: ?string, resume_from: ?string, to_author: bool}|Response
+     * @return array{action: string, note: ?string, verdict: ?string, resume_from: ?string, to_author: bool, values: array<string, string>}|Response
      */
     public static function parseAct(Request $request): array|Response
     {
@@ -595,12 +600,21 @@ final class DocumentRoutingApiHandler
             return Response::error("'to_author' must be true or false when present", 422);
         }
 
+        // WHIT-1016: the values the step asks for. Shape here; whether the step
+        // asks for them, and whether this act carries them, in the engine.
+        try {
+            $values = RouteStepInputs::parseValues($body['values'] ?? null);
+        } catch (\InvalidArgumentException) {
+            return Response::error("'values' must be an object of one-line text values, by key", 422);
+        }
+
         return [
             'action' => $action,
             'note' => is_string($note) ? $note : null,
             'verdict' => is_string($verdict) ? $verdict : null,
             'resume_from' => is_string($resumeFrom) ? $resumeFrom : null,
             'to_author' => $toAuthor,
+            'values' => $values,
         ];
     }
 

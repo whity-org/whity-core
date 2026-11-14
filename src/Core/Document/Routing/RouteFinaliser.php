@@ -9,6 +9,7 @@ use Throwable;
 use Whity\Core\Document\DocumentRepository;
 use Whity\Core\Document\DocumentSourceRepository;
 use Whity\Core\Document\Fields\DocumentFieldRegistry;
+use Whity\Core\Document\Fields\RouteValueFieldProvider;
 use Whity\Core\Document\Issuing\ActingAs;
 use Whity\Core\Document\Issuing\DocumentIssuing;
 use Whity\Core\Document\Issuing\DocumentOriginKeyConflictException;
@@ -88,6 +89,8 @@ final class RouteFinaliser implements RouteFinaliseService
 
     private readonly DocumentNumbering $numbering;
 
+    private readonly RouteStepValueRepository $stepValues;
+
     /** @var DocumentIssuing|\Closure(): DocumentIssuing */
     private DocumentIssuing|\Closure $issuing;
 
@@ -121,6 +124,7 @@ final class RouteFinaliser implements RouteFinaliseService
         $this->issuing = $issuing;
         $this->renderAvailable = $renderAvailable;
         $this->numbering = new DocumentNumbering($db);
+        $this->stepValues = new RouteStepValueRepository($db);
     }
 
     /**
@@ -284,6 +288,7 @@ final class RouteFinaliser implements RouteFinaliseService
 
         $approved = $this->approvedVersion($tenantId, $row);
         $values = $this->sharedValues($tenantId)
+            + $this->routeValues($tenantId, (int) $row['route_id'])
             + $provider->finalValues($tenantId, $subjectId, $approved, (string) ($source['lang'] ?? 'en'), $templateVersion);
         $actor = ActingAs::engine($tenantId);
 
@@ -415,6 +420,22 @@ final class RouteFinaliser implements RouteFinaliseService
         $resolved = $this->fields->resolve($tenantId, 0, static fn (string $permission): bool => false, null, null);
 
         return $resolved['values'] ?? [];
+    }
+
+    /**
+     * WHIT-1016: the values people entered at this route's steps, as
+     * `route.value.<key>`.
+     *
+     * @return array<string, string|null>
+     */
+    private function routeValues(int $tenantId, int $routeId): array
+    {
+        $out = [];
+        foreach ($this->stepValues->valuesForRoute($tenantId, $routeId) as $key => $value) {
+            $out[RouteValueFieldProvider::path($key)] = $value;
+        }
+
+        return $out;
     }
 
     /**

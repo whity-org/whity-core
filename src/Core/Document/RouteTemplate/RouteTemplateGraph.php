@@ -7,6 +7,7 @@ namespace Whity\Core\Document\RouteTemplate;
 use InvalidArgumentException;
 use Whity\Core\Document\Routing\RouteQuorum;
 use Whity\Core\Document\Routing\RouteSatisfaction;
+use Whity\Core\Document\Routing\RouteStepInputs;
 use Whity\Core\Document\Routing\RouteStepKind;
 use Whity\Core\Document\Routing\RouteVerdict;
 use Whity\Core\Document\Routing\RoutingRuleRegistry;
@@ -106,7 +107,7 @@ final class RouteTemplateGraph
      * @param mixed $edges    The raw `edges` value from the request body.
      * @param int   $maxSteps The tenant's effective `documents.routing_max_steps`.
      * @param int   $tenantId Whose design it is, for whether it may end with a final document.
-     * @return array{steps: list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, kind?: ?string, final_template_id?: ?int, canvas_x: int, canvas_y: int}>, edges: list<array{from: int, to: int, verdict: string}>}
+     * @return array{steps: list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, kind?: ?string, final_template_id?: ?int, inputs: list<array<string, mixed>>, canvas_x: int, canvas_y: int}>, edges: list<array{from: int, to: int, verdict: string}>}
      */
     public function validate(mixed $steps, mixed $edges, int $maxSteps, int $tenantId = 0): array
     {
@@ -130,7 +131,7 @@ final class RouteTemplateGraph
     }
 
     /**
-     * @return list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, kind?: ?string, final_template_id?: ?int, canvas_x: int, canvas_y: int}>
+     * @return list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, kind?: ?string, final_template_id?: ?int, inputs: list<array<string, mixed>>, canvas_x: int, canvas_y: int}>
      */
     private function validateSteps(mixed $steps, int $maxSteps, int $tenantId): array
     {
@@ -315,6 +316,14 @@ final class RouteTemplateGraph
                 }
             }
 
+            // WHIT-1016: the values a person letting it through here fills in.
+            try {
+                $inputs = RouteStepInputs::parse($step['inputs'] ?? null);
+                RouteStepInputs::assertAllowed($inputs, $satisfiedBy, null);
+            } catch (InvalidArgumentException $e) {
+                throw RouteTemplateRejectedException::because("Step {$position}: " . $e->getMessage());
+            }
+
             $out[] = [
                 'position' => $position,
                 'rule_kind' => $kind,
@@ -327,6 +336,7 @@ final class RouteTemplateGraph
                 'allow_send_back' => $allowSendBack,
                 'kind' => null,
                 'final_template_id' => null,
+                'inputs' => $inputs,
                 'canvas_x' => self::coordinate($step['canvas_x'] ?? 0, $position, 'canvas_x'),
                 'canvas_y' => self::coordinate($step['canvas_y'] ?? 0, $position, 'canvas_y'),
             ];
@@ -357,7 +367,7 @@ final class RouteTemplateGraph
      * template to render with.
      *
      * @param array<string, mixed> $step
-     * @return array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back: bool, kind: string, final_template_id: ?int, canvas_x: int, canvas_y: int}
+     * @return array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back: bool, kind: string, final_template_id: ?int, inputs: list<array<string, mixed>>, canvas_x: int, canvas_y: int}
      */
     private function finaliseStage(array $step, int $position, int $tenantId): array
     {
@@ -372,6 +382,11 @@ final class RouteTemplateGraph
             throw RouteTemplateRejectedException::because(
                 "Step {$position} makes the final document. Nobody acts on it, so it is not a decision "
                 . 'and sends nothing to anybody.'
+            );
+        }
+        if (($step['inputs'] ?? []) !== [] && ($step['inputs'] ?? null) !== null) {
+            throw RouteTemplateRejectedException::because(
+                "Step {$position} makes the final document. Nobody acts on it, so it cannot ask for values."
             );
         }
         $label = $step['label'] ?? null;
@@ -399,6 +414,7 @@ final class RouteTemplateGraph
             'allow_send_back' => false,
             'kind' => RouteStepKind::FINALISE,
             'final_template_id' => $templateId,
+            'inputs' => [],
             'canvas_x' => self::coordinate($step['canvas_x'] ?? 0, $position, 'canvas_x'),
             'canvas_y' => self::coordinate($step['canvas_y'] ?? 0, $position, 'canvas_y'),
         ];

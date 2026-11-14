@@ -24,6 +24,7 @@ use Whity\Core\Document\Qr\DocumentQrTokenRepository;
 use Whity\Core\Document\Render\FlowDocumentRenderer;
 use Whity\Core\Document\RouteTemplate\RouteTemplateGraph;
 use Whity\Core\Document\RouteTemplate\RouteTemplateRejectedException;
+use Whity\Core\Document\Fields\RouteValueFieldProvider;
 use Whity\Core\Document\RouteTemplate\RouteTemplateRepository;
 use Whity\Core\Document\Routing\DocumentRouter;
 use Whity\Core\Document\Routing\DocumentRouteSubject;
@@ -343,6 +344,41 @@ final class RouteFinaliseRealEngineTest extends TestCase
         $this->approve($this->form($this->clerkThenFinalise(null), $id), ['supplier' => 'Example Mill']);
 
         self::assertContains('Vendor: Example Mill', EditorTemplateFixture::texts($this->render->flowCalls[0]));
+    }
+
+    public function testAValueEnteredAtAStepPrintsOnTheFinalDocument(): void
+    {
+        // WHIT-1016: the clerk enters the committee meeting number while
+        // approving, and the approval letter prints it.
+        $id = $this->editor->sourceRepo->create(self::TENANT, [
+            'kind' => 'template',
+            'title' => 'Approval letter',
+            'lang' => 'en',
+            'default_view' => 'page',
+            'blocks' => [$this->editor->para('Meeting: ', $this->editor->field(RouteValueFieldProvider::path('meeting_no')))],
+            'scope' => 'tenant',
+            'created_by' => self::APPLICANT,
+        ]);
+        $this->editor->publish(self::TENANT, $id, self::APPLICANT);
+
+        $design = $this->clerkThenFinalise(null, [['key' => 'meeting_no', 'label' => 'Committee meeting number']]);
+        $provider = new RouteValueFieldProvider($this->pdo);
+        self::assertSame(
+            [['group' => 'Entered during review', 'items' => [[
+                'path' => 'route.value.meeting_no',
+                'label' => 'Committee meeting number',
+                'sample' => 'Committee meeting number',
+            ]]]],
+            $provider->groups(self::TENANT),
+            'the template picker offers what the designs ask for',
+        );
+        self::assertSame([], $provider->groups(2), 'and only in their own workspace');
+
+        $submission = $this->send($this->form($design, $id), ['supplier' => 'Example Mill']);
+        $route = $this->routeOf((int) $submission['id']);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED, null, false, ['meeting_no' => '14']);
+
+        self::assertContains('Meeting: 14', EditorTemplateFixture::texts($this->render->flowCalls[0]));
     }
 
     public function testATemplateMadeFromTheFormIssuesACorrectDocumentFromARealSubmission(): void
@@ -830,7 +866,8 @@ final class RouteFinaliseRealEngineTest extends TestCase
     }
 
     /** Stage 1: the clerk decides. Stage 2: the final document, with this template or none. */
-    private function clerkThenFinalise(?int $templateId): int
+    /** @param list<array<string, mixed>> $clerkInputs */
+    private function clerkThenFinalise(?int $templateId, array $clerkInputs = []): int
     {
         $id = $this->routeTemplates->create(self::TENANT, 'Supplier approval ' . bin2hex(random_bytes(3)), null, null);
         $this->routeTemplates->replaceGraph($id, self::TENANT, [
@@ -842,6 +879,7 @@ final class RouteFinaliseRealEngineTest extends TestCase
                 'decision' => true,
                 'decision_quorum' => null,
                 'satisfied_by' => 'act',
+                'inputs' => $clerkInputs,
                 'canvas_x' => 0,
                 'canvas_y' => 0,
             ],
