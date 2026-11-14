@@ -1090,7 +1090,18 @@ function DocEditor({
       )}
 
       {/* Toolbar (44px) */}
-      {hideToolbar ? null : editor ? (
+      {hideToolbar ? null : editor && phone ? (
+        <PhoneToolbar
+          editor={editor}
+          labels={labels}
+          editable={editable}
+          suggesting={suggesting}
+          inset={keyboardInset}
+          onMore={() => setMoreOpen(true)}
+          onInsert={() => setMoreOpen(true)}
+          onComment={showCollab && canComment ? startComment : undefined}
+        />
+      ) : editor ? (
         <EditorToolbar
           editor={editor}
           labels={labels}
