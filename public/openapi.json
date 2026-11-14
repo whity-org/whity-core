@@ -90275,6 +90275,15 @@
                             "name"
                         ]
                     },
+                    "brand": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                            }
+                        ],
+                        "description": "Only on the manage link: the brand of the workspace (WHIT-1014)."
+                    },
                     "time_zone": {
                         "type": "string"
                     }
@@ -90425,6 +90434,15 @@
                                 "type": "string"
                             }
                         }
+                    },
+                    "brand": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                            }
+                        ],
+                        "description": "The brand of the workspace, for the page (WHIT-1014)."
                     }
                 },
                 "required": [
@@ -91477,6 +91495,58 @@
                 "required": [
                     "email",
                     "display_name"
+                ]
+            },
+            "PublicWorkspaceBrand": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The site name the workspace set, else its name."
+                    },
+                    "logo_wide_url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "logo_square_url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "main_color": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The workspace main colour as #rrggbb, or null for Whity Blue."
+                    },
+                    "theme": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Token values derived from the main colour (decision 2.8), keyed by token name without the leading dashes; null when no main colour is set.",
+                        "properties": {
+                            "light": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            },
+                            "dark": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "required": [
+                            "light",
+                            "dark"
+                        ]
+                    }
+                },
+                "required": [
+                    "name",
+                    "logo_wide_url",
+                    "logo_square_url",
+                    "main_color",
+                    "theme"
                 ]
             },
             "PublishWorkspacePluginRequest": {
