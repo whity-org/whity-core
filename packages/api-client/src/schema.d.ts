@@ -17497,6 +17497,8 @@ export interface components {
             role_customer_safe: boolean | null;
             allowed_domains: string[];
             customer_invites: boolean;
+            /** @description How many people one customer may invite; 0 is no limit (WHIT-1043). */
+            invites_per_customer: number;
             eligible_roles: components["schemas"]["SignupEligibleRole"][];
             pending_count: number;
             workspace_slug: string | null;
@@ -17520,6 +17522,8 @@ export interface components {
             allowed_domains?: string[];
             /** @description Whether customers may invite colleagues into their own role, as customers (POST /api/v1/team-invitations). Off by default. */
             customer_invites?: boolean;
+            /** @description How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043). */
+            invites_per_customer?: number;
         };
         SimpleMessageResponse: {
             message: string;
@@ -18006,6 +18010,10 @@ export interface components {
         TeamInvitationListResponse: {
             data: {
                 enabled: boolean;
+                /** @description How many people you may invite; 0 is no limit (WHIT-1043). */
+                limit: number;
+                /** @description How many places your invitations take: open, accepted and not sent. */
+                used: number;
                 items: components["schemas"]["TeamInvitationItem"][];
             };
         };
