@@ -945,7 +945,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'tenants',
-        'label' => 'Tenants',
+        'label' => 'Workspaces',
         'href' => '/admin/tenants',
         'icon' => 'building',
         'group' => 'platform',
@@ -994,7 +994,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'billing',
-        'label' => 'Plans & pricing',
+        'label' => 'Plans and pricing',
         'href' => '/admin/billing',
         'icon' => 'receipt',
         'group' => 'platform',
@@ -1059,7 +1059,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'notifications',
-        'label' => 'Notification Delivery',
+        'label' => 'Notification log',
         'href' => '/admin/notifications',
         'icon' => 'bell-cog',
         'group' => 'platform',
@@ -1089,7 +1089,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'website-settings',
-        'label' => 'Website Settings',
+        'label' => 'Workspace settings',
         'href' => '/admin/settings',
         'icon' => 'settings',
         'group' => 'settings',
@@ -1270,7 +1270,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'approval-gating',
-        'label' => 'Approval Gating',
+        'label' => 'Sign-up approvals',
         'href' => '/admin/registrations',
         'icon' => 'user-check',
         'group' => 'people',

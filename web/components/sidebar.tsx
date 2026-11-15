@@ -95,7 +95,7 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
           const message =
             err instanceof Error
               ? err.message
-              : t('sidebar.tenantSwitcher.error', 'Couldn’t switch tenant');
+              : t('sidebar.tenantSwitcher.error', 'Couldn’t switch workspace');
           addToast(message, 'error');
         } finally {
           setIsSwitching(false);
@@ -240,7 +240,7 @@ export function Sidebar() {
         <DropdownMenuItem asChild>
           <Link href="/settings" onClick={() => setIsMobileOpen(false)}>
             <IconUserCog />
-            {t('sidebar.accountSettings', 'Account settings')}
+            {t('sidebar.accountSettings', 'My settings')}
           </Link>
         </DropdownMenuItem>
         {isI18nEnabled && availableLanguages.length > 1 && (

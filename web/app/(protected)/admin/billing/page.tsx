@@ -134,7 +134,7 @@ export default function BillingPage() {
   return (
     <div className="space-y-4">
       <AdminHeader
-        title={t('billing.title', 'Plans & pricing')}
+        title={t('billing.title', 'Plans and pricing')}
         description={t(
           'billing.description',
           'The tiers this instance sells and what each one costs. Managed by the system tenant.'

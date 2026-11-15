@@ -430,7 +430,7 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
                   {t('agentRecord.notifications.email', 'Email the person it works for when something needs them')}
                 </label>
                 <p className="text-sm text-muted-foreground">
-                  {t('agentRecord.notifications.emailHelp', 'At most one email an hour, except sign-in approvals. The email only opens Whity: nothing is approved from it. Each person can still turn these off in Preferences › Notifications.')}
+                  {t('agentRecord.notifications.emailHelp', 'At most one email an hour, except sign-in approvals. The email only opens Whity: nothing is approved from it. Each person can still turn these off in My settings.')}
                 </p>
               </div>
             </div>

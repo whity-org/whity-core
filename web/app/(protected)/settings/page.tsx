@@ -42,7 +42,7 @@ function SettingsPageInner() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">{t('settings.title', 'Settings')}</h1>
+        <h1 className="text-2xl font-semibold">{t('settings.title', 'My settings')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {t('settings.subtitle', 'Manage your account and security preferences')}
         </p>
@@ -51,9 +51,9 @@ function SettingsPageInner() {
       <Tabs value={tab} onValueChange={(next) => router.replace(`${pathname}?tab=${next}`, { scroll: false })}>
         <TabsList>
           <TabsTrigger value="profile">{t('settings.tab.profile', 'Profile')}</TabsTrigger>
-          <TabsTrigger value="security">{t('settings.tab.security', 'Sign-in and security')}</TabsTrigger>
-          <TabsTrigger value="sessions">{t('settings.tab.sessions', 'Sessions and devices')}</TabsTrigger>
-          <TabsTrigger value="preferences">{t('settings.tab.preferences', 'Preferences')}</TabsTrigger>
+          <TabsTrigger value="security">{t('settings.tab.security', 'Password and two-step')}</TabsTrigger>
+          <TabsTrigger value="sessions">{t('settings.tab.sessions', 'Where you’re signed in')}</TabsTrigger>
+          <TabsTrigger value="preferences">{t('settings.tab.preferences', 'Language and display')}</TabsTrigger>
         </TabsList>
 
         {/* Profile — self-service edit (WC-64) */}

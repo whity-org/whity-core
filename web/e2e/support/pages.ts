@@ -222,7 +222,7 @@ export class AppShell {
    * the user menu).
    */
   get accountLink(): Locator {
-    return this.page.getByRole('menuitem', { name: 'Account settings' });
+    return this.page.getByRole('menuitem', { name: 'My settings' });
   }
 
   /** "Sign out", inside the account menu (open it first). */
@@ -316,9 +316,9 @@ export class SettingsPage {
   }
 
   async goto(): Promise<void> {
-    // Two-step sign-in is on the account page's Sign-in and security tab.
+    // Two-step sign-in is on the account page's Password and two-step tab.
     await this.page.goto('/settings?tab=security');
-    await expect(this.page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: 'My settings' })).toBeVisible();
   }
 
   /** The 2FA status chip — "Enabled" (green) or "Not Enabled". */

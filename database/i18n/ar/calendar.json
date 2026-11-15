@@ -63,7 +63,7 @@
         "booking.new.submit": "احجز",
         "booking.new.title": "حجز جديد",
         "booking.noName": "بلا اسم",
-        "booking.source.agent": "حجزه وكيل ووافق عليه شخص",
+        "booking.source.agent": "حجزه مساعد ووافق عليه شخص",
         "booking.source.public": "حجزه الزبون عبر الإنترنت",
         "booking.source.staff": "حجزه الفريق",
         "booking.status.cancelled": "ملغى",

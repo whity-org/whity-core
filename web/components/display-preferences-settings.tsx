@@ -7,11 +7,15 @@ import { RadioGroup, RadioGroupItem } from '@whity/ui/radio-group';
 import { Switch } from '@whity/ui/switch';
 import { ToggleGroup } from '@whity/ui/toggle-group';
 import { useTranslation } from '@whity/features/i18n';
+import { useThemeMode } from '@/lib/theme-mode-context';
 
 /** Text size, Show technical details (W.3) and Animations (LT.4). Moves into the Preferences tab with U04. */
 export function DisplayPreferencesSettings() {
   const t = useTranslation('auth');
   const { textSize, showTechnicalDetails, animations, update } = useDisplayPreferences();
+  // Light or dark lives in this browser (lib/theme-mode-context.tsx), unlike the
+  // rest of this card, which is stored on the account; the card says so.
+  const { preference: theme, setPreference: setTheme } = useThemeMode();
   const motionOptions: { value: MotionMode; label: string; help: string }[] = [
     {
       value: 'full',
@@ -34,9 +38,29 @@ export function DisplayPreferencesSettings() {
     <Card data-testid="display-preferences">
       <CardHeader>
         <CardTitle>{t('settings.display.title', 'Display')}</CardTitle>
-        <CardDescription>{t('settings.display.description', 'How Whity looks for you, on every device.')}</CardDescription>
+        <CardDescription>{t(
+            'settings.display.description',
+            'Text size, technical details and animations follow you to every device. Light or dark is saved on this device.',
+          )}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
+        <div className="grid gap-2" data-testid="display-theme">
+          <span className="text-sm font-medium">{t('settings.display.theme', 'Light or dark')}</span>
+          <ToggleGroup
+            required
+            label={t('settings.display.theme', 'Light or dark')}
+            value={theme}
+            onChange={(value) => setTheme(value as typeof theme)}
+            options={[
+              { value: 'light', label: t('settings.display.theme.light', 'Light') },
+              { value: 'dark', label: t('settings.display.theme.dark', 'Dark') },
+              { value: 'system', label: t('settings.display.theme.system', 'Same as this device') },
+            ]}
+          />
+          <span className="text-xs text-muted-foreground">
+            {t('settings.display.theme.help', 'Saved on this device only.')}
+          </span>
+        </div>
         <div className="grid gap-2">
           <span className="text-sm font-medium">
             {t('settings.display.textSize', 'Text size')}

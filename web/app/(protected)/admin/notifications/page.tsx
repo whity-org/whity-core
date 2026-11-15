@@ -152,7 +152,7 @@ export default function NotificationsAdminPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            {t('notifications.title', 'Notification delivery')}
+            {t('notifications.title', 'Notification log')}
           </h1>
           <p className="text-sm text-muted-foreground">
             {t(
