@@ -47,8 +47,14 @@ const SECOND_LINE_MINUTES = 54;
 
 export type ItemKind = 'booking' | 'wait' | 'request' | 'event' | 'timeoff' | 'cancelled';
 
-/** One thing on the calendar, ready to draw. */
+/**
+ * One thing on the calendar, ready to draw. The grid, the details and the
+ * editing read only these fields, so meetings and other kinds can join the
+ * same grid when the calendar's items become one model (the unify plan's
+ * `/api/calendar/items`).
+ */
 export interface CalItem {
+  /** "booking:7", "event:12", "time_off:5": the id the one-calendar items endpoint will use. */
   key: string;
   kind: ItemKind;
   starts_at: string;

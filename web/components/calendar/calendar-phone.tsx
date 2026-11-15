@@ -142,7 +142,7 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
       const kind = b.status === 'cancelled' ? 'cancelled' : b.status === 'pending_payment' ? 'wait' : b.status === 'requested' ? 'request' : 'booking';
       const room = b.room_name ? words.label(b.room_name) : b.room_id ? words.label(roomById.get(b.room_id)?.name) : '';
       out.push({
-        key: `b${b.id}`,
+        key: `booking:${b.id}`,
         kind,
         starts_at: b.starts_at,
         ends_at: b.ends_at,
@@ -157,7 +157,7 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
     for (const e of data.events) {
       if (e.status === 'cancelled' || hiddenPeople.has(e.profile_id)) continue;
       out.push({
-        key: `e${e.id}`,
+        key: `event:${e.id}`,
         kind: 'event',
         starts_at: e.starts_at,
         ends_at: e.ends_at,
@@ -173,7 +173,7 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
       if (off.kind === 'open' || hiddenPeople.has(off.profile_id)) continue;
       const span = new Date(off.ends_at).getTime() - new Date(off.starts_at).getTime();
       out.push({
-        key: `o${off.id}`,
+        key: `time_off:${off.id}`,
         kind: 'timeoff',
         starts_at: off.starts_at,
         ends_at: off.ends_at,
