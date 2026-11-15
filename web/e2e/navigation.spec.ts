@@ -85,12 +85,11 @@ test.describe('Sidebar navigation (admin)', () => {
 
   test('the user row opens the account page', async ({ adminPage, page }) => {
     await adminPage.shell.openAccountSettings();
-    await page.waitForURL('**/settings');
-    await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
-    // The Account Information card became the editable Profile card (WC-64).
-    // The account page is in tabs (Profile, Password and two-step, Where you’re signed in, Language and display).
-    await expect(page.getByRole('tab', { name: 'Profile' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Password and two-step' })).toBeVisible();
+    // Your own settings are pages in the one Settings area (WHIT-1081); on a computer it opens Profile.
+    await page.waitForURL('**/settings/profile');
+    await expect(page.getByRole('heading', { name: 'Profile', level: 1 })).toBeVisible();
+    await expect(page.getByTestId('settings-area-link-profile')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('settings-area-link-password')).toBeVisible();
   });
 
   test('Dashboard section loads the home page', async ({

@@ -91,8 +91,8 @@ test.describe('Regular user (non-admin)', () => {
 
   test('settings page is accessible and shows the user role', async ({ userPage, page }) => {
     await userPage.shell.openAccountSettings();
-    await page.waitForURL('**/settings');
-    await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
+    await page.waitForURL('**/settings/profile');
+    await expect(page.getByRole('heading', { name: 'Profile', level: 1 })).toBeVisible();
     await expect(page.getByText(REGULAR_USER.email).first()).toBeVisible();
   });
 
@@ -105,9 +105,10 @@ test.describe('Regular user (non-admin)', () => {
     // and cancel it (no confirm) so the user's account is never actually
     // enrolled, keeping user@example.com a plain-login account for other specs.
     await userPage.shell.openAccountSettings();
-    await page.waitForURL('**/settings');
-    // Two-step sign-in lives in the account page's Sign-in and security tab.
-    await page.getByRole('tab', { name: 'Password and two-step' }).click();
+    await page.waitForURL('**/settings/profile');
+    // Two-step sign-in is its own page in My settings (WHIT-1081).
+    await page.getByTestId('settings-area-link-password').click();
+    await page.waitForURL('**/settings/security');
 
     const enable = page.getByRole('button', { name: 'Enable 2FA' });
     await expect(enable).toBeVisible();

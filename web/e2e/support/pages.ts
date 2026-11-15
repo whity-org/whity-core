@@ -316,9 +316,9 @@ export class SettingsPage {
   }
 
   async goto(): Promise<void> {
-    // Two-step sign-in is on the account page's Password and two-step tab.
-    await this.page.goto('/settings?tab=security');
-    await expect(this.page.getByRole('heading', { name: 'My settings' })).toBeVisible();
+    // Two-step sign-in is My settings › Password and two-step (WHIT-1081).
+    await this.page.goto('/settings/security');
+    await expect(this.page.getByRole('heading', { name: 'Password and two-step', level: 1 })).toBeVisible();
   }
 
   /** The 2FA status chip — "Enabled" (green) or "Not Enabled". */
