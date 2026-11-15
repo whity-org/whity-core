@@ -60,7 +60,10 @@ test.describe('Sidebar navigation (admin)', () => {
   });
 
   test('Settings General leads a workspace admin to their workspace record', async ({ adminPage, page }) => {
+    // Settings opens My settings first (WHIT-1081); General is in its sub-nav.
     await adminPage.shell.clickNav('Settings');
+    await page.waitForURL('**/settings/profile');
+    await page.getByTestId('settings-area-link-general').click();
     await page.waitForURL('**/admin/settings');
     await page.getByRole('link', { name: 'Open workspace record' }).click();
     await page.waitForURL(/\/admin\/tenants\/\d+$/);
@@ -72,7 +75,7 @@ test.describe('Sidebar navigation (admin)', () => {
     page,
   }) => {
     await adminPage.shell.clickNav('Settings');
-    await page.waitForURL('**/admin/settings');
+    await page.waitForURL('**/settings/profile');
     const area = page.getByTestId('settings-area-nav');
     await expect(area).toBeVisible();
     await expect(area.getByText('Sign-in and security')).toBeVisible();

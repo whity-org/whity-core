@@ -47,9 +47,10 @@ test.describe('Regular user (non-admin)', () => {
     // The home is everyone's (H.1), so its link is always there.
     await expect(userPage.shell.navLink('Dashboard')).toBeVisible();
 
-    // The workspace Settings area is gated, so a plain user has no Settings
-    // entry; their own account is always reachable from the user row.
-    await expect(userPage.shell.navLink('Settings')).toHaveCount(0);
+    // Settings is everyone's since WHIT-1081: a plain user's opens their own
+    // settings, and the workspace's groups stay out of its sub-nav. Their
+    // account is also reachable from the user row.
+    await expect(userPage.shell.navLink('Settings')).toHaveCount(1);
     await userPage.shell.openAccountMenu();
     await expect(userPage.shell.accountLink).toBeVisible();
     await expect(userPage.shell.logoutButton).toBeVisible();
