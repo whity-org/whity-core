@@ -96035,6 +96035,10 @@
                     "customer_invites": {
                         "type": "boolean"
                     },
+                    "invites_per_customer": {
+                        "type": "integer",
+                        "description": "How many people one customer may invite; 0 is no limit (WHIT-1043)."
+                    },
                     "eligible_roles": {
                         "type": "array",
                         "items": {
@@ -96072,6 +96076,7 @@
                     "role_customer_safe",
                     "allowed_domains",
                     "customer_invites",
+                    "invites_per_customer",
                     "eligible_roles",
                     "pending_count",
                     "workspace_slug",
@@ -96119,6 +96124,10 @@
                     "customer_invites": {
                         "type": "boolean",
                         "description": "Whether customers may invite colleagues into their own role, as customers (POST /api/v1/team-invitations). Off by default."
+                    },
+                    "invites_per_customer": {
+                        "type": "integer",
+                        "description": "How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043)."
                     }
                 }
             },
@@ -97967,6 +97976,14 @@
                             "enabled": {
                                 "type": "boolean"
                             },
+                            "limit": {
+                                "type": "integer",
+                                "description": "How many people you may invite; 0 is no limit (WHIT-1043)."
+                            },
+                            "used": {
+                                "type": "integer",
+                                "description": "How many places your invitations take: open, accepted and not sent."
+                            },
                             "items": {
                                 "type": "array",
                                 "items": {
@@ -97976,6 +97993,8 @@
                         },
                         "required": [
                             "enabled",
+                            "limit",
+                            "used",
                             "items"
                         ]
                     }

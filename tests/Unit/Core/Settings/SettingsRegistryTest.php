@@ -135,7 +135,9 @@ final class SettingsRegistryTest extends TestCase
              'website.plans',
              'website.contact_workspace',
              // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
-             'signup.mode', 'signup.role_id', 'signup.allowed_domains', 'signup.customer_invites'],
+             'signup.mode', 'signup.role_id', 'signup.allowed_domains', 'signup.customer_invites',
+             // WHIT-1043.
+             'signup.invites_per_customer'],
             SettingsRegistry::keys()
         );
     }
@@ -468,8 +470,8 @@ final class SettingsRegistryTest extends TestCase
         // 114 since WHIT-941: eight calendar.* keys.
         // 117 since WHIT-960: website.plans and website.contact_workspace.
         // 120 since design 3.4 (P1): company.name_ar and company.address_ar.
-        // 124 since WHIT-1035: the four signup.* keys.
-        self::assertCount(124, $describe);
+        // 124 since WHIT-1035: the four signup.* keys; 125 since WHIT-1043.
+        self::assertCount(125, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

@@ -859,6 +859,32 @@ final class InvitationService
         return CustomerSafeRole::make($this->db)->isCustomerSafe($roleId, $tenantId);
     }
 
+    /**
+     * How many places a customer's team invitations take (WHIT-1043): the ones
+     * accepted, and the ones still open, sent or quietly not sent alike, so
+     * the count says nothing about who is already here. Withdrawn, superseded
+     * and expired ones free their place.
+     */
+    public function customerInvitesUsed(int $tenantId, int $inviterProfileId): int
+    {
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*) FROM invitations
+              WHERE tenant_id = :tenant_id AND invited_by = :inviter AND kind = :kind
+                AND (status = :accepted OR (status IN (:pending, :not_sent) AND expires_at > :now))'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':inviter' => $inviterProfileId,
+            ':kind' => self::KIND_CUSTOMER,
+            ':accepted' => self::STATUS_ACCEPTED,
+            ':pending' => self::STATUS_PENDING,
+            ':not_sent' => self::STATUS_NOT_SENT,
+            ':now' => gmdate('Y-m-d H:i:s'),
+        ]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
     /** Whether this workspace's sign-up turned the address away (#1872). */
     private function wasTurnedAway(int $tenantId, string $email): bool
     {
