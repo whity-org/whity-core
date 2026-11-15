@@ -19,7 +19,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Icon } from '@whity/ui/icon';
+import type { IconName } from '@whity/ui/icon-map';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
@@ -27,7 +29,7 @@ import { useNavigation } from '@/lib/navigation-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { LICENSING_VIEW } from '@/lib/capabilities';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 type SettingsTab = components['schemas']['SettingsTab'];
 
@@ -86,6 +88,49 @@ export const SETTINGS_AREA_PREFIXES = [
   '/admin/translations',
   DEVICES_HREF,
 ] as const;
+
+/** On a phone the menu is its own page (PwSettings, PW.3); More opens it. */
+export const SETTINGS_MENU_HREF = '/admin/settings/menu';
+
+/** "Last opened" is remembered per browser. */
+const LAST_OPENED_KEY = 'whity.settings.lastOpened';
+
+const ROW_ICON: Readonly<Record<string, IconName>> = {
+  general: 'settings',
+  branding: 'branding',
+  security: 'shield',
+  sso: 'key',
+  signup: 'user',
+  'customer-signup': 'user',
+  'public-forms': 'form',
+  messages: 'comment',
+  email: 'mail',
+  'email-domains': 'world',
+  storage: 'archive',
+  fields: 'field',
+  tags: 'flag',
+  languages: 'language',
+  translations: 'text',
+  'feature-flags': 'trigger',
+  'error-tracking': 'error',
+  devices: 'desktop',
+};
+
+function readLastOpened(): string | null {
+  try {
+    return window.localStorage.getItem(LAST_OPENED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeLastOpened(id: string) {
+  try {
+    window.localStorage.setItem(LAST_OPENED_KEY, id);
+  } catch {
+    // Private windows and blocked storage: the mark is a convenience only.
+  }
+}
 
 export interface SettingsAreaLink {
   id: string;
@@ -163,14 +208,54 @@ export function SettingsArea({ children }: { children: ReactNode }) {
     })).filter((group) => group.links.length > 0);
   }, [tabs, navItems, canSeeDevices, canManageFields, t, tc]);
 
+  const onMenu = pathname === SETTINGS_MENU_HREF;
+  // Read when the menu opens; the page you leave it for is written back below.
+  const lastOpened = useMemo(() => (onMenu ? readLastOpened() : null), [onMenu]);
+  const [query, setQuery] = useState('');
+  const lastRef = useRef<HTMLAnchorElement | null>(null);
+
+  // The page you are on is the one marked next time you open the menu.
+  const current = useMemo(() => {
+    const all = groups.flatMap((group) => group.links.map((link) => ({ ...link, groupLabel: group.label })));
+    // The longest matching address wins, so a record page maps to its list page.
+    return all
+      .filter((link) => isActive(pathname, link.href))
+      .sort((a, b) => b.href.length - a.href.length)[0];
+  }, [groups, pathname]);
+
+  useEffect(() => {
+    if (!onMenu && current) writeLastOpened(current.id);
+  }, [onMenu, current]);
+
+  useEffect(() => {
+    if (onMenu && lastOpened) lastRef.current?.scrollIntoView?.({ block: 'center' });
+  }, [onMenu, lastOpened, groups]);
+
+  const needle = query.trim().toLowerCase();
+  const menuGroups = groups
+    .map((group) => ({
+      ...group,
+      links: needle ? group.links.filter((link) => link.label.toLowerCase().includes(needle)) : group.links,
+    }))
+    .filter((group) => group.links.length > 0);
+
+  // A page deeper than its list page goes back to that list; any other goes to the menu.
+  const deeper = Boolean(current && pathname !== current.href && current.href !== '/admin/settings');
+  const backHref = deeper && current ? current.href : SETTINGS_MENU_HREF;
+  const backLabel = deeper && current ? current.label : t('settingsArea.title', 'Settings');
+  const crumbs = current
+    ? [t('settingsArea.title', 'Settings'), current.groupLabel, ...(deeper ? [current.label] : [])]
+    : [];
+
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[200px_minmax(0,1fr)] md:gap-8">
       {/* One shrinkable column on phones: without it the grid track sizes to the
           sideways-scrolling nav row's full width and the whole page scrolls sideways. */}
+      {/* From 640px up: today's sub-nav. Under it the menu is its own page. */}
       <nav
         aria-label={t('settingsArea.navLabel', 'Settings')}
         data-testid="settings-area-nav"
-        className="md:sticky md:top-0 md:self-start"
+        className="max-sm:hidden md:sticky md:top-0 md:self-start"
       >
         <p className="mb-2 px-2 text-lg font-semibold">{t('settingsArea.title', 'Settings')}</p>
         {/* Under 768px the groups sit in a row that scrolls sideways, so the page stays first. */}
@@ -203,7 +288,92 @@ export function SettingsArea({ children }: { children: ReactNode }) {
           ))}
         </div>
       </nav>
-      <div className="min-w-0">{children}</div>
+
+      {/* Phone: the menu is its own page (PwSettings). */}
+      {onMenu && (
+        <div className="flex flex-col gap-5 sm:hidden" data-testid="settings-menu">
+          <Link
+            href="/more"
+            className="-ms-1 flex min-h-11 w-fit items-center gap-1 text-base text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Icon name="chevron-left" size={24} />
+            {tc('phoneNav.more', 'More')}
+          </Link>
+          <h1 className="text-2xl font-semibold">{t('settingsArea.title', 'Settings')}</h1>
+          {menuGroups.map((group) => (
+            <section key={group.id} aria-label={group.label}>
+              <h2 data-settings-group className="mb-1.5 px-1 text-sm font-medium text-muted-foreground">
+                {group.label}
+              </h2>
+              <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+                {group.links.map((link) => {
+                  const last = link.id === lastOpened;
+                  return (
+                    <li key={link.id}>
+                      <Link
+                        href={link.href}
+                        ref={last ? lastRef : undefined}
+                        data-testid={`settings-menu-row-${link.id}`}
+                        className={cn(
+                          'flex min-h-12 items-center gap-3 px-4 py-2 text-base text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                          last && 'border-s-4 border-primary bg-primary-tint text-primary-tint-foreground',
+                        )}
+                      >
+                        <Icon name={ROW_ICON[link.id] ?? 'settings'} size={20} className="text-muted-foreground" />
+                        <span className="min-w-0 flex-1">
+                          {link.label}
+                          {last && (
+                            <small className="block text-sm text-muted-foreground">
+                              {t('settingsArea.lastOpened', 'Last opened')}
+                            </small>
+                          )}
+                        </span>
+                        <Icon name="chevron-right" size={18} className="text-muted-foreground" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+          <p className="px-1 text-sm text-muted-foreground">
+            {t('settingsArea.roleNote', 'You see the settings your role can change. An owner can change the rest.')}
+          </p>
+          <div className="sticky bottom-0 -mx-4 border-t border-border bg-background px-4 py-3">
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              aria-label={t('settingsArea.search', 'Search settings')}
+              placeholder={t('settingsArea.search', 'Search settings')}
+              data-testid="settings-menu-search"
+              className="h-11 w-full rounded-lg border border-input bg-muted px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Phone: a page shows a back control and where it sits, then its own title. */}
+      {!onMenu && current && (
+        <div className="-mb-3 sm:hidden" data-testid="settings-back">
+          <Link
+            href={backHref}
+            className="-ms-1 flex min-h-11 w-fit items-center gap-1 text-base text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Icon name="chevron-left" size={24} />
+            {backLabel}
+          </Link>
+          <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground" data-testid="settings-crumb">
+            {crumbs.map((crumb, index) => (
+              <span key={index} className="flex items-center gap-1">
+                {index > 0 && <Icon name="chevron-right" size={14} />}
+                {crumb}
+              </span>
+            ))}
+          </p>
+        </div>
+      )}
+      <div className={cn('min-w-0', onMenu && 'max-sm:hidden')}>{children}</div>
     </div>
   );
 }

@@ -297,13 +297,13 @@ jobs:
         working-directory: .
         run: npm ci
 
-      # The committed lib/api/schema.d.ts must match a fresh generation from
-      # public/openapi.json — API changes that skip `npm run generate:api`
-      # would ship a typed client that lies about the contract (WC-168).
+      # The typed client's types (@whity/api-client, which web imports) must
+      # match a fresh generation from public/openapi.json.
       - name: Typed-client schema drift check
+        working-directory: packages/api-client
         run: |
-          npm run generate:api
-          git diff --exit-code -- lib/api/schema.d.ts
+          npm run generate
+          git diff --exit-code -- src/schema.d.ts
 
       # The committed design-token outputs must match the generator (base.json
       # is the single source of truth for styling variables).

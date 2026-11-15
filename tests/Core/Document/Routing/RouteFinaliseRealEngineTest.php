@@ -729,6 +729,86 @@ final class RouteFinaliseRealEngineTest extends TestCase
         self::assertSame(1, $this->scalar('SELECT COUNT(*) FROM document_artifacts'));
     }
 
+    /**
+     * WHIT-1072: the render service is down when the route reaches its final
+     * document, so the first attempt makes nothing; the worker's retry makes
+     * it. The person who sent the form gets the decision exactly once, from
+     * the retry, with the final document's PDF attached.
+     */
+    public function testTheDecisionEmailGoesOnceWhenOnlyTheWorkersRetryMakesTheFinalDocument(): void
+    {
+        $this->pdo->exec(
+            'INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
+             VALUES (' . self::APPLICANT . ", 'applicant@example.test', true, true, CURRENT_TIMESTAMP)"
+        );
+        /** @var list<\Whity\Core\Mail\OutgoingEmail> $mails */
+        $mails = [];
+        $mailer = new class (function (\Whity\Core\Mail\OutgoingEmail $e) use (&$mails): void {
+            $mails[] = $e;
+        }) implements \Whity\Core\Mail\Mailer, \Whity\Core\Mail\ThreadedMailer {
+            public function __construct(private readonly \Closure $sink)
+            {
+            }
+
+            public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
+            {
+                ($this->sink)(new \Whity\Core\Mail\OutgoingEmail($toEmail, $subject, $textBody, $htmlBody));
+            }
+
+            public function sendThreaded(\Whity\Core\Mail\OutgoingEmail $email): void
+            {
+                ($this->sink)($email);
+            }
+        };
+        // As both processes wire it: the request's and the worker's listener,
+        // each with its own sender, sharing one store.
+        $store = new \Whity\Core\Store\DatabaseSharedStore($this->pdo);
+        foreach ([0, 1] as $process) {
+            (new \Whity\Core\Form\FormDecisionEmail(
+                $this->pdo,
+                new \Whity\Core\Identity\ProfileEmailRepository($this->pdo),
+                new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $this->settings),
+                $this->settings,
+                'https://app.example.test',
+                $process === 0 ? $this->store : fn (): DocumentArtifactStore => $this->store,
+                $store,
+            ))->subscribe($this->hooks);
+        }
+
+        $formId = $this->form($this->clerkThenFinalise(null), $this->letter);
+        $submission = $this->send($formId, ['supplier' => 'Example Mill']);
+        $route = $this->routeOf((int) $submission['id']);
+
+        $this->render->throwOnRender = true;
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertCount(0, $mails, 'the route completed, but its final document is still to come');
+
+        $job = new FinaliseRouteJob(fn (): RouteFinaliser => $this->finaliser);
+        $this->render->throwOnRender = false;
+        self::assertSame(['outcome' => RouteFinaliser::DONE], $job->handle(['route_id' => (int) $route['id']]));
+
+        self::assertCount(1, $mails, 'two listeners, one email');
+        $mail = $mails[0];
+        self::assertSame('applicant@example.test', $mail->to);
+        self::assertStringStartsWith('Approved: ', $mail->subject);
+        self::assertCount(1, $mail->attachments, 'the final document, attached');
+        self::assertSame('approval.pdf', $mail->attachments[0]->filename);
+        $done = $this->finalisations->findForRoute(self::TENANT, (int) $route['id']);
+        self::assertNotNull($done);
+        $artifact = $this->artifacts->findLatestForDocument((int) $done['document_id'], self::TENANT);
+        self::assertNotNull($artifact);
+        self::assertLessThanOrEqual(1_048_576, (int) $artifact['byte_size']);
+        self::assertSame($this->store->get((string) $artifact['storage_key']), $mail->attachments[0]->content);
+
+        // Running the job again, or the event arriving again, sends nothing more.
+        $job->handle(['route_id' => (int) $route['id']]);
+        $this->hooks->dispatch(Events::DOCUMENT_FINALISED, [
+            'tenant_id' => self::TENANT, 'document_id' => (int) $done['document_id'], 'artifact_id' => (int) $artifact['id'],
+            'route_id' => (int) $route['id'], 'subject_type' => FormSubmissionRouteSubject::TYPE, 'subject_id' => (int) $submission['id'],
+        ]);
+        self::assertCount(1, $mails);
+    }
+
     public function testFinaliseIsRefusedWhenNotLastTwiceOrWithoutARenderService(): void
     {
         $document = $this->plainDocument();

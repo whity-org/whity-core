@@ -37,10 +37,19 @@ import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { localizedName } from '@/lib/localized-name';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { buildCoreCommands, useCommandTranslation, type CommandContext, type PaletteCommand } from '@/lib/commands/core-commands';
+import {
+  APPROVE_NAMES,
+  buildCoreCommands,
+  useCommandTranslation,
+  type CommandContext,
+  type CommandOption,
+  type PaletteCommand,
+} from '@/lib/commands/core-commands';
+import { readRecent, rememberCommand, rememberPlace, type Recent, type RecentPlace } from '@/lib/commands/recent';
+import { usePaletteData } from '@/lib/commands/use-palette-data';
 import { requestNew } from '@/lib/commands/new-intent';
 import { fold, parseCommand, rank } from '@/lib/commands/parse';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 type SearchGroup = components['schemas']['SearchGroup'];
 
@@ -83,6 +92,35 @@ export function AppCommandPalette() {
   const [query, setQuery] = useState('');
   const [groups, setGroups] = useState<SearchGroup[]>([]);
   const request = useRef(0);
+
+  // Recents are this person's in this workspace (WHIT-1070), read afresh at
+  // each opening: they only change by running something, which closes it.
+  const recentOwner = user ? `${user.id}:${user.tenant_id ?? ''}` : null;
+  const recent = useMemo<Recent>(
+    () => (open && recentOwner !== null ? readRecent(recentOwner) : { places: [], commands: [] }),
+    [open, recentOwner],
+  );
+  const openPlace = useCallback(
+    (place: RecentPlace) => {
+      if (recentOwner !== null) rememberPlace(recentOwner, place);
+      router.push(place.href);
+    },
+    [recentOwner, router],
+  );
+
+  const chatAvailable = navItems.some((item) => item.href === '/chat');
+  const aiPage = navItems.find((item) => item.id === 'ai-principals');
+  const approvalsPage = navItems.find((item) => item.href === '/admin/approvals');
+  const parsedNow = parseCommand(query);
+  const data = usePaletteData({
+    open,
+    wantWaiting: parsedNow !== null && parsedNow.named && APPROVE_NAMES.some((n) => fold(n) === fold(parsedNow.name)),
+    chat: chatAvailable,
+    documents: has('documents:read'),
+    approvalsHref: approvalsPage?.href ?? null,
+    arabic: currentLanguage === 'ar',
+    unknownAgent: t('dashboard.agent.unknown', 'An agent'),
+  });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ⌘K / Ctrl K toggles; the top bar's field opens it by event.
@@ -180,13 +218,17 @@ export function AppCommandPalette() {
       language: currentLanguage ?? '',
       setLanguage: (code) => void setLanguage(code),
       go: (href) => router.push(href),
-      newThing: (kind, text, href) => {
-        requestNew({ kind, text });
+      newThing: (kind, text, href, target) => {
+        requestNew({ kind, text, ...(target !== undefined ? { target } : {}) });
         router.push(href);
       },
       // A command only rewrites the query into another command, which never
       // searches, so the plain setter is enough.
       setQuery,
+      waiting: data.waiting,
+      waitingLoaded: data.waitingLoaded,
+      agents: data.agents,
+      connectAgentHref: aiPage?.href ?? null,
     };
     return buildCoreCommands(commandT, ctx);
   }, [
@@ -206,6 +248,10 @@ export function AppCommandPalette() {
     availableLanguages,
     setLanguage,
     router,
+    data.waiting,
+    data.waitingLoaded,
+    data.agents,
+    aiPage?.href,
   ]);
 
   /** A command as a row: picking it (or Tab) moves on to its details. */
@@ -232,6 +278,13 @@ export function AppCommandPalette() {
     const typed = fold(parsed.name);
     const command = commands.find((c) => c.names.some((n) => fold(n) === typed));
     if (command === undefined) return [];
+    // A command run is remembered by its name and the option picked, never by
+    // the words typed after it (a title, an address stays out of storage).
+    const remember = (o: CommandOption) => {
+      if (o.keepOpen === true || recentOwner === null) return;
+      if (o.place !== undefined) rememberPlace(recentOwner, o.place);
+      else rememberCommand(recentOwner, o.complete?.trim() ?? `/${command.name}`);
+    };
     return command.options(parsed.rest).map((o) => ({
       id: `option-${o.id}`,
       group: `/${command.name}`,
@@ -239,10 +292,15 @@ export function AppCommandPalette() {
       hint: o.hint,
       icon: o.icon !== undefined ? <Icon name={o.icon} size={16} /> : undefined,
       keepOpen: o.keepOpen,
+      disabled: o.disabled,
+      agent: o.agent,
       onComplete: o.complete !== undefined ? () => setQuery(o.complete as string) : undefined,
-      onSelect: o.run,
+      onSelect: () => {
+        remember(o);
+        o.run();
+      },
     }));
-  }, [query, commands, commandRow]);
+  }, [query, commands, commandRow, recentOwner]);
 
   const items = useMemo<CommandPaletteItem[]>(() => {
     const ar = currentLanguage === 'ar';
@@ -260,7 +318,9 @@ export function AppCommandPalette() {
           always: true,
           icon: <Icon name="document" size={16} />,
           onSelect: () => {
-            if (hit.url) router.push(hit.url);
+            if (hit.url) {
+              openPlace({ id: `record-${hit.type}-${hit.id}`, label: hit.title, href: hit.url, hint: ar ? group.label.ar : group.label.en });
+            }
           },
         });
       }
@@ -276,7 +336,7 @@ export function AppCommandPalette() {
           label: navLabels[item.id] ?? item.label,
           keywords: item.label,
           icon: <NavIcon size={16} />,
-          onSelect: () => router.push(item.href),
+          onSelect: () => openPlace({ id: `page-${item.id}`, label: navLabels[item.id] ?? item.label, href: item.href }),
         };
       });
 
@@ -306,9 +366,58 @@ export function AppCommandPalette() {
     const commandRows: CommandPaletteItem[] =
       query.trim() === '' ? [] : commands.filter((c) => c.name !== 'help').map((c) => commandRow(c, true));
 
-    // D2: only for people who may open AI principals, where an agent is connected.
-    const aiPage = navItems.find((item) => item.id === 'ai-principals');
-    const agent: CommandPaletteItem[] = aiPage
+    // The empty box leads with what this person opened and ran lately: the
+    // palette's own recents, then their recent documents from the server.
+    const recentRows: CommandPaletteItem[] = [];
+    if (query.trim() === '') {
+      const group = t('palette.group.recent', 'Recent');
+      const seen = new Set<string>();
+      for (const place of [...recent.places, ...data.recentDocuments]) {
+        if (seen.has(place.href)) continue;
+        seen.add(place.href);
+        recentRows.push({
+          id: `recent-${place.id}`,
+          group,
+          label: place.label,
+          hint: place.hint,
+          icon: <Icon name="clock" size={16} />,
+          onSelect: () => openPlace(place),
+        });
+      }
+      for (const line of recent.commands) {
+        recentRows.push({
+          id: `recent-command-${line}`,
+          group,
+          label: line,
+          icon: <Icon name="keyboard" size={16} />,
+          keepOpen: true,
+          onComplete: () => setQuery(`${line} `),
+          onSelect: () => setQuery(`${line} `),
+        });
+      }
+    }
+
+    // 2.1c: the last row asks an agent. With an agent to ask, it carries the
+    // words into `/ask`, where the person picks which; without one it offers
+    // to connect one (D2), to people who may open AI principals.
+    const askable = data.agents !== null && data.agents.length > 0;
+    const words = query.trim();
+    const agent: CommandPaletteItem[] = askable
+      ? [
+          {
+            id: 'agent-ask',
+            group: t('palette.group.agent', 'Ask an agent'),
+            label: words === '' ? t('palette.agent.ask', 'Ask an agent') : t('palette.agent.askWith', 'Ask an agent: {words}', { words }),
+            hint: t('palette.agent.hint', 'It proposes; you approve'),
+            agent: true,
+            always: true,
+            keepOpen: true,
+            icon: <Icon name="robot" size={16} />,
+            onComplete: () => setQuery(`/ask ${words}`),
+            onSelect: () => setQuery(`/ask ${words}`),
+          },
+        ]
+      : aiPage
       ? [
           {
             id: 'agent-connect',
@@ -323,8 +432,8 @@ export function AppCommandPalette() {
         ]
       : [];
 
-    return [...records, ...pages, ...actions, ...commandRows, ...agent];
-  }, [groups, navItems, navLabels, currentLanguage, theme, toggleTheme, router, t, query, commands, commandRow]);
+    return [...recentRows, ...records, ...pages, ...actions, ...commandRows, ...agent];
+  }, [groups, navItems, navLabels, currentLanguage, theme, toggleTheme, router, t, query, commands, commandRow, recent, data.recentDocuments, data.agents, aiPage, openPlace]);
 
   const commandMode = commandItems !== null;
 

@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { useToast } from '@/lib/toast-context';
 import { useNavigation } from '@/lib/navigation-context';
 import { useCapabilities } from '@/hooks/useCapabilities';

@@ -13,7 +13,7 @@ import type {
  * Mirrors `RouteTemplatePresenter` (`src/Core/Document/RouteTemplate/RouteTemplatePresenter.php`)
  * field for field.
  *
- * Hand-written rather than taken from `@/lib/api/schema`, matching the
+ * Hand-written rather than taken from `@whity/api-client`, matching the
  * convention its nearest neighbours state (`routing-wire.ts`,
  * `document-library/types.ts`): the generated client is built from the DYNAMIC
  * `/api/openapi.json`, which describes whatever plugin routes a given install

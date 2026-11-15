@@ -148,6 +148,47 @@ final class AgentGrantApiTest extends TestCase
         self::assertSame([], $this->audit->log);
     }
 
+    /** @return array<string, array{string, string}> */
+    public static function startingAboveThePerson(): array
+    {
+        // "Allowed where every operation asks" runs through the same
+        // AgentGrantView::choices() and is covered by the PATCH cases above.
+        return [
+            'Ask first on a permission the person lacks' => ['grant:roles:manage=ask', 'roles:manage'],
+            'Allowed on a permission the person lacks'   => ['grant:roles:manage=allow', 'roles:manage'],
+        ];
+    }
+
+    /**
+     * WHIT-1040 (TplAgentCredential): the starting grant meets the same rule
+     * as a change. Nothing is issued, so no key exists to leak.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('startingAboveThePerson')]
+    public function testAStartingGrantAboveThePersonIssuesNothing(string $entry, string $permission): void
+    {
+        $_COOKIE['access_token'] = $this->session(self::RANA);
+
+        $response = $this->handler->create(new Request('POST', '/', [], json_encode([
+            'name' => 'Billing assistant', 'agent' => true, 'scope' => ['tools:call', 'grant:users:read=allow', $entry],
+        ], JSON_THROW_ON_ERROR)));
+
+        self::assertSame(422, $response->getStatusCode(), $response->getBody());
+        self::assertStringContainsString($permission, $response->getBody());
+        self::assertStringContainsString('grant_above_issuer', $response->getBody());
+        $count = $this->pdo->query('SELECT COUNT(*) FROM mcp_tokens');
+        self::assertNotFalse($count);
+        self::assertSame(0, (int) $count->fetchColumn(), 'no key was issued');
+    }
+
+    public function testAStartingGrantOfOffIsAlwaysPossible(): void
+    {
+        $_COOKIE['access_token'] = $this->session(self::RANA);
+
+        $response = $this->handler->create(new Request('POST', '/', [], '{"name":"Reader","agent":true,"scope":["tools:call","grant:roles:manage=off","grant:users:read=ask"]}'));
+
+        self::assertSame(201, $response->getStatusCode(), $response->getBody());
+    }
+
     public function testEveryChangeIsAuditLogged(): void
     {
         [$jti] = $this->issueAgent();

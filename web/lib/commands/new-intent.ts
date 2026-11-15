@@ -19,12 +19,19 @@
 
 import { useEffect, useRef } from 'react';
 
-export type NewKind = 'document' | 'form' | 'booking' | 'task' | 'message' | 'person';
+/**
+ * `ask` (WHIT-1070) is the one that is not a New dialog: it opens the person's
+ * direct chat with an agent (`target`) with the words in the message box,
+ * unsent, so the agent answers in Chat with a proposal to approve.
+ */
+export type NewKind = 'document' | 'form' | 'booking' | 'task' | 'message' | 'person' | 'ask';
 
 export interface NewIntent {
   kind: NewKind;
   /** Words typed after the kind: a title, or for `person` the email addresses. */
   text: string;
+  /** For `ask`: the agent's id in Chat's directory. */
+  target?: number;
 }
 
 export const NEW_INTENT_EVENT = 'whity:new-intent';
@@ -45,7 +52,7 @@ export function requestNew(intent: NewIntent): void {
 function take(kind: NewKind): NewIntent | null {
   if (pending === null || pending.kind !== kind) return null;
   const fresh = Date.now() - pending.at <= FRESH_MS;
-  const intent = { kind: pending.kind, text: pending.text };
+  const intent: NewIntent = { kind: pending.kind, text: pending.text, ...(pending.target !== undefined ? { target: pending.target } : {}) };
   pending = null;
   return fresh ? intent : null;
 }

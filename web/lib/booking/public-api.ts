@@ -9,7 +9,7 @@
  * and the pages turn the statuses a person can act on into their own words.
  */
 
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { groupByDay, rangeQuery, addDays, type CalendarDate } from '@/lib/calendar/layout';
 
 type Schemas = components['schemas'];

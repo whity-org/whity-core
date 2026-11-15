@@ -120,6 +120,8 @@ final class WorkerDocumentServices
         $issuing = WorkerDocumentIssuing::build($pdo, $settings, $hooks, $roleChecker, $resourceTypes, $fields, $embeds, $slots, $env, $storageRoot, $parts);
 
         \Whity\register_service(DocumentFieldRegistry::class, $fields);
+        // WHIT-1072: the form-decision email reads a final document's PDF through the same storage.
+        \Whity\register_service(WorkerDocumentParts::class, $parts);
         \Whity\register_service(TemplateSlotRegistry::class, $slots);
         // WHIT-921: the worker retries a route's final document while the render
         // service was down. Its issuing stack is built on the first attempt.

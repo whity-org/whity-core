@@ -3313,6 +3313,48 @@ final class CoreApiSchemas
             ],
             [
                 'method' => 'GET',
+                'path' => '/api/me/push-subscriptions',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The web push public key of the instance and the devices of the caller with push on, in the active workspace',
+                    'tags' => ['notifications'],
+                    'responses' => [
+                        200 => self::jsonResponse('The public key and the devices of the caller', 'PushSubscriptionsResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/push-subscriptions',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Turn web push on for this browser (its PushSubscription JSON), for the caller in the active workspace',
+                    'tags' => ['notifications'],
+                    'request' => 'PushSubscriptionRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('Stored; the new id with the devices of the caller', 'PushSubscriptionsResponse'),
+                        422 => self::errorResponse('Not a push subscription from a known push service, or no active workspace'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'DELETE',
+                'path' => '/api/me/push-subscriptions/{id:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Turn web push off for one device of the caller',
+                    'tags' => ['notifications'],
+                    'responses' => [
+                        200 => self::jsonResponse('The remaining devices of the caller', 'PushSubscriptionsResponse'),
+                        404 => self::errorResponse('Not a device of the caller'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
                 'path' => '/api/me/display-preferences',
                 'requiredRole' => null,
                 'requiredPermission' => null,
@@ -10820,6 +10862,23 @@ final class CoreApiSchemas
                     'plugin' => self::str(),
                 ], ['type', 'label', 'plugin'])],
             ], ['data', 'transactional_prefixes', 'plugin_types']),
+            'PushDevice' => self::object([
+                'id' => self::int(),
+                'endpoint_hash' => self::str(),
+                'user_agent' => self::str(),
+                'created_at' => self::str(),
+                'last_success_at' => self::str(true),
+                'failing' => self::bool(),
+            ], ['id', 'endpoint_hash', 'user_agent', 'created_at', 'last_success_at', 'failing']),
+            'PushSubscriptionsResponse' => self::object([
+                'id' => self::int(),
+                'public_key' => self::str(),
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('PushDevice')],
+            ], ['public_key', 'data']),
+            'PushSubscriptionRequest' => self::object([
+                'endpoint' => self::str(),
+                'keys' => self::object(['p256dh' => self::str(), 'auth' => self::str()], ['p256dh', 'auth']),
+            ], ['endpoint', 'keys']),
             'DisplayPreferences' => self::object([
                 'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
                 'showTechnicalDetails' => self::bool(),

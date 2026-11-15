@@ -5,56 +5,61 @@ declare(strict_types=1);
 namespace Whity\Core\Notification;
 
 use PDO;
-use Whity\Core\Db\DbBool;
+use Whity\Core\Settings\SettingsRegistry;
+use Whity\Core\Settings\TenantSettingsRepository;
 
 /**
- * Data-access layer for `tenant_notification_settings` (WC-notifications): a
- * tenant's per-channel SENDER configuration. Every query binds tenant_id in the
- * SQL literal (guard-visible) so a tenant only ever sees or edits its own config.
+ * A tenant's per-channel notification SENDER configuration (WC-notifications):
+ * the transport, from/reply-to identity, non-secret provider config, whether
+ * the channel is on, and the encrypted provider credentials.
+ *
+ * Stored as the `notifications.<channel>.<field>` family of the settings
+ * registry in `tenant_settings` (WHIT-1036, migration 275; until then the
+ * `tenant_notification_settings` table). A channel "has settings" when any of
+ * its fields is stored. Every read and write binds the tenant through
+ * {@see TenantSettingsRepository}, so a tenant only sees or edits its own.
  *
  * SECRET HANDLING: the API-facing reads ({@see self::listForTenant()},
- * {@see self::findForChannel()}) NEVER return the stored `credentials_encrypted`
- * blob — only a `has_credentials` flag. {@see self::findWithCredentials()} is the
- * internal accessor a sending transport uses to obtain the (still-encrypted) blob
- * for decryption. `config` values and the encrypted blob are set by two separate
- * upserts so editing config never clobbers stored credentials and vice-versa.
+ * {@see self::findForChannel()}) NEVER return the stored credentials, only a
+ * `has_credentials` flag. {@see self::findWithCredentials()} is the internal
+ * accessor a sending transport uses to obtain the (still-encrypted) blob.
+ * Config and credentials are written separately, so editing one never touches
+ * the other.
  */
 final class TenantNotificationSettingsRepository
 {
-    private PDO $pdo;
+    private readonly TenantSettingsRepository $store;
 
-    public function __construct(PDO $pdo)
+    public function __construct(private readonly PDO $pdo)
     {
-        $this->pdo = $pdo;
+        $this->store = new TenantSettingsRepository($pdo);
     }
 
     /**
-     * List a tenant's per-channel sender config — REDACTED (no secret blob).
+     * Every channel a tenant configured, by channel name — REDACTED.
      *
      * @return list<array<string, mixed>>
      */
     public function listForTenant(int $tenantId): array
     {
-        $stmt = $this->pdo->prepare(
-            'SELECT * FROM tenant_notification_settings WHERE tenant_id = :tenant_id ORDER BY channel ASC'
-        );
-        $stmt->execute([':tenant_id' => $tenantId]);
-        /** @var list<array<string, mixed>> $rows */
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $out = [];
+        foreach ($this->channels($tenantId) as $channel => $fields) {
+            $out[] = self::mapRedacted($channel, $fields);
+        }
 
-        return array_map(static fn (array $r): array => self::mapRedacted($r), $rows);
+        return $out;
     }
 
     /**
-     * One channel's sender config for a tenant — REDACTED (no secret blob).
+     * One channel's sender config for a tenant — REDACTED.
      *
      * @return array<string, mixed>|null
      */
     public function findForChannel(int $tenantId, string $channel): ?array
     {
-        $row = $this->rawForChannel($tenantId, $channel);
+        $fields = $this->channels($tenantId)[$channel] ?? null;
 
-        return $row === null ? null : self::mapRedacted($row);
+        return $fields === null ? null : self::mapRedacted($channel, $fields);
     }
 
     /**
@@ -65,63 +70,55 @@ final class TenantNotificationSettingsRepository
      */
     public function findWithCredentials(int $tenantId, string $channel): ?array
     {
-        $row = $this->rawForChannel($tenantId, $channel);
-        if ($row === null) {
+        $fields = $this->channels($tenantId)[$channel] ?? null;
+        if ($fields === null) {
             return null;
         }
-        $mapped = self::mapRedacted($row);
-        $mapped['credentials_encrypted'] = isset($row['credentials_encrypted'])
-            ? (string) $row['credentials_encrypted']
-            : null;
+        $mapped = self::mapRedacted($channel, $fields);
+        $mapped['credentials_encrypted'] = $fields['credentials_encrypted'] ?? null;
 
         return $mapped;
     }
 
     /**
      * Upsert a channel's non-secret sender config (transport, from/reply-to,
-     * provider config, enabled) WITHOUT touching stored credentials.
+     * provider config, enabled) WITHOUT touching stored credentials. A field
+     * given as null or empty is cleared.
      *
      * @param array{transport?: string|null, from_address?: string|null, from_name?: string|null, reply_to?: string|null, config?: array<string, mixed>, enabled?: bool} $fields
      */
     public function upsertConfig(int $tenantId, string $channel, array $fields): void
     {
-        $enabledSql = ($fields['enabled'] ?? true) ? 'TRUE' : 'FALSE';
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO tenant_notification_settings
-                (tenant_id, channel, transport, from_address, from_name, reply_to, config, enabled, created_at, updated_at)
-             VALUES (:tenant_id, :channel, :transport, :from_address, :from_name, :reply_to, :config, {$enabledSql}, NOW(), NOW())
-             ON CONFLICT (tenant_id, channel) DO UPDATE SET
-                transport = :transport, from_address = :from_address, from_name = :from_name,
-                reply_to = :reply_to, config = :config, enabled = {$enabledSql}, updated_at = NOW()"
-        );
         $config = $fields['config'] ?? [];
-        $stmt->execute([
-            ':tenant_id'    => $tenantId,
-            ':channel'      => $channel,
-            ':transport'    => self::nullableString($fields['transport'] ?? null),
-            ':from_address' => self::nullableString($fields['from_address'] ?? null),
-            ':from_name'    => self::nullableString($fields['from_name'] ?? null),
-            ':reply_to'     => self::nullableString($fields['reply_to'] ?? null),
-            ':config'       => json_encode($config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '{}',
-        ]);
+        $values = [
+            'enabled'      => ($fields['enabled'] ?? true) ? 'true' : 'false',
+            'transport'    => self::nullableString($fields['transport'] ?? null),
+            'from_address' => self::nullableString($fields['from_address'] ?? null),
+            'from_name'    => self::nullableString($fields['from_name'] ?? null),
+            'reply_to'     => self::nullableString($fields['reply_to'] ?? null),
+            'config'       => json_encode($config === [] ? new \stdClass() : $config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '{}',
+        ];
+
+        $this->atomically(function () use ($tenantId, $channel, $values): void {
+            foreach ($values as $field => $value) {
+                $this->write($tenantId, $channel, $field, $value);
+            }
+        });
     }
 
     /**
      * Set or clear (null) a channel's ENCRYPTED credentials blob WITHOUT touching
      * the config. The caller encrypts before storing; this layer only persists.
+     * Setting credentials on a channel with no config yet stores it as on.
      */
     public function setCredentials(int $tenantId, string $channel, ?string $encrypted): void
     {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO tenant_notification_settings (tenant_id, channel, credentials_encrypted, created_at, updated_at)
-             VALUES (:tenant_id, :channel, :credentials, NOW(), NOW())
-             ON CONFLICT (tenant_id, channel) DO UPDATE SET credentials_encrypted = :credentials, updated_at = NOW()'
-        );
-        $stmt->execute([
-            ':tenant_id'   => $tenantId,
-            ':channel'     => $channel,
-            ':credentials' => $encrypted,
-        ]);
+        $this->atomically(function () use ($tenantId, $channel, $encrypted): void {
+            if (!isset($this->channels($tenantId)[$channel])) {
+                $this->write($tenantId, $channel, 'enabled', SettingsRegistry::NOTIFICATION_ENABLED_DEFAULT);
+            }
+            $this->write($tenantId, $channel, 'credentials_encrypted', $encrypted === '' ? null : $encrypted);
+        });
     }
 
     /**
@@ -129,48 +126,91 @@ final class TenantNotificationSettingsRepository
      */
     public function delete(int $tenantId, string $channel): bool
     {
-        $stmt = $this->pdo->prepare(
-            'DELETE FROM tenant_notification_settings WHERE tenant_id = :tenant_id AND channel = :channel'
-        );
-        $stmt->execute([':tenant_id' => $tenantId, ':channel' => $channel]);
+        $removed = 0;
+        $this->atomically(function () use ($tenantId, $channel, &$removed): void {
+            foreach (SettingsRegistry::NOTIFICATION_FIELDS as $field) {
+                $removed += $this->store->delete($tenantId, SettingsRegistry::notificationKey($channel, $field));
+            }
+        });
 
-        return $stmt->rowCount() > 0;
+        return $removed > 0;
     }
 
     /**
-     * @return array<string, mixed>|null
+     * The tenant's stored notification fields, grouped by channel and sorted
+     * by channel name.
+     *
+     * @return array<string, array<string, string>>
      */
-    private function rawForChannel(int $tenantId, string $channel): ?array
+    private function channels(int $tenantId): array
     {
-        $stmt = $this->pdo->prepare(
-            'SELECT * FROM tenant_notification_settings WHERE tenant_id = :tenant_id AND channel = :channel'
-        );
-        $stmt->execute([':tenant_id' => $tenantId, ':channel' => $channel]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $out = [];
+        foreach ($this->store->allForTenant($tenantId) as $key => $value) {
+            $parsed = SettingsRegistry::parseNotificationKey($key);
+            if ($parsed !== null) {
+                $out[$parsed['channel']][$parsed['field']] = $value;
+            }
+        }
+        ksort($out);
 
-        return $row === false ? null : $row;
+        return $out;
+    }
+
+    /** Store one field, or remove it for null. Refuses a value the registry refuses. */
+    private function write(int $tenantId, string $channel, string $field, ?string $value): void
+    {
+        $key = SettingsRegistry::notificationKey($channel, $field);
+        if ($value === null) {
+            $this->store->delete($tenantId, $key);
+            return;
+        }
+        $problem = SettingsRegistry::validateNotificationValue($field, $value);
+        if ($problem !== null) {
+            throw new \InvalidArgumentException($problem);
+        }
+        $this->store->set($tenantId, $key, $value);
+    }
+
+    /** Run $work in one transaction, or in the caller's when one is open. */
+    private function atomically(callable $work): void
+    {
+        $own = !$this->pdo->inTransaction();
+        if ($own) {
+            $this->pdo->beginTransaction();
+        }
+        try {
+            $work();
+            if ($own) {
+                $this->pdo->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($own && $this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     /**
      * Redacted public shape: NEVER includes the encrypted blob, only a boolean flag.
      *
-     * @param array<string, mixed> $row
+     * @param array<string, string> $fields
      * @return array<string, mixed>
      */
-    private static function mapRedacted(array $row): array
+    private static function mapRedacted(string $channel, array $fields): array
     {
-        $config = json_decode((string) ($row['config'] ?? '{}'), true);
-        $creds = $row['credentials_encrypted'] ?? null;
+        $config = json_decode($fields['config'] ?? '{}', true);
+        $creds  = $fields['credentials_encrypted'] ?? null;
 
         return [
-            'channel'         => (string) $row['channel'],
-            'transport'       => isset($row['transport']) ? (string) $row['transport'] : null,
-            'from_address'    => isset($row['from_address']) ? (string) $row['from_address'] : null,
-            'from_name'       => isset($row['from_name']) ? (string) $row['from_name'] : null,
-            'reply_to'        => isset($row['reply_to']) ? (string) $row['reply_to'] : null,
+            'channel'         => $channel,
+            'transport'       => $fields['transport'] ?? null,
+            'from_address'    => $fields['from_address'] ?? null,
+            'from_name'       => $fields['from_name'] ?? null,
+            'reply_to'        => $fields['reply_to'] ?? null,
             'config'          => is_array($config) ? $config : [],
             'has_credentials' => $creds !== null && $creds !== '',
-            'enabled'         => self::toBool($row['enabled'] ?? true),
+            'enabled'         => ($fields['enabled'] ?? SettingsRegistry::NOTIFICATION_ENABLED_DEFAULT) === 'true',
         ];
     }
 
@@ -182,18 +222,5 @@ final class TenantNotificationSettingsRepository
         $s = trim((string) $value);
 
         return $s === '' ? null : $s;
-    }
-
-    /**
-     * Coerce a DB boolean column to a real bool.
-     *
-     * Delegates to the canonical coercion (#891). {@see DbBool} records which
-     * spellings each driver actually returns — measured on the PHP this
-     * platform ships, not assumed — and why a bare `(bool)` cast is not an
-     * equivalent substitute for it.
-     */
-    private static function toBool(mixed $value): bool
-    {
-        return DbBool::of($value);
     }
 }

@@ -24,7 +24,8 @@
       "@whity/ui": ["../packages/ui/src/index.ts"],
       "@whity/ui/*": ["../packages/ui/src/*"],
       "@whity/features": ["../packages/features/src/index.ts"],
-      "@whity/features/*": ["../packages/features/src/*"]
+      "@whity/features/*": ["../packages/features/src/*"],
+      "@whity/api-client": ["../packages/api-client/src/index.ts"]
     }
   },
   "include": [

@@ -102,6 +102,7 @@ final class CoreTables
         'document_comment_threads' => '184_create_document_comment_threads.php',
         'document_comments' => '185_create_document_comments.php',
         'document_agent_requests' => '252_create_document_agent_requests.php',
+        'push_subscriptions' => '276_create_push_subscriptions.php',
         'saved_blocks' => '260_create_saved_blocks.php',
         'saved_block_versions' => '260_create_saved_blocks.php',
         'saved_block_uses' => '265_create_saved_block_uses.php',

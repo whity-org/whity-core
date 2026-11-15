@@ -5012,6 +5012,9 @@ $router->register('POST',   '/api/data-types/{type}/bulk',           [$dataTypes
 // core or a plugin) dispatches a notification (hook-subscriber mode).
 // E2: the `email` channel is delivered through core mail, not only logged.
 $transportRegistry = \Whity\Core\Notification\CoreTransports::make($logger, $brandedEmailSender, $profileEmailRepository);
+// WHIT-1074: web push. Registered here so the dispatcher adds `push` for a
+// person with a device on; the worker sends it.
+$transportRegistry->register(\Whity\Core\Notification\Push\PushTransport::fromEnv($db->getPdo(), $logger, $_ENV));
 $notificationRepository = new \Whity\Core\Notification\NotificationRepository($db->getPdo());
 // Per-user preference resolver — the dispatcher consults it to filter a
 // recipient's channels (transactional types always bypass; #c56a6455).
@@ -5123,9 +5126,18 @@ $router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/rep
 // reached is operator configuration.
 $routingNotifications = new \Whity\Core\Document\Routing\RoutingNotifications(
     $notificationDispatcher,
-    $settingsService
+    $settingsService,
+    // E2: people at a sign step get the sign-request email instead of an emailed notice.
+    $db->getPdo(),
 );
 $routingNotifications->subscribe($hookManager);
+// E2 `EmailForms`: "Please sign this" to people a route asks to sign, and
+// "We received it" to a signed-in person who sends a form.
+(new \Whity\Core\Document\Routing\SignRequestEmail($db->getPdo(), $profileEmailRepository, $brandedEmailSender, $frontendUrls->base()))->subscribe($hookManager);
+(new \Whity\Core\Form\FormReceivedEmail($db->getPdo(), $profileEmailRepository, $brandedEmailSender, $settingsService, $frontendUrls->base()))->subscribe($hookManager);
+// E2 `form-decision` (WHIT-1034): the decision, with the final document's PDF (P1) when there is one.
+// The worker subscribes it too, for a final document its retry makes; the shared store keeps it to one email.
+(new \Whity\Core\Form\FormDecisionEmail($db->getPdo(), $profileEmailRepository, $brandedEmailSender, $settingsService, $frontendUrls->base(), $documentArtifactStore, new DatabaseSharedStore($db->getPdo())))->subscribe($hookManager);
 
 // THE EFFECT ENGINE (#1032), beside the notifier and for the same reasons.
 //
@@ -5446,6 +5458,22 @@ $notificationPreferencesHandler = new \Whity\Api\NotificationPreferencesApiHandl
 );
 $router->register('GET', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'list'],   null);
 $router->register('PUT', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'update'], null);
+
+// Web push: a person's devices and the instance's public key (WHIT-1073).
+// Self-scoped, session-gated, no RBAC permission. The key pair is made on
+// first use and kept encrypted with the shared key ring.
+$pushSubscriptionsHandler = new \Whity\Api\PushSubscriptionsApiHandler(
+    $tokenValidator,
+    new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
+    static fn (): \Whity\Core\Notification\Push\VapidKeys => new \Whity\Core\Notification\Push\VapidKeys(
+        $globalSettingsRepository,
+        \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+    ),
+    \Whity\Core\Notification\Push\PushEndpoint::extraHostsFrom($_ENV),
+);
+$router->register('GET',    '/api/me/push-subscriptions',             [$pushSubscriptionsHandler, 'list'],      null);
+$router->register('POST',   '/api/me/push-subscriptions',             [$pushSubscriptionsHandler, 'subscribe'], null);
+$router->register('DELETE', '/api/me/push-subscriptions/{id:\d+}',    [$pushSubscriptionsHandler, 'remove'],    null);
 
 // A person's text size and Show technical details (design decisions W.3, A.3).
 // Self-scoped, session-gated, no RBAC permission.

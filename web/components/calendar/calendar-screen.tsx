@@ -131,6 +131,8 @@ function CalendarBody({
   });
   const [eventOpen, setEventOpen] = useState(false);
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
+  // Phone month: the day whose bookings are listed under the grid.
+  const [monthDay, setMonthDay] = useState<CalendarDate | null>(null);
 
   const range = viewRange(view, anchor, settings.week_start);
   const query = rangeQuery(range, timeZone);
@@ -212,6 +214,15 @@ function CalendarBody({
   const notSetUp = services.length === 0 && staff.length === 0;
   const filtered = person !== EVERYONE;
   const nothing = data !== null && items.length === 0;
+
+  // The chosen day, when it is in the month shown; otherwise today if it is in
+  // this month, otherwise the first of the month.
+  const listedDay: CalendarDate =
+    monthDay !== null && monthDay.year === anchor.year && monthDay.month === anchor.month
+      ? monthDay
+      : today.year === anchor.year && today.month === anchor.month
+        ? today
+        : { year: anchor.year, month: anchor.month, day: 1 };
 
   const openDay = (date: CalendarDate) => {
     setAnchor(date);
@@ -374,7 +385,18 @@ function CalendarBody({
           onClear={() => setPerson(EVERYONE)}
         />
       ) : view === 'month' ? (
-        <MonthGrid {...gridProps} weeks={monthWeeks(anchor, settings.week_start)} month={anchor.month} />
+        <>
+          <MonthGrid
+            {...gridProps}
+            weeks={monthWeeks(anchor, settings.week_start)}
+            month={anchor.month}
+            selected={listedDay}
+            onSelectDay={setMonthDay}
+          />
+          <div className="md:hidden" data-testid="calendar-month-day-list">
+            <AgendaList {...gridProps} days={[listedDay]} />
+          </div>
+        </>
       ) : view === 'week' ? (
         <>
           <div className="hidden md:block">
