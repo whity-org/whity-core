@@ -48,7 +48,7 @@ export function PushOffer({ className = '' }: { className?: string }) {
       <p className="text-base text-muted-foreground">
         {t(
           'push.ask.chatBody',
-          'Messages and mentions in chat, approvals, and your agents asking first. Never marketing. Change it any time in Settings › Preferences.'
+          'Messages and mentions in chat, approvals, and your agents asking first. Never marketing. Change it any time in My settings.'
         )}
       </p>
       {push.error && (

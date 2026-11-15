@@ -207,7 +207,7 @@ export function AppCommandPalette() {
             await refreshNav();
           } catch (err) {
             addToast(
-              err instanceof Error ? err.message : t('sidebar.tenantSwitcher.error', 'Couldn’t switch tenant'),
+              err instanceof Error ? err.message : t('sidebar.tenantSwitcher.error', 'Couldn’t switch workspace'),
               'error',
             );
           }
@@ -355,7 +355,7 @@ export function AppCommandPalette() {
       {
         id: 'action-account',
         group: t('palette.group.actions', 'Actions'),
-        label: t('palette.action.account', 'Open your account settings'),
+        label: t('palette.action.account', 'Open my settings'),
         icon: <Icon name="user" size={16} />,
         onSelect: () => router.push('/settings'),
       },

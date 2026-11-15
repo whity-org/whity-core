@@ -11,6 +11,7 @@ import { ApprovalQueue } from '@whity/ui/approval-queue';
 import { LockedScreen } from '@whity/ui/locked-screen';
 
 import { DisplayPreferencesSettings } from '@/components/display-preferences-settings';
+import { ThemeModeProvider } from '@/lib/theme-mode-context';
 import { FirstVisitScene } from '@/components/first-visit-scene';
 import { libraryEmptyState } from '@/app/(protected)/admin/document-library/library-empty-state';
 
@@ -120,9 +121,11 @@ describe('Animations in Account › Preferences', () => {
       update,
     };
     render(
-      <DisplayPreferencesContextProvider value={value}>
-        <DisplayPreferencesSettings />
-      </DisplayPreferencesContextProvider>,
+      <ThemeModeProvider>
+        <DisplayPreferencesContextProvider value={value}>
+          <DisplayPreferencesSettings />
+        </DisplayPreferencesContextProvider>
+      </ThemeModeProvider>,
     );
     expect(screen.getByRole('radio', { name: /Full/ })).toBeChecked();
     fireEvent.click(screen.getByRole('radio', { name: /Calm/ }));

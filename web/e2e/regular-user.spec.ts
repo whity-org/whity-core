@@ -34,7 +34,7 @@ test.describe('Regular user (non-admin)', () => {
       'Users',
       'Roles',
       'Organizational Units',
-      'Tenants',
+      'Workspaces',
       'Delegations',
       'Audit Logs',
       'Family Relations',
@@ -92,7 +92,7 @@ test.describe('Regular user (non-admin)', () => {
   test('settings page is accessible and shows the user role', async ({ userPage, page }) => {
     await userPage.shell.openAccountSettings();
     await page.waitForURL('**/settings');
-    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
     await expect(page.getByText(REGULAR_USER.email).first()).toBeVisible();
   });
 
@@ -107,7 +107,7 @@ test.describe('Regular user (non-admin)', () => {
     await userPage.shell.openAccountSettings();
     await page.waitForURL('**/settings');
     // Two-step sign-in lives in the account page's Sign-in and security tab.
-    await page.getByRole('tab', { name: 'Sign-in and security' }).click();
+    await page.getByRole('tab', { name: 'Password and two-step' }).click();
 
     const enable = page.getByRole('button', { name: 'Enable 2FA' });
     await expect(enable).toBeVisible();

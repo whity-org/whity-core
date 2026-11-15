@@ -197,7 +197,7 @@ export default function PendingRegistrationsPage() {
             <>
               {beforeLink}
               <Link href="/admin/settings" className="font-medium underline">
-                {t('registrations.accessDenied.link', 'Website Settings')}
+                {t('registrations.accessDenied.link', 'Workspace settings')}
               </Link>
               {afterLink}
             </>

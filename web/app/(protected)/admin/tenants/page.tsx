@@ -223,7 +223,7 @@ export default function TenantsPage() {
   return (
     <div className="space-y-8">
       <AdminHeader
-        title={t('tenants.title', 'Tenants')}
+        title={t('tenants.title', 'Workspaces')}
         description={t('tenants.description', 'The workspaces on this installation.')}
         action={
           canCreate && !forbidden ? (
