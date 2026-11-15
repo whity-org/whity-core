@@ -105,6 +105,23 @@ final class GlobalSettingsRepository
     }
 
     /**
+     * Store a value only when the key has none yet. Returns whether this call
+     * stored it, so two workers racing to create the same value agree on one.
+     */
+    public function setIfAbsent(string $key, string $value): bool
+    {
+        // App_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
+        $stmt = $this->db->prepare(
+            'INSERT INTO app_settings (setting_key, value, updated_at)
+             VALUES (:key, :value, NOW())
+             ON CONFLICT (setting_key) DO NOTHING'
+        );
+        $stmt->execute([':key' => $key, ':value' => $value]);
+
+        return $stmt->rowCount() === 1;
+    }
+
+    /**
      * Replace a value only if it still holds what the caller read. Returns whether
      * it did, so a slow writer cannot overwrite a newer value.
      */

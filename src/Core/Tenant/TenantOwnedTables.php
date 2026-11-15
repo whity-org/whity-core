@@ -610,6 +610,8 @@ final class TenantOwnedTables
         // profile-only join condition would be satisfiable by another tenant's
         // invitation row.
         'meeting_attendees' => '134_create_meeting_attendance.php',
+        // Web push: one browser per person per workspace (WHIT-1073).
+        'push_subscriptions' => '276_create_push_subscriptions.php',
     ];
 
     /**
