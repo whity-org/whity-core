@@ -8405,7 +8405,7 @@
                         }
                     },
                     "409": {
-                        "description": "That time was just taken",
+                        "description": "That time was just taken; `reason` says why when known: person_busy (Book anyway is possible), room_taken or closed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8926,6 +8926,193 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/CalendarEventResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/my-view": {
+            "get": {
+                "operationId": "get_api_v1_calendar_my_view",
+                "summary": "Read your own calendar choices: view, Colour by, people and rooms shown",
+                "tags": [
+                    "calendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Your choices",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarViewChoices"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "operationId": "put_api_v1_calendar_my_view",
+                "summary": "Change your own calendar choices; fields left out keep their value, null forgets one",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "Only changes what you see. Everyone else keeps their own choices.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarViewChoices"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Your choices",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarViewChoices"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
                                 }
                             }
                         }
@@ -73492,6 +73679,24 @@
                     "keep_to_hours": {
                         "type": "boolean",
                         "description": "Refuse a time outside working hours. Always on for agents."
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "minimum": 5,
+                        "maximum": 1440,
+                        "description": "Staff only: a length other than the service's, such as a time dragged across on the grid."
+                    },
+                    "notify": {
+                        "type": "boolean",
+                        "description": "Email the customer a confirmation. Default true."
+                    },
+                    "book_anyway": {
+                        "type": "boolean",
+                        "description": "Book even though the person is busy then (a taken room or closed hours still refuse). Never for agents."
+                    },
+                    "within_hours": {
+                        "type": "boolean",
+                        "description": "Refuse a time outside the person's working hours, without the booking window's notice rules."
                     }
                 },
                 "required": [
@@ -73539,6 +73744,24 @@
                     "keep_to_hours": {
                         "type": "boolean",
                         "description": "Refuse a time outside working hours. Always on for agents."
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "minimum": 5,
+                        "maximum": 1440,
+                        "description": "A new length, such as pulling the bottom edge on the grid. Default: keep the booking's length."
+                    },
+                    "notify": {
+                        "type": "boolean",
+                        "description": "Email the customer the new time. Default true."
+                    },
+                    "book_anyway": {
+                        "type": "boolean",
+                        "description": "Move even though the person is busy then (a taken room or closed hours still refuse). Never for agents."
+                    },
+                    "within_hours": {
+                        "type": "boolean",
+                        "description": "Refuse a time outside the person's working hours, without the booking window's notice rules."
                     }
                 },
                 "required": [
@@ -74215,6 +74438,73 @@
                     "requests",
                     "reminders_sent"
                 ]
+            },
+            "CalendarViewChoices": {
+                "type": "object",
+                "properties": {
+                    "view": {
+                        "type": "string",
+                        "enum": [
+                            "day",
+                            "four_days",
+                            "week",
+                            "month",
+                            "year",
+                            "three_days"
+                        ],
+                        "description": "The view last chosen: Day, 4 days, Week, Month, Year, or 3 days on a phone."
+                    },
+                    "colour_by": {
+                        "type": "string",
+                        "enum": [
+                            "person",
+                            "service",
+                            "room"
+                        ],
+                        "description": "What colours mean for this person: the person, the service, or the room or branch."
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "The date in view, YYYY-MM-DD."
+                    },
+                    "hidden_people": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Staff profile ids unticked in the panel."
+                    },
+                    "hidden_rooms": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Room ids unticked in the panel."
+                    },
+                    "hidden_services": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Service ids unticked in the panel."
+                    },
+                    "also_show": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "team_events",
+                                "time_off",
+                                "cancelled"
+                            ]
+                        },
+                        "description": "What else the calendar shows besides bookings."
+                    },
+                    "sidebar_open": {
+                        "type": "boolean",
+                        "description": "The person opened the app's sidebar on the calendar, so it stays open there."
+                    }
+                }
             },
             "CapabilityDenial": {
                 "type": "object",

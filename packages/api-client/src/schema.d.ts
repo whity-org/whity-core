@@ -1433,6 +1433,27 @@ export interface paths {
         patch: operations["patch_api_v1_calendar_events_id"];
         trace?: never;
     };
+    "/api/v1/calendar/my-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read your own calendar choices: view, Colour by, people and rooms shown */
+        get: operations["get_api_v1_calendar_my_view"];
+        /**
+         * Change your own calendar choices; fields left out keep their value, null forgets one
+         * @description Only changes what you see. Everyone else keeps their own choices.
+         */
+        put: operations["put_api_v1_calendar_my_view"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/rooms": {
         parameters: {
             query?: never;
@@ -11067,6 +11088,14 @@ export interface components {
             customer: components["schemas"]["CalendarBookingCustomer"];
             /** @description Refuse a time outside working hours. Always on for agents. */
             keep_to_hours?: boolean;
+            /** @description Staff only: a length other than the service's, such as a time dragged across on the grid. */
+            duration_minutes?: number;
+            /** @description Email the customer a confirmation. Default true. */
+            notify?: boolean;
+            /** @description Book even though the person is busy then (a taken room or closed hours still refuse). Never for agents. */
+            book_anyway?: boolean;
+            /** @description Refuse a time outside the person's working hours, without the booking window's notice rules. */
+            within_hours?: boolean;
         };
         CalendarBookingCustomer: {
             /** @description An existing customer or member of this workspace. */
@@ -11083,6 +11112,14 @@ export interface components {
             profile_id?: number;
             /** @description Refuse a time outside working hours. Always on for agents. */
             keep_to_hours?: boolean;
+            /** @description A new length, such as pulling the bottom edge on the grid. Default: keep the booking's length. */
+            duration_minutes?: number;
+            /** @description Email the customer the new time. Default true. */
+            notify?: boolean;
+            /** @description Move even though the person is busy then (a taken room or closed hours still refuse). Never for agents. */
+            book_anyway?: boolean;
+            /** @description Refuse a time outside the person's working hours, without the booking window's notice rules. */
+            within_hours?: boolean;
         };
         CalendarBookingSuggestRequest: {
             /** @description The time to suggest, ISO 8601 with an offset. */
@@ -11297,6 +11334,30 @@ export interface components {
             requests: number;
             /** @description Reminders sent that day. */
             reminders_sent: number;
+        };
+        CalendarViewChoices: {
+            /**
+             * @description The view last chosen: Day, 4 days, Week, Month, Year, or 3 days on a phone.
+             * @enum {string}
+             */
+            view?: "day" | "four_days" | "week" | "month" | "year" | "three_days";
+            /**
+             * @description What colours mean for this person: the person, the service, or the room or branch.
+             * @enum {string}
+             */
+            colour_by?: "person" | "service" | "room";
+            /** @description The date in view, YYYY-MM-DD. */
+            date?: string;
+            /** @description Staff profile ids unticked in the panel. */
+            hidden_people?: number[];
+            /** @description Room ids unticked in the panel. */
+            hidden_rooms?: number[];
+            /** @description Service ids unticked in the panel. */
+            hidden_services?: number[];
+            /** @description What else the calendar shows besides bookings. */
+            also_show?: ("team_events" | "time_off" | "cancelled")[];
+            /** @description The person opened the app's sidebar on the calendar, so it stays open there. */
+            sidebar_open?: boolean;
         };
         CapabilityDenial: {
             /** @enum {string} */
@@ -25631,7 +25692,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description That time was just taken */
+            /** @description That time was just taken; `reason` says why when known: person_busy (Book anyway is possible), room_taken or closed */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -26006,6 +26067,153 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CalendarEventResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_my_view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your choices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarViewChoices"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_calendar_my_view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarViewChoices"];
+            };
+        };
+        responses: {
+            /** @description Your choices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarViewChoices"];
+                    };
                 };
             };
             /** @description Invalid request body */

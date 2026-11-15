@@ -95,6 +95,35 @@ final class CalendarApiHandler
 
     // ── settings ────────────────────────────────────────────────────────
 
+    /**
+     * What the caller last chose on the calendar here (design 3.5, CV.2,
+     * CV.4, CV.7): the view, Colour by, unticked people and rooms, Also show.
+     * Only ever the caller's own.
+     */
+    public function getMyView(Request $request): Response
+    {
+        return $this->run($request, 'view', function (int $tenantId, int $actor): Response {
+            return Response::json(['data' => (object) $this->viewPreferences()->get($tenantId, $actor)]);
+        });
+    }
+
+    /** Change the caller's own choices; keys left out keep their value, null forgets one. */
+    public function putMyView(Request $request): Response
+    {
+        return $this->run($request, 'view', function (int $tenantId, int $actor) use ($request): Response {
+            if ($actor === 0) {
+                throw new CalendarRejectedException('Only a signed-in person has calendar choices', 422);
+            }
+
+            return Response::json(['data' => (object) $this->viewPreferences()->update($tenantId, $actor, JsonBody::parsed($request))]);
+        });
+    }
+
+    private function viewPreferences(): \Whity\Core\Calendar\ViewPreferences
+    {
+        return new \Whity\Core\Calendar\ViewPreferences($this->calendar->db());
+    }
+
     public function getSettings(Request $request): Response
     {
         return $this->run($request, 'settings', function (int $tenantId): Response {
@@ -397,7 +426,7 @@ final class CalendarApiHandler
                 // an agent keeps to them.
                 'enforce_hours' => $isAgent || ($body['keep_to_hours'] ?? false) === true,
                 'public' => false,
-            ]);
+            ] + self::gridOptions($body, $isAgent));
 
             unset($booking['manage_token']);
 
@@ -412,7 +441,19 @@ final class CalendarApiHandler
             $body = JsonBody::parsed($request);
             $start = Interval::fromApi($body['starts_at'] ?? null) ?? throw new CalendarRejectedException('starts_at must be a date and time with an offset', 422);
             $profileId = is_int($body['profile_id'] ?? null) ? $body['profile_id'] : null;
-            $booking = $this->booking->move($tenantId, (int) $params['id'], $start, $profileId, self::isAgent($request) || ($body['keep_to_hours'] ?? false) === true);
+            $isAgent = self::isAgent($request);
+            $options = self::gridOptions($body, $isAgent);
+            $booking = $this->booking->move(
+                $tenantId,
+                (int) $params['id'],
+                $start,
+                $profileId,
+                $isAgent || ($body['keep_to_hours'] ?? false) === true,
+                $options['duration_minutes'],
+                $options['notify'],
+                $options['book_anyway'],
+                $options['within_hours'],
+            );
             // The customer's new link goes to the customer, by email, not to staff.
             unset($booking['manage_token']);
 
@@ -561,6 +602,30 @@ final class CalendarApiHandler
 
             return Response::error('Failed to update the calendar', 500);
         }
+    }
+
+    /**
+     * What the calendar grid adds to a create or a move (design 3.5, CV.8,
+     * CV.9): a length of its own, "Email the customer" (default on), Book
+     * anyway when the person is busy, and keeping to the person's hours. An
+     * agent never books over someone's time.
+     *
+     * @param array<string, mixed> $body
+     * @return array{duration_minutes: ?int, notify: bool, book_anyway: bool, within_hours: bool}
+     */
+    private static function gridOptions(array $body, bool $isAgent): array
+    {
+        $minutes = $body['duration_minutes'] ?? null;
+        if ($minutes !== null && !is_int($minutes)) {
+            throw new CalendarRejectedException('duration_minutes must be a whole number of minutes', 422);
+        }
+
+        return [
+            'duration_minutes' => $minutes,
+            'notify' => ($body['notify'] ?? true) !== false,
+            'book_anyway' => !$isAgent && ($body['book_anyway'] ?? false) === true,
+            'within_hours' => ($body['within_hours'] ?? false) === true,
+        ];
     }
 
     private static function isAgent(Request $request): bool

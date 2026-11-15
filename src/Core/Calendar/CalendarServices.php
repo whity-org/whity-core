@@ -38,6 +38,8 @@ final class CalendarServices
             $settings,
             $hooks,
         );
+        // Meetings block calendar time (issue #1933, WHIT-1051).
+        $service->addBusySource(new MeetingBusySource($pdo));
         $service->setLinks(new ManageLinks($pdo));
         $service->setManageUrlBase($urls->linkOrPath(FrontendUrls::BOOKING_MANAGE));
         if ($plugins !== null) {

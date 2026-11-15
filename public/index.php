@@ -5282,6 +5282,9 @@ $calendarHandler = new \Whity\Api\CalendarApiHandler(
 );
 $router->register('GET',    '/api/calendar/settings',                       [$calendarHandler, 'getSettings'],     null, null, CorePermissions::CALENDAR_READ);
 $router->register('PUT',    '/api/calendar/settings',                       [$calendarHandler, 'putSettings'],     null, null, CorePermissions::CALENDAR_MANAGE);
+// Design 3.5: each person's own calendar choices (view, Colour by, ticks).
+$router->register('GET',    '/api/calendar/my-view',                        [$calendarHandler, 'getMyView'],       null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/my-view',                        [$calendarHandler, 'putMyView'],       null, null, CorePermissions::CALENDAR_READ);
 $router->register('GET',    '/api/calendar/staff',                          [$calendarHandler, 'listStaff'],       null, null, CorePermissions::CALENDAR_READ);
 $router->register('PUT',    '/api/calendar/staff/{profileId:\d+}',          [$calendarHandler, 'putStaff'],        null, null, CorePermissions::CALENDAR_MANAGE);
 // A person's ICS feed URL: shown once when turned on; turning it on again

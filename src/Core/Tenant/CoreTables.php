@@ -66,6 +66,7 @@ final class CoreTables
         'calendar_service_staff' => '248_create_calendar_bookings.php',
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_staff' => '247_create_calendar.php',
+        'calendar_view_preferences' => '278_create_calendar_view_preferences.php',
         'calendar_working_hours' => '247_create_calendar.php',
         'contact_import_changes' => '261_create_contacts.php',
         'contact_imports' => '261_create_contacts.php',
