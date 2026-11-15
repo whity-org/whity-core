@@ -51,7 +51,10 @@ import { usePaletteData } from '@/lib/commands/use-palette-data';
 import { requestNew } from '@/lib/commands/new-intent';
 import { fold, parseCommand, rank } from '@/lib/commands/parse';
 import type { components } from '@whity/api-client';
-import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
+import { isInSettingsArea, useSettingsGroups } from '@/components/settings/settings-area';
+import { searchSettings, useSettingsIndex, type SettingEntry } from '@/components/settings/settings-index';
+import { SETTINGS_HOME_HREF } from '@/lib/settings/my-settings';
+import { useCurrentWorkspace } from '@/components/settings/scope';
 
 
 type SearchGroup = components['schemas']['SearchGroup'];
@@ -82,7 +85,6 @@ export function AppCommandPalette() {
   const { currentLanguage, availableLanguages, setLanguage } = useCurrentLanguage();
   const { items: navItems, refresh: refreshNav } = useNavigation();
   const navLabels = useNavItemLabels();
-  const notificationsLabel = t('palette.page.notifications', 'Notifications');
   const {
     resolved: theme,
     preference: themePreference,
@@ -94,6 +96,13 @@ export function AppCommandPalette() {
   const { addToast } = useToast();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  // Every setting by name (WHIT-1084), asked for only while the palette is open.
+  const ta = useTranslation('auth');
+  const settingsGroups = useSettingsGroups({ enabled: open });
+  const settingsIndex = useSettingsIndex(settingsGroups);
+  const isSystemTenant = user?.tenant_id === 0;
+  const settingsLabel = t('sidebar.item.settings', 'Settings');
+  const { name: workspaceName } = useCurrentWorkspace();
   const [groups, setGroups] = useState<SearchGroup[]>([]);
   const request = useRef(0);
 
@@ -195,12 +204,16 @@ export function AppCommandPalette() {
   const commands = useMemo<PaletteCommand[]>(() => {
     const ctx: CommandContext = {
       can: has,
+      // `/go` reaches every screen and every settings page (WHIT-1084): the
+      // Settings area is one nav entry, its pages come from the settings index.
       pages: [
         ...navItems
-          .filter((item) => item.href)
+          .filter((item) => item.href && !isInSettingsArea(item, isSystemTenant))
           .map((item) => ({ id: item.id, href: item.href, label: navLabels[item.id] ?? item.label })),
-        // WHIT-1078: not a sidebar page, but people look for it by name.
-        { id: 'notifications', href: NOTIFICATIONS_HREF, label: notificationsLabel, icon: 'notification' as const },
+        { id: 'settings', href: SETTINGS_HOME_HREF, label: settingsLabel },
+        ...settingsIndex
+          .filter((entry) => !entry.id.includes('.'))
+          .map((entry) => ({ id: `setting-${entry.id}`, href: entry.href, label: entry.label })),
       ],
       workspaces: memberships.map((m) => ({
         id: m.tenant_id,
@@ -245,7 +258,9 @@ export function AppCommandPalette() {
     has,
     navItems,
     navLabels,
-    notificationsLabel,
+    isSystemTenant,
+    settingsLabel,
+    settingsIndex,
     memberships,
     currentLanguage,
     user?.tenant_id,
@@ -336,7 +351,7 @@ export function AppCommandPalette() {
     }
 
     const pages: CommandPaletteItem[] = navItems
-      .filter((item) => item.href)
+      .filter((item) => item.href && !isInSettingsArea(item, isSystemTenant))
       .map((item) => {
         const NavIcon = navIcon(item.icon);
         return {
@@ -348,15 +363,37 @@ export function AppCommandPalette() {
           onSelect: () => openPlace({ id: `page-${item.id}`, label: navLabels[item.id] ?? item.label, href: item.href }),
         };
       });
-    // WHIT-1078: notifications settings, found by name from anywhere.
+    // The Settings area is one place in Go to; its pages are in the Settings group below.
     pages.push({
-      id: 'page-notifications',
+      id: 'page-settings',
       group: t('palette.group.pages', 'Go to'),
-      label: notificationsLabel,
-      keywords: 'notifications push alerts إشعارات تنبيهات',
-      icon: <TablerIcons.IconBell size={16} />,
-      onSelect: () => openPlace({ id: 'page-notifications', label: notificationsLabel, href: NOTIFICATIONS_HREF }),
+      label: settingsLabel,
+      keywords: 'settings preferences الإعدادات',
+      icon: <Icon name="settings" size={16} />,
+      onSelect: () => openPlace({ id: 'page-settings', label: settingsLabel, href: SETTINGS_HOME_HREF }),
     });
+
+    // Every setting by name, in both languages, whatever the screen's language
+    // (WHIT-1084). Matched here with Arabic folding, so the palette must not
+    // filter them again. WHIT-1078's notifications row is one of them now.
+    const scopeText = (entry: SettingEntry) =>
+      entry.scope === 'account'
+        ? ta('settings.scope.account', 'All your workspaces')
+        : entry.scope === 'device'
+        ? ta('settings.scope.device', 'This device')
+        : workspaceName || ta('settings.scope.thisWorkspace', 'This workspace');
+    const settingRows: CommandPaletteItem[] = query.trim().startsWith('/')
+      ? []
+      : searchSettings(settingsIndex, query).map((entry) => ({
+          id: `setting-${entry.id}`,
+          group: t('palette.group.settings', 'Settings'),
+          label: entry.label,
+          // The place names the workspace already for You in [workspace]; no need twice.
+          hint: entry.place.includes(scopeText(entry)) ? entry.place : `${entry.place} · ${scopeText(entry)}`,
+          always: true,
+          icon: <Icon name="settings" size={16} />,
+          onSelect: () => openPlace({ id: `setting-${entry.id}`, label: entry.label, href: entry.href, hint: entry.place }),
+        }));
 
     const actions: CommandPaletteItem[] = [
       {
@@ -450,8 +487,8 @@ export function AppCommandPalette() {
         ]
       : [];
 
-    return [...recentRows, ...records, ...pages, ...actions, ...commandRows, ...agent];
-  }, [groups, navItems, navLabels, notificationsLabel, currentLanguage, theme, toggleTheme, router, t, query, commands, commandRow, recent, data.recentDocuments, data.agents, aiPage, openPlace]);
+    return [...recentRows, ...settingRows, ...records, ...pages, ...actions, ...commandRows, ...agent];
+  }, [groups, navItems, navLabels, settingsLabel, settingsIndex, isSystemTenant, ta, workspaceName, currentLanguage, theme, toggleTheme, router, t, query, commands, commandRow, recent, data.recentDocuments, data.agents, aiPage, openPlace]);
 
   const commandMode = commandItems !== null;
 
