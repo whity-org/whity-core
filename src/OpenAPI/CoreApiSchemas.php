@@ -11700,6 +11700,9 @@ final class CoreApiSchemas
                 'request_id' => ['type' => 'integer', 'description' => 'The two-step reset request about to be approved'],
                 'profile_id' => ['type' => 'integer', 'description' => 'The person a reset is about to be started for, when there is no request'],
             ], []),
+            'GatedApprovalRequest' => self::object([
+                'code' => ['type' => 'string', 'description' => 'The code from the approver\'s authenticator, or the one emailed by the identity check'],
+            ], ['code']),
             'IdentityCheckResponse' => self::dataEnvelope(self::object([
                 'method' => ['type' => 'string', 'enum' => ['totp', 'email_code']],
                 'email_hint' => self::str(true),
@@ -12712,10 +12715,25 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('Requests awaiting approval', 'PendingPasswordResetListResponse'),
                 ] + self::authErrors(),
             ]),
-            self::permissionRoute('POST', '/api/password-resets/{id:\d+}/approve', 'password_resets:approve', [
-                'summary' => 'Apply the staged password (tenant-scoped)',
+            self::permissionRoute('POST', '/api/password-resets/identity-check', 'password_resets:approve', [
+                'summary' => 'Start the approver\'s "confirm it\'s you" check for a password reset: names it, and sends a code by email when that is the check',
                 'tags' => ['auth'],
+                'request' => self::object([
+                    'request_id' => ['type' => 'integer', 'description' => 'The password-reset request about to be approved'],
+                ], ['request_id']),
                 'responses' => [
+                    200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                    422 => self::errorResponse('A request_id is required'),
+                    429 => self::errorResponse('Too many codes were sent lately'),
+                    503 => self::errorResponse('Confirming it is you is not available'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/password-resets/{id:\d+}/approve', 'password_resets:approve', [
+                'summary' => 'Apply the staged password once the approver has confirmed it is them (tenant-scoped)',
+                'tags' => ['auth'],
+                'request' => 'GatedApprovalRequest',
+                'responses' => [
+                    503 => self::errorResponse('Confirming it is you is not available'),
                     200 => self::jsonResponse('Approved', 'ApprovalStatusResponse'),
                     404 => self::errorResponse('No pending password-reset request found for that id'),
                 ] + self::authErrors(),
@@ -16112,6 +16130,8 @@ final class CoreApiSchemas
             'request' => $editable
                 ? self::object([
                     'arguments' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Edited arguments to run with instead of the agent\'s (optional).'],
+                    // AG.1: a Needs verifying proposal needs the person's fresh check.
+                    'code' => ['type' => 'string', 'description' => 'For a Needs verifying (tier 3) proposal: the code from the person\'s authenticator, or the one emailed after identity-check.'],
                     // WHIT-1042: the tick on a destructive impact plan.
                     'acknowledgedDestructive' => ['type' => 'boolean', 'description' => 'Needed for a Whity Builder publish or roll back that stops showing data people entered: the person ticked that they understand what is lost.'],
                 ], [])
@@ -16148,6 +16168,25 @@ final class CoreApiSchemas
                     'Runs the operation as your delegate, after checking again that you and the agent may. Edit the arguments by sending them. Runs once, however many times it is approved.',
                     true,
                 ),
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/agent-proposals/{id:\d+}/identity-check',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Start "confirm it\'s you" before approving a Needs verifying proposal',
+                    'description' => 'Names the check (an authenticator code, or a code sent by email) and sends the email code when that is the check. The code then goes with the approval.',
+                    'tags' => ['me'],
+                    'parameters' => [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'ID of the proposal.', 'schema' => ['type' => 'integer']]],
+                    'responses' => [
+                        200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                        404 => self::errorResponse('No such proposal made on your behalf'),
+                        422 => self::errorResponse('This proposal needs no check'),
+                        429 => self::errorResponse('Too many codes were sent lately'),
+                        503 => self::errorResponse('Confirming it is you is not available'),
+                    ] + self::authErrors(),
+                ],
             ],
             [
                 'method' => 'POST',

@@ -35927,6 +35927,10 @@
                                         "additionalProperties": true,
                                         "description": "Edited arguments to run with instead of the agent's (optional)."
                                     },
+                                    "code": {
+                                        "type": "string",
+                                        "description": "For a Needs verifying (tier 3) proposal: the code from the person's authenticator, or the one emailed after identity-check."
+                                    },
                                     "acknowledgedDestructive": {
                                         "type": "boolean",
                                         "description": "Needed for a Whity Builder publish or roll back that stops showing data people entered: the person ticked that they understand what is lost."
@@ -36147,6 +36151,127 @@
                     },
                     "500": {
                         "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/agent-proposals/{id}/identity-check": {
+            "post": {
+                "operationId": "post_api_v1_me_agent_proposals_id_identity_check",
+                "summary": "Start \"confirm it's you\" before approving a Needs verifying proposal",
+                "tags": [
+                    "me"
+                ],
+                "description": "Names the check (an authenticator code, or a code sent by email) and sends the email code when that is the check. The code then goes with the approval.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the proposal.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The check to make",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/IdentityCheckResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such proposal made on your behalf",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "This proposal needs no check",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many codes were sent lately",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Confirming it is you is not available",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -46493,6 +46618,141 @@
                 ]
             }
         },
+        "/api/v1/password-resets/identity-check": {
+            "post": {
+                "operationId": "post_api_v1_password_resets_identity_check",
+                "summary": "Start the approver's \"confirm it's you\" check for a password reset: names it, and sends a code by email when that is the check",
+                "tags": [
+                    "auth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "request_id": {
+                                        "type": "integer",
+                                        "description": "The password-reset request about to be approved"
+                                    }
+                                },
+                                "required": [
+                                    "request_id"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The check to make",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/IdentityCheckResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A request_id is required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many codes were sent lately",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Confirming it is you is not available",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/password-resets/pending": {
             "get": {
                 "operationId": "get_api_v1_password_resets_pending",
@@ -46572,7 +46832,7 @@
         "/api/v1/password-resets/{id}/approve": {
             "post": {
                 "operationId": "post_api_v1_password_resets_id_approve",
-                "summary": "Apply the staged password (tenant-scoped)",
+                "summary": "Apply the staged password once the approver has confirmed it is them (tenant-scoped)",
                 "tags": [
                     "auth"
                 ],
@@ -46586,6 +46846,16 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GatedApprovalRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "Approved",
@@ -46593,6 +46863,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApprovalStatusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
                         }
@@ -46639,6 +46919,16 @@
                     },
                     "500": {
                         "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Confirming it is you is not available",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -84757,6 +85047,18 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "GatedApprovalRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "The code from the approver's authenticator, or the one emailed by the identity check"
+                    }
+                },
+                "required": [
+                    "code"
                 ]
             },
             "GenericMessageDataResponse": {
