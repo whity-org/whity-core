@@ -5476,6 +5476,17 @@ $notificationPreferencesHandler = new \Whity\Api\NotificationPreferencesApiHandl
 $router->register('GET', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'list'],   null);
 $router->register('PUT', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'update'], null);
 
+// Your notifications in each of your workspaces, read-only (WHIT-1081): push
+// devices and whether email and push are on, so a person in several
+// workspaces can see where they will hear from. Self-scoped, no permission.
+$notificationSummaryHandler = new \Whity\Api\NotificationSummaryApiHandler(
+    $tokenValidator,
+    $db->getPdo(),
+    $notificationPreferenceRepository,
+    new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
+);
+$router->register('GET', '/api/me/notification-summary', [$notificationSummaryHandler, 'summary'], null);
+
 // Web push: a person's devices and the instance's public key (WHIT-1073).
 // Self-scoped, session-gated, no RBAC permission. The key pair is made on
 // first use and kept encrypted with the shared key ring.

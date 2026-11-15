@@ -42512,6 +42512,77 @@
                 }
             }
         },
+        "/api/v1/me/notification-summary": {
+            "get": {
+                "operationId": "get_api_v1_me_notification_summary",
+                "summary": "The caller's notifications in each workspace they belong to: push devices, and whether email and push are on, off or on for some kinds (read-only)",
+                "tags": [
+                    "notifications"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One row per workspace the caller is an active member of",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotificationSummaryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/notifications": {
             "get": {
                 "operationId": "get_api_v1_me_notifications",
@@ -92116,6 +92187,57 @@
                 },
                 "required": [
                     "preferences"
+                ]
+            },
+            "NotificationSummaryResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/NotificationSummaryWorkspace"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "NotificationSummaryWorkspace": {
+                "type": "object",
+                "properties": {
+                    "tenant_id": {
+                        "type": "integer"
+                    },
+                    "current": {
+                        "type": "boolean"
+                    },
+                    "push_devices": {
+                        "type": "integer"
+                    },
+                    "email": {
+                        "type": "string",
+                        "enum": [
+                            "on",
+                            "off",
+                            "some"
+                        ]
+                    },
+                    "push": {
+                        "type": "string",
+                        "enum": [
+                            "on",
+                            "off",
+                            "some"
+                        ]
+                    }
+                },
+                "required": [
+                    "tenant_id",
+                    "current",
+                    "push_devices",
+                    "email",
+                    "push"
                 ]
             },
             "OAuthWorkspace": {

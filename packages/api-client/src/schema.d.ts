@@ -6271,6 +6271,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/notification-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's notifications in each workspace they belong to: push devices, and whether email and push are on, off or on for some kinds (read-only) */
+        get: operations["get_api_v1_me_notification_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/notifications": {
         parameters: {
             query?: never;
@@ -16191,6 +16208,18 @@ export interface components {
         NotificationPreferencesUpdateRequest: {
             /** @description Entries of `{type, channel, enabled}` to set for the signed-in user. Transactional notification types cannot be turned off. */
             preferences: components["schemas"]["NotificationPreferenceEntry"][];
+        };
+        NotificationSummaryResponse: {
+            data: components["schemas"]["NotificationSummaryWorkspace"][];
+        };
+        NotificationSummaryWorkspace: {
+            tenant_id: number;
+            current: boolean;
+            push_devices: number;
+            /** @enum {string} */
+            email: "on" | "off" | "some";
+            /** @enum {string} */
+            push: "on" | "off" | "some";
         };
         OAuthWorkspace: {
             id: number;
@@ -52780,6 +52809,71 @@ export interface operations {
             };
             /** @description Invalid preferences, or an attempt to disable a transactional type */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_notification_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One row per workspace the caller is an active member of */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSummaryResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

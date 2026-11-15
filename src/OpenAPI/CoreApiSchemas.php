@@ -205,6 +205,8 @@ final class CoreApiSchemas
         'POST /api/me/notifications/{id:\d+}/read',
         'GET /api/me/notification-preferences',
         'PUT /api/me/notification-preferences',
+        // WHIT-1081: the caller's own notification state per workspace, read-only.
+        'GET /api/me/notification-summary',
         'GET /api/me/inbox/sources',
         'GET /api/me/inbox',
         // WHIT-859: only ever the caller's own rows. It held `forms:submit` until members
@@ -3308,6 +3310,19 @@ final class CoreApiSchemas
                     'responses' => [
                         200 => self::jsonResponse('The caller\'s updated preferences', 'NotificationPreferencesResponse'),
                         422 => self::errorResponse('Invalid preferences, or an attempt to disable a transactional type'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/notification-summary',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The caller\'s notifications in each workspace they belong to: push devices, and whether email and push are on, off or on for some kinds (read-only)',
+                    'tags' => ['notifications'],
+                    'responses' => [
+                        200 => self::jsonResponse('One row per workspace the caller is an active member of', 'NotificationSummaryResponse'),
                     ] + self::authErrors(),
                 ],
             ],
@@ -11028,6 +11043,16 @@ final class CoreApiSchemas
                 'public_key' => self::str(),
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('PushDevice')],
             ], ['public_key', 'data']),
+            'NotificationSummaryWorkspace' => self::object([
+                'tenant_id' => self::int(),
+                'current' => self::bool(),
+                'push_devices' => self::int(),
+                'email' => ['type' => 'string', 'enum' => ['on', 'off', 'some']],
+                'push' => ['type' => 'string', 'enum' => ['on', 'off', 'some']],
+            ], ['tenant_id', 'current', 'push_devices', 'email', 'push']),
+            'NotificationSummaryResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationSummaryWorkspace')],
+            ], ['data']),
             'PushSubscriptionRequest' => self::object([
                 'endpoint' => self::str(),
                 'keys' => self::object(['p256dh' => self::str(), 'auth' => self::str()], ['p256dh', 'auth']),
