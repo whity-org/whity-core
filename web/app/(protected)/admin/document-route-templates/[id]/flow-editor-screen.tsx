@@ -84,6 +84,8 @@ import {
 } from '@whity/ui/route-flow/model';
 import { IconDeviceFloppy, IconFileCheck, IconPencil, IconPlus } from '@tabler/icons-react';
 import { useLeaveGuard } from '@whity/ui/save-bar';
+import { useViewportAtLeast } from '@whity/ui/screen-too-small';
+import { RouteReadOnly } from './route-read-only';
 import { routeSentence } from '@/lib/documents/route-sentence';
 import type { RoutingRule } from '@/components/documents/routing-wire';
 import { AudienceGroupPicker, type AudienceGroupPreview } from '@whity/ui/audience-group-picker';
@@ -158,6 +160,9 @@ export function RouteFlowEditorScreen({
 }) {
   const { apiClient } = useAuth();
   const t = useTranslation('admin');
+  // Under 640px the route is read as sentences instead of a canvas (PwBuilders).
+  // Not measured yet counts as wide, as it does for every gate on this hook.
+  const phone = useViewportAtLeast(640) === false;
 
   const templateResult = useFetch(async () => {
     const response = await apiClient(`/api/v1/document-route-templates/${templateId}`);
@@ -214,6 +219,18 @@ export function RouteFlowEditorScreen({
   }
   if (templateResult.data === null) {
     return <p className="text-sm text-muted-foreground">{t('routeTemplates.loading', 'Loading…')}</p>;
+  }
+
+  if (phone) {
+    return (
+      <RouteReadOnly
+        name={templateResult.data.name}
+        graph={toFlowGraph(templateResult.data)}
+        rules={rulesResult.data ?? []}
+        roles={rolesResult.data ?? []}
+        groups={groupsResult.data ?? []}
+      />
+    );
   }
 
   // The editing body mounts only once the design has arrived, so its state can be
