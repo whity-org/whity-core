@@ -47,6 +47,8 @@ export function chatApi(api: ApiClient) {
     post: (id: number, body: string, mentions: { type: 'person' | 'agent'; id: number }[]) =>
       call<ChatMessage>(api, `/api/v1/chat/chats/${id}/messages`, json('POST', { body, mentions })),
     read: (id: number, messageId: number) => call<unknown>(api, `/api/v1/chat/chats/${id}/read`, json('POST', { message_id: messageId })),
+    // WHIT-1077: no push for this chat while it is open in a focused window.
+    focus: (id: number, focused: boolean) => call<unknown>(api, `/api/v1/chat/chats/${id}/focus`, json('POST', { focused })),
     createGroup: (title: string, people: number[], link: ChatLink | null) =>
       call<ChatDetail>(
         api,

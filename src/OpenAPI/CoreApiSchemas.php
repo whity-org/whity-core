@@ -7043,6 +7043,9 @@ final class CoreApiSchemas
             'ChatReadRequest' => self::object([
                 'message_id' => self::int() + ['description' => 'The newest message you have read.'],
             ], ['message_id']),
+            'ChatFocusRequest' => self::object([
+                'focused' => self::bool() + ['description' => 'True while the chat is open in a focused window; false when it stops.'],
+            ], []),
 
             // -- Messages (ADR 0016, WHIT-938) ------------------------------------
             // People are id and name, never a bare id.
@@ -12827,6 +12830,14 @@ final class CoreApiSchemas
                 'summary' => 'Mark a chat read up to a message',
                 'tags' => ['chat'],
                 'request' => 'ChatReadRequest',
+                'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/focus', [
+                'mcp' => $personOnly,
+                'summary' => 'Say the caller is looking at this chat in a focused window (every 20 seconds), or stopped',
+                'description' => 'While a person looks at a chat, its new lines are not pushed to their devices (WHIT-1077).',
+                'tags' => ['chat'],
+                'request' => 'ChatFocusRequest',
                 'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
             ]),
             self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/members', [

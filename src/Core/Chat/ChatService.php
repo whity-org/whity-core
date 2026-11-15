@@ -43,8 +43,22 @@ final class ChatService
     /** What an agent may do when the person adding it says nothing: post and reply. */
     public const DEFAULT_ACTIONS = ['post' => 'allowed'];
 
-    public function __construct(private readonly ChatRepository $repo)
+    public function __construct(
+        private readonly ChatRepository $repo,
+        // WHIT-1077: chat lines as web push. Null: no pushes (tests, MCP-only).
+        private readonly ?ChatPushNotifier $push = null,
+    ) {
+    }
+
+    /**
+     * The person is looking at this chat in a focused window, or stopped
+     * (WHIT-1077): no pushes for it while they are. Members only.
+     */
+    public function focus(int $tenantId, ChatViewer $viewer, int $chatId, bool $focused): void
     {
+        $this->personOnly($viewer);
+        $this->open($tenantId, $viewer, $chatId);
+        $this->push?->focus($tenantId, $viewer->profileId, $chatId, $focused);
     }
 
     public function repository(): ChatRepository
@@ -431,6 +445,10 @@ final class ChatService
         if (!$viewer->isAgent()) {
             $this->repo->markRead($tenantId, (int) $me['id'], $id);
         }
+        // A held line reaches people only once it is approved (decideHeld).
+        if (!isset($meta['held'])) {
+            $this->pushLine($tenantId, $chatId, $id, $viewer->isAgent() ? null : $viewer->profileId, $viewer->isAgent() ? $viewer->agentName : $this->who($viewer->profileId)['name'], $body, $kept);
+        }
 
         return $this->presented($tenantId, $id, $viewer);
     }
@@ -490,8 +508,39 @@ final class ChatService
         unset($meta['held']);
         $meta['decided'] = ['by' => $this->who($viewer->profileId), 'approved' => $approve];
         $this->repo->updateMessage($tenantId, $messageId, $meta, $approve ? 'noted' : 'cancelled');
+        if ($approve) {
+            $agentName = is_array($meta['agent'] ?? null) ? (string) ($meta['agent']['name'] ?? '') : '';
+            $mentioned = is_array($meta['mentions'] ?? null) ? array_values(array_filter($meta['mentions'], 'is_array')) : [];
+            $this->pushLine($tenantId, (int) $message['conversation_id'], $messageId, null, $agentName, (string) $message['body_text'], $mentioned);
+        }
 
         return $this->presented($tenantId, $messageId, $viewer);
+    }
+
+    /**
+     * Hand a line to the push notifier. Never stops the post.
+     *
+     * @param list<array<string, mixed>> $mentions
+     */
+    private function pushLine(int $tenantId, int $chatId, int $messageId, ?int $authorProfileId, string $authorName, string $body, array $mentions): void
+    {
+        if ($this->push === null) {
+            return;
+        }
+        try {
+            $chat = $this->repo->findChat($tenantId, $chatId);
+            if ($chat === null) {
+                return;
+            }
+            $members = $this->repo->membersOf($tenantId, [$chatId])[$chatId] ?? [];
+            $kept = [];
+            foreach ($mentions as $m) {
+                $kept[] = ['type' => (string) ($m['type'] ?? ''), 'id' => (int) ($m['id'] ?? 0), 'name' => (string) ($m['name'] ?? '')];
+            }
+            $this->push->posted($tenantId, $chat, $members, $messageId, $authorProfileId, $authorName, $body, $kept);
+        } catch (\Throwable) {
+            // A push problem must never cost anyone their message.
+        }
     }
 
     // ── Presenting ───────────────────────────────────────────────────────────

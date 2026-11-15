@@ -56,6 +56,39 @@ function usePoll(fn: () => void, ms: number, active: boolean) {
   }, [ms, active]);
 }
 
+/** Seconds between "I'm looking at this chat" beats; the server's ChatPushNotifier::HEARTBEAT. */
+export const FOCUS_BEAT_MS = 20_000;
+
+/**
+ * While the open chat is on screen in a focused window, tell the server every
+ * beat, so its new lines aren't pushed to this person's devices (WHIT-1077).
+ * Losing focus, hiding the tab or leaving the chat says so at once.
+ */
+export function useChatFocus(chatId: number | null, send: (id: number, focused: boolean) => Promise<unknown>) {
+  useEffect(() => {
+    if (chatId === null) return;
+    const looking = () => document.visibilityState === 'visible' && document.hasFocus();
+    let on = false;
+    const beat = () => {
+      const now = looking();
+      if (now || on) void send(chatId, now).catch(() => undefined);
+      on = now;
+    };
+    beat();
+    const timer = window.setInterval(beat, FOCUS_BEAT_MS);
+    window.addEventListener('focus', beat);
+    window.addEventListener('blur', beat);
+    document.addEventListener('visibilitychange', beat);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', beat);
+      window.removeEventListener('blur', beat);
+      document.removeEventListener('visibilitychange', beat);
+      if (on) void send(chatId, false).catch(() => undefined);
+    };
+  }, [chatId, send]);
+}
+
 export function ChatScreen() {
   const t = useTranslation('chat');
   const { apiClient, user } = useAuth();
@@ -96,6 +129,7 @@ export function ChatScreen() {
     };
   }, [api]);
   usePoll(loadList, LIST_MS, true);
+  useChatFocus(selected, api.focus);
 
   const open = useCallback(
     (id: number | null) => {
