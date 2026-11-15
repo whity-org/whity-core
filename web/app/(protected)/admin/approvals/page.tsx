@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@whity/ui/tabs';
 import { Card } from '@whity/ui/card';
-import { ActionProposal, type ActionProposalLabels } from '@whity/ui/action-proposal';
+import type { ActionProposalLabels } from '@whity/ui/action-proposal';
 import { ApprovalQueue, type ApprovalQueueItem } from '@whity/ui/approval-queue';
 import { AgentActivity } from '@whity/ui/agent-activity';
 import { UndoBar, type UndoBarLabels } from '@whity/ui/undo-bar';
@@ -51,6 +51,8 @@ import {
 import { ViewToggle } from '@whity/ui/view-toggle';
 import { EditProposalDialog } from './edit-proposal-dialog';
 import { ApprovalsList } from './approvals-list';
+import { DecidedList } from './decided-list';
+import { useAuth } from '@/lib/auth-context';
 
 export default function ApprovalsPage() {
   const t = useTranslation('admin');
@@ -60,6 +62,7 @@ export default function ApprovalsPage() {
   // workspace hides dates.
   const clock = (value: string): string => dates.time(value) ?? '';
   const { addToast } = useToast();
+  const { user } = useAuth();
   const [tab, setTab] = useState('waiting');
   const [currentId, setCurrentId] = useState<string | undefined>(undefined);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -366,7 +369,7 @@ export default function ApprovalsPage() {
     <div>
       <AdminHeader
         title={t('approvals.title', 'Approvals')}
-        description={t('approvals.description.agents', 'What agents propose to do for you')}
+        description={t('approvals.description.askFirst', 'Agents ask here before they do anything you set to “Ask first”.')}
         action={
           <ViewToggle<'one' | 'list'>
             label={t('approvals.view', 'How to review')}
@@ -462,11 +465,14 @@ export default function ApprovalsPage() {
                 description={t('approvals.decided.emptyDescription', 'Proposals you approve or decline stay here.')}
               />
             ) : (
-              <div className="grid max-w-[560px] gap-4">
-                {decided.map((proposal) => (
-                  <ActionProposal key={proposal.id} {...cardProps(proposal)} />
-                ))}
-              </div>
+              <DecidedList
+                proposals={decided}
+                words={words}
+                me={user?.display_name || t('approvals.decided.you', 'You')}
+                now={now}
+                undoingId={undoingId}
+                onUndo={(action) => void undo(action)}
+              />
             )}
           </TabsContent>
 
@@ -496,6 +502,7 @@ export default function ApprovalsPage() {
       {editing && (
         <EditProposalDialog
           proposal={editing}
+          agent={agentName(editing, words)}
           busy={busyId === editing.id}
           onCancel={() => setEditing(null)}
           onApprove={(args) => void decide(editing, 'approve', args)}
