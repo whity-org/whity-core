@@ -9,6 +9,7 @@ use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Mail\EmailGate;
 use Whity\Core\Notification\Jobs\SendNotificationDeliveryJob;
+use Whity\Core\Notification\Push\PushTransport;
 use Whity\Core\Queue\QueueService;
 
 /**
@@ -101,6 +102,11 @@ final class NotificationDispatcher
         if ($this->preferences !== null) {
             $channels = $this->preferences->filterChannels($tenantId, $recipientProfileId, $type, $channels);
         }
+        // WHIT-1074: web push follows the in-app notification to every device
+        // the person turned on, through the same gate as email (the
+        // workspace's push switch, then the person's choice for the kind;
+        // security kinds always). A person with no device gets no push row.
+        $channels = $this->withPush($tenantId, $recipientProfileId, $type, $channels);
         // E2: email goes only where every core email may go: not when the
         // workspace turned its email off, nor when the person turned this kind
         // (or all email) off. Security types always go.
@@ -137,6 +143,44 @@ final class NotificationDispatcher
         }
 
         return $notificationId;
+    }
+
+    /**
+     * Add `push` beside `in_app` (or keep a caller's own `push`) only when a push
+     * transport is registered, the person has a device on in this workspace,
+     * and the gate allows the kind on push. Otherwise remove it.
+     *
+     * @param list<string> $channels
+     * @return list<string>
+     */
+    private function withPush(int $tenantId, ?int $recipientProfileId, string $type, array $channels): array
+    {
+        $wanted = in_array(PushTransport::CHANNEL, $channels, true) || in_array(InAppTransport::CHANNEL, $channels, true);
+        $without = array_values(array_diff($channels, [PushTransport::CHANNEL]));
+        if (!$wanted || $recipientProfileId === null || $recipientProfileId <= 0) {
+            return $without;
+        }
+        $push = $this->transports->resolve($tenantId, PushTransport::CHANNEL);
+        if (!$push instanceof PushTransport) {
+            // No web push here: a caller's own `push` is left for the usual
+            // "no transport" record, and nothing is added.
+            return $channels;
+        }
+        try {
+            if (!$push->hasDevice($tenantId, $recipientProfileId)) {
+                return $without;
+            }
+        } catch (\Throwable $e) {
+            $this->logger?->warning('[notifications] push devices could not be read', ['tenant_id' => $tenantId, 'error' => $e->getMessage()]);
+
+            return $without;
+        }
+        if ($this->emailGate !== null && !$this->emailGate->allows($tenantId, $recipientProfileId, $type, PushTransport::CHANNEL)) {
+            return $without;
+        }
+        $without[] = PushTransport::CHANNEL;
+
+        return $without;
     }
 
     /**
@@ -182,6 +226,11 @@ final class NotificationDispatcher
         array $options
     ): void {
         $deliveryId = $this->repo->recordDelivery($tenantId, $notificationId, $channel);
+        if ($channel === PushTransport::CHANNEL) {
+            // The push tag: a retried delivery replaces the notification on the
+            // device instead of showing it twice.
+            $data['_notification_id'] = $notificationId;
+        }
 
         if (!$this->transports->has($channel)) {
             $this->repo->markDeliveryFailed($deliveryId, 'no transport registered for channel: ' . $channel);
