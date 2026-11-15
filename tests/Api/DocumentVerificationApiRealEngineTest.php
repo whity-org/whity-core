@@ -108,6 +108,38 @@ final class DocumentVerificationApiRealEngineTest extends TestCase
         self::assertSame('Ministry of Records', $data['issuer'], 'the ORGANISATION, never a person');
     }
 
+    /**
+     * WHIT-1044: a code that verified comes with the issuer's logo and colour,
+     * so the page wears the issuer's brand. A refused code still says nothing
+     * about whose it was: it stays byte-identical to an unknown one.
+     */
+    public function testAVerifiedCodeCarriesTheIssuersBrandAndARefusedOneDoesNot(): void
+    {
+        $this->settings->setTenant(self::TENANT, 'branding_main_color', '#7a1f3d');
+        $branded = new DocumentVerificationApiHandler(
+            $this->qr,
+            new DocumentRepository($this->pdo),
+            new RouteEventRepository($this->pdo),
+            $this->settings,
+            new DatabaseSharedStore($this->pdo),
+            null,
+            null,
+            new \Whity\Core\Branding\BrandingService($this->settings),
+        );
+        $token = $this->mintFor($this->raise('Minutes'));
+
+        $data = self::data($this->verify($token, $branded));
+        self::assertTrue($data['verified']);
+        self::assertSame(['name', 'logo_wide_url', 'logo_square_url', 'main_color', 'theme'], array_keys($data['brand']));
+        self::assertSame('#7a1f3d', $data['brand']['main_color']);
+
+        $this->qr->revoke(self::TENANT, $this->documentOf($token), self::AUTHOR);
+        $withdrawn = $this->verify($token, $branded);
+        $unknown = $this->verify(str_repeat('a', 64), $branded);
+        self::assertSame($unknown->getBody(), $withdrawn->getBody());
+        self::assertStringNotContainsString('brand', (string) $withdrawn->getBody());
+    }
+
     /** The date is a DATE. A timestamp would add a fact with no verification value. */
     public function testTheIssueDateIsADateAndNotATimestamp(): void
     {
@@ -426,7 +458,7 @@ final class DocumentVerificationApiRealEngineTest extends TestCase
         return (int) $statement->fetchColumn();
     }
 
-    private function verify(string $token): Response
+    private function verify(string $token, ?DocumentVerificationApiHandler $handler = null): Response
     {
         TenantContext::reset();
         $request = new Request(
@@ -436,7 +468,7 @@ final class DocumentVerificationApiRealEngineTest extends TestCase
             ''
         );
 
-        return $this->handler->verify($request, ['token' => $token]);
+        return ($handler ?? $this->handler)->verify($request, ['token' => $token]);
     }
 
     private function raise(string $title): int

@@ -24471,6 +24471,15 @@
                                                         "revision",
                                                         "issued_on"
                                                     ]
+                                                },
+                                                "brand": {
+                                                    "nullable": true,
+                                                    "allOf": [
+                                                        {
+                                                            "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                                                        }
+                                                    ],
+                                                    "description": "Only beside a code that verified and names its issuer: the issuer logo and colour (WHIT-1044)."
                                                 }
                                             },
                                             "required": [
@@ -92601,6 +92610,15 @@
                                 "items": {
                                     "$ref": "#/components/schemas/SignupJoinProvider"
                                 }
+                            },
+                            "brand": {
+                                "nullable": true,
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                                    }
+                                ],
+                                "description": "The workspace logo and colour for the page (WHIT-1044)."
                             }
                         },
                         "required": [
@@ -92633,6 +92651,15 @@
                             },
                             "requires_password": {
                                 "type": "boolean"
+                            },
+                            "brand": {
+                                "nullable": true,
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                                    }
+                                ],
+                                "description": "The workspace logo and colour for the page (WHIT-1044)."
                             }
                         },
                         "required": [

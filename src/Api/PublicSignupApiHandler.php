@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Core\Audit\AuditLogger;
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\PasswordPolicy;
@@ -69,7 +70,28 @@ final class PublicSignupApiHandler
         private readonly AuditLogger $audit,
         /** The sign-in providers a visitor may join with (WHIT-917); null lists none. */
         private readonly ?\Whity\Core\Signup\JoinProviders $joinProviders = null,
+        /** The workspace's logo and colour for the page (WHIT-1044); null sends none. */
+        private readonly ?BrandingService $branding = null,
     ) {
+    }
+
+    /**
+     * The workspace's public brand (WHIT-1044, as the booking page's WHIT-1014),
+     * or null without a branding service or when it cannot be read: the page
+     * then wears the host's brand, never an error.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function brandFor(int $tenantId, string $workspaceName): ?array
+    {
+        if ($this->branding === null) {
+            return null;
+        }
+        try {
+            return $this->branding->forPublicPage($tenantId, $workspaceName);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -112,6 +134,7 @@ final class PublicSignupApiHandler
             'email_signup' => $this->emailSignupReady(),
             'email_signup_reason' => $this->emailSignupReady() ? null : 'bot_check_unavailable',
             'providers' => $this->joinProviders(),
+            'brand' => $this->brandFor((int) $workspace['id'], (string) $workspace['name']),
         ]], 200);
     }
 
@@ -224,6 +247,7 @@ final class PublicSignupApiHandler
             'workspace_name' => $preview['workspace_name'],
             'email' => $preview['email'],
             'requires_password' => $preview['requires_password'],
+            'brand' => $this->brandFor((int) $preview['tenant_id'], (string) $preview['workspace_name']),
         ]], 200);
     }
 
