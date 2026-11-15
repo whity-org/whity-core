@@ -44,6 +44,7 @@ function message(over: Partial<ChatMessage> = {}): ChatMessage {
     thread: null,
     reactions: [],
     attachments: [],
+    block: null,
     pinned: false,
     edited: false,
     deleted: false,

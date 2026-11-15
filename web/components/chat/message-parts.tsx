@@ -28,6 +28,7 @@ import { useDateDisplay } from '@whity/features/datetime';
 import { cn } from '@/lib/utils';
 import type { ChatLayout, ChatMention, ChatMessage, ChatReadMark } from '@/lib/chat-wire';
 import { MessageAttachments, attachmentsLine } from './attachments';
+import { MessageBlock } from './blocks';
 
 /** The words here are Chat's: the `t` passed in is `useTranslation('chat')`, as this hook gives. */
 export function useChatText(): TranslateFn {
@@ -55,6 +56,8 @@ export interface MessageActions {
   onEdit: (m: ChatMessage) => void;
   onDelete: (m: ChatMessage) => void;
   onQuote: (messageId: number) => void;
+  /** Vote in a poll (UC.5); absent where nobody can vote (a preview). */
+  onVote?: (m: ChatMessage, choices: number[]) => void;
 }
 
 /** The text, with the people and agents it mentions in the main colour and searched words marked. */
@@ -329,6 +332,7 @@ export function MessageItem({
     <>
       <Quote t={t} message={message} onOpen={actions.onQuote} />
       <MessageAttachments t={t} attachments={message.attachments ?? []} />
+      {message.block && <MessageBlock t={t} block={message.block} onVote={actions.onVote ? (choices) => actions.onVote!(message, choices) : undefined} />}
       {children ?? (message.body !== '' ? <MessageBody text={message.body} mentions={message.mentions} highlight={highlight} /> : null)}
     </>
   );

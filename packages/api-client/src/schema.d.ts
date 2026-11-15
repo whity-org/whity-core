@@ -2140,6 +2140,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/messages/{id}/vote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vote in a poll, or change your vote */
+        post: operations["post_api_v1_chat_messages_id_vote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat/preferences": {
         parameters: {
             query?: never;
@@ -2151,6 +2168,23 @@ export interface paths {
         get: operations["get_api_v1_chat_preferences"];
         /** Choose bubbles or compact rows for your chats */
         put: operations["put_api_v1_chat_preferences"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Find a booking or a document to put in a message */
+        get: operations["get_api_v1_chat_records"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -11744,6 +11778,10 @@ export interface components {
             name: string;
             works_for?: components["schemas"]["ChatPerson"];
         };
+        /** @description type poll: question, options [{text, votes, mine, people}], multiple, voters, closes_at, closed. type record: record (booking or document), id, title, status, href, and its times or number; missing when it no longer exists. */
+        ChatBlock: {
+            [key: string]: unknown;
+        };
         ChatCreateRequest: {
             /**
              * @description group (the default) or direct.
@@ -11912,6 +11950,8 @@ export interface components {
             }[];
             /** @description Photos (an album when several), videos, files and voice (UC.10). */
             attachments?: components["schemas"]["ChatAttachment"][];
+            /** @description A poll, or a Whity record with its live status (UC.5). */
+            block?: components["schemas"]["ChatBlock"] | null;
             pinned?: boolean;
             edited?: boolean;
             /** @description Shown as "This message was deleted"; the body is empty. */
@@ -11983,6 +12023,10 @@ export interface components {
             also_to_chat?: boolean;
             /** @description Files you uploaded to this chat and have not sent yet; the body may then be empty. */
             attachments?: number[];
+            /** @description A poll ({type: poll, question, options[2-10], multiple, closes_at}) or a record ({type: record, record: booking|document, id}); the body may then be empty. */
+            block?: {
+                [key: string]: unknown;
+            };
         };
         ChatPreferencesRequest: {
             /** @enum {string} */
@@ -12001,6 +12045,9 @@ export interface components {
         ChatReadRequest: {
             /** @description The newest message you have read. */
             message_id: number;
+        };
+        ChatRecordsResponse: {
+            data: components["schemas"]["ChatBlock"][];
         };
         ChatShareProposalRequest: {
             /** @description One of your waiting proposals (from an Ask-first call). */
@@ -12048,6 +12095,10 @@ export interface components {
             title?: string;
             /** @description What the chat is about, or null to remove the link. */
             link?: components["schemas"]["ChatLink"] | null;
+        };
+        ChatVoteRequest: {
+            /** @description The answers you pick, by position; empty takes your vote back. */
+            choices: number[];
         };
         CheckoutStartRequest: {
             plan_key: string;
@@ -30491,6 +30542,95 @@ export interface operations {
             };
         };
     };
+    post_api_v1_chat_messages_id_vote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatVoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The message */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Closed, or more answers than the poll takes */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_chat_preferences: {
         parameters: {
             query?: never;
@@ -30585,6 +30725,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_records: {
+        parameters: {
+            query?: {
+                /** @description booking or document */
+                type?: string;
+                /** @description Words in its name */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Records */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatRecordsResponse"];
                 };
             };
             /** @description Missing or invalid authentication */

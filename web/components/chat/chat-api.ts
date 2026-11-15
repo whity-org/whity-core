@@ -3,7 +3,7 @@
  * messages: the server's own sentence for a refusal, ours otherwise.
  */
 
-import type { ChatAttachment, ChatDetail, ChatDirectory, ChatInbox, ChatLayout, ChatMessage, ChatMode, ChatReads, ChatState, ChatSummary, ChatLink } from '@/lib/chat-wire';
+import type { ChatAttachment, ChatDetail, ChatRecordBlock, ChatDirectory, ChatInbox, ChatLayout, ChatMessage, ChatMode, ChatReads, ChatState, ChatSummary, ChatLink } from '@/lib/chat-wire';
 
 type ApiClient = (path: string, init?: RequestInit) => Promise<Response>;
 
@@ -53,7 +53,7 @@ export function chatApi(api: ApiClient) {
       id: number,
       body: string,
       mentions: { type: 'person' | 'agent' | 'everyone'; id: number }[],
-      extra: { reply_to?: number; thread_root?: number; also_to_chat?: boolean; attachments?: number[] } = {}
+      extra: { reply_to?: number; thread_root?: number; also_to_chat?: boolean; attachments?: number[]; block?: Record<string, unknown> } = {}
     ) => call<ChatMessage>(api, `/api/v1/chat/chats/${id}/messages`, json('POST', { body, mentions, ...extra })),
     // The parts of a message (UC.6–UC.12).
     state: (id: number, after: number, since: string | null) =>
@@ -65,6 +65,10 @@ export function chatApi(api: ApiClient) {
     thread: (messageId: number) => call<{ root: ChatMessage; replies: ChatMessage[] }>(api, `/api/v1/chat/messages/${messageId}/thread`),
     search: (id: number, q: string, from: number | null) =>
       call<ChatMessage[]>(api, `/api/v1/chat/chats/${id}/search?q=${encodeURIComponent(q)}${from ? `&from=${from}` : ''}`),
+    // Blocks inside messages (UC.5).
+    vote: (messageId: number, choices: number[]) => call<ChatMessage>(api, `/api/v1/chat/messages/${messageId}/vote`, json('POST', { choices })),
+    records: (type: 'booking' | 'document', q: string) =>
+      call<ChatRecordBlock[]>(api, `/api/v1/chat/records?type=${type}&q=${encodeURIComponent(q)}`),
     // Files, photos and voice (UC.10).
     transcribe: (attachmentId: number, transcript: string) =>
       call<unknown>(api, `/api/v1/chat/attachments/${attachmentId}`, json('PATCH', { transcript })),

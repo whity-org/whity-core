@@ -99,6 +99,7 @@ export interface ChatMessage {
   thread: { count: number; last_at: string | null; people: string[] } | null;
   reactions: ChatReaction[];
   attachments: ChatAttachment[];
+  block: ChatBlock | null;
   pinned: boolean;
   edited: boolean;
   deleted: boolean;
@@ -113,6 +114,36 @@ export interface ChatQuote {
   body: string;
   deleted: boolean;
 }
+
+/** A poll inside a message (UC.5): live counts, and whether the reader voted. */
+export interface ChatPollBlock {
+  type: 'poll';
+  question: string;
+  multiple: boolean;
+  closes_at: string | null;
+  closed: boolean;
+  voters: number;
+  options: { text: string; votes: number; mine: boolean; people: string[] }[];
+}
+
+/** A Whity record inside a message (UC.5), with its status as it is now. */
+export interface ChatRecordBlock {
+  type: 'record';
+  record: 'booking' | 'document';
+  id: number;
+  missing?: boolean;
+  title: string;
+  status: string;
+  href: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  with?: string | null;
+  number?: string | null;
+  kind?: string | null;
+  created_at?: string | null;
+}
+
+export type ChatBlock = ChatPollBlock | ChatRecordBlock;
 
 /** A photo, video, file or voice message on a message (UC.10). */
 export interface ChatAttachment {

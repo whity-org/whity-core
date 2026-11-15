@@ -205,6 +205,7 @@ final class ChatApiHandler
                 self::positiveInt($body['thread_root'] ?? null),
                 ($body['also_to_chat'] ?? false) === true,
                 is_array($body['attachments'] ?? null) ? array_values(array_filter($body['attachments'], 'is_int')) : [],
+                $body['block'] ?? null,
             )], 201);
         });
     }
@@ -287,6 +288,29 @@ final class ChatApiHandler
             $this->chat->typing($t, $v, (int) ($params['id'] ?? 0));
 
             return Response::json(['data' => ['ok' => true]]);
+        });
+    }
+
+    // ── Blocks inside messages (UC.5) ────────────────────────────────────────
+
+    /** @param array<string, string> $params */
+    public function vote(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            $choices = JsonBody::parsed($request)['choices'] ?? [];
+
+            return Response::json(['data' => $this->chat->vote($t, $v, (int) ($params['id'] ?? 0), is_array($choices) ? array_values(array_filter($choices, 'is_int')) : [])]);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function records(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request): Response {
+            $q = MessagesApiHandler::query($request);
+            $kind = in_array($q['type'] ?? null, ['booking', 'document'], true) ? (string) $q['type'] : 'booking';
+
+            return Response::json(['data' => $this->chat->findRecords($t, $v, $kind, (string) ($q['q'] ?? ''))]);
         });
     }
 

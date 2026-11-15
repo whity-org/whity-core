@@ -6977,6 +6977,7 @@ final class CoreApiSchemas
                     'people' => ['type' => 'array', 'items' => self::str()],
                 ], ['emoji', 'count', 'mine'])],
                 'attachments' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatAttachment'), 'description' => 'Photos (an album when several), videos, files and voice (UC.10).'],
+                'block' => ['oneOf' => [SchemaBuilder::ref('ChatBlock'), ['type' => 'null']], 'description' => 'A poll, or a Whity record with its live status (UC.5).'],
                 'pinned' => self::bool(),
                 'edited' => self::bool(),
                 'deleted' => self::bool() + ['description' => 'Shown as "This message was deleted"; the body is empty.'],
@@ -7068,7 +7069,13 @@ final class CoreApiSchemas
                 'thread_root' => self::int() + ['description' => 'Reply in the thread under this message.'],
                 'also_to_chat' => self::bool() + ['description' => 'With thread_root: also show the reply in the chat.'],
                 'attachments' => ['type' => 'array', 'items' => self::int(), 'description' => 'Files you uploaded to this chat and have not sent yet; the body may then be empty.'],
+                'block' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A poll ({type: poll, question, options[2-10], multiple, closes_at}) or a record ({type: record, record: booking|document, id}); the body may then be empty.'],
             ], ['body']),
+            'ChatBlock' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'type poll: question, options [{text, votes, mine, people}], multiple, voters, closes_at, closed. type record: record (booking or document), id, title, status, href, and its times or number; missing when it no longer exists.'],
+            'ChatVoteRequest' => self::object([
+                'choices' => ['type' => 'array', 'items' => self::int(), 'description' => 'The answers you pick, by position; empty takes your vote back.'],
+            ], ['choices']),
+            'ChatRecordsResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('ChatBlock')]),
             'ChatAttachment' => self::object([
                 'id' => self::int(),
                 'kind' => ['type' => 'string', 'enum' => ['image', 'video', 'file', 'voice']],
@@ -13124,6 +13131,21 @@ final class CoreApiSchemas
                 'summary' => 'Say you are typing in this chat (every few seconds while you type)',
                 'tags' => ['chat'],
                 'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
+            ]),
+            // Blocks inside messages (UC.5, WHIT-1096).
+            self::ungatedRoute('POST', '/api/chat/messages/{id:\d+}/vote', [
+                'mcp' => $personOnly,
+                'summary' => 'Vote in a poll, or change your vote',
+                'tags' => ['chat'],
+                'request' => 'ChatVoteRequest',
+                'responses' => [200 => self::jsonResponse('The message', 'ChatMessageResponse'), 422 => self::errorResponse('Closed, or more answers than the poll takes')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/records', [
+                'mcp' => $personOnly,
+                'summary' => 'Find a booking or a document to put in a message',
+                'tags' => ['chat'],
+                'parameters' => [self::queryParam('type', 'string', 'booking or document'), self::queryParam('q', 'string', 'Words in its name')],
+                'responses' => [200 => self::jsonResponse('Records', 'ChatRecordsResponse')] + self::authErrors(),
             ]),
             // Files, photos and voice (UC.10, WHIT-1095).
             self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/attachments', [
