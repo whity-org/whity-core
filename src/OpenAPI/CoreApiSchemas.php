@@ -7046,6 +7046,36 @@ final class CoreApiSchemas
             'ChatReadRequest' => self::object([
                 'message_id' => self::int() + ['description' => 'The newest message you have read.'],
             ], ['message_id']),
+            // One chat (UC.1, WHIT-1093): team chats and customer conversations in one list.
+            'ChatInboxItem' => self::object([
+                'id' => self::int() + ['description' => 'The conversation id; /chat?c=<id> opens it whatever its kind.'],
+                'kind' => ['type' => 'string', 'enum' => ['team', 'customer']],
+                'type' => ['type' => 'string', 'enum' => ['group', 'direct', 'customer']],
+                'title' => self::str(true),
+                'pinned' => self::bool(),
+                'unread' => self::int(),
+                'with' => ['oneOf' => [SchemaBuilder::ref('ChatMember'), ['type' => 'null']]],
+                'people_count' => self::int(),
+                'agents_count' => self::int(),
+                'link' => ['oneOf' => [SchemaBuilder::ref('ChatLink'), ['type' => 'null']]],
+                'channel' => self::str() + ['description' => 'Customer conversations: email, webchat or a plugin channel.'],
+                'status' => ['type' => 'string', 'enum' => ['open', 'pending', 'closed']],
+                'subject' => self::str(true),
+                'contact' => self::object(['name' => self::str(true), 'address' => self::str()], ['address']),
+                'customer' => ['oneOf' => [SchemaBuilder::ref('MessagingPerson'), ['type' => 'null']]],
+                'assignee' => ['oneOf' => [SchemaBuilder::ref('MessagingPerson'), ['type' => 'null']]],
+                'waiting_since' => self::str(true) + ['description' => 'The customer wrote last and nobody has answered since.'],
+                'last_message' => ['oneOf' => [['type' => 'object', 'additionalProperties' => true], ['type' => 'null']]],
+                'last_message_at' => self::str(true),
+                'created_at' => self::str(true),
+            ], ['id', 'kind', 'type', 'pinned', 'unread']),
+            'ChatInboxResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatInboxItem')],
+                'customers' => self::bool() + ['description' => 'Whether the list includes customer conversations (messages.read).'],
+            ], ['data', 'customers']),
+            'ChatPinRequest' => self::object([
+                'pinned' => self::bool() + ['description' => 'False unpins; true by default.'],
+            ], []),
             'ChatFocusRequest' => self::object([
                 'focused' => self::bool() + ['description' => 'True while the chat is open in a focused window; false when it stops.'],
             ], []),
@@ -12915,6 +12945,28 @@ final class CoreApiSchemas
                     403 => self::errorResponse('Someone else decides this message'),
                     409 => self::errorResponse('The message is not waiting'),
                 ] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/inbox', [
+                'mcp' => $personOnly,
+                'summary' => 'The one Chat list: your team chats and the workspace\'s customer conversations',
+                'description' => 'Customer conversations are included for people who may read them (messages.read): open and waiting ones, '
+                    . 'closed ones for 30 days, and any you pinned. Newest activity first.',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('The list', 'ChatInboxResponse')] + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/inbox/{id:\d+}/pin', [
+                'mcp' => $personOnly,
+                'summary' => 'Pin a chat or customer conversation to the top of your list, or unpin it',
+                'tags' => ['chat'],
+                'request' => 'ChatPinRequest',
+                'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/inbox/{id:\d+}/read', [
+                'mcp' => $personOnly,
+                'summary' => 'Mark a customer conversation read up to a message, for you',
+                'tags' => ['chat'],
+                'request' => 'ChatReadRequest',
+                'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
             ]),
             self::ungatedRoute('GET', '/api/chat/directory', [
                 'summary' => 'Find people and agents to add to a chat or mention',

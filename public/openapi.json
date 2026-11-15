@@ -12447,6 +12447,280 @@
                 }
             }
         },
+        "/api/v1/chat/inbox": {
+            "get": {
+                "operationId": "get_api_v1_chat_inbox",
+                "summary": "The one Chat list: your team chats and the workspace's customer conversations",
+                "tags": [
+                    "chat"
+                ],
+                "description": "Customer conversations are included for people who may read them (messages.read): open and waiting ones, closed ones for 30 days, and any you pinned. Newest activity first.",
+                "responses": {
+                    "200": {
+                        "description": "The list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatInboxResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/chat/inbox/{id}/pin": {
+            "post": {
+                "operationId": "post_api_v1_chat_inbox_id_pin",
+                "summary": "Pin a chat or customer conversation to the top of your list, or unpin it",
+                "tags": [
+                    "chat"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChatPinRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatDoneResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Chat not found, or you are not in it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/chat/inbox/{id}/read": {
+            "post": {
+                "operationId": "post_api_v1_chat_inbox_id_read",
+                "summary": "Mark a customer conversation read up to a message, for you",
+                "tags": [
+                    "chat"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChatReadRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatDoneResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Chat not found, or you are not in it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/chat/messages/{id}/approve": {
             "post": {
                 "operationId": "post_api_v1_chat_messages_id_approve",
@@ -74993,6 +75267,167 @@
                     }
                 }
             },
+            "ChatInboxItem": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "The conversation id; /chat?c=<id> opens it whatever its kind."
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "team",
+                            "customer"
+                        ]
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "group",
+                            "direct",
+                            "customer"
+                        ]
+                    },
+                    "title": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "pinned": {
+                        "type": "boolean"
+                    },
+                    "unread": {
+                        "type": "integer"
+                    },
+                    "with": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/ChatMember"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "people_count": {
+                        "type": "integer"
+                    },
+                    "agents_count": {
+                        "type": "integer"
+                    },
+                    "link": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/ChatLink"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "channel": {
+                        "type": "string",
+                        "description": "Customer conversations: email, webchat or a plugin channel."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "open",
+                            "pending",
+                            "closed"
+                        ]
+                    },
+                    "subject": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "contact": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "address": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "address"
+                        ]
+                    },
+                    "customer": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/MessagingPerson"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "assignee": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/MessagingPerson"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "waiting_since": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The customer wrote last and nobody has answered since."
+                    },
+                    "last_message": {
+                        "oneOf": [
+                            {
+                                "type": "object",
+                                "additionalProperties": true
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "last_message_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind",
+                    "type",
+                    "pinned",
+                    "unread"
+                ]
+            },
+            "ChatInboxResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ChatInboxItem"
+                        }
+                    },
+                    "customers": {
+                        "type": "boolean",
+                        "description": "Whether the list includes customer conversations (messages.read)."
+                    }
+                },
+                "required": [
+                    "data",
+                    "customers"
+                ]
+            },
             "ChatLink": {
                 "type": "object",
                 "properties": {
@@ -75294,6 +75729,15 @@
                     "id",
                     "name"
                 ]
+            },
+            "ChatPinRequest": {
+                "type": "object",
+                "properties": {
+                    "pinned": {
+                        "type": "boolean",
+                        "description": "False unpins; true by default."
+                    }
+                }
             },
             "ChatPostRequest": {
                 "type": "object",
