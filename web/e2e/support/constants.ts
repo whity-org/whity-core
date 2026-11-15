@@ -79,7 +79,7 @@ export const DELEGATED_PERMISSIONS = [
  * Sidebar sections an ADMIN sees. `GET /api/navigation` is now RBAC-filtered
  * per caller server-side (WC-175 #191): each link is returned only if the
  * caller satisfies that page's RBAC, so the set differs by role (a plain user
- * sees only "Settings"). This is the ADMIN-visible set — navigation.spec.ts
+ * sees only Dashboard and "Settings"). This is the ADMIN-visible set — navigation.spec.ts
  * runs authenticated as admin, which holds every gated permission and so sees
  * all of these.
  */
@@ -89,10 +89,9 @@ export const SIDEBAR_SECTIONS = [
   { label: 'Roles', href: '/admin/roles' },
   { label: 'Organizational Units', href: '/admin/ous' },
   { label: 'User Groups', href: '/admin/user-groups' },
-  // The one Settings entry opens the Settings area (WHIT-806). The personal
-  // account page is not in the nav: AppShell.openAccountSettings() uses the
-  // user row in the footer.
-  { label: 'Settings', href: '/admin/settings' },
+  // The one Settings entry opens the Settings area (WHIT-806), for everyone
+  // since WHIT-1081: your own settings first, the workspace's below.
+  { label: 'Settings', href: '/settings' },
 ] as const;
 
 /**
