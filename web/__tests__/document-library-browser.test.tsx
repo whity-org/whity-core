@@ -581,7 +581,7 @@ describe('controls the caller cannot use', () => {
     render(<DocumentLibraryPage />);
     await waitFor(() => expect(screen.getByText('Invoice 42')).toBeInTheDocument());
 
-    await userEvent.click(screen.getByRole('button', { name: /^Starred$/ }));
+    await userEvent.click(within(screen.getByTestId('document-rail')).getByRole('button', { name: /^Starred$/ }));
     await userEvent.click(screen.getByRole('button', { name: 'This collection' }));
 
     // Present, not hidden: hiding them would make "this one is built in", "you
@@ -649,7 +649,7 @@ describe('managing a collection', () => {
     render(<DocumentLibraryPage />);
     await waitFor(() => expect(screen.getByText('Invoice 42')).toBeInTheDocument());
 
-    await userEvent.click(screen.getByRole('button', { name: /Q3 audit/ }));
+    await userEvent.click(within(screen.getByTestId('document-rail')).getByRole('button', { name: /Q3 audit/ }));
     await userEvent.click(screen.getByRole('button', { name: 'This collection' }));
     await userEvent.click(screen.getByRole('menuitem', { name: /Rename/ }));
 
@@ -708,7 +708,7 @@ describe('managing a collection', () => {
     expect(screen.queryByRole('menuitem', { name: /Remove from this collection/ })).toBeNull();
     await userEvent.keyboard('{Escape}');
 
-    await userEvent.click(screen.getByRole('button', { name: /Q3 audit/ }));
+    await userEvent.click(within(screen.getByTestId('document-rail')).getByRole('button', { name: /Q3 audit/ }));
     await waitFor(() => expect(lastListUrl()).toContain('collection_id=5'));
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Document actions' })[0]);
@@ -824,5 +824,38 @@ describe('the unit column: names (#821)', () => {
 
     await waitFor(() => expect(screen.getAllByText('Registry').length).toBeGreaterThan(0));
     expect(screen.queryByText('التسجيل')).not.toBeInTheDocument();
+  });
+});
+
+// ── 7. the phone (PwLibrary) ────────────────────────────────────────────────
+
+describe('on a phone', () => {
+  it('opens the folders as a sheet from the Folder button, and a chip opens a collection', async () => {
+    render(<DocumentLibraryPage />);
+    await waitFor(() => expect(screen.getByText('Invoice 42')).toBeInTheDocument());
+
+    const folderButton = screen.getByRole('button', { name: /Folder\s*All documents/ });
+    expect(screen.queryByTestId('folders-sheet')).toBeNull();
+    await userEvent.click(folderButton);
+    const sheet = await screen.findByTestId('folders-sheet');
+    expect(within(sheet).getByRole('button', { name: 'Created by me' })).toBeInTheDocument();
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Created by me' }));
+    await waitFor(() => expect(lastListUrl()).toContain('view=created-by-me'));
+    await waitFor(() => expect(screen.queryByTestId('folders-sheet')).toBeNull());
+
+    const chips = screen.getByRole('list', { name: 'Collections' });
+    await userEvent.click(within(chips).getByRole('button', { name: /Q3 audit/ }));
+    await waitFor(() => expect(lastListUrl()).toContain('collection_id=5'));
+  });
+
+  it('says a search found titles, and that the text is not searched', async () => {
+    render(<DocumentLibraryPage />);
+    await waitFor(() => expect(screen.getByText('Invoice 42')).toBeInTheDocument());
+
+    await userEvent.type(screen.getByLabelText('Search titles and numbers'), 'inv{Enter}');
+    const summary = await screen.findByTestId('search-summary');
+    expect(summary).toHaveTextContent(/results in All documents/);
+    expect(summary).toHaveTextContent(/In the title/);
+    expect(summary).toHaveTextContent(/inside the text of documents is not available/);
   });
 });
