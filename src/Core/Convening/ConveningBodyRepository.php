@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Convening;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 use Whity\Core\Db\DbBool;
 
@@ -451,11 +452,11 @@ final class ConveningBodyRepository
             // BESIDE the map, never instead of it. A localizing client reads
             // `name`; a surface that can only hold one string — a notification
             // subject, a server-driven table cell — reads this. See
-            // LocalizedText::preferred().
-            'display_name' => LocalizedText::preferred(
+            // LocalizedText::resolve().
+            'display_name' => LocalizedText::resolve(
                 LocalizedText::decode($row['name'] ?? null, self::FALLBACK_LOCALE),
                 self::FALLBACK_LOCALE,
-                (string) $row['body_key']
+                fallback: (string) $row['body_key'],
             ),
             'ou_id' => $row['ou_id'] !== null ? (int) $row['ou_id'] : null,
             'description' => $row['description'] !== null ? (string) $row['description'] : null,

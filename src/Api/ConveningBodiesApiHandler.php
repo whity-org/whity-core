@@ -6,7 +6,8 @@ namespace Whity\Api;
 
 use Whity\Core\Convening\ConveningBodyRepository;
 use Whity\Core\Convening\ConveningRejectedException;
-use Whity\Core\Convening\LocalizedText;
+use Whity\Core\i18n\LocalizedText;
+use Whity\Core\i18n\LocalizedTextRejected;
 use Whity\Core\Convening\MemberRole;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -115,8 +116,9 @@ final class ConveningBodiesApiHandler
 
             $name = LocalizedText::normalize(
                 $body['name'] ?? null,
-                ConveningBodyRepository::FALLBACK_LOCALE,
-                'name'
+                'name',
+                bareLanguage: ConveningBodyRepository::FALLBACK_LOCALE,
+                required: true,
             );
 
             $description = isset($body['description']) && is_string($body['description'])
@@ -133,7 +135,7 @@ final class ConveningBodiesApiHandler
             $id = $this->bodies->create($tenantId, $key, $name, $ouId, $description);
 
             return Response::json(['data' => $this->bodies->find($tenantId, $id)], 201);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             // ->clientMessage, never ->getMessage(): only text somebody wrote FOR
             // a caller reaches a caller (WC-186). Every catch site below follows.
             return Response::error($e->clientMessage, 422);
@@ -171,8 +173,9 @@ final class ConveningBodiesApiHandler
             if (array_key_exists('name', $body)) {
                 $fields['name'] = LocalizedText::normalize(
                     $body['name'],
-                    ConveningBodyRepository::FALLBACK_LOCALE,
-                    'name'
+                    'name',
+                    bareLanguage: ConveningBodyRepository::FALLBACK_LOCALE,
+                    required: true,
                 );
             }
             if (array_key_exists('ou_id', $body)) {
@@ -198,7 +201,7 @@ final class ConveningBodiesApiHandler
             $this->bodies->update($tenantId, $id, $fields);
 
             return Response::json(['data' => $this->bodies->find($tenantId, $id)]);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[ConveningBodiesApiHandler] update failed: ' . $e->getMessage());
@@ -228,7 +231,7 @@ final class ConveningBodiesApiHandler
             $this->bodies->delete($tenantId, $id);
 
             return Response::json(['data' => ['deleted' => true]]);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             // 409, not 422: the request is well-formed and the refusal is about
             // the STATE of the resource, which is what a conflict means.
             return Response::error($e->clientMessage, 409);
@@ -302,7 +305,7 @@ final class ConveningBodiesApiHandler
             $this->bodies->addMember($tenantId, $id, $profileId, $memberRole);
 
             return Response::json(['data' => $this->bodies->currentMembers($tenantId, $id)], 201);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[ConveningBodiesApiHandler] addMember failed: ' . $e->getMessage());

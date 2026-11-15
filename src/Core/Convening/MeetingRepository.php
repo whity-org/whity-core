@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Convening;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 use Whity\Sdk\Sql\SequenceAllocator;
 
@@ -265,11 +266,11 @@ final class MeetingRepository
             'meeting_number' => (int) $row['meeting_number'],
             'title' => LocalizedText::decode($row['title'] ?? null, self::FALLBACK_LOCALE),
             // Beside the map, for surfaces that can hold only one string. See
-            // LocalizedText::preferred().
-            'display_title' => LocalizedText::preferred(
+            // LocalizedText::resolve().
+            'display_title' => LocalizedText::resolve(
                 LocalizedText::decode($row['title'] ?? null, self::FALLBACK_LOCALE),
                 self::FALLBACK_LOCALE,
-                '#' . (string) $row['meeting_number']
+                fallback: '#' . (string) $row['meeting_number'],
             ),
             'scheduled_at' => $row['scheduled_at'] !== null ? (string) $row['scheduled_at'] : null,
             'held_at' => $row['held_at'] !== null ? (string) $row['held_at'] : null,

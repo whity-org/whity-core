@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Convening;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 
 /**
@@ -342,11 +343,11 @@ final class AgendaRepository
             'position' => (int) $row['position'],
             'title' => LocalizedText::decode($row['title'] ?? null, self::FALLBACK_LOCALE),
             // Beside the map, for surfaces that can hold only one string. See
-            // LocalizedText::preferred().
-            'display_title' => LocalizedText::preferred(
+            // LocalizedText::resolve().
+            'display_title' => LocalizedText::resolve(
                 LocalizedText::decode($row['title'] ?? null, self::FALLBACK_LOCALE),
                 self::FALLBACK_LOCALE,
-                'Item ' . (string) $row['position']
+                fallback: 'Item ' . (string) $row['position'],
             ),
             'document_id' => $row['document_id'] !== null ? (int) $row['document_id'] : null,
             'notes' => $row['notes'] !== null ? (string) $row['notes'] : null,
