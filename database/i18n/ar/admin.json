@@ -3115,6 +3115,8 @@
         "settings.meta.auth.sso_enabled.label": "الدخول الموحّد (SSO)",
         "settings.meta.auth.sso_self_provision_workspace.help": "يمنح من يسجّل الدخول عبر مزوّد هوية المشغّل ولا ينتمي إلى أي مساحة عمل مساحة عمل جديدة خاصة به.",
         "settings.meta.auth.sso_self_provision_workspace.label": "مساحة عمل عند أول تسجيل دخول موحّد",
+        "settings.meta.billing.default_currency.help": "تبدأ الأسعار والخدمات والمستندات الجديدة بهذه العملة، برمز من ثلاثة أحرف مثل USD أو JOD. المبالغ المحفوظة تبقى بعملتها.",
+        "settings.meta.billing.default_currency.label": "العملة",
         "settings.meta.company.address.help": "يُطبع على الترويسات والفواتير.",
         "settings.meta.company.address.label": "العنوان",
         "settings.meta.company.address_ar.help": "يُطبع تحت الاسم العربي في الترويسة بالعربية والإنجليزية.",

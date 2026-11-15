@@ -119,6 +119,9 @@ export const COMPANY_SETTING_KEYS: readonly string[] = [
   'company.email',
   'company.name_ar',
   'company.address_ar',
+  // The workspace currency (CU.4): USD for a new workspace, the currency it
+  // already used for one made before design 3.5.1.
+  'billing.default_currency',
 ];
 
 /**
@@ -134,6 +137,7 @@ const COMPANY_INPUT_DIR: Readonly<Record<string, 'ltr' | 'rtl' | 'auto'>> = {
   'company.email': 'ltr',
   'company.name_ar': 'rtl',
   'company.address_ar': 'rtl',
+  'billing.default_currency': 'ltr',
 };
 
 /**
@@ -245,6 +249,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
     'company.address_ar': {
       label: t('settings.meta.company.address_ar.label', 'Address in Arabic'),
       help: t('settings.meta.company.address_ar.help', 'Printed under the Arabic name on a letterhead in English and Arabic.'),
+    },
+    'billing.default_currency': {
+      label: t('settings.meta.billing.default_currency.label', 'Currency'),
+      help: t(
+        'settings.meta.billing.default_currency.help',
+        'New prices, services and documents start in this currency, as a three-letter code such as USD or JOD. Amounts already saved keep their own currency.'
+      ),
     },
     site_name: {
       label: t('settings.meta.site_name.label', 'Site name'),
