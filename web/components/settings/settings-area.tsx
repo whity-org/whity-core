@@ -32,6 +32,7 @@ import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import type { components } from '@whity/api-client';
 import { MY_SETTINGS_PAGES, SETTINGS_HOME_HREF, WORKSPACE_SETTINGS_ANCHOR } from '@/lib/settings/my-settings';
 import { useNavItemLabels } from '@/lib/nav-item-labels';
+import { searchSettings, useSettingsIndex } from '@/components/settings/settings-index';
 import { useBranding } from '@/lib/branding-context';
 import { TenantLogo } from '@whity/ui/tenant-logo';
 import { CALENDAR_MANAGE } from '@/lib/calendar/api';
@@ -211,17 +212,44 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SettingsArea({ children }: { children: ReactNode }) {
+/**
+ * Whether a navigation item is one of the Settings area's pages, so lists that
+ * show the area as one entry (the palette's Go to) leave it out.
+ */
+export function isInSettingsArea(item: { id: string; group?: string }, isSystemTenant: boolean): boolean {
+  return (
+    item.id === 'settings' ||
+    item.group === 'settings' ||
+    (SETTINGS_AREA_NAV_IDS as readonly string[]).includes(item.id) ||
+    (!isSystemTenant && item.id in WORKSPACE_PAGE_NAV_IDS)
+  );
+}
+
+export interface SettingsAreaGroup {
+  id: GroupId;
+  label: string;
+  links: SettingsAreaLink[];
+}
+
+/** Whether a group holds your own settings (My settings, You in [workspace]). */
+export function isPersonalGroup(id: GroupId): boolean {
+  return PERSONAL_GROUPS.includes(id);
+}
+
+/**
+ * Every page in the Settings area this person may open, grouped and ordered
+ * as the sub-nav shows them. The one list behind the sub-nav, the phone menu
+ * and the settings search (WHIT-1084), so they can never disagree.
+ */
+export function useSettingsGroups({ enabled = true }: { enabled?: boolean } = {}): SettingsAreaGroup[] {
   const t = useTranslation('admin');
   const tc = useTranslation('common');
   const ta = useTranslation('auth');
   const { id: workspaceId, name: workspaceName } = useCurrentWorkspace();
   // The system tenant runs the install: its workspace-wide pages stay in Platform.
   const isSystemTenant = workspaceId === SYSTEM_TENANT_ID;
-  const pathname = usePathname() ?? '';
   const { items: navItems } = useNavigation();
   const navLabels = useNavItemLabels();
-  const { logoSquareUrl } = useBranding();
   const { has } = useCapabilities();
   const canSeeDevices = has(LICENSING_VIEW);
   // WHIT-955: the workspace's own fields on its records (A9).
@@ -231,10 +259,12 @@ export function SettingsArea({ children }: { children: ReactNode }) {
   const language = useLanguageCode();
 
   // The server words the tabs in the caller's language, so a switch needs them again.
+  // `enabled: false` (the palette while closed) asks nothing.
   const { data: tabs } = useFetch<SettingsTab[]>(async () => {
+    if (!enabled) return [];
     const { data: body } = await api.GET('/api/v1/settings/tabs');
     return body?.data ?? [];
-  }, [language]);
+  }, [language, enabled]);
 
   const groups = useMemo(() => {
     const groupLabels: Record<GroupId, string> = {
@@ -320,6 +350,17 @@ export function SettingsArea({ children }: { children: ReactNode }) {
     })).filter((group) => group.links.length > 0);
   }, [tabs, navItems, navLabels, canSeeDevices, canManageFields, canEditThemes, canManageBookings, isSystemTenant, t, tc, ta, workspaceName]);
 
+  return groups;
+}
+
+export function SettingsArea({ children }: { children: ReactNode }) {
+  const t = useTranslation('admin');
+  const tc = useTranslation('common');
+  const { name: workspaceName } = useCurrentWorkspace();
+  const pathname = usePathname() ?? '';
+  const { logoSquareUrl } = useBranding();
+  const groups = useSettingsGroups();
+
   const onMenu = pathname === SETTINGS_MENU_HREF;
   // Read when the menu opens; the page you leave it for is written back below.
   const lastOpened = useMemo(() => (onMenu ? readLastOpened() : null), [onMenu]);
@@ -351,11 +392,15 @@ export function SettingsArea({ children }: { children: ReactNode }) {
     if (lastOpened) lastRef.current?.scrollIntoView?.({ block: 'center' });
   }, [onMenu, lastOpened, groups]);
 
-  const needle = query.trim().toLowerCase();
+  // The menu's search reads the settings index (WHIT-1084): names, what is on
+  // each page and words in both languages, so "إشعارات" or "push" finds
+  // Notifications on an English screen too.
+  const index = useSettingsIndex(groups);
+  const matched = query.trim() ? new Set(searchSettings(index, query, index.length).map((entry) => entry.pageId)) : null;
   const menuGroups = groups
     .map((group) => ({
       ...group,
-      links: needle ? group.links.filter((link) => link.label.toLowerCase().includes(needle)) : group.links,
+      links: matched ? group.links.filter((link) => matched.has(link.id)) : group.links,
     }))
     .filter((group) => group.links.length > 0);
 
