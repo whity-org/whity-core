@@ -12,6 +12,7 @@ import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import { roleLabel } from '@whity/features/roles/role-label';
 import { useAuth } from '@/lib/auth-context';
 import { localizedName } from '@/lib/localized-name';
+import { roleNames } from '@/lib/workspace-memberships';
 import { MySettingsHeader, useCurrentWorkspace } from '@/components/settings/scope';
 
 export default function RoleSettingsPage() {
@@ -20,9 +21,11 @@ export default function RoleSettingsPage() {
   const { user, memberships } = useAuth();
   const { id: currentId, name: workspace } = useCurrentWorkspace();
 
-  // One entry per (workspace, role): a person may hold several roles in one workspace.
+  // A person may hold several roles in one workspace (WHIT-1079): `roles`
+  // lists them, and an older answer may still send one entry per role.
   const here = memberships.filter((m) => m.tenant_id === currentId);
-  const roles = here.length > 0 ? here.map((m) => m.role) : user?.role ? [user.role] : [];
+  const heldHere = [...new Set(here.flatMap((m) => roleNames(m)))];
+  const roles = heldHere.length > 0 ? heldHere : user?.role ? [user.role] : [];
   const others = new Map<number, { name: string; roles: string[] }>();
   for (const m of memberships) {
     if (m.tenant_id === currentId) continue;
@@ -30,7 +33,7 @@ export default function RoleSettingsPage() {
       name: localizedName(m.tenant_names, language, m.tenant_name_language, m.tenant_name),
       roles: [],
     };
-    entry.roles.push(m.role);
+    for (const name of roleNames(m)) if (!entry.roles.includes(name)) entry.roles.push(name);
     others.set(m.tenant_id, entry);
   }
   const isCustomer = here.some((m) => m.kind === 'customer');
