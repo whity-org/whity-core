@@ -78,7 +78,8 @@ test.describe('Sidebar navigation (admin)', () => {
     await page.waitForURL('**/settings/profile');
     const area = page.getByTestId('settings-area-nav');
     await expect(area).toBeVisible();
-    await expect(area.getByText('Sign-in and security')).toBeVisible();
+    // The group heading, not the Security page's own link of the same name.
+    await expect(area.locator('[data-settings-group]', { hasText: /^Security$/ })).toBeVisible();
     // Tags keeps its own route, inside the same area (WHIT-806, owner decision D1).
     await area.getByTestId('settings-area-link-tags').click();
     await page.waitForURL('**/admin/tags');
@@ -174,7 +175,7 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(shell.navLink('Connected AI apps')).toBeVisible();
   });
 
-  test('the nav filter reaches a page sitting in a closed group', async ({
+  test('the one search reaches a page sitting in a closed group', async ({
     adminPage,
     page,
   }) => {
@@ -183,14 +184,13 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
 
     await expect(shell.navLink('Connected AI apps')).toBeHidden();
+    // One search since WHIT-1082: the sidebar has no filter box of its own.
+    await expect(shell.navSearch).toHaveCount(0);
 
-    await shell.navSearch.fill('connected');
+    await page.keyboard.press('Control+k');
+    await page.keyboard.type('connected');
     // Reached without knowing which group holds it, and without opening it.
-    await expect(shell.navLink('Connected AI apps')).toBeVisible();
-    // A query narrows to matches, so a non-matching link leaves the DOM.
-    await expect(shell.navLink('Users')).toHaveCount(0);
-
-    await shell.navSearch.fill('');
-    await expect(shell.navLink('Users')).toBeVisible();
+    await page.getByRole('option', { name: /Connected AI apps/ }).click();
+    await page.waitForURL('**/admin/ai-principals');
   });
 });

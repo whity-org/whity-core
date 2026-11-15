@@ -780,10 +780,11 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Contacts',
         'href' => '/contacts',
         'icon' => 'customer',
-        // Customers and suppliers (WHIT-955, design 3.3 A8): the Operations
-        // group holds Contacts first (register, section 28 N1).
-        'group' => 'operations',
-        'order' => 1,
+        // Customers and suppliers (WHIT-955, design 3.3 A8). In Work since
+        // WHIT-1082: Operations held nothing else, so it was a heading for one
+        // link. Tasks, Boards and Calendar hold orders 1-3.
+        'group' => 'work',
+        'order' => 4,
         // Mirrors GET /api/contacts.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CONTACTS_READ,
     ];
