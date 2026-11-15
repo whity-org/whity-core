@@ -56,7 +56,10 @@ const RTL_CLASS = '\\u0590-\\u08FF\\uFB1D-\\uFDFF\\uFE70-\\uFEFF';
  * the slowest thing in the render. One class matches the same runs in linear
  * time. The trailing space it now also swallows is put back outside the
  * isolate below, which the caller-facing behaviour already required. */
-const LTR_RUN = /[A-Za-z0-9][A-Za-z0-9._,\-–\/+:#() ]*/g;
+/* An amount can start with its currency's symbol or a minus (CU.2: "$312.00",
+ * "−$35.00"). Neither is a Latin letter or digit, so without them here the
+ * symbol stays outside the isolate and an Arabic page prints "312.00$". */
+const LTR_RUN = /[$€£¥−A-Za-z0-9][A-Za-z0-9._,\-–\/+:#()$€£¥ ]*/g;
 
 /* Also one class, also linear — see the note on LTR_RUN. */
 function rtlRun() {

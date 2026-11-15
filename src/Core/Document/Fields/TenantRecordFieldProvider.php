@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Whity\Core\Document\Fields;
 
 use Whity\Core\Money\AmountInWords;
+use Whity\Core\Money\Currency;
+use Whity\Core\Money\MoneyException;
 use Whity\Core\Plugin\Tenant\TenantRecordRepository;
 use Whity\Sdk\Manifest\PluginManifest;
 
@@ -22,17 +24,14 @@ use Whity\Sdk\Manifest\PluginManifest;
  * the type exists only where the plugin is published and switched on. Reading
  * needs the record type's own read permission, which the manifest declares.
  *
- * Values print as a reader sees them: money in major units with its currency
- * (JOD has three decimals), dates as "29 October 2026", choices by their label
+ * Values print as a reader sees them: money as CU.2 writes it in the field's
+ * own currency ($312.00, JOD 312.000), dates as "29 October 2026", choices by their label
  * in the reader's language, a person by name, a linked record by its title.
  */
 final class TenantRecordFieldProvider implements DocumentFieldProvider
 {
     /** How many recent records the record picker searches. */
     private const SEARCH_WINDOW = 200;
-
-    /** Minor units per currency where it isn't two. */
-    private const DECIMALS = ['JOD' => 3, 'KWD' => 3, 'BHD' => 3, 'OMR' => 3, 'TND' => 3, 'IQD' => 3, 'LYD' => 3, 'JPY' => 0, 'KRW' => 0];
 
     private FieldLabels $labels;
 
@@ -138,7 +137,7 @@ final class TenantRecordFieldProvider implements DocumentFieldProvider
                 $minor = $data[$name] ?? null;
                 foreach (['en', 'ar'] as $language) {
                     $values['record.' . $name . '_in_words_' . $language] = is_int($minor)
-                        ? AmountInWords::write($minor, 'JOD', $language)
+                        ? AmountInWords::write($minor, (string) $field['currency'], $language)
                         : null;
                 }
             }
@@ -215,21 +214,25 @@ final class TenantRecordFieldProvider implements DocumentFieldProvider
     }
 
     /**
-     * Section 16's amount in words: dinars and fils, so a JOD money field only.
+     * Section 16's amount in words (CU.3), for a money field whose currency has
+     * words: US dollars and cents, dinars and fils, and the others AmountInWords
+     * knows.
      *
      * @param array<string, mixed> $field
      */
     private static function isWritableInWords(array $field): bool
     {
-        return ($field['type'] ?? null) === 'money' && strtoupper((string) ($field['currency'] ?? '')) === 'JOD';
+        return ($field['type'] ?? null) === 'money' && AmountInWords::supports((string) ($field['currency'] ?? ''));
     }
 
+    /** CU.2: "$312.00", "JOD 312.000"; a field without a valid currency prints the bare figure to two places. */
     private function money(int $minor, string $currency): string
     {
-        $decimals = self::DECIMALS[$currency] ?? 2;
-        $major = number_format($minor / (10 ** $decimals), $decimals, '.', ',');
-
-        return $currency !== '' ? "{$major} {$currency}" : $major;
+        try {
+            return Currency::display($minor, $currency);
+        } catch (MoneyException) {
+            return number_format($minor / 100, 2, '.', ',');
+        }
     }
 
     private function date(string $value, bool $withTime): ?string

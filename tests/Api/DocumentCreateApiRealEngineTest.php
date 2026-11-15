@@ -2037,7 +2037,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         self::assertSame(201, $res->getStatusCode(), $res->getBody());
         $values = $this->storedValues(self::data($res)['id']);
         self::assertSame('Example Bakery', $values['record.customer'] ?? null);
-        self::assertSame('18.000 JOD', $values['record.price'] ?? null);
+        self::assertSame('JOD 18.000', $values['record.price'] ?? null);
     }
 
     /**
