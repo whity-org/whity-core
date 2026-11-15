@@ -80,6 +80,12 @@ final class CrossTenantRouteProbeRealBootTest extends TestCase
                 "The demo catalogue's change sequence is global by design (its sync cursor is one "
                 . 'monotonic counter across workspaces); it is a number, not data.',
             ],
+            [
+                'app_settings',
+                static fn(array $row): bool => $row['setting_key'] === 'push.vapid.keys',
+                "Web push's VAPID key pair is the instance's own, made by the first request that needs it "
+                . '(WHIT-1073); it identifies the server to push services and holds nothing of any workspace.',
+            ],
         ];
     }
 
