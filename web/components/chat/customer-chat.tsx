@@ -453,7 +453,7 @@ export function CustomerChat({
                     ? tc('customer.replyTo', 'Reply to {name} by {channel}', { name: firstName, channel })
                     : t('messages.composer.noteHint', 'Write a note. Only your team sees it.')
                 }
-                className="min-h-10 flex-1 resize-none border-0 bg-transparent p-0 py-2 shadow-none focus-visible:outline-none"
+                className="min-h-10 flex-1 resize-none border-0 bg-transparent p-0 py-2 text-base shadow-none focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none md:text-base"
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault();

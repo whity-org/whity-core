@@ -98,6 +98,7 @@ export interface ChatMessage {
   in_chat: boolean;
   thread: { count: number; last_at: string | null; people: string[] } | null;
   reactions: ChatReaction[];
+  attachments: ChatAttachment[];
   pinned: boolean;
   edited: boolean;
   deleted: boolean;
@@ -111,6 +112,21 @@ export interface ChatQuote {
   author_name: string;
   body: string;
   deleted: boolean;
+}
+
+/** A photo, video, file or voice message on a message (UC.10). */
+export interface ChatAttachment {
+  id: number;
+  kind: 'image' | 'video' | 'file' | 'voice';
+  content_type: string;
+  byte_size: number;
+  filename: string | null;
+  width: number | null;
+  height: number | null;
+  duration_ms: number | null;
+  transcript: string | null;
+  message_id: number | null;
+  url: string;
 }
 
 export interface ChatReaction {

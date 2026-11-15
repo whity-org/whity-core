@@ -51,6 +51,8 @@ final class ChatService
         private readonly ?ChatPushNotifier $push = null,
         // UC.11: who is typing, a few seconds at a time. Null: nobody shows as typing.
         private readonly ?SharedStoreInterface $store = null,
+        // UC.10: files, photos and voice. Null: messages carry words only.
+        private readonly ?ChatAttachments $attachments = null,
     ) {
     }
 
@@ -422,6 +424,7 @@ final class ChatService
      * line ("handed the announcement to …"), shown small, agents only.
      *
      * @param list<mixed> $mentions
+     * @param list<mixed> $attachmentIds files the person uploaded to this chat and has not sent yet
      * @return array<string, mixed> the posted message
      */
     public function post(
@@ -434,8 +437,16 @@ final class ChatService
         ?int $replyTo = null,
         ?int $threadRoot = null,
         bool $alsoToChat = false,
+        array $attachmentIds = [],
     ): array {
         [$chat, $members, $me] = $this->open($tenantId, $viewer, $chatId);
+        $attachmentIds = array_values(array_unique(array_filter(array_map('intval', $attachmentIds), static fn (int $id): bool => $id > 0)));
+        if ($attachmentIds !== []) {
+            if ($viewer->isAgent() || $this->attachments === null) {
+                throw new ChatException('Only people send files in a chat.', 403);
+            }
+            $this->attachments->assertSendable($tenantId, $chatId, $viewer->profileId, $attachmentIds);
+        }
         // UC.6: a reply quotes the message it answers; a thread reply sits under its root.
         $root = $threadRoot !== null ? $this->target($tenantId, $viewer, $chatId, $threadRoot, 'reply in a thread to') : null;
         if ($root !== null && $root['thread_root_id'] !== null) {
@@ -446,7 +457,7 @@ final class ChatService
         }
         $quoted = $replyTo !== null ? $this->target($tenantId, $viewer, $chatId, $replyTo, 'reply to') : null;
         $body = trim($body);
-        if ($body === '') {
+        if ($body === '' && $attachmentIds === []) {
             throw new ChatException('The message is empty.');
         }
         if (mb_strlen($body) > self::MAX_BODY) {
@@ -490,12 +501,15 @@ final class ChatService
             // The root's "n replies" changed: open chats fetch it again.
             $this->repo->touch($tenantId, (int) $root['id']);
         }
+        if ($attachmentIds !== []) {
+            $this->files()->attach($tenantId, $id, $attachmentIds);
+        }
         if (!$viewer->isAgent()) {
             $this->repo->markRead($tenantId, (int) $me['id'], $id);
         }
         // A held line reaches people only once it is approved (decideHeld).
         if (!isset($meta['held'])) {
-            $this->pushLine($tenantId, $chatId, $id, $viewer->isAgent() ? null : $viewer->profileId, $viewer->isAgent() ? $viewer->agentName : $this->who($viewer->profileId)['name'], $body, $kept);
+            $this->pushLine($tenantId, $chatId, $id, $viewer->isAgent() ? null : $viewer->profileId, $viewer->isAgent() ? $viewer->agentName : $this->who($viewer->profileId)['name'], $body !== '' ? $body : $this->filesLine($tenantId, $id), $kept);
         }
 
         return $this->presented($tenantId, $id, $viewer);
@@ -698,8 +712,9 @@ final class ChatService
         $quoted = $this->repo->messagesByIds($tenantId, $quotedIds);
         $threads = $this->repo->threadSummaries($tenantId, $ids, 0);
         $reactions = $this->repo->reactions($tenantId, $ids);
+        $files = $this->attachments?->forMessages($tenantId, $ids) ?? [];
 
-        return array_map(function (array $r) use ($proposals, $viewer, $quoted, $threads, $reactions): array {
+        return array_map(function (array $r) use ($proposals, $viewer, $quoted, $threads, $reactions, $files): array {
             $meta = $r['chat_meta'];
             $source = (string) $r['source'];
             $kind = match (true) {
@@ -765,6 +780,7 @@ final class ChatService
                     'people' => array_slice($thread['people'], 0, 3),
                 ],
                 'reactions' => array_values($grouped),
+                'attachments' => $deleted ? [] : ($files[$id] ?? []),
                 'pinned' => ($r['pinned_at'] ?? null) !== null,
                 'edited' => ($r['edited_at'] ?? null) !== null,
                 'deleted' => $deleted,
@@ -1043,6 +1059,7 @@ final class ChatService
             throw new ChatException('A message can be deleted for everyone up to 2 days after it was sent.', 422);
         }
         $this->repo->deleteMessage($tenantId, $messageId);
+        $this->attachments?->deleteForMessage($tenantId, $messageId);
 
         return $this->presented($tenantId, $messageId, $viewer);
     }
@@ -1158,6 +1175,105 @@ final class ChatService
             'pinned' => $this->presentMessages($tenantId, $this->repo->pinnedMessages($tenantId, $chatId, $floor), $viewer),
             'now' => self::iso($now),
         ];
+    }
+
+    // ── Files, photos and voice (UC.10) ──────────────────────────────────────
+
+    /**
+     * Upload a file to a chat; it joins a message when the message is sent.
+     *
+     * @param array{duration_ms?: ?int, width?: ?int, height?: ?int} $about
+     * @return array<string, mixed>
+     */
+    public function upload(int $tenantId, ChatViewer $viewer, int $chatId, string $bytes, ?string $type, ?string $filename, array $about): array
+    {
+        $this->personOnly($viewer);
+        $this->open($tenantId, $viewer, $chatId);
+
+        return $this->files()->upload($tenantId, $chatId, $viewer->profileId, $bytes, $type, $filename, $about);
+    }
+
+    /**
+     * The words of a voice message, from the sender's browser, before it is sent.
+     *
+     * @return array<string, mixed>
+     */
+    public function transcribe(int $tenantId, ChatViewer $viewer, int $attachmentId, string $text): array
+    {
+        $this->personOnly($viewer);
+        $row = $this->files()->row($tenantId, $attachmentId);
+        if ($row === null || (int) ($row['uploaded_by_profile_id'] ?? 0) !== $viewer->profileId || $row['message_id'] !== null || $row['kind'] !== 'voice') {
+            throw new ChatException('File not found', 404);
+        }
+        $this->files()->setTranscript($tenantId, $attachmentId, $text);
+
+        return ['id' => $attachmentId, 'transcript' => trim(mb_substr($text, 0, 4000))];
+    }
+
+    /**
+     * A file's bytes, for someone who may read its chat (or its uploader, before it is sent).
+     *
+     * @return array{bytes: string, content_type: string, filename: string, inline: bool}
+     */
+    public function file(int $tenantId, ChatViewer $viewer, int $attachmentId): array
+    {
+        $row = $this->files()->row($tenantId, $attachmentId);
+        if ($row === null) {
+            throw new ChatException('File not found', 404);
+        }
+        if ($row['message_id'] === null) {
+            if ($viewer->isAgent() || (int) ($row['uploaded_by_profile_id'] ?? 0) !== $viewer->profileId) {
+                throw new ChatException('File not found', 404);
+            }
+            $this->open($tenantId, $viewer, (int) $row['conversation_id']);
+        } else {
+            $this->messageInChat($tenantId, $viewer, (int) $row['message_id']);
+        }
+        $type = (string) $row['content_type'];
+
+        return [
+            'bytes' => $this->files()->bytes((string) $row['storage_key']),
+            'content_type' => $type,
+            'filename' => (string) ($row['filename'] ?? 'file'),
+            'inline' => ChatAttachmentPolicy::showsInline($type),
+        ];
+    }
+
+    /**
+     * A chat's photos and files, newest first (UC.8 details).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function media(int $tenantId, ChatViewer $viewer, int $chatId, ?string $kind): array
+    {
+        [, , $me] = $this->open($tenantId, $viewer, $chatId);
+
+        return $this->files()->media($tenantId, $chatId, (int) $me['reads_after_message_id'], $kind);
+    }
+
+    private function files(): ChatAttachments
+    {
+        if ($this->attachments === null) {
+            throw new ChatException('Files are not available in this chat.', 404);
+        }
+
+        return $this->attachments;
+    }
+
+    /** "Photo", "2 photos", "Voice message", "File": what a push says for a message of files only. */
+    private function filesLine(int $tenantId, int $messageId): string
+    {
+        $files = $this->attachments?->forMessages($tenantId, [$messageId])[$messageId] ?? [];
+        $kinds = array_count_values(array_map(static fn (array $f): string => (string) $f['kind'], $files));
+        if (($kinds['voice'] ?? 0) > 0) {
+            return 'Voice message';
+        }
+        $photos = ($kinds['image'] ?? 0) + ($kinds['video'] ?? 0);
+        if ($photos > 0 && count($files) === $photos) {
+            return $photos === 1 ? 'Photo' : "{$photos} photos";
+        }
+
+        return count($files) === 1 ? 'File: ' . (string) ($files[0]['filename'] ?? '') : count($files) . ' files';
     }
 
     /** Bubbles or compact rows (UC.7). */

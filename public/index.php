@@ -5740,7 +5740,7 @@ $chatService = new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core
     new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
     $chatStore,
     $logger,
-), $chatStore);
+), $chatStore, new \Whity\Core\Chat\ChatAttachments($db->getPdo(), $storageDriver));
 // One chat (UC.1, WHIT-1093): team chats and, for people with messages.read,
 // the customer conversations, in one list with each person's pins.
 $chatHandler = new \Whity\Api\ChatApiHandler(
@@ -5775,6 +5775,11 @@ $router->register('GET',    '/api/chat/messages/{id:\d+}/thread',               
 $router->register('GET',    '/api/chat/chats/{id:\d+}/search',                  [$chatHandler, 'search'],        null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}/state',                   [$chatHandler, 'state'],         null);
 $router->register('POST',   '/api/chat/chats/{id:\d+}/typing',                  [$chatHandler, 'typing'],        null);
+// Files, photos and voice (UC.10, WHIT-1095): upload to a chat, then send.
+$router->register('POST',   '/api/chat/chats/{id:\d+}/attachments',             [$chatHandler, 'upload'],        null);
+$router->register('GET',    '/api/chat/chats/{id:\d+}/media',                   [$chatHandler, 'media'],         null);
+$router->register('GET',    '/api/chat/attachments/{id:\d+}',                   [$chatHandler, 'file'],          null);
+$router->register('PATCH',  '/api/chat/attachments/{id:\d+}',                   [$chatHandler, 'transcribe'],    null);
 $router->register('GET',    '/api/chat/preferences',                            [$chatHandler, 'preferences'],   null);
 $router->register('PUT',    '/api/chat/preferences',                            [$chatHandler, 'preferences'],   null);
 $router->register('GET',    '/api/chat/directory',                              [$chatHandler, 'directory'],     null);

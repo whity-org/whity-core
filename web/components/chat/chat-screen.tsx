@@ -30,12 +30,14 @@ import { useLanguageDirection, useTranslation, type TranslateFn } from '@whity/f
 import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
-import type { ChatAgentMember, ChatDetail, ChatInboxItem, ChatLayout, ChatMember, ChatMention, ChatMessage, ChatMode, ChatReadMark, ChatSummary } from '@/lib/chat-wire';
+import type { ChatAttachment, ChatAgentMember, ChatDetail, ChatInboxItem, ChatLayout, ChatMember, ChatMention, ChatMessage, ChatMode, ChatReadMark, ChatSummary } from '@/lib/chat-wire';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@whity/ui/dropdown-menu';
+import { PendingFiles, VoiceRecorder, attachmentsLine, fileSize, type PendingFile } from './attachments';
 import { ComposerBanner, MessageBody, MessageItem, NewLine, PinnedBar, TypingLine, type MessageActions } from './message-parts';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
 import { ChatSidePane, CustomerAvatar, CustomerChat, channelName, useListTime } from './customer-chat';
-import { chatApi, chatErrorText, type ChatApi } from './chat-api';
+import { chatApi, chatErrorText, uploadToChat, type ChatApi } from './chat-api';
 import { AddMemberDialog } from './add-member-dialog';
 import { NewChatDialog } from './new-chat-dialog';
 import { useNewIntent } from '@/lib/commands/new-intent';
@@ -602,6 +604,10 @@ function ListRow({ item, active, onOpen, t }: { item: ChatInboxItem; active: boo
 function preview(c: ChatSummary, t: TranslateFn): string {
   const m = c.last_message;
   if (!m) return '';
+  if (m.body === '' && (m.attachments?.length ?? 0) > 0) {
+    const line = attachmentsLine(t, m.attachments);
+    return !m.author || c.type === 'direct' ? line : `${m.author.name.split(' ')[0]}: ${line}`;
+  }
   if (m.kind === 'line') return `${m.author?.name ?? ''} ${m.body}`.trim();
   if (m.kind === 'system') return systemText(m, t);
   if (!m.author || c.type === 'direct') return m.body;
@@ -909,6 +915,7 @@ function OpenChat({
       {side?.kind === 'details' && (
         <SidePanel
           t={t}
+          api={api}
           onClose={() => toggleSide('details')}
           chat={chat}
           people={people}
@@ -1370,6 +1377,95 @@ function Composer({
   const box = useRef<HTMLTextAreaElement>(null);
   const lastBeat = useRef(0);
   const [editingId, setEditingId] = useState<number | null>(null);
+  // UC.10: files on their way, and the voice recorder.
+  const [pending, setPending] = useState<PendingFile[]>([]);
+  const [recording, setRecording] = useState(false);
+  const photoInput = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const patchPending = (key: string, change: Partial<PendingFile>) =>
+    setPending((prev) => prev.map((f) => (f.key === key ? { ...f, ...change } : f)));
+
+  const startUpload = async (item: PendingFile): Promise<ChatAttachment | null> => {
+    patchPending(item.key, { status: 'uploading', progress: 0, error: undefined });
+    try {
+      const meta: { duration_ms?: number; width?: number; height?: number } = { duration_ms: item.durationMs };
+      if (item.kind === 'image' && item.preview) {
+        const size = await new Promise<{ w: number; h: number }>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+          img.onerror = () => resolve({ w: 0, h: 0 });
+          img.src = item.preview!;
+        });
+        meta.width = size.w;
+        meta.height = size.h;
+      }
+      const attachment = await uploadToChat(chat.id, item.file, item.name, meta, (fraction) => patchPending(item.key, { progress: fraction }));
+      if (item.kind === 'voice' && item.transcript) await api.transcribe(attachment.id, item.transcript).catch(() => undefined);
+      patchPending(item.key, { status: 'ready', progress: 1, attachment });
+      return attachment;
+    } catch (e) {
+      // Not sent, and nothing lost: the file stays here with Try again.
+      patchPending(item.key, { status: 'failed', error: chatErrorText(e, '') });
+      return null;
+    }
+  };
+
+  const addFiles = (files: FileList | File[] | null) => {
+    if (!files) return;
+    const items: PendingFile[] = Array.from(files)
+      .slice(0, 10)
+      .map((file) => {
+        const kind: PendingFile['kind'] = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file';
+        return {
+          key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          file,
+          name: file.name,
+          kind,
+          progress: 0,
+          status: 'uploading',
+          preview: kind === 'image' ? URL.createObjectURL(file) : undefined,
+        };
+      });
+    setPending((prev) => [...prev, ...items]);
+    items.forEach((item) => void startUpload(item));
+  };
+
+  const removePending = (key: string) =>
+    setPending((prev) => {
+      const gone = prev.find((f) => f.key === key);
+      if (gone?.preview) URL.revokeObjectURL(gone.preview);
+      return prev.filter((f) => f.key !== key);
+    });
+
+  const sendVoice = async (blob: Blob, durationMs: number, transcript: string) => {
+    setRecording(false);
+    const item: PendingFile = {
+      key: `voice-${Date.now()}`,
+      file: blob,
+      name: `voice-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.${blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm'}`,
+      kind: 'voice',
+      progress: 0,
+      status: 'uploading',
+      durationMs,
+      transcript,
+    };
+    setPending((prev) => [...prev, item]);
+    const attachment = await startUpload(item);
+    if (!attachment) return;
+    try {
+      onSent(
+        await api.post(chat.id, '', [], {
+          attachments: [attachment.id],
+          ...(replyTo ? { reply_to: replyTo.id } : {}),
+          ...(threadRoot ? { thread_root: threadRoot, also_to_chat: alsoToChat } : {}),
+        })
+      );
+      removePending(item.key);
+    } catch (e) {
+      patchPending(item.key, { status: 'failed', error: chatErrorText(e, '') });
+    }
+  };
 
   // Editing puts the message's words in the box; leaving edit clears it.
   if ((editing?.id ?? null) !== editingId) {
@@ -1417,9 +1513,13 @@ function Composer({
     box.current?.focus();
   };
 
+  const ready = pending.filter((f) => f.status === 'ready' && f.attachment);
+  const uploading = pending.some((f) => f.status === 'uploading');
+  const canSend = !sending && !uploading && (draft.trim() !== '' || (ready.length > 0 && !editing));
+
   const send = async () => {
     const text = draft.trim();
-    if (text === '' || sending) return;
+    if (!canSend) return;
     setSending(true);
     onError(null);
     try {
@@ -1431,8 +1531,10 @@ function Composer({
           await api.post(chat.id, text, mentions, {
             ...(replyTo ? { reply_to: replyTo.id } : {}),
             ...(threadRoot ? { thread_root: threadRoot, also_to_chat: alsoToChat } : {}),
+            ...(ready.length > 0 ? { attachments: ready.map((f) => f.attachment!.id) } : {}),
           })
         );
+        ready.forEach((f) => removePending(f.key));
       }
       // Sent: the box empties. Not sent: the words stay, so nothing is lost.
       setDraft('');
@@ -1464,7 +1566,60 @@ function Composer({
           onClose={() => onCancelEdit?.()}
         />
       )}
-      <div className="relative flex items-end gap-1 rounded-card border border-input bg-card px-2 py-1.5 focus-within:outline-2 focus-within:outline-ring">
+      <PendingFiles
+        t={t}
+        files={pending}
+        onRemove={removePending}
+        onRetry={(key) => {
+          const item = pending.find((f) => f.key === key);
+          if (item) void startUpload(item);
+        }}
+      />
+      {recording ? (
+        <VoiceRecorder
+          t={t}
+          onDone={(blob, ms, words) => void sendVoice(blob, ms, words)}
+          onCancel={() => setRecording(false)}
+          onError={(message) => {
+            setRecording(false);
+            onError(message);
+          }}
+        />
+      ) : (
+      <div
+        className="relative flex items-end gap-1 rounded-card border border-input bg-card px-2 py-1.5 focus-within:outline-2 focus-within:outline-ring"
+        onDragOver={(e) => {
+          if (!editing && e.dataTransfer.types.includes('Files')) e.preventDefault();
+        }}
+        onDrop={(e) => {
+          if (editing || e.dataTransfer.files.length === 0) return;
+          e.preventDefault();
+          addFiles(e.dataTransfer.files);
+        }}
+      >
+        {!editing && (
+          <>
+            <input ref={photoInput} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+            <input ref={fileInput} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" aria-label={t('attach.label', 'Add photos, files and more')}>
+                  <Icon name="plus" size={18} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top">
+                <DropdownMenuItem onSelect={() => photoInput.current?.click()}>
+                  <Icon name="image" size={16} />
+                  {t('attach.photos', 'Photos and videos')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
+                  <Icon name="document" size={16} />
+                  {t('attach.file', 'File')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        )}
         {candidates.length > 0 && (
           <ul
             role="listbox"
@@ -1516,6 +1671,12 @@ function Composer({
           rows={1}
           maxLength={4000}
           onChange={(e) => onChange(e.target.value)}
+          onPaste={(e) => {
+            if (!editing && e.clipboardData.files.length > 0) {
+              e.preventDefault();
+              addFiles(e.clipboardData.files);
+            }
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && candidates.length === 0) {
               e.preventDefault();
@@ -1529,13 +1690,18 @@ function Composer({
           }}
           aria-label={t('compose.label', 'Message')}
           placeholder={placeholder ?? t('compose.placeholderShort', 'Message {name}', { name: chat.title })}
-          className="min-h-10 flex-1 resize-none border-0 bg-transparent p-0 py-2 shadow-none focus-visible:outline-none"
+          className="min-h-10 flex-1 resize-none border-0 bg-transparent p-0 py-2 text-base shadow-none focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none md:text-base"
         />
+        {!editing && draft.trim() === '' && ready.length === 0 && (
+          <Button type="button" variant="ghost" size="icon" aria-label={t('voice.record', 'Record a voice message')} onClick={() => setRecording(true)}>
+            <Icon name="microphone" size={18} />
+          </Button>
+        )}
         <Button
           type="button"
           size="icon-sm"
           className="mb-1 rtl:[&_svg]:-scale-x-100"
-          disabled={sending || draft.trim() === ''}
+          disabled={!canSend}
           onClick={() => void send()}
           aria-label={editing ? t('compose.save', 'Save') : t('compose.send', 'Send')}
           title={editing ? t('compose.save', 'Save') : t('compose.send', 'Send')}
@@ -1543,6 +1709,7 @@ function Composer({
           <Icon name={editing ? 'check' : 'send'} size={16} />
         </Button>
       </div>
+      )}
       {threadRoot !== undefined && alsoLabel && (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" className="size-4 accent-primary" checked={alsoToChat} onChange={(e) => setAlsoToChat(e.target.checked)} />
@@ -1776,6 +1943,7 @@ function SearchPane({
 
 function SidePanel({
   t,
+  api,
   onClose,
   chat,
   people,
@@ -1787,6 +1955,7 @@ function SidePanel({
   onRemove,
 }: {
   t: TranslateFn;
+  api: ChatApi;
   onClose: () => void;
   chat: ChatDetail;
   people: ChatMember[];
@@ -1866,6 +2035,7 @@ function SidePanel({
         </>
       )}
       {shown && <MayDo t={t} agent={shown} name={agentName(shown)} onRemove={() => void onRemove(shown.member_id)} />}
+      <PhotosAndFiles t={t} api={api} chatId={chat.id} />
       <div className="grid gap-2">
         <Button variant="outline" size="sm" icon="plus" onClick={() => onAdd('agent')}>
           {t('side.add', 'Add a person or an agent')}
@@ -1884,6 +2054,48 @@ function SidePanel({
         )}
       </div>
     </ChatSidePane>
+  );
+}
+
+/** The chat's photos and files, newest first (UC.8). */
+function PhotosAndFiles({ t, api, chatId }: { t: TranslateFn; api: ChatApi; chatId: number }) {
+  const [items, setItems] = useState<ChatAttachment[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    api.media(chatId, null).then(
+      (found) => live && setItems(found),
+      () => live && setItems([])
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, chatId]);
+  if (!items || items.length === 0) return null;
+  const photos = items.filter((a) => a.kind === 'image').slice(0, 8);
+  const files = items.filter((a) => a.kind === 'file').slice(0, 5);
+  return (
+    <section className="grid gap-2">
+      <h2 className="text-xs font-semibold text-muted-foreground">{t('side.media', 'Photos and files')}</h2>
+      {photos.length > 0 && (
+        <div className="grid grid-cols-4 gap-1">
+          {photos.map((a) => (
+            <a key={a.id} href={a.url} target="_blank" rel="noreferrer" className="block aspect-square overflow-hidden rounded-control-sm bg-muted">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a signed-in file from the API */}
+              <img src={a.url} alt={a.filename ?? t('file.photo', 'Photo')} loading="lazy" className="size-full object-cover" />
+            </a>
+          ))}
+        </div>
+      )}
+      {files.map((a) => (
+        <a key={a.id} href={a.url} download={a.filename ?? undefined} className="flex items-center gap-2 rounded-control px-1 py-1 text-sm hover:bg-muted">
+          <Icon name="document" size={16} />
+          <span dir="auto" className="min-w-0 flex-1 truncate text-start">
+            {a.filename}
+          </span>
+          <span className="text-xs text-muted-foreground">{fileSize(a.byte_size)}</span>
+        </a>
+      ))}
+    </section>
   );
 }
 

@@ -157,6 +157,8 @@ final class TenantOwnedTables
         'chat_person_state' => '281_create_chat_person_state.php',
         // Reactions on chat messages (UC.9).
         'chat_message_reactions' => '282_add_chat_message_parts.php',
+        // Files, photos and voice sent in Chat (UC.10).
+        'chat_attachments' => '283_create_chat_attachments.php',
 
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says

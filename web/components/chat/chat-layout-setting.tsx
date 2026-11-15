@@ -46,6 +46,7 @@ function sample(id: number, author: { profile_id: number; name: string }, body: 
     in_chat: true,
     thread: null,
     reactions: [],
+    attachments: [],
     pinned: false,
     edited: false,
     deleted: false,

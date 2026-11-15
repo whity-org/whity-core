@@ -1697,6 +1697,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/attachments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a file sent in a chat you are in */
+        get: operations["get_api_v1_chat_attachments_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set the words of a voice message you have not sent yet */
+        patch: operations["patch_api_v1_chat_attachments_id"];
+        trace?: never;
+    };
     "/api/v1/chat/chats": {
         parameters: {
             query?: never;
@@ -1739,6 +1757,26 @@ export interface paths {
         patch: operations["patch_api_v1_chat_chats_id"];
         trace?: never;
     };
+    "/api/v1/chat/chats/{id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a photo, video, voice message or file to a chat, to send with your next message
+         * @description multipart/form-data with the file in `file`, up to 25 MB. Photos, videos, voice (webm, ogg, mp4, mp3), PDF, Word, Excel, PowerPoint, text, CSV and zip; the type is read from the file itself.
+         */
+        post: operations["post_api_v1_chat_chats_id_attachments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat/chats/{id}/focus": {
         parameters: {
             query?: never;
@@ -1753,6 +1791,23 @@ export interface paths {
          * @description While a person looks at a chat, its new lines are not pushed to their devices (WHIT-1077).
          */
         post: operations["post_api_v1_chat_chats_id_focus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/chats/{id}/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A chat's photos and files, newest first */
+        get: operations["get_api_v1_chat_chats_id_media"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -11658,6 +11713,29 @@ export interface components {
                 [key: string]: "off" | "ask" | "allowed";
             };
         };
+        ChatAttachment: {
+            id: number;
+            /** @enum {string} */
+            kind: "image" | "video" | "file" | "voice";
+            content_type: string;
+            byte_size: number;
+            filename?: string | null;
+            width?: number | null;
+            height?: number | null;
+            duration_ms?: number | null;
+            /** @description A voice message's words. */
+            transcript?: string | null;
+            /** @description Empty until the message it goes on is sent. */
+            message_id?: number | null;
+            /** @description Where its bytes are read, signed in. */
+            url: string;
+        };
+        ChatAttachmentResponse: {
+            data: components["schemas"]["ChatAttachment"];
+        };
+        ChatAttachmentsResponse: {
+            data: components["schemas"]["ChatAttachment"][];
+        };
         ChatAuthor: {
             /** @enum {string} */
             type: "person" | "agent";
@@ -11832,6 +11910,8 @@ export interface components {
                 mine: boolean;
                 people?: string[];
             }[];
+            /** @description Photos (an album when several), videos, files and voice (UC.10). */
+            attachments?: components["schemas"]["ChatAttachment"][];
             pinned?: boolean;
             edited?: boolean;
             /** @description Shown as "This message was deleted"; the body is empty. */
@@ -11901,6 +11981,8 @@ export interface components {
             thread_root?: number;
             /** @description With thread_root: also show the reply in the chat. */
             also_to_chat?: boolean;
+            /** @description Files you uploaded to this chat and have not sent yet; the body may then be empty. */
+            attachments?: number[];
         };
         ChatPreferencesRequest: {
             /** @enum {string} */
@@ -11949,6 +12031,16 @@ export interface components {
             data: {
                 root: components["schemas"]["ChatMessage"];
                 replies: components["schemas"]["ChatMessage"][];
+            };
+        };
+        ChatTranscriptRequest: {
+            /** @description The words of the voice message, at most 4000 characters. */
+            transcript: string;
+        };
+        ChatTranscriptResponse: {
+            data: {
+                id: number;
+                transcript: string;
             };
         };
         ChatUpdateRequest: {
@@ -28194,6 +28286,151 @@ export interface operations {
             };
         };
     };
+    get_api_v1_chat_attachments_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file's bytes, with its type */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_chat_attachments_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatTranscriptRequest"];
+            };
+        };
+        responses: {
+            /** @description The words */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatTranscriptResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_chat_chats: {
         parameters: {
             query?: never;
@@ -28502,6 +28739,89 @@ export interface operations {
             };
         };
     };
+    post_api_v1_chat_chats_id_attachments: {
+        parameters: {
+            query?: {
+                /** @description A voice message or video: its length */
+                duration_ms?: number;
+                /** @description A photo: its width */
+                width?: number;
+                /** @description A photo: its height */
+                height?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file, not sent yet */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAttachmentResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Empty, too large or not a type Chat takes */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_chat_chats_id_focus: {
         parameters: {
             query?: never;
@@ -28533,6 +28853,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_chats_id_media: {
+        parameters: {
+            query?: {
+                /** @description photos or files; both when empty */
+                kind?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Photos and files */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAttachmentsResponse"];
                 };
             };
             /** @description Missing or invalid authentication */

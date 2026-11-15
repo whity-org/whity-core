@@ -219,6 +219,8 @@ final class CoreTables
         'chat_person_state' => '281_create_chat_person_state.php',
         // Reactions on chat messages (UC.9).
         'chat_message_reactions' => '282_add_chat_message_parts.php',
+        // Files, photos and voice sent in Chat (UC.10).
+        'chat_attachments' => '283_create_chat_attachments.php',
         'tenant_settings' => '025_create_tenant_settings.php',
         'tenant_storage_config' => '053_create_tenant_storage_config.php',
         'tenants' => '001_create_users_roles.php',

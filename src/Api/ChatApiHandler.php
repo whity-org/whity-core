@@ -11,6 +11,8 @@ use Whity\Core\Chat\ChatViewer;
 use Whity\Core\Request;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Response;
+use Whity\Http\UploadedFilePart;
+use Whity\Http\UploadedFilePartException;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\JsonBody;
 use Whity\Mcp\Auth\McpPrincipal;
@@ -202,6 +204,7 @@ final class ChatApiHandler
                 self::positiveInt($body['reply_to'] ?? null),
                 self::positiveInt($body['thread_root'] ?? null),
                 ($body['also_to_chat'] ?? false) === true,
+                is_array($body['attachments'] ?? null) ? array_values(array_filter($body['attachments'], 'is_int')) : [],
             )], 201);
         });
     }
@@ -284,6 +287,75 @@ final class ChatApiHandler
             $this->chat->typing($t, $v, (int) ($params['id'] ?? 0));
 
             return Response::json(['data' => ['ok' => true]]);
+        });
+    }
+
+    // ── Files, photos and voice (UC.10) ──────────────────────────────────────
+
+    /**
+     * Upload one file (multipart field `file`) to a chat; `?duration_ms=`,
+     * `?width=` and `?height=` describe a voice message, video or photo.
+     *
+     * @param array<string, string> $params
+     */
+    public function upload(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            try {
+                $part = UploadedFilePart::read($request, 'file');
+            } catch (UploadedFilePartException $e) {
+                return Response::error($e->clientMessage, $e->status);
+            }
+            $q = MessagesApiHandler::query($request);
+
+            return Response::json(['data' => $this->chat->upload($t, $v, (int) ($params['id'] ?? 0), $part['bytes'], $part['media_type'], $part['filename'], [
+                'duration_ms' => self::positiveInt($q['duration_ms'] ?? null),
+                'width' => self::positiveInt($q['width'] ?? null),
+                'height' => self::positiveInt($q['height'] ?? null),
+            ])], 201);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function transcribe(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            $text = (string) (JsonBody::parsed($request)['transcript'] ?? '');
+
+            return Response::json(['data' => $this->chat->transcribe($t, $v, (int) ($params['id'] ?? 0), $text)]);
+        });
+    }
+
+    /**
+     * A file's bytes. Photos, videos, voice and PDF show in the browser; the
+     * rest download. Never sniffed by the browser, never cached by others.
+     *
+     * @param array<string, string> $params
+     */
+    public function file(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($params): Response {
+            $file = $this->chat->file($t, $v, (int) ($params['id'] ?? 0));
+            $name = str_replace(['"', '\\', "\r", "\n"], '', $file['filename']);
+
+            return new Response(200, $file['bytes'], [
+                'Content-Type' => $file['content_type'],
+                'Content-Length' => (string) strlen($file['bytes']),
+                'Content-Disposition' => ($file['inline'] ? 'inline' : 'attachment') . '; filename="' . (preg_replace('/[^\x20-\x7e]/', '_', $name) ?? 'file')
+                    . '"; filename*=UTF-8\'\'' . rawurlencode($name),
+                'X-Content-Type-Options' => 'nosniff',
+                'Cache-Control' => 'private, max-age=3600',
+            ]);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function media(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            $kind = MessagesApiHandler::query($request)['kind'] ?? null;
+
+            return Response::json(['data' => $this->chat->media($t, $v, (int) ($params['id'] ?? 0), in_array($kind, ['photos', 'files'], true) ? $kind : null)]);
         });
     }
 
