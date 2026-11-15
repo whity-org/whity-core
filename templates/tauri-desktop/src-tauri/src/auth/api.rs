@@ -45,8 +45,12 @@ pub struct TenantMembership {
     /// Display name; may be empty if the tenant row carries none. May be
     /// Arabic — the UI renders it with `dir="auto"`.
     pub tenant_name: String,
-    /// The profile's role in that tenant ("" when the membership has no role).
+    /// The profile's primary role in that tenant ("" when it has none).
     pub role: String,
+    /// Every role held in that tenant, the primary one first. A person with
+    /// several roles in one workspace still gets ONE entry; permissions there
+    /// are the union of all of them.
+    pub roles: Vec<String>,
 }
 
 /// The session minted by completing a tenant selection.
@@ -182,11 +186,39 @@ fn parse_memberships(value: Option<&serde_json::Value>) -> Vec<TenantMembership>
     let Some(rows) = value.and_then(|v| v.as_array()) else {
         return Vec::new();
     };
-    rows.iter().filter_map(parse_membership).collect()
+    // One entry per tenant. The server already folds a person's roles in one
+    // workspace into a single entry; folding again here keeps the picker right
+    // against a server that still lists one row per role.
+    let mut out: Vec<TenantMembership> = Vec::new();
+    for entry in rows.iter().filter_map(parse_membership) {
+        match out.iter_mut().find(|seen| seen.tenant_id == entry.tenant_id) {
+            Some(seen) => {
+                for role in entry.roles {
+                    if !seen.roles.contains(&role) {
+                        seen.roles.push(role);
+                    }
+                }
+            }
+            None => out.push(entry),
+        }
+    }
+    out
 }
 
 fn parse_membership(row: &serde_json::Value) -> Option<TenantMembership> {
     let tenant_id = row.get("tenant_id")?.as_i64()?;
+    let role = row.get("role").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+    let mut roles: Vec<String> = Vec::new();
+    if !role.is_empty() {
+        roles.push(role.clone());
+    }
+    for name in row.get("roles").and_then(|v| v.as_array()).into_iter().flatten() {
+        if let Some(name) = name.as_str() {
+            if !name.is_empty() && !roles.iter().any(|seen| seen == name) {
+                roles.push(name.to_string());
+            }
+        }
+    }
     Some(TenantMembership {
         tenant_id,
         tenant_name: row
@@ -194,7 +226,8 @@ fn parse_membership(row: &serde_json::Value) -> Option<TenantMembership> {
             .and_then(|v| v.as_str())
             .unwrap_or_default()
             .to_string(),
-        role: row.get("role").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+        role: role.clone(),
+        roles,
     })
 }
 
@@ -363,11 +396,13 @@ mod tests {
                     tenant_id: 0,
                     tenant_name: "System".to_string(),
                     role: "system_admin".to_string(),
+                    roles: vec!["system_admin".to_string()],
                 },
                 TenantMembership {
                     tenant_id: 4,
                     tenant_name: "شركة الأمل".to_string(),
                     role: "admin".to_string(),
+                    roles: vec!["admin".to_string()],
                 },
             ]
         );
@@ -381,8 +416,30 @@ mod tests {
 
         assert_eq!(
             parsed,
-            vec![TenantMembership { tenant_id: 9, tenant_name: String::new(), role: String::new() }]
+            vec![TenantMembership {
+                tenant_id: 9,
+                tenant_name: String::new(),
+                role: String::new(),
+                roles: Vec::new(),
+            }]
         );
+    }
+
+    /// Several roles in one workspace are ONE choice, naming every role —
+    /// whether the server sent them folded (`roles`) or one row per role.
+    #[test]
+    fn folds_several_roles_in_one_workspace_into_one_entry() {
+        let parsed = parse_memberships(Some(&json!([
+            { "tenant_id": 4, "tenant_name": "Example Bakery", "role": "admin", "roles": ["admin", "baker"] },
+            { "tenant_id": 4, "tenant_name": "Example Bakery", "role": "cashier" },
+            { "tenant_id": 7, "tenant_name": "Example Cafe", "role": "baker" },
+        ])));
+
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].tenant_id, 4);
+        assert_eq!(parsed[0].role, "admin");
+        assert_eq!(parsed[0].roles, vec!["admin", "baker", "cashier"]);
+        assert_eq!(parsed[1].tenant_id, 7);
     }
 
     /// One unreadable entry must not hide the readable ones: dropping the whole
@@ -417,9 +474,13 @@ mod tests {
             tenant_id: 0,
             tenant_name: "System".to_string(),
             role: "system_admin".to_string(),
+            roles: vec!["system_admin".to_string()],
         })
         .unwrap();
 
-        assert_eq!(json, r#"{"tenantId":0,"tenantName":"System","role":"system_admin"}"#);
+        assert_eq!(
+            json,
+            r#"{"tenantId":0,"tenantName":"System","role":"system_admin","roles":["system_admin"]}"#
+        );
     }
 }

@@ -29,6 +29,7 @@ import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
 import { useCurrentLanguage, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import { roleLabel } from '@whity/features/roles/role-label';
 import { localizedName } from '@/lib/localized-name';
+import { rolesLabel } from '@/lib/workspace-memberships';
 import {
   IconLogout,
   IconUserCog,
@@ -58,6 +59,10 @@ interface TenantSwitcherProps {
   collapsed: boolean;
 }
 
+function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function TenantSwitcher({ memberships, activeTenantId, collapsed }: TenantSwitcherProps) {
   const { switchTenant } = useAuth();
   const { refresh: refreshNav } = useNavigation();
@@ -72,7 +77,7 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
         id: String(m.tenant_id),
         // #821: the reader's language, else the original name.
         name: localizedName(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
-        role: m.role ? m.role.charAt(0).toUpperCase() + m.role.slice(1) : undefined,
+        role: capitalise(rolesLabel(m)) || undefined,
       })),
     [memberships, currentLanguage],
   );
@@ -199,8 +204,8 @@ export function Sidebar() {
   // it is built to the nearest one: the row is the cards', and the menu holds
   // what the old foot showed as four stacked controls.
   const displayName = user?.display_name || user?.email || '';
-  const activeRole =
-    memberships.find((membership) => membership.tenant_id === user?.tenant_id)?.role ?? user?.role ?? '';
+  const activeMembership = memberships.find((membership) => membership.tenant_id === user?.tenant_id);
+  const activeRole = (activeMembership ? rolesLabel(activeMembership) : '') || user?.role || '';
   const footer = (
     <DropdownMenu>
       <DropdownMenuTrigger

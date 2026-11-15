@@ -1062,6 +1062,24 @@ describe('LoginPage - returning from SSO with several workspaces (WHIT-848)', ()
     expect(window.location.search).toBe('');
   });
 
+  test('lists a workspace once when the person holds several roles in it', async () => {
+    const severalRoles = [
+      { tenant_id: 1, tenant_name: 'Example Bakery', role: 'admin', roles: ['admin', 'baker'] },
+      // One row per role, as an older server answers.
+      { tenant_id: 4, tenant_name: 'Example Clinic', role: 'doctor' },
+      { tenant_id: 4, tenant_name: 'Example Clinic', role: 'nurse' },
+    ];
+    respond(() =>
+      Promise.resolve({ ok: true, status: 200, json: async () => ({ data: { memberships: severalRoles } }) })
+    );
+    renderReturn();
+
+    expect(await screen.findAllByRole('button', { name: /Example Bakery/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /Example Clinic/ })).toHaveLength(1);
+    expect(screen.getByText('admin, baker')).toBeInTheDocument();
+    expect(screen.getByText('doctor, nurse')).toBeInTheDocument();
+  });
+
   test('choosing a workspace completes the sign-in for that workspace', async () => {
     respond(() =>
       Promise.resolve({ ok: true, status: 200, json: async () => ({ data: { memberships } }) })

@@ -41,7 +41,10 @@ export interface TenantMembership {
   tenantId: number
   /** May be empty, and may be Arabic - always render it with `dir="auto"`. */
   tenantName: string
+  /** The primary role. */
   role: string
+  /** Every role held in the tenant, the primary one first (one entry per tenant). */
+  roles: string[]
 }
 
 /** Mirrors `commands::auth::EnrollResult` (internally-tagged on `status`). */

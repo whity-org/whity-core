@@ -4697,7 +4697,10 @@ final class CoreApiSchemas
             'tenant_name' => self::str(),
             'tenant_name_language' => self::str(),
             'tenant_names' => self::localizedText(),
+            // The primary role; `roles` names every role held in the workspace.
             'role' => self::str(),
+            'roles' => ['type' => 'array', 'items' => ['type' => 'string']],
+            'kind' => ['type' => 'string', 'enum' => ['member', 'customer']],
         ], ['tenant_id', 'tenant_name', 'role']);
 
         // Token mode (`X-Auth-Mode: token`, WC-ddcd16ad): every endpoint that

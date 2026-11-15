@@ -14895,6 +14895,9 @@ export interface components {
                     en?: string;
                 };
                 role: string;
+                roles?: string[];
+                /** @enum {string} */
+                kind?: "member" | "customer";
             }[] | null;
             selection_token?: string;
             access_token?: string;
@@ -15014,6 +15017,9 @@ export interface components {
                     en?: string;
                 };
                 role: string;
+                roles?: string[];
+                /** @enum {string} */
+                kind?: "member" | "customer";
             }[];
         };
         MeIdentity: {
@@ -15829,6 +15835,9 @@ export interface components {
                         en?: string;
                     };
                     role: string;
+                    roles?: string[];
+                    /** @enum {string} */
+                    kind?: "member" | "customer";
                 }[];
             };
         };

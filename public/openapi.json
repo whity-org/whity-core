@@ -86175,6 +86175,19 @@
                                 },
                                 "role": {
                                     "type": "string"
+                                },
+                                "roles": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "member",
+                                        "customer"
+                                    ]
                                 }
                             },
                             "required": [
@@ -86570,6 +86583,19 @@
                                 },
                                 "role": {
                                     "type": "string"
+                                },
+                                "roles": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "member",
+                                        "customer"
+                                    ]
                                 }
                             },
                             "required": [
@@ -89739,6 +89765,19 @@
                                         },
                                         "role": {
                                             "type": "string"
+                                        },
+                                        "roles": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "kind": {
+                                            "type": "string",
+                                            "enum": [
+                                                "member",
+                                                "customer"
+                                            ]
                                         }
                                     },
                                     "required": [
