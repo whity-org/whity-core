@@ -5455,6 +5455,22 @@ $notificationPreferencesHandler = new \Whity\Api\NotificationPreferencesApiHandl
 $router->register('GET', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'list'],   null);
 $router->register('PUT', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'update'], null);
 
+// Web push: a person's devices and the instance's public key (WHIT-1073).
+// Self-scoped, session-gated, no RBAC permission. The key pair is made on
+// first use and kept encrypted with the shared key ring.
+$pushSubscriptionsHandler = new \Whity\Api\PushSubscriptionsApiHandler(
+    $tokenValidator,
+    new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
+    static fn (): \Whity\Core\Notification\Push\VapidKeys => new \Whity\Core\Notification\Push\VapidKeys(
+        $globalSettingsRepository,
+        \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+    ),
+    \Whity\Core\Notification\Push\PushEndpoint::extraHostsFrom($_ENV),
+);
+$router->register('GET',    '/api/me/push-subscriptions',             [$pushSubscriptionsHandler, 'list'],      null);
+$router->register('POST',   '/api/me/push-subscriptions',             [$pushSubscriptionsHandler, 'subscribe'], null);
+$router->register('DELETE', '/api/me/push-subscriptions/{id:\d+}',    [$pushSubscriptionsHandler, 'remove'],    null);
+
 // A person's text size and Show technical details (design decisions W.3, A.3).
 // Self-scoped, session-gated, no RBAC permission.
 $displayPreferencesHandler = new \Whity\Api\DisplayPreferencesApiHandler($tokenValidator, $db->getPdo());
