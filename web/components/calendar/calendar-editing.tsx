@@ -128,9 +128,11 @@ export interface QuickBookingProps {
   onClose: () => void;
   onSaved: (message: string) => void;
   onMore: (date: CalendarDate, profileId: number | null) => void;
+  /** Inside the phone's sheet: full width, no card of its own. */
+  inSheet?: boolean;
 }
 
-export function QuickBooking({ draft, services, staff, timeZone, canEvent, me, onServiceLength, onClose, onSaved, onMore }: QuickBookingProps) {
+export function QuickBooking({ draft, services, staff, timeZone, canEvent, me, onServiceLength, onClose, onSaved, onMore, inSheet = false }: QuickBookingProps) {
   const t = useTranslation('calendar');
   const words = useCalendarWords();
   const when = useWhen();
@@ -221,7 +223,7 @@ export function QuickBooking({ draft, services, staff, timeZone, canEvent, me, o
     <div
       role="dialog"
       aria-label={t('toolbar.newBooking', 'New booking')}
-      className="grid w-[360px] gap-3 rounded-[14px] border border-border bg-card p-4 text-sm text-foreground shadow-float"
+      className={inSheet ? 'grid gap-3 text-base text-foreground' : 'grid w-[360px] gap-3 rounded-[14px] border border-border bg-card p-4 text-sm text-foreground shadow-float'}
       data-testid="calendar-quick"
       onPointerDown={(event) => event.stopPropagation()}
       onKeyDown={(event) => {

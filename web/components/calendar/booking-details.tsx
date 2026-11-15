@@ -40,9 +40,11 @@ export interface BookingDetailsProps {
   onMove: () => void;
   onCancel: () => void;
   onOpen: () => void;
+  /** The phone's sheet (CV.11): Move, Call, Message, then Cancel booking. */
+  inSheet?: boolean;
 }
 
-export function BookingDetails({ item, timeZone, withName, canChange, onClose, onMove, onCancel, onOpen }: BookingDetailsProps) {
+export function BookingDetails({ item, timeZone, withName, canChange, onClose, onMove, onCancel, onOpen, inSheet = false }: BookingDetailsProps) {
   const t = useTranslation('calendar');
   const words = useCalendarWords();
   const dates = useDateDisplay({ timeZone });
@@ -75,7 +77,7 @@ export function BookingDetails({ item, timeZone, withName, canChange, onClose, o
     <div
       role="dialog"
       aria-label={item.title}
-      className="grid w-[360px] gap-3.5 rounded-[14px] border border-border bg-card p-4 text-sm leading-[1.45] text-foreground shadow-float"
+      className={inSheet ? 'grid gap-3.5 text-base leading-[1.45] text-foreground' : 'grid w-[360px] gap-3.5 rounded-[14px] border border-border bg-card p-4 text-sm leading-[1.45] text-foreground shadow-float'}
       data-testid="calendar-details"
     >
       <div className="grid grid-cols-[16px_1fr_auto] items-start gap-3">
@@ -84,9 +86,11 @@ export function BookingDetails({ item, timeZone, withName, canChange, onClose, o
           <h3 className={`m-0 text-lg leading-snug font-semibold ${item.kind === 'cancelled' ? 'line-through' : ''}`}>{item.title}</h3>
           <p className="m-0 mt-0.5 text-muted-foreground">{when}</p>
         </div>
-        <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label={t('action.close', 'Close')} title={t('action.close', 'Close')}>
-          <Icon name="close" />
-        </Button>
+        {inSheet ? <span /> : (
+          <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label={t('action.close', 'Close')} title={t('action.close', 'Close')}>
+            <Icon name="close" />
+          </Button>
+        )}
       </div>
       {booking !== undefined && (
         <Row icon="customer" small={booking.customer.phone ? <span dir="ltr">{booking.customer.phone}</span> : undefined}>
@@ -97,7 +101,44 @@ export function BookingDetails({ item, timeZone, withName, canChange, onClose, o
       {item.where !== '' && <Row icon="store">{item.where}</Row>}
       {paid !== null && <Row icon="money">{paid}</Row>}
       {how !== null && <Row icon="clock">{how}</Row>}
-      {booking !== undefined && (
+      {booking !== undefined && inSheet && (
+        <>
+          <div className="grid grid-cols-3 gap-2">
+            {live && canChange && (
+              <Button variant="outline" className="h-12" onClick={onMove} data-testid="calendar-details-move">
+                <Icon name="calendar" />
+                {t('details.move', 'Move')}
+              </Button>
+            )}
+            {booking.customer.phone ? (
+              <Button variant="outline" className="h-12" asChild>
+                <a href={`tel:${booking.customer.phone.replace(/\s+/g, '')}`}>
+                  <Icon name="phone" />
+                  {t('details.call', 'Call')}
+                </a>
+              </Button>
+            ) : null}
+            {booking.customer.email ? (
+              <Button variant="outline" className="h-12" asChild>
+                <a href={`mailto:${booking.customer.email}`}>
+                  <Icon name="send" />
+                  {t('details.message', 'Message')}
+                </a>
+              </Button>
+            ) : null}
+          </div>
+          {live && canChange && (
+            <Button variant="ghost" className="h-12" onClick={onCancel} data-testid="calendar-details-cancel">
+              {t('details.cancelBooking', 'Cancel booking')}
+            </Button>
+          )}
+          <Button variant="ghost" className="h-12" onClick={onOpen} data-testid="calendar-details-open">
+            {t('details.open', 'Open booking')}
+            <Icon name="chevron-right" className="rtl:-scale-x-100" />
+          </Button>
+        </>
+      )}
+      {booking !== undefined && !inSheet && (
         <>
           <div className="flex flex-wrap items-center gap-2">
             {live && canChange && (
