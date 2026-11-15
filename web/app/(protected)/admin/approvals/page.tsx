@@ -39,6 +39,7 @@ import {
   agentName,
   isToday,
   newestFirst,
+  impactPlanOf,
   oldestFirst,
   proposalActivity,
   proposalChanges,
@@ -49,6 +50,7 @@ import {
   type ProposalWords,
 } from '@/components/agents/proposals';
 import { ViewToggle } from '@whity/ui/view-toggle';
+import { useImpactPlanCard } from '@/components/agents/impact-plan';
 import { EditProposalDialog } from './edit-proposal-dialog';
 import { ApprovalsList } from './approvals-list';
 
@@ -68,6 +70,9 @@ export default function ApprovalsPage() {
   // One at a time stays the default (AQ.1).
   const [view, setView] = useState<'one' | 'list'>('one');
   const [bulkBusy, setBulkBusy] = useState(false);
+  // WHIT-1042: destructive impact plans the person ticked, by proposal id.
+  const [acknowledged, setAcknowledged] = useState<ReadonlySet<number>>(() => new Set());
+  const impactPlanCard = useImpactPlanCard();
 
   // The undo meters count down without a request: the window's end is known.
   const [now, setNow] = useState(() => Date.now());
@@ -188,6 +193,20 @@ export default function ApprovalsPage() {
     busy: action !== null && undoingId === action.id,
     onUndo: canUndo && action !== null ? () => void undo(action) : undefined,
     labels,
+    // WHIT-1042: decided, a Whity Builder publish or roll back still reads as its plan.
+    ...(() => {
+      const plan = impactPlanOf(proposal);
+      return plan
+        ? impactPlanCard(plan, {
+            acknowledged: false,
+            onAcknowledge: () => undefined,
+            onAskToFix: () => undefined,
+            busy: false,
+            agent: agentName(proposal, words),
+            waiting: false,
+          })
+        : {};
+    })(),
     };
   };
 
@@ -198,10 +217,15 @@ export default function ApprovalsPage() {
     setCurrentId(next ? String(next.id) : undefined);
   };
 
-  const decide = async (proposal: AgentProposal, verdict: 'approve' | 'decline', args?: Record<string, unknown>) => {
+  const decide = async (
+    proposal: AgentProposal,
+    verdict: 'approve' | 'decline',
+    args?: Record<string, unknown>,
+    extra: { acknowledgedDestructive?: boolean; reason?: string } = {},
+  ) => {
     setBusyId(proposal.id);
     try {
-      const path = { params: { path: { id: proposal.id } }, body: (args ? { arguments: args } : {}) as never };
+      const path = { params: { path: { id: proposal.id } }, body: { ...(args ? { arguments: args } : {}), ...extra } as never };
       const { data, error, response } =
         verdict === 'approve'
           ? await api.POST('/api/v1/me/agent-proposals/{id}/approve', path)
@@ -330,14 +354,34 @@ export default function ApprovalsPage() {
     setView('one');
   };
 
-  const queueItems: ApprovalQueueItem[] = waiting.map((proposal) => ({
-    id: String(proposal.id),
-    ...cardProps(proposal),
-    busy: busyId === proposal.id,
-    onApprove: () => void decide(proposal, 'approve'),
-    onDecline: () => void decide(proposal, 'decline'),
-    onEdit: () => setEditing(proposal),
-  }));
+  const queueItems: ApprovalQueueItem[] = waiting.map((proposal) => {
+    const plan = impactPlanOf(proposal);
+    const ticked = acknowledged.has(proposal.id);
+    return {
+      id: String(proposal.id),
+      ...cardProps(proposal),
+      busy: busyId === proposal.id,
+      onApprove: () => void decide(proposal, 'approve', undefined, plan && ticked ? { acknowledgedDestructive: true } : {}),
+      onDecline: () => void decide(proposal, 'decline'),
+      onEdit: () => setEditing(proposal),
+      // WHIT-1042: a Whity Builder publish or roll back reads as its impact plan.
+      ...(plan
+        ? impactPlanCard(plan, {
+            acknowledged: ticked,
+            onAcknowledge: (value) =>
+              setAcknowledged((current) => {
+                const next = new Set(current);
+                if (value) next.add(proposal.id);
+                else next.delete(proposal.id);
+                return next;
+              }),
+            onAskToFix: (reason) => void decide(proposal, 'decline', undefined, { reason }),
+            busy: busyId === proposal.id,
+            agent: agentName(proposal, words),
+          })
+        : {}),
+    };
+  });
 
   // Derived each render: a few dozen rows at most (the list is capped at 50).
   const actionExtra = (action: AgentAction) => {

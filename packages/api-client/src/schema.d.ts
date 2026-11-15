@@ -5267,7 +5267,7 @@ export interface paths {
         put?: never;
         /**
          * Decline an agent's proposal
-         * @description Nothing runs. The agent can ask again.
+         * @description Nothing runs. The agent can ask again, and reads the reason when you give one.
          */
         post: operations["post_api_v1_me_agent_proposals_id_decline"];
         delete?: never;
@@ -10714,6 +10714,7 @@ export interface components {
             decidedAt: string | null;
             expiresAt: string;
             createdAt: string;
+            declineReason?: string | null;
             action: components["schemas"]["AgentAction"] | null;
             /** @description The agent is paused, so this can be declined but not approved until it is resumed */
             agentPaused?: boolean;
@@ -46836,6 +46837,8 @@ export interface operations {
                     arguments?: {
                         [key: string]: unknown;
                     };
+                    /** @description Needed for a Whity Builder publish or roll back that stops showing data people entered: the person ticked that they understand what is lost. */
+                    acknowledgedDestructive?: boolean;
                 };
             };
         };
@@ -46903,6 +46906,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description An impact plan whose tests failed (code tests_failed), or a destructive one without acknowledgedDestructive (code acknowledge_destructive) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Internal server error */
             500: {
                 headers: {
@@ -46924,7 +46936,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Why, for the agent to read back (optional), such as which tests to fix. */
+                    reason?: string;
+                };
+            };
+        };
         responses: {
             /** @description The proposal after the decision */
             200: {
@@ -46933,6 +46952,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentProposalResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Missing or invalid authentication */

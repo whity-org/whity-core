@@ -35917,6 +35917,10 @@
                                         "type": "object",
                                         "additionalProperties": true,
                                         "description": "Edited arguments to run with instead of the agent's (optional)."
+                                    },
+                                    "acknowledgedDestructive": {
+                                        "type": "boolean",
+                                        "description": "Needed for a Whity Builder publish or roll back that stops showing data people entered: the person ticked that they understand what is lost."
                                     }
                                 }
                             }
@@ -35994,6 +35998,16 @@
                             }
                         }
                     },
+                    "422": {
+                        "description": "An impact plan whose tests failed (code tests_failed), or a destructive one without acknowledgedDestructive (code acknowledge_destructive)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "content": {
@@ -36014,7 +36028,7 @@
                 "tags": [
                     "me"
                 ],
-                "description": "Nothing runs. The agent can ask again.",
+                "description": "Nothing runs. The agent can ask again, and reads the reason when you give one.",
                 "parameters": [
                     {
                         "name": "id",
@@ -36034,6 +36048,23 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "maxLength": 1000,
+                                        "description": "Why, for the agent to read back (optional), such as which tests to fix."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "The proposal after the decision",
@@ -36041,6 +36072,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/AgentProposalResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
                         }
@@ -72145,6 +72186,10 @@
                     },
                     "createdAt": {
                         "type": "string"
+                    },
+                    "declineReason": {
+                        "type": "string",
+                        "nullable": true
                     },
                     "action": {
                         "allOf": [
