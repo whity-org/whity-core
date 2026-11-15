@@ -20,7 +20,7 @@ final class PaymentRequirement
             throw new \InvalidArgumentException('A payment requirement must be for more than nothing.');
         }
         if (preg_match('/^[A-Z]{3}$/', $currency) !== 1) {
-            throw new \InvalidArgumentException('The currency must be a three-letter code such as JOD.');
+            throw new \InvalidArgumentException('The currency must be a three-letter code such as USD.');
         }
     }
 }

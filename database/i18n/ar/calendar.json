@@ -252,7 +252,7 @@
         "services.empty.title": "لا خدمات بعد",
         "services.error.buffer": "يجب أن يكون الوقت المتروك عددًا صحيحًا من الدقائق، من 0 إلى 240.",
         "services.error.create": "تعذّرت إضافة الخدمة. حاول مرة أخرى.",
-        "services.error.currency": "أدخل رمز عملة من ثلاثة أحرف، مثل JOD.",
+        "services.error.currency": "أدخل رمز عملة من ثلاثة أحرف، مثل USD.",
         "services.error.duration": "يجب أن تكون المدة عددًا صحيحًا من الدقائق، من 5 إلى 1440.",
         "services.error.load": "تعذّر تحميل الخدمات.",
         "services.error.loadOne": "تعذّر تحميل هذه الخدمة.",

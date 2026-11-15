@@ -45,9 +45,9 @@ use Whity\Database\SequenceCounters;
  * WHAT EACH ROW IS FOR
  * --------------------
  * Plans: three tiers, so the "no price yet — this plan cannot be sold" state is
- * visible beside two that can. Prices in JOD at three decimal places, because
- * that is the currency this platform bills in and the one an amount rendered by
- * dividing by 100 gets wrong.
+ * visible beside two that can. Prices in US dollars, the default currency since
+ * design 3.5.1 (CU.1); the same figures as before, so $15.00 where it was
+ * 15.000 JOD and every invoice still adds up.
  *
  * Promotions: an early bird (no code, capped, expires), a promo code (typed by
  * the customer), a fixed-amount offer, and a RETIRED one — because a campaign
@@ -68,7 +68,7 @@ final class BillingDemoSeeder
     private const DEMO_TENANT_NAME = 'Demo Company (billing sample)';
     private const DEMO_TENANT_SLUG = 'billing-demo';
 
-    private const CURRENCY = 'JOD';
+    private const CURRENCY = 'USD';
 
     public function __construct(
         private readonly PDO $pdo,
@@ -107,10 +107,10 @@ final class BillingDemoSeeder
     {
         $plans = [
             // key, name, description, prices [amount in MINOR units, period, per-seat]
-            ['starter', 'Starter', 'For a small team finding its feet.', [[15000, 'month', false]]],
+            ['starter', 'Starter', 'For a small team finding its feet.', [[1500, 'month', false]]],
             ['professional', 'Professional', 'Per-seat, for a growing organisation.', [
-                [8000, 'month', true],
-                [80000, 'year', true],
+                [800, 'month', true],
+                [8000, 'year', true],
             ]],
             // DELIBERATELY UNPRICED, so the "this plan cannot be sold" state is
             // visible on the screen beside two that can.
@@ -212,7 +212,7 @@ final class BillingDemoSeeder
             ['Autumn campaign', 'AUTUMN25', 25, null, null, $now->modify('+6 weeks'), null, true],
             // A FIXED amount, so the screen shows both kinds side by side and the
             // "a percentage has no currency" distinction is visible.
-            ['Migration credit', 'MOVEIN', null, 20000, null, null, 100, true],
+            ['Migration credit', 'MOVEIN', null, 2000, null, null, 100, true],
             // RETIRED, because a campaign that ended is the explanation for a
             // discount somebody is querying.
             ['Launch week (ended)', 'LAUNCH', 50, null, $now->modify('-6 months'), $now->modify('-5 months'), null, false],
@@ -358,9 +358,9 @@ final class BillingDemoSeeder
         $paid = $this->issue(
             $invoices, $numbers, $tenantId, $planId,
             'Professional plan — ' . $now->modify('-2 months')->format('F Y'),
-            3, 8000, $now->modify('-2 months'), $now->modify('-6 weeks'), $seller, $buyer
+            3, 800, $now->modify('-2 months'), $now->modify('-6 weeks'), $seller, $buyer
         );
-        $this->record($ledger, $tenantId, $paid, 24000, PaymentEventType::Succeeded, 'demo-paid-1', $now->modify('-7 weeks'));
+        $this->record($ledger, $tenantId, $paid, 2400, PaymentEventType::Succeeded, 'demo-paid-1', $now->modify('-7 weeks'));
         $invoices->markPaid($tenantId, $paid, $now->modify('-7 weeks'));
 
         // 2. PART-PAID — the state most likely to be got wrong, and the only way
@@ -368,9 +368,9 @@ final class BillingDemoSeeder
         $partial = $this->issue(
             $invoices, $numbers, $tenantId, $planId,
             'Professional plan — ' . $now->modify('-1 month')->format('F Y'),
-            3, 8000, $now->modify('-1 month'), $now->modify('+1 week'), $seller, $buyer
+            3, 800, $now->modify('-1 month'), $now->modify('+1 week'), $seller, $buyer
         );
-        $this->record($ledger, $tenantId, $partial, 10000, PaymentEventType::Succeeded, 'demo-partial-1', $now->modify('-3 weeks'));
+        $this->record($ledger, $tenantId, $partial, 1000, PaymentEventType::Succeeded, 'demo-partial-1', $now->modify('-3 weeks'));
 
         // 3. OVERDUE, with a FAILED attempt carrying the bank's reason —
         // because "why does it say I have not paid" is answered by the attempt
@@ -378,10 +378,10 @@ final class BillingDemoSeeder
         $overdue = $this->issue(
             $invoices, $numbers, $tenantId, $planId,
             'Professional plan — ' . $now->modify('-3 months')->format('F Y'),
-            3, 8000, $now->modify('-3 months'), $now->modify('-10 days'), $seller, $buyer
+            3, 800, $now->modify('-3 months'), $now->modify('-10 days'), $seller, $buyer
         );
         $this->record(
-            $ledger, $tenantId, $overdue, 24000, PaymentEventType::Failed, 'demo-failed-1',
+            $ledger, $tenantId, $overdue, 2400, PaymentEventType::Failed, 'demo-failed-1',
             $now->modify('-9 days'), 'Insufficient funds'
         );
 
@@ -389,13 +389,13 @@ final class BillingDemoSeeder
         $this->issue(
             $invoices, $numbers, $tenantId, $planId,
             'Professional plan — ' . $now->format('F Y'),
-            3, 8000, $now, $now->modify('+2 weeks'), $seller, $buyer
+            3, 800, $now, $now->modify('+2 weeks'), $seller, $buyer
         );
 
         // 5. A DRAFT — no number, because a draft that took one and was
         // abandoned would punch a hole in the sequence.
         $draft = $invoices->createDraft($tenantId, self::CURRENCY);
-        $invoices->addLine($tenantId, $draft, 'Additional storage (draft, not yet issued)', 1, 5000);
+        $invoices->addLine($tenantId, $draft, 'Additional storage (draft, not yet issued)', 1, 500);
 
         $notes[] = 'Invoices: paid, part-paid, overdue (with a failed attempt), open, and a draft.';
     }

@@ -153,7 +153,7 @@ export default function CalendarServicePage() {
     }
     const currency = current.currency.trim().toUpperCase();
     if (!/^[A-Z]{3}$/.test(currency)) {
-      setProblem(t('services.error.currency', 'Enter a three-letter currency code, such as JOD.'));
+      setProblem(t('services.error.currency', 'Enter a three-letter currency code, such as USD.'));
       return;
     }
     let priceMinor: number | null = null;

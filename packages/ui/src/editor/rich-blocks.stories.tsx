@@ -30,17 +30,17 @@ const SERVICES: EditorServices = {
   resolveRecord: (ref) =>
     wait(
       ref.id === "INV-1042"
-        ? { typeLabel: "Invoice", title: "INV-1042 · Example Clinic", subtitle: "Due 14 Oct 2026", amount: "JOD 301.600", status: { label: "Overdue", tone: "warning" as const } }
+        ? { typeLabel: "Invoice", title: "INV-1042 · Example Clinic", subtitle: "Due 14 Oct 2026", amount: "$301.60", status: { label: "Overdue", tone: "warning" as const } }
         : ref.id === "INV-0001"
           ? null
-          : { typeLabel: "Invoice", title: `${ref.id} · Example Bakery`, amount: "JOD 96.000", status: { label: "Paid", tone: "success" as const } }
+          : { typeLabel: "Invoice", title: `${ref.id} · Example Bakery`, amount: "$96.00", status: { label: "Paid", tone: "success" as const } }
     ),
   loadChart: (source) =>
     wait(
       source.query === "empty"
         ? { points: [] }
         : {
-            valueLabel: source.query === "revenue-by-month" ? "JOD" : "Documents",
+            valueLabel: source.query === "revenue-by-month" ? "USD" : "Documents",
             subtitle: "Last 6 months",
             points: [
               { label: "May", value: 18 },
@@ -82,8 +82,8 @@ const BLOCKS: Block[] = [
     columns: [{ align: "start" }, { align: "start" }, { align: "end" }],
     rows: [
       [[t("Invoice")], [t("Customer")], [t("Amount")]],
-      [[t("INV-1042")], [t("Example Clinic")], [t("JOD 301.600")]],
-      [[t("INV-1051")], [t("Example Café")], [t("JOD 96.000")]],
+      [[t("INV-1042")], [t("Example Clinic")], [t("$301.60")]],
+      [[t("INV-1051")], [t("Example Café")], [t("$96.00")]],
     ],
   },
   { id: "r7", type: "image", src: "", alt: "", width: "wide" },

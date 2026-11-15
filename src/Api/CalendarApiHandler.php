@@ -769,12 +769,12 @@ final class CalendarApiHandler
         };
         $price = $pick('price_minor', $existing['price_minor'] ?? null);
         if ($price !== null && (!is_int($price) || $price < 0)) {
-            throw new CalendarRejectedException('price_minor must be a whole number of minor units (JOD 12.500 is 12500), or null', 422);
+            throw new CalendarRejectedException('price_minor must be a whole number of minor units ($12.50 is 1250, JOD 12.500 is 12500), or null', 422);
         }
         $settings = CalendarSettings::fromSettings($this->settings->effective($tenantId));
         $currency = $pick('currency', $existing['currency'] ?? $settings->currency);
         if (!is_string($currency) || preg_match('/^[A-Z]{3}$/', $currency) !== 1) {
-            throw new CalendarRejectedException('currency must be a three-letter code such as JOD', 422);
+            throw new CalendarRejectedException('currency must be a three-letter code such as USD', 422);
         }
         $staff = $pick('staff_profile_ids', $existing['staff_profile_ids'] ?? []);
         if (!is_array($staff) || count($staff) > 200) {

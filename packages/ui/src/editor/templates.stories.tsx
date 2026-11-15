@@ -33,7 +33,7 @@ const FIELDS: FieldGroup[] = [
     group: "Invoice",
     items: [
       { path: "invoice.number", label: "Invoice number", sample: "INV-1042", required: true },
-      { path: "invoice.total", label: "Invoice total", sample: "JOD 301.600", required: true },
+      { path: "invoice.total", label: "Invoice total", sample: "$301.60", required: true },
       { path: "invoice.due_date", label: "Due date", sample: "14 Oct 2026" },
       { path: "invoice.days_overdue", label: "Days overdue", sample: "15" },
     ],
@@ -89,8 +89,8 @@ const BLOCKS: Block[] = [
     columns: [{ align: "start" }, { align: "start" }, { align: "end" }],
     rows: [
       [[t("Invoice")], [t("Due")], [t("Amount")]],
-      [[t("INV-1042")], [t("14 Oct 2026")], [t("JOD 301.600")]],
-      [[t("INV-1051")], [t("21 Oct 2026")], [t("JOD 96.000")]],
+      [[t("INV-1042")], [t("14 Oct 2026")], [t("$301.60")]],
+      [[t("INV-1051")], [t("21 Oct 2026")], [t("$96.00")]],
     ],
   },
   { id: "t6", type: "paragraph", content: [t("Customer tax number: "), f("customer.tax_number", "Customer tax number")] },
@@ -105,7 +105,7 @@ const PREVIEW: FieldPreview = {
     "customer.name": "Example Clinic",
     "customer.tax_number": null,
     "invoice.number": "INV-1042",
-    "invoice.total": "JOD 301.600",
+    "invoice.total": "$301.60",
     "invoice.due_date": "14 Oct 2026",
     "invoice.days_overdue": "15",
     "company.name": "Example Bakery",

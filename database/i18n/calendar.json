@@ -251,7 +251,7 @@
         "services.empty.title": "No services yet",
         "services.error.buffer": "Time kept free must be a whole number of minutes, from 0 to 240.",
         "services.error.create": "The service could not be added. Try again.",
-        "services.error.currency": "Enter a three-letter currency code, such as JOD.",
+        "services.error.currency": "Enter a three-letter currency code, such as USD.",
         "services.error.duration": "The length must be a whole number of minutes, from 5 to 1440.",
         "services.error.load": "The services could not be loaded.",
         "services.error.loadOne": "This service could not be loaded.",
