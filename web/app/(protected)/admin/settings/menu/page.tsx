@@ -1,17 +1,18 @@
 'use client';
 
+/**
+ * The phone's old settings menu address. The menu is the Settings area's own
+ * root since WHIT-1081, with your own settings above the workspace's.
+ */
+
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { SETTINGS_HOME_HREF } from '@/lib/settings/my-settings';
 
-/**
- * The settings menu as its own page is a phone page (PwSettings): the Settings
- * area draws it. From 640px up the area already shows its menu beside General,
- * so this sends a wide window there.
- */
 export default function SettingsMenuPage() {
   const router = useRouter();
   useEffect(() => {
-    if (window.matchMedia('(min-width: 640px)').matches) router.replace('/admin/settings');
+    router.replace(SETTINGS_HOME_HREF);
   }, [router]);
   return null;
 }

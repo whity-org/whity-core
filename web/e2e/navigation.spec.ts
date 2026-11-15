@@ -60,7 +60,10 @@ test.describe('Sidebar navigation (admin)', () => {
   });
 
   test('Settings General leads a workspace admin to their workspace record', async ({ adminPage, page }) => {
+    // Settings opens My settings first (WHIT-1081); General is in its sub-nav.
     await adminPage.shell.clickNav('Settings');
+    await page.waitForURL('**/settings/profile');
+    await page.getByTestId('settings-area-link-general').click();
     await page.waitForURL('**/admin/settings');
     await page.getByRole('link', { name: 'Open workspace record' }).click();
     await page.waitForURL(/\/admin\/tenants\/\d+$/);
@@ -72,7 +75,7 @@ test.describe('Sidebar navigation (admin)', () => {
     page,
   }) => {
     await adminPage.shell.clickNav('Settings');
-    await page.waitForURL('**/admin/settings');
+    await page.waitForURL('**/settings/profile');
     const area = page.getByTestId('settings-area-nav');
     await expect(area).toBeVisible();
     await expect(area.getByText('Sign-in and security')).toBeVisible();
@@ -85,12 +88,11 @@ test.describe('Sidebar navigation (admin)', () => {
 
   test('the user row opens the account page', async ({ adminPage, page }) => {
     await adminPage.shell.openAccountSettings();
-    await page.waitForURL('**/settings');
-    await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
-    // The Account Information card became the editable Profile card (WC-64).
-    // The account page is in tabs (Profile, Password and two-step, Where you’re signed in, Language and display).
-    await expect(page.getByRole('tab', { name: 'Profile' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Password and two-step' })).toBeVisible();
+    // Your own settings are pages in the one Settings area (WHIT-1081); on a computer it opens Profile.
+    await page.waitForURL('**/settings/profile');
+    await expect(page.getByRole('heading', { name: 'Profile', level: 1 })).toBeVisible();
+    await expect(page.getByTestId('settings-area-link-profile')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('settings-area-link-password')).toBeVisible();
   });
 
   test('Dashboard section loads the home page', async ({

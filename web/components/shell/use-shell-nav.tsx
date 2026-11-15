@@ -26,6 +26,7 @@ import {
   SETTINGS_AREA_NAV_IDS,
   SETTINGS_AREA_PREFIXES,
 } from '@/components/settings/settings-area';
+import { SETTINGS_HOME_HREF } from '@/lib/settings/my-settings';
 
 /**
  * Resolve a navigation `icon` name to a Tabler icon component.
@@ -231,11 +232,11 @@ export function useShellNav(): ShellNav {
   const groups = useMemo(() => {
     // The Settings area (WHIT-806, owner decision D1): every settings page,
     // the data pages it holds and the server's `settings` group become ONE
-    // entry at the foot, opening the area's own sub-nav. The personal account
-    // page leaves the nav too: it is the user row in the footer.
+    // entry at the foot, opening the area's own sub-nav. Since WHIT-1081 your
+    // own settings are in the same area, so the entry is there for everyone,
+    // members who can change nothing of the workspace's included.
     const inSettingsArea = (item: { id: string; group?: string }) =>
       item.group === 'settings' || (SETTINGS_AREA_NAV_IDS as readonly string[]).includes(item.id);
-    const settingsEntry = navItems.find((item) => item.id === 'website-settings') ?? navItems.find(inSettingsArea);
     const regrouped = navItems
       .filter((item) => !inSettingsArea(item) && item.id !== ACCOUNT_SETTINGS_ITEM_ID)
       .map((item) =>
@@ -262,7 +263,6 @@ export function useShellNav(): ShellNav {
         counts[item.id] ? { ...item, count: counts[item.id], countLabel: countLabel(counts[item.id]) } : item,
       ),
     }));
-    if (!settingsEntry) return withCounts;
     return [
       ...withCounts,
       {
@@ -271,7 +271,7 @@ export function useShellNav(): ShellNav {
           {
             id: 'settings-area',
             label: t('sidebar.item.settings', 'Settings'),
-            href: settingsEntry.href,
+            href: SETTINGS_HOME_HREF,
             icon: <IconSettings size={20} />,
             active:
               !Object.values(PLATFORM_SETTINGS_TABS).includes(pathname ?? '') &&
