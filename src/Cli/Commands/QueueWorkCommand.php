@@ -163,6 +163,25 @@ final class QueueWorkCommand implements CliCommand
                 $workerSettings,
                 entitlements: new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo))
             ));
+            // WHIT-1072: a final document this worker's retry makes (FinaliseRouteJob)
+            // announces document.finalised here, so the form-decision email goes from
+            // here too. The shared store keeps it to one email per route and decision,
+            // whichever process gets there first. Storage is built on first use.
+            (new \Whity\Core\Form\FormDecisionEmail(
+                $pdo,
+                new \Whity\Core\Identity\ProfileEmailRepository($pdo),
+                $workerSender,
+                $workerSettings,
+                \Whity\Core\Http\FrontendUrls::fromEnv()->base(),
+                static function (): ?\Whity\Core\Document\DocumentArtifactStore {
+                    $parts = \Whity\app(\Whity\Core\Document\Issuing\WorkerDocumentParts::class);
+
+                    return $parts instanceof \Whity\Core\Document\Issuing\WorkerDocumentParts
+                        ? new \Whity\Core\Document\DocumentArtifactStore($parts->storage())
+                        : null;
+                },
+                new \Whity\Core\Store\DatabaseSharedStore($pdo),
+            ))->subscribe($hookManager);
             $messaging = \Whity\Core\Messaging\CoreMessaging::build(
                 $pdo,
                 $messageChannels,

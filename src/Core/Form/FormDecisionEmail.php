@@ -19,6 +19,7 @@ use Whity\Core\Mail\EmailOptions;
 use Whity\Core\Mail\MailAttachment;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
+use Whity\Core\Store\SharedStoreInterface;
 use Whity\Sdk\Hooks\Events;
 
 /**
@@ -34,6 +35,14 @@ use Whity\Sdk\Hooks\Events;
  * - every other finished route (not approved, or approved with no final
  *   document) sends on `route.completed`, with no file.
  *
+ * Whichever process makes the final document sends it: the request that
+ * reached the finalise step, or the queue worker's retry when the render
+ * service was down then (WHIT-1072; the worker subscribes this on its own hook
+ * manager). **Exactly once**: before sending, it takes a key per route and
+ * decision in the shared store (`form-decision:{tenant}:{route}:{decision}`);
+ * a second event for the same route and decision finds the key and sends
+ * nothing. A send that fails gives the key back, so a later attempt can send.
+ *
  * Public submissions have no submitter and get nothing (see
  * {@see FormReceivedEmail}). Like `form-received`, the person can turn it off;
  * the workspace's email switch applies. Best-effort: never fails the route.
@@ -42,7 +51,17 @@ final class FormDecisionEmail
 {
     public const TYPE = 'form.decision';
     private const MAX_ATTACHMENT = 1_048_576;
+    /** How long a sent decision is remembered: far longer than any retry runs. */
+    private const SENT_TTL = 400 * 86400;
 
+    /** @var DocumentArtifactStore|(\Closure(): ?DocumentArtifactStore)|null */
+    private DocumentArtifactStore|\Closure|null $artifacts;
+
+    /**
+     * @param DocumentArtifactStore|(\Closure(): ?DocumentArtifactStore)|null $artifacts
+     *        Where final documents are stored; a closure builds it on first use
+     *        (the worker builds storage only when it needs it).
+     */
     public function __construct(
         private readonly PDO $db,
         private readonly ProfileEmailRepository $emails,
@@ -50,8 +69,10 @@ final class FormDecisionEmail
         private readonly SettingsService $settings,
         /** The app's base URL ("https://app.example.com"). */
         private readonly string $appUrl,
-        private readonly ?DocumentArtifactStore $artifacts = null,
+        DocumentArtifactStore|\Closure|null $artifacts = null,
+        private readonly ?SharedStoreInterface $sent = null,
     ) {
+        $this->artifacts = $artifacts;
     }
 
     public function subscribe(HookManager $hooks): void
@@ -144,7 +165,14 @@ final class FormDecisionEmail
             : [];
         $mine = rtrim($this->appUrl, '/') . '/admin/x/my-form-submissions';
 
-        return $this->sender->send(
+        // Exactly once per route and decision, whichever process gets here.
+        $key = 'form-decision:' . $tenantId . ':' . ($routeId > 0 ? 'route-' . $routeId : 'submission-' . $submissionId)
+            . ':' . ($approved ? RouteVerdict::APPROVED : RouteVerdict::REJECTED);
+        if ($this->sent !== null && $this->sent->increment($key, self::SENT_TTL) > 1) {
+            return false;
+        }
+
+        $delivered = $this->sender->send(
             $tenantId,
             $email,
             trim($decision . ': ' . $form . ($reference !== '' ? ' ' . $reference : '')),
@@ -166,11 +194,23 @@ final class FormDecisionEmail
             ),
             new EmailOptions(attachments: $attachments, replyTo: $replyTo),
         );
+        if (!$delivered) {
+            $this->sent?->delete($key); // Not sent: a later attempt may.
+        }
+
+        return $delivered;
     }
 
     /** The final document's PDF when it fits in an email, else null. */
     private function pdf(int $tenantId, int $documentId, int $artifactId): ?string
     {
+        if ($this->artifacts instanceof \Closure) {
+            try {
+                $this->artifacts = ($this->artifacts)();
+            } catch (\Throwable) {
+                $this->artifacts = null; // No storage here: the email goes without the file.
+            }
+        }
         if ($this->artifacts === null || $documentId <= 0 || $artifactId <= 0) {
             return null;
         }
