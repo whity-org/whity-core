@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { apiClient as apiClientModule } from './api-client';
 import { SESSION_EXPIRED_EVENT } from './api/client';
 import { refreshSession } from '@/lib/session-refresh';
+import { forgetPushOnSignOut } from '@/lib/pwa/push';
 
 interface User {
   id: number;
@@ -217,6 +218,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = async (): Promise<void> => {
+    // WHIT-1075: a signed-out browser gets nobody's notifications.
+    await forgetPushOnSignOut().catch(() => undefined);
     try {
       await fetch('/api/v1/auth/logout', {
         method: 'POST',

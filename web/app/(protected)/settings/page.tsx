@@ -19,6 +19,7 @@ import { DisplayPreferencesSettings } from '@/components/display-preferences-set
 import { EmailAddressesSettings } from '@/components/EmailAddressesSettings';
 import { LanguageSwitcher, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import { ProfileForm } from './profile-form';
+import { PushSettings } from '@/components/settings/push-settings';
 
 const TABS = ['profile', 'security', 'sessions', 'preferences'] as const;
 type TabId = (typeof TABS)[number];
@@ -148,6 +149,8 @@ function SettingsPageInner() {
 
         <TabsContent value="preferences" className="space-y-6 pt-4">
           <DisplayPreferencesSettings />
+
+          <PushSettings />
 
           {/* Language. This also sets the interface DIRECTION: each language
               carries its own 'ltr'/'rtl', so choosing Arabic mirrors the interface.
