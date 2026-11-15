@@ -34,6 +34,7 @@ import {
   dateKey,
   isTimeView,
   labelInstant,
+  placeInDay,
   addMonths,
   parseDateKey,
   rangeQuery,
@@ -52,6 +53,7 @@ import { BookingSheet } from './booking-sheet';
 import { EventDialog } from './event-dialog';
 import { RequestsCard } from './appointments-side';
 import { TimeGrid, hoursToDraw, type CalItem } from './time-grid';
+import { QuickBooking, useGridEditing } from './calendar-editing';
 import { useCalendarAccess, type CalendarBasics } from './use-calendar-basics';
 import { useCalendarWords } from './use-calendar-words';
 
@@ -310,7 +312,28 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
   const shownFrom = isTimeView(view) ? range.days[0] : { year: anchor.year, month: anchor.month, day: 1 };
   const shownTo = isTimeView(view) ? range.days[range.days.length - 1] : addDays(addMonths(shownFrom, 1), -1);
 
+  // CV.8–CV.10: create, move and resize on the grid, asked first, Undo.
+  const [moreFor, setMoreFor] = useState<{ date: CalendarDate; profileId: number | null } | null>(null);
+  const edits = useGridEditing({
+    items,
+    days: range.days,
+    services,
+    staff,
+    timeZone,
+    canWrite: access.canWrite,
+    canChange: access.canChange,
+    placeOf: (item) => {
+      for (const date of range.days) {
+        const place = placeInDay(item, date, timeZone);
+        if (place !== null && !place.continuesBefore) return { date, startMinute: place.startMinute, endMinute: place.endMinute };
+      }
+      return null;
+    },
+    onChanged: refetch,
+  });
+
   const openItem = (item: CalItem | null) => {
+    edits.setDraft(null);
     if (item?.event) {
       setSelected(null);
       setEditing(item.event);
@@ -437,6 +460,37 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
             zone={zoneLabel(timeZone).replace(/^.*\((.*)\)$/, '$1')}
             selectedKey={selected?.key ?? null}
             onSelect={openItem}
+            canDrag={edits.canDrag}
+            onCreate={access.canWrite ? (slot) => {
+              setSelected(null);
+              edits.onCreate(slot);
+            } : undefined}
+            onChange={edits.onChange}
+            preview={edits.preview}
+            renderDraft={() =>
+              edits.draft === null ? null : (
+                <QuickBooking
+                  draft={edits.draft}
+                  services={services}
+                  staff={staff}
+                  timeZone={timeZone}
+                  canEvent={access.canWrite}
+                  me={access.me}
+                  onServiceLength={edits.onServiceLength}
+                  onClose={() => edits.setDraft(null)}
+                  onSaved={(message) => {
+                    edits.setDraft(null);
+                    addToast(message, 'success');
+                    refetch();
+                  }}
+                  onMore={(date, profileId) => {
+                    edits.setDraft(null);
+                    setMoreFor({ date, profileId });
+                    setNewBooking(true);
+                  }}
+                />
+              )
+            }
             onPickDay={(date) => update({ date: dateKey(date), view: 'day' })}
             renderDetails={(item) => (
               <BookingDetails
@@ -456,12 +510,15 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
 
       <BookingDialog
         open={newBooking}
-        onOpenChange={setNewBooking}
+        onOpenChange={(open) => {
+          setNewBooking(open);
+          if (!open) setMoreFor(null);
+        }}
         services={services}
         staff={staff}
         timeZone={timeZone}
-        initialDate={view === 'day' ? anchor : null}
-        initialProfileId={null}
+        initialDate={moreFor?.date ?? (view === 'day' ? anchor : null)}
+        initialProfileId={moreFor?.profileId ?? null}
         onBooked={(made) => {
           setNewBooking(false);
           addToast(t('booking.made', 'Booked for {name}', { name: made.customer.name ?? '' }), 'success');
@@ -514,6 +571,7 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
         initialDate={view === 'day' ? anchor : null}
         onSaved={refetch}
       />
+      {edits.dialogs}
     </div>
   );
 }
