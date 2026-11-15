@@ -65,11 +65,14 @@ function fromDraft(original: Record<string, unknown>, draft: Draft): Record<stri
 
 export function EditProposalDialog({
   proposal,
+  agent,
   busy,
   onCancel,
   onApprove,
 }: {
   proposal: AgentProposal;
+  /** The agent's name, as the page shows it. */
+  agent: string;
   busy: boolean;
   onCancel: () => void;
   onApprove: (args: Record<string, unknown>) => void;
@@ -77,15 +80,13 @@ export function EditProposalDialog({
   const t = useTranslation('admin');
   const original = (proposal.arguments ?? {}) as Record<string, unknown>;
   const [draft, setDraft] = useState<Draft>(() => toDraft(original));
-  const [invalid, setInvalid] = useState<string | null>(null);
+  // Checked as the person types: the field says what to do, and Approve with
+  // changes waits until everything is valid (TplApprovalsDecided note 4).
+  const parsed = fromDraft(original, draft);
+  const invalid = typeof parsed === 'string' ? parsed : null;
 
   const submit = () => {
-    const parsed = fromDraft(original, draft);
-    if (typeof parsed === 'string') {
-      setInvalid(parsed);
-      return;
-    }
-    onApprove(parsed);
+    if (typeof parsed !== 'string') onApprove(parsed);
   };
 
   return (
@@ -94,7 +95,10 @@ export function EditProposalDialog({
         <DialogHeader>
           <DialogTitle>{t('approvals.editDialog.title', 'Edit before approving')}</DialogTitle>
           <DialogDescription>
-            {t('approvals.editDialog.description', 'Change what it will send. It runs once you approve.')}
+            {t(
+              'approvals.editDialog.describe',
+              'Change what {agent} will send, then approve it. The agent sees what you changed.',
+            ).replace('{agent}', agent)}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -104,7 +108,6 @@ export function EditProposalDialog({
             submit();
           }}
         >
-          <p className="text-sm font-medium">{proposal.summary}</p>
           {Object.keys(draft).length === 0 && (
             <p className="text-sm text-muted-foreground">
               {t('approvals.editDialog.nothing', 'This request has nothing to change.')}
@@ -126,8 +129,8 @@ export function EditProposalDialog({
                     dir="ltr"
                     className="font-mono text-xs"
                     aria-invalid={invalid === key || undefined}
+                    aria-describedby={invalid === key ? `${id}-error` : undefined}
                     onChange={(event) => {
-                      setInvalid(null);
                       setDraft({ ...draft, [key]: event.target.value });
                     }}
                   />
@@ -137,14 +140,14 @@ export function EditProposalDialog({
                     value={value}
                     inputMode={typeof original[key] === 'number' ? 'decimal' : undefined}
                     aria-invalid={invalid === key || undefined}
+                    aria-describedby={invalid === key ? `${id}-error` : undefined}
                     onChange={(event) => {
-                      setInvalid(null);
                       setDraft({ ...draft, [key]: event.target.value });
                     }}
                   />
                 )}
                 {invalid === key && (
-                  <p className="text-sm text-error-text">
+                  <p id={`${id}-error`} className="text-sm text-error-text">
                     {nested
                       ? t('approvals.editDialog.invalidJson', 'This needs to stay valid JSON.')
                       : t('approvals.editDialog.invalidNumber', 'This needs to be a number.')}
@@ -154,10 +157,10 @@ export function EditProposalDialog({
             );
           })}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>
+            <Button type="button" variant="ghost" onClick={onCancel} disabled={busy}>
               {t('approvals.editDialog.cancel', 'Cancel')}
             </Button>
-            <Button type="submit" disabled={busy}>
+            <Button type="submit" disabled={busy || invalid !== null}>
               <Icon name="check" size={16} />
               {t('approvals.editDialog.approve', 'Approve with changes')}
             </Button>
