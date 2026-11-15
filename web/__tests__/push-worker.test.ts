@@ -103,3 +103,23 @@ describe('push helpers', () => {
     expect(deviceLabel('')).toEqual({ browser: '', os: '' });
   });
 });
+
+describe('the push icon query (WHIT-1076)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { letterFrom, colourFrom } = require('@/lib/pwa/push-icon') as typeof import('@/lib/pwa/push-icon');
+
+  it('draws only one Latin letter or digit', () => {
+    expect(letterFrom('E')).toBe('E');
+    expect(letterFrom('7')).toBe('7');
+    expect(letterFrom('e')).toBeNull();
+    expect(letterFrom('EB')).toBeNull();
+    expect(letterFrom('<')).toBeNull();
+    expect(letterFrom(null)).toBeNull();
+  });
+
+  it('takes only a hex colour, else Whity Blue', () => {
+    expect(colourFrom('B74C05')).toBe('#b74c05');
+    expect(colourFrom('red')).toBe('#0961bb');
+    expect(colourFrom('#b74c05')).toBe('#0961bb');
+  });
+});

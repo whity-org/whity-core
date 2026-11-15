@@ -16,6 +16,7 @@ use Whity\Core\Notification\NotificationDispatcher;
 use Whity\Core\Notification\NotificationPreferenceRepository;
 use Whity\Core\Notification\NotificationRepository;
 use Whity\Core\Notification\Push\Base64Url;
+use Whity\Core\Notification\Push\PushBranding;
 use Whity\Core\Notification\Push\PushDigestJob;
 use Whity\Core\Notification\Push\PushHttpClient;
 use Whity\Core\Notification\Push\PushSubscriptionRepository;
@@ -74,7 +75,7 @@ final class PushChannelRealEngineTest extends TestCase
             $queue,
             'https://app.example.test',
             null,
-            static fn (int $tenantId): array => ['icon' => '/branding/icon?t=' . $tenantId],
+            PushBranding::fromPdo($this->pdo),
             fn (): int => $this->now,
         );
 
@@ -143,9 +144,35 @@ final class PushChannelRealEngineTest extends TestCase
         self::assertSame('/admin/document-library/42', $push['url']);
         self::assertSame('n' . $id, $push['tag']);
         self::assertSame('ltr', $push['dir']);
-        self::assertSame('/branding/icon?t=1', $push['icon']);
+        self::assertSame('/push-icon/icon?l=E', $push['icon'], 'no logo: its initial, drawn');
+        self::assertSame('/push-icon/badge?l=E', $push['badge']);
         self::assertSame('https://fcm.googleapis.com', $this->service->audiences[0]);
         self::assertSame('aes128gcm', $this->service->headers[0]['Content-Encoding']);
+    }
+
+    public function testAWorkspaceWithItsOwnNameAndLogoShowsThem(): void
+    {
+        $this->pdo->exec("INSERT INTO tenant_settings (tenant_id, setting_key, value) VALUES
+            (1, 'site_name', 'AAU IRB'),
+            (1, 'branding_logo_square', 'tenants/1/branding/logo-square.png'),
+            (1, 'branding_main_color', '#1d6f42')");
+        $phone = $this->device(self::AMRO, 'phone');
+        $this->notify(self::AMRO, 'document.routing.awaiting', 'Application waiting for pre-check');
+        $this->drain();
+
+        $push = $phone->received[0];
+        self::assertSame('AAU IRB · Application waiting for pre-check', $push['title']);
+        self::assertSame('/api/v1/branding/asset/1/logo-square.png', $push['icon']);
+        self::assertSame('/push-icon/badge?l=A', $push['badge'], 'a silhouette, never the colour logo');
+    }
+
+    public function testWithoutALogoTheIconIsItsInitialOnItsColour(): void
+    {
+        self::assertSame('/push-icon/icon?l=E&c=b74c05', PushBranding::drawnIcon('Example Bakery', '#B74C05'));
+        self::assertSame('/push-icon/icon?l=E', PushBranding::drawnIcon('Example Bakery', null));
+        self::assertSame('/push-icon/icon', PushBranding::drawnIcon('Whity', '#0961bb'));
+        self::assertSame('/push-icon/icon', PushBranding::drawnIcon('مخبز', null), 'a letter the icon font cannot draw');
+        self::assertSame('/push-icon/badge', PushBranding::badge('مخبز'));
     }
 
     public function testThePushIsInThePersonsLanguage(): void

@@ -60,7 +60,7 @@ final class PushTransport implements NotificationTransport
 
     /**
      * @param \Closure(): VapidKeys $keys
-     * @param (\Closure(int): array{icon?: string|null, badge?: string|null})|null $images The workspace's icon and badge URLs.
+     * @param PushBranding|null $branding The workspace's name, icon and badge; without it, the bare workspace name.
      */
     public function __construct(
         private readonly PDO $db,
@@ -71,7 +71,7 @@ final class PushTransport implements NotificationTransport
         private readonly ?QueueService $queue,
         private readonly string $subject,
         private readonly ?LoggerInterface $logger = null,
-        private readonly ?\Closure $images = null,
+        private readonly ?PushBranding $branding = null,
         private readonly ?\Closure $clock = null,
     ) {
     }
@@ -81,9 +81,8 @@ final class PushTransport implements NotificationTransport
      * is read only when a push is actually sent.
      *
      * @param array<string, mixed> $env
-     * @param (\Closure(int): array{icon?: string|null, badge?: string|null})|null $images
      */
-    public static function fromEnv(PDO $pdo, ?LoggerInterface $logger, array $env, ?\Closure $images = null): self
+    public static function fromEnv(PDO $pdo, ?LoggerInterface $logger, array $env): self
     {
         return new self(
             $pdo,
@@ -97,7 +96,7 @@ final class PushTransport implements NotificationTransport
             new QueueService(new \Whity\Core\Queue\JobRepository($pdo)),
             VapidAuth::subjectFrom($env),
             $logger,
-            $images,
+            PushBranding::fromPdo($pdo),
         );
     }
 
@@ -131,7 +130,8 @@ final class PushTransport implements NotificationTransport
 
         $language = $this->language($message->locale, $profileId, $tenantId);
         $notificationId = (int) ($message->data['_notification_id'] ?? 0);
-        $payload = PushPayload::build($message, $language, $this->workspaceName($tenantId), $notificationId, $this->imagesFor($tenantId));
+        $brand = $this->brand($tenantId);
+        $payload = PushPayload::build($message, $language, $brand['name'], $notificationId, $brand);
         if ($security) {
             $payload['tag'] = 'security' . $notificationId;
         }
@@ -154,7 +154,8 @@ final class PushTransport implements NotificationTransport
         if ($devices === []) {
             return SendResult::sent(self::PROVIDER_NO_DEVICE);
         }
-        $payload = PushPayload::digest($held, $this->language(null, $profileId, $tenantId), $this->workspaceName($tenantId), $tenantId, $this->imagesFor($tenantId));
+        $brand = $this->brand($tenantId);
+        $payload = PushPayload::digest($held, $this->language(null, $profileId, $tenantId), $brand['name'], $tenantId, $brand);
 
         return $this->deliver($tenantId, $devices, $payload, 'normal');
     }
@@ -299,17 +300,18 @@ final class PushTransport implements NotificationTransport
         }
     }
 
-    /** @return array{icon?: string|null, badge?: string|null} */
-    private function imagesFor(int $tenantId): array
+    /** @return array{name: string, icon?: string, badge?: string} */
+    private function brand(int $tenantId): array
     {
-        if ($this->images === null) {
-            return [];
+        if ($this->branding !== null) {
+            try {
+                return $this->branding->forWorkspace($tenantId);
+            } catch (\Throwable) {
+                // Fall back to the bare name below.
+            }
         }
-        try {
-            return ($this->images)($tenantId);
-        } catch (\Throwable) {
-            return [];
-        }
+
+        return ['name' => $this->workspaceName($tenantId)];
     }
 
     private function now(): int
