@@ -199,7 +199,104 @@ final class ChatApiHandler
                 (string) ($body['body'] ?? ''),
                 $mentions,
                 ($body['style'] ?? null) === 'line' ? 'line' : 'message',
+                self::positiveInt($body['reply_to'] ?? null),
+                self::positiveInt($body['thread_root'] ?? null),
+                ($body['also_to_chat'] ?? false) === true,
             )], 201);
+        });
+    }
+
+    // ── The parts of a message (UC.6–UC.12) ──────────────────────────────────
+
+    /** @param array<string, string> $params */
+    public function edit(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            $body = JsonBody::parsed($request);
+
+            return Response::json(['data' => $this->chat->edit($t, $v, (int) ($params['id'] ?? 0), (string) ($body['body'] ?? ''))]);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function deleteMessage(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, fn (int $t, ChatViewer $v): Response => Response::json(['data' => $this->chat->delete($t, $v, (int) ($params['id'] ?? 0))]));
+    }
+
+    /** @param array<string, string> $params */
+    public function react(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            $body = JsonBody::parsed($request);
+
+            return Response::json(['data' => $this->chat->react($t, $v, (int) ($params['id'] ?? 0), (string) ($body['emoji'] ?? ''))]);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function pinMessage(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            $pinned = (JsonBody::parsed($request)['pinned'] ?? true) !== false;
+
+            return Response::json(['data' => $this->chat->pinMessage($t, $v, (int) ($params['id'] ?? 0), $pinned)]);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function thread(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, fn (int $t, ChatViewer $v): Response => Response::json(['data' => $this->chat->thread($t, $v, (int) ($params['id'] ?? 0))]));
+    }
+
+    /** @param array<string, string> $params */
+    public function search(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            $q = MessagesApiHandler::query($request);
+
+            return Response::json(['data' => $this->chat->search(
+                $t,
+                $v,
+                (int) ($params['id'] ?? 0),
+                (string) ($q['q'] ?? ''),
+                self::positiveInt($q['from'] ?? null),
+            )]);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function state(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            $q = MessagesApiHandler::query($request);
+            $since = isset($q['since']) && $q['since'] !== '' ? mb_substr($q['since'], 0, 40) : null;
+
+            return Response::json(['data' => $this->chat->state($t, $v, (int) ($params['id'] ?? 0), self::positiveInt($q['after'] ?? null) ?? 0, $since)]);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function typing(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($params): Response {
+            $this->chat->typing($t, $v, (int) ($params['id'] ?? 0));
+
+            return Response::json(['data' => ['ok' => true]]);
+        });
+    }
+
+    /** Bubbles or compact rows, the person's own choice (UC.7). */
+    /** @param array<string, string> $params */
+    public function preferences(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request): Response {
+            if ($request->getMethod() === 'PUT') {
+                $this->chat->setLayout($v->profileId, (string) (JsonBody::parsed($request)['layout'] ?? ''));
+            }
+
+            return Response::json(['data' => ['layout' => $this->chat->layout($v->profileId)]]);
         });
     }
 
@@ -304,6 +401,18 @@ final class ChatApiHandler
 
             return Response::error('Something went wrong with Chat. Please try again.', 500);
         }
+    }
+
+    private static function positiveInt(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value > 0 ? $value : null;
+        }
+        if (is_string($value) && ctype_digit($value) && $value !== '0') {
+            return (int) $value;
+        }
+
+        return null;
     }
 
     private function theInbox(): ChatInbox

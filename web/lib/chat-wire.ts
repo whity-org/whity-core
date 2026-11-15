@@ -52,7 +52,7 @@ export interface ChatAuthor {
 }
 
 export interface ChatMention {
-  type: 'person' | 'agent';
+  type: 'person' | 'agent' | 'everyone';
   id: number;
   name: string;
 }
@@ -92,7 +92,52 @@ export interface ChatMessage {
   proposal: ChatProposal | null;
   event: ChatEvent | null;
   created_at: string | null;
+  // UC.6–UC.12 (WHIT-1094)
+  reply_to: ChatQuote | null;
+  thread_root_id: number | null;
+  in_chat: boolean;
+  thread: { count: number; last_at: string | null; people: string[] } | null;
+  reactions: ChatReaction[];
+  pinned: boolean;
+  edited: boolean;
+  deleted: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
 }
+
+/** The message a reply answers, quoted above it. */
+export interface ChatQuote {
+  id: number;
+  author_name: string;
+  body: string;
+  deleted: boolean;
+}
+
+export interface ChatReaction {
+  emoji: string;
+  count: number;
+  mine: boolean;
+  people: string[];
+}
+
+export interface ChatReadMark {
+  member_id: number;
+  profile_id: number;
+  name: string;
+  last_read_message_id: number;
+}
+
+/** What an open chat polls for (`GET /api/v1/chat/chats/{id}/state`). */
+export interface ChatState {
+  messages: ChatMessage[];
+  changed: ChatMessage[];
+  read_marks: ChatReadMark[];
+  typing: string[];
+  pinned: ChatMessage[];
+  now: string | null;
+}
+
+export type ChatLayout = 'bubbles' | 'rows';
 
 export interface ChatSummary {
   id: number;

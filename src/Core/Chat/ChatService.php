@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Chat;
 
+use Whity\Core\Store\SharedStoreInterface;
 use Whity\Core\Agent\AgentAssignmentRepository;
 
 /**
@@ -47,6 +48,8 @@ final class ChatService
         private readonly ChatRepository $repo,
         // WHIT-1077: chat lines as web push. Null: no pushes (tests, MCP-only).
         private readonly ?ChatPushNotifier $push = null,
+        // UC.11: who is typing, a few seconds at a time. Null: nobody shows as typing.
+        private readonly ?SharedStoreInterface $store = null,
     ) {
     }
 
@@ -420,9 +423,27 @@ final class ChatService
      * @param list<mixed> $mentions
      * @return array<string, mixed> the posted message
      */
-    public function post(int $tenantId, ChatViewer $viewer, int $chatId, string $body, array $mentions = [], string $style = 'message'): array
-    {
-        [, $members, $me] = $this->open($tenantId, $viewer, $chatId);
+    public function post(
+        int $tenantId,
+        ChatViewer $viewer,
+        int $chatId,
+        string $body,
+        array $mentions = [],
+        string $style = 'message',
+        ?int $replyTo = null,
+        ?int $threadRoot = null,
+        bool $alsoToChat = false,
+    ): array {
+        [$chat, $members, $me] = $this->open($tenantId, $viewer, $chatId);
+        // UC.6: a reply quotes the message it answers; a thread reply sits under its root.
+        $root = $threadRoot !== null ? $this->target($tenantId, $viewer, $chatId, $threadRoot, 'reply in a thread to') : null;
+        if ($root !== null && $root['thread_root_id'] !== null) {
+            $root = $this->target($tenantId, $viewer, $chatId, (int) $root['thread_root_id'], 'reply in a thread to');
+        }
+        if ($root !== null && $root['deleted_at'] !== null) {
+            throw new ChatException('This message was deleted.');
+        }
+        $quoted = $replyTo !== null ? $this->target($tenantId, $viewer, $chatId, $replyTo, 'reply to') : null;
         $body = trim($body);
         if ($body === '') {
             throw new ChatException('The message is empty.');
@@ -432,7 +453,7 @@ final class ChatService
         }
 
         $meta = [];
-        $kept = self::mentions($mentions, $members);
+        $kept = self::mentions($mentions, $members, (string) $chat['type'] === 'group');
         if ($kept !== []) {
             $meta['mentions'] = $kept;
         }
@@ -451,7 +472,23 @@ final class ChatService
             }
         }
 
-        $id = $this->repo->insertMessage($tenantId, $chatId, $viewer->profileId, $viewer->isAgent(), $viewer->isAgent() ? 'chat.agent' : 'chat.person', $body, $meta, $status);
+        $id = $this->repo->insertMessage(
+            $tenantId,
+            $chatId,
+            $viewer->profileId,
+            $viewer->isAgent(),
+            $viewer->isAgent() ? 'chat.agent' : 'chat.person',
+            $body,
+            $meta,
+            $status,
+            $quoted !== null ? (int) $quoted['id'] : null,
+            $root !== null ? (int) $root['id'] : null,
+            $alsoToChat,
+        );
+        if ($root !== null) {
+            // The root's "n replies" changed: open chats fetch it again.
+            $this->repo->touch($tenantId, (int) $root['id']);
+        }
         if (!$viewer->isAgent()) {
             $this->repo->markRead($tenantId, (int) $me['id'], $id);
         }
@@ -654,7 +691,14 @@ final class ChatService
         }
         $proposals = $this->repo->proposals($tenantId, $proposalIds);
 
-        return array_map(function (array $r) use ($proposals, $viewer): array {
+        // UC.6–UC.12: what each message carries beyond its words.
+        $ids = array_map(static fn (array $r): int => (int) $r['id'], $rows);
+        $quotedIds = array_values(array_unique(array_filter(array_map(static fn (array $r): int => (int) ($r['reply_to_message_id'] ?? 0), $rows))));
+        $quoted = $this->repo->messagesByIds($tenantId, $quotedIds);
+        $threads = $this->repo->threadSummaries($tenantId, $ids, 0);
+        $reactions = $this->repo->reactions($tenantId, $ids);
+
+        return array_map(function (array $r) use ($proposals, $viewer, $quoted, $threads, $reactions): array {
             $meta = $r['chat_meta'];
             $source = (string) $r['source'];
             $kind = match (true) {
@@ -689,11 +733,49 @@ final class ChatService
                 ];
             }
 
-            return [
-                'id' => (int) $r['id'],
+            $deleted = ($r['deleted_at'] ?? null) !== null;
+            $id = (int) $r['id'];
+            $q = $quoted[(int) ($r['reply_to_message_id'] ?? 0)] ?? null;
+            $mine = !$viewer->isAgent() && !$r['by_agent'] && $r['author_profile_id'] !== null
+                && (int) $r['author_profile_id'] === $viewer->profileId && $source === 'chat.person';
+            $sent = strtotime((string) $r['created_at'] . ' UTC');
+            $grouped = [];
+            foreach ($reactions[$id] ?? [] as $x) {
+                $g = $grouped[$x['emoji']] ?? ['emoji' => $x['emoji'], 'count' => 0, 'mine' => false, 'people' => []];
+                $g['count']++;
+                $g['mine'] = $g['mine'] || (!$viewer->isAgent() && $x['profile_id'] === $viewer->profileId);
+                $g['people'][] = $x['name'];
+                $grouped[$x['emoji']] = $g;
+            }
+            $thread = $threads[$id] ?? null;
+
+            $parts = [
+                'reply_to' => $q === null ? null : [
+                    'id' => (int) $q['id'],
+                    'author_name' => $q['by_agent'] ? (string) ($q['chat_meta']['agent']['name'] ?? '') : (string) ($q['author_name'] ?? ''),
+                    'body' => $q['deleted_at'] !== null ? '' : mb_substr((string) $q['body_text'], 0, 160),
+                    'deleted' => $q['deleted_at'] !== null,
+                ],
+                'thread_root_id' => isset($r['thread_root_id']) ? (int) $r['thread_root_id'] : null,
+                'in_chat' => (bool) ($r['in_chat'] ?? true),
+                'thread' => $thread === null ? null : [
+                    'count' => $thread['count'],
+                    'last_at' => self::iso($thread['last_at']),
+                    'people' => array_slice($thread['people'], 0, 3),
+                ],
+                'reactions' => array_values($grouped),
+                'pinned' => ($r['pinned_at'] ?? null) !== null,
+                'edited' => ($r['edited_at'] ?? null) !== null,
+                'deleted' => $deleted,
+                'can_edit' => $mine && !$deleted,
+                'can_delete' => $mine && !$deleted && $sent !== false && time() - $sent <= self::DELETE_WINDOW_SECONDS,
+            ];
+
+            return $parts + [
+                'id' => $id,
                 'chat_id' => (int) $r['conversation_id'],
                 'kind' => $kind,
-                'body' => (string) $r['body_text'],
+                'body' => $deleted ? '' : (string) $r['body_text'],
                 'author' => $author,
                 // Rebuilt in a fixed shape: jsonb does not keep key order.
                 'mentions' => array_values(array_map(
@@ -880,7 +962,7 @@ final class ChatService
      * @param list<array<string, mixed>> $members
      * @return list<array{type: string, id: int, name: string}>
      */
-    private static function mentions(array $mentions, array $members): array
+    private static function mentions(array $mentions, array $members, bool $group = false): array
     {
         $kept = [];
         foreach (array_slice($mentions, 0, 20) as $m) {
@@ -888,6 +970,11 @@ final class ChatService
                 continue;
             }
             $type = $m['type'] ?? null;
+            // UC.10: @everyone tells every person in a group.
+            if ($type === 'everyone' && $group) {
+                $kept['everyone'] = ['type' => 'everyone', 'id' => 0, 'name' => 'everyone'];
+                continue;
+            }
             $id = (int) ($m['id'] ?? 0);
             foreach ($members as $member) {
                 if ($type === 'person' && $member['profile_id'] !== null && (int) $member['profile_id'] === $id) {
@@ -899,6 +986,281 @@ final class ChatService
         }
 
         return array_values($kept);
+    }
+
+    // ── The parts of a message (UC.6–UC.12) ──────────────────────────────────
+
+    /** How long a person can delete their own message for everyone (UC.12). */
+    public const DELETE_WINDOW_SECONDS = 2 * 86400;
+
+    /** Seconds a "typing" beat lasts; the browser beats while the person types. */
+    public const TYPING_SECONDS = 6;
+
+    /**
+     * Edit your own message: "edited" shows on it. Mentions still in the words stay.
+     *
+     * @return array<string, mixed>
+     */
+    public function edit(int $tenantId, ChatViewer $viewer, int $messageId, string $body): array
+    {
+        $this->personOnly($viewer);
+        [$message] = $this->ownMessage($tenantId, $viewer, $messageId);
+        $body = trim($body);
+        if ($body === '') {
+            throw new ChatException('The message is empty. To take it back, delete it.');
+        }
+        if (mb_strlen($body) > self::MAX_BODY) {
+            throw new ChatException('The message is too long (' . self::MAX_BODY . ' characters at most).');
+        }
+        $meta = $message['chat_meta'];
+        if (is_array($meta['mentions'] ?? null)) {
+            $meta['mentions'] = array_values(array_filter(
+                $meta['mentions'],
+                static fn (mixed $m): bool => is_array($m) && str_contains($body, '@' . (string) ($m['name'] ?? '')),
+            ));
+            if ($meta['mentions'] === []) {
+                unset($meta['mentions']);
+            }
+        }
+        $this->repo->editMessage($tenantId, $messageId, $body, $meta);
+
+        return $this->presented($tenantId, $messageId, $viewer);
+    }
+
+    /**
+     * Delete your own message for everyone, within two days of sending it: it
+     * stays in place as "This message was deleted".
+     *
+     * @return array<string, mixed>
+     */
+    public function delete(int $tenantId, ChatViewer $viewer, int $messageId): array
+    {
+        $this->personOnly($viewer);
+        [$message] = $this->ownMessage($tenantId, $viewer, $messageId);
+        $sent = strtotime((string) $message['created_at'] . ' UTC');
+        if ($sent !== false && time() - $sent > self::DELETE_WINDOW_SECONDS) {
+            throw new ChatException('A message can be deleted for everyone up to 2 days after it was sent.', 422);
+        }
+        $this->repo->deleteMessage($tenantId, $messageId);
+
+        return $this->presented($tenantId, $messageId, $viewer);
+    }
+
+    /**
+     * Add a reaction, or take it back when you already gave it.
+     *
+     * @return array<string, mixed> the message with its reactions
+     */
+    public function react(int $tenantId, ChatViewer $viewer, int $messageId, string $emoji): array
+    {
+        $this->personOnly($viewer);
+        $emoji = trim($emoji);
+        // One emoji (a few code points with skin tones and joiners), never words or markup.
+        if ($emoji === '' || mb_strlen($emoji) > 8 || strlen($emoji) > 32 || preg_match('/[\p{L}\p{N}<>&"\'\s]/u', $emoji) === 1) {
+            throw new ChatException('Pick an emoji to react with.');
+        }
+        $message = $this->messageInChat($tenantId, $viewer, $messageId);
+        if ($message['deleted_at'] !== null) {
+            throw new ChatException('This message was deleted.');
+        }
+        $this->repo->toggleReaction($tenantId, $messageId, $viewer->profileId, $emoji);
+
+        return $this->presented($tenantId, $messageId, $viewer);
+    }
+
+    /**
+     * Pin a message to the top of its chat for everyone in it, or unpin it.
+     *
+     * @return array<string, mixed>
+     */
+    public function pinMessage(int $tenantId, ChatViewer $viewer, int $messageId, bool $pinned): array
+    {
+        $this->personOnly($viewer);
+        $message = $this->messageInChat($tenantId, $viewer, $messageId);
+        if ($pinned && $message['deleted_at'] !== null) {
+            throw new ChatException('This message was deleted.');
+        }
+        $this->repo->setPinned($tenantId, $messageId, $pinned ? $viewer->profileId : null);
+
+        return $this->presented($tenantId, $messageId, $viewer);
+    }
+
+    /**
+     * A message and the replies in its thread (UC.6).
+     *
+     * @return array{root: array<string, mixed>, replies: list<array<string, mixed>>}
+     */
+    public function thread(int $tenantId, ChatViewer $viewer, int $messageId): array
+    {
+        $root = $this->messageInChat($tenantId, $viewer, $messageId);
+        if ($root['thread_root_id'] !== null) {
+            $root = $this->messageInChat($tenantId, $viewer, (int) $root['thread_root_id']);
+        }
+        [, , $me] = $this->open($tenantId, $viewer, (int) $root['conversation_id']);
+        $replies = $this->repo->threadMessages($tenantId, (int) $root['conversation_id'], (int) $root['id'], (int) $me['reads_after_message_id']);
+
+        return [
+            'root' => $this->presentMessages($tenantId, [$root], $viewer)[0],
+            'replies' => $this->presentMessages($tenantId, $replies, $viewer),
+        ];
+    }
+
+    /**
+     * Search one chat's messages by words and, optionally, by who wrote them (UC.8).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function search(int $tenantId, ChatViewer $viewer, int $chatId, string $q, ?int $authorProfileId): array
+    {
+        [, , $me] = $this->open($tenantId, $viewer, $chatId);
+        $q = trim(mb_substr($q, 0, 100));
+        if ($q === '' && $authorProfileId === null) {
+            return [];
+        }
+        $rows = $this->repo->search($tenantId, $chatId, (int) $me['reads_after_message_id'], $q, $authorProfileId);
+
+        return $this->presentMessages($tenantId, $rows, $viewer);
+    }
+
+    /** The person is typing in this chat (a beat every few seconds while they type). */
+    public function typing(int $tenantId, ChatViewer $viewer, int $chatId): void
+    {
+        $this->personOnly($viewer);
+        $this->open($tenantId, $viewer, $chatId);
+        $this->store?->increment(self::typingKey($tenantId, $chatId, $viewer->profileId), self::TYPING_SECONDS);
+    }
+
+    /**
+     * What an open chat polls for: new lines after `$after`, lines changed
+     * since `$since` (edits, deletes, reactions, pins, thread replies), who has
+     * read how far, who is typing, and the pinned messages.
+     *
+     * @return array<string, mixed>
+     */
+    public function state(int $tenantId, ChatViewer $viewer, int $chatId, int $after, ?string $since): array
+    {
+        [, $members, $me] = $this->open($tenantId, $viewer, $chatId);
+        $floor = (int) $me['reads_after_message_id'];
+        $now = gmdate('Y-m-d H:i:s');
+        $new = $this->repo->messages($tenantId, $chatId, $floor, $after, null, 100);
+        $changed = [];
+        if ($since !== null && ($ts = strtotime($since)) !== false) {
+            // A second of overlap: a change written in the same second as the last poll is not lost.
+            $changed = $this->repo->changedSince($tenantId, $chatId, $floor, gmdate('Y-m-d H:i:s', $ts - 1));
+        }
+
+        return [
+            'messages' => $this->presentMessages($tenantId, $new, $viewer),
+            'changed' => $this->presentMessages($tenantId, $changed, $viewer),
+            'read_marks' => $this->repo->readMarks($tenantId, $chatId),
+            'typing' => $this->typingNames($tenantId, $chatId, $members, $viewer),
+            'pinned' => $this->presentMessages($tenantId, $this->repo->pinnedMessages($tenantId, $chatId, $floor), $viewer),
+            'now' => self::iso($now),
+        ];
+    }
+
+    /** Bubbles or compact rows (UC.7). */
+    public function layout(int $profileId): string
+    {
+        return $this->repo->chatLayout($profileId);
+    }
+
+    public function setLayout(int $profileId, string $layout): string
+    {
+        if (!in_array($layout, ['bubbles', 'rows'], true)) {
+            throw new ChatException('Choose bubbles or rows.');
+        }
+        $this->repo->setChatLayout($profileId, $layout);
+
+        return $layout;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $members
+     * @return list<string>
+     */
+    private function typingNames(int $tenantId, int $chatId, array $members, ChatViewer $viewer): array
+    {
+        if ($this->store === null) {
+            return [];
+        }
+        $names = [];
+        foreach (array_slice($members, 0, 50) as $m) {
+            if ($m['profile_id'] === null || (!$viewer->isAgent() && (int) $m['profile_id'] === $viewer->profileId)) {
+                continue;
+            }
+            try {
+                if ($this->store->count(self::typingKey($tenantId, $chatId, (int) $m['profile_id'])) > 0) {
+                    $names[] = (string) $m['person_name'];
+                }
+            } catch (\Throwable) {
+                // Typing is a nicety: a store problem shows nobody typing.
+            }
+        }
+
+        return $names;
+    }
+
+    private static function typingKey(int $tenantId, int $chatId, int $profileId): string
+    {
+        return 'chat-typing:' . $tenantId . ':' . $chatId . ':' . $profileId;
+    }
+
+    /**
+     * A message in a chat the viewer is in, above their read-from mark.
+     *
+     * @return array<string, mixed>
+     */
+    private function messageInChat(int $tenantId, ChatViewer $viewer, int $messageId): array
+    {
+        $message = $this->repo->message($tenantId, $messageId);
+        if ($message === null) {
+            throw new ChatException('Message not found', 404);
+        }
+        [, , $me] = $this->open($tenantId, $viewer, (int) $message['conversation_id']);
+        if ((int) $message['id'] <= (int) $me['reads_after_message_id']) {
+            throw new ChatException('Message not found', 404);
+        }
+
+        return $message;
+    }
+
+    /**
+     * The viewer's own message, written by them as a person, not deleted.
+     *
+     * @return array{0: array<string, mixed>}
+     */
+    private function ownMessage(int $tenantId, ChatViewer $viewer, int $messageId): array
+    {
+        $message = $this->messageInChat($tenantId, $viewer, $messageId);
+        $mine = $message['author_profile_id'] !== null && (int) $message['author_profile_id'] === $viewer->profileId
+            && !$message['by_agent'] && (string) $message['source'] === 'chat.person';
+        if (!$mine) {
+            throw new ChatException('You can only change your own messages.', 403);
+        }
+        if ($message['deleted_at'] !== null) {
+            throw new ChatException('This message was deleted.');
+        }
+
+        return [$message];
+    }
+
+    /**
+     * The message a new one replies to or threads under: in the same chat and
+     * readable by the viewer. A thread never nests: a reply in a thread goes to
+     * its root.
+     *
+     * @return array<string, mixed>
+     */
+    private function target(int $tenantId, ChatViewer $viewer, int $chatId, int $messageId, string $what): array
+    {
+        $message = $this->repo->message($tenantId, $messageId);
+        [, , $me] = $this->open($tenantId, $viewer, $chatId);
+        if ($message === null || (int) $message['conversation_id'] !== $chatId || (int) $message['id'] <= (int) $me['reads_after_message_id']) {
+            throw new ChatException("The message to {$what} is not in this chat.", 422);
+        }
+
+        return $message;
     }
 
     private static function iso(mixed $at): ?string

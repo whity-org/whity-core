@@ -14,7 +14,7 @@
  */
 
 import { apiFetch } from '@/lib/api/client';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Avatar } from '@whity/ui/avatar';
 import { Badge } from '@whity/ui/badge';
@@ -30,7 +30,8 @@ import { useLanguageDirection, useTranslation, type TranslateFn } from '@whity/f
 import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
-import type { ChatAgentMember, ChatDetail, ChatInboxItem, ChatMember, ChatMention, ChatMessage, ChatMode, ChatSummary } from '@/lib/chat-wire';
+import type { ChatAgentMember, ChatDetail, ChatInboxItem, ChatLayout, ChatMember, ChatMention, ChatMessage, ChatMode, ChatReadMark, ChatSummary } from '@/lib/chat-wire';
+import { ComposerBanner, MessageBody, MessageItem, NewLine, PinnedBar, TypingLine, type MessageActions } from './message-parts';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
 import { ChatSidePane, CustomerAvatar, CustomerChat, channelName, useListTime } from './customer-chat';
@@ -130,6 +131,18 @@ export function ChatScreen() {
   const [newOpen, setNewOpen] = useState(false);
   // The chat screen renders only in the browser (useSearchParams under Suspense), so the preference is read at once.
   const [detailsOpen, setDetailsOpen] = useState(readDetailsPref);
+  // UC.7: bubbles or compact rows, the person's own choice (My settings › Language and display).
+  const [layout, setLayout] = useState<ChatLayout>('bubbles');
+  useEffect(() => {
+    let live = true;
+    api.layout().then(
+      (pref) => live && setLayout(pref.layout),
+      () => undefined
+    );
+    return () => {
+      live = false;
+    };
+  }, [api]);
   const toggleDetails = useCallback(() => {
     setDetailsOpen((was) => {
       saveDetailsPref(!was);
@@ -297,6 +310,8 @@ export function ChatScreen() {
             api={api}
             chatId={selected}
             myId={myId}
+            layout={layout}
+            unreadAtOpen={unreadAtOpen?.id === selected ? unreadAtOpen.n : 0}
             pinned={current?.pinned ?? false}
             onPin={(pinned) => void pin(selected, pinned)}
             detailsOpen={detailsOpen}
@@ -610,11 +625,16 @@ function ChatIcon({ chat, size }: { chat: Pick<ChatSummary, 'type' | 'with' | 'l
 
 // ── The open chat ────────────────────────────────────────────────────────────
 
+/** What the right pane shows for a team chat (UC.2): its people and agents, a thread, or search. */
+type Side = { kind: 'details' } | { kind: 'thread'; rootId: number } | { kind: 'search' } | null;
+
 function OpenChat({
   t,
   api,
   chatId,
   myId,
+  layout,
+  unreadAtOpen,
   pinned,
   onPin,
   detailsOpen,
@@ -627,6 +647,9 @@ function OpenChat({
   api: ChatApi;
   chatId: number;
   myId: number;
+  layout: ChatLayout;
+  /** Unread lines when the chat opened: the "n new" line goes above them. */
+  unreadAtOpen: number;
   pinned: boolean;
   onPin: (pinned: boolean) => void;
   detailsOpen: boolean;
@@ -642,54 +665,82 @@ function OpenChat({
   const [notice, setNotice] = useState<string | null>(null);
   const [adding, setAdding] = useState<'person' | 'agent' | null>(null);
   const [focusAgent, setFocusAgent] = useState<number | null>(null);
+  const [readMarks, setReadMarks] = useState<ChatReadMark[]>([]);
+  const [typing, setTyping] = useState<string[]>([]);
+  const [pins, setPins] = useState<ChatMessage[]>([]);
+  const [side, setSide] = useState<Side>(detailsOpen ? { kind: 'details' } : null);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [editing, setEditing] = useState<ChatMessage | null>(null);
+  const [highlight, setHighlight] = useState<{ id: number; words: string } | null>(null);
+  // The first unread line when the chat opened; it stays put while the chat is open.
+  const [newFrom, setNewFrom] = useState<number | null>(null);
   const lastId = useRef(0);
   const readMark = useRef(0);
+  const since = useRef<string | null>(null);
 
   const merge = useCallback((incoming: ChatMessage[]) => {
     if (incoming.length === 0) return;
     setMessages((prev) => {
       const byId = new Map(prev.map((m) => [m.id, m]));
-      for (const m of incoming) byId.set(m.id, m);
+      // Thread-only replies live in the thread pane, not the chat.
+      for (const m of incoming) if (m.thread_root_id === null || m.in_chat) byId.set(m.id, m);
       return [...byId.values()].sort((a, b) => a.id - b.id);
     });
     lastId.current = Math.max(lastId.current, ...incoming.map((m) => m.id));
   }, []);
 
+  const apply = useCallback((detail: ChatDetail) => {
+    setChat(detail);
+    setMessages(detail.messages);
+    lastId.current = detail.messages.reduce((max, m) => Math.max(max, m.id), 0);
+  }, []);
+
   const load = useCallback(async () => {
     try {
-      const detail = await api.show(chatId);
-      setChat(detail);
-      setMessages(detail.messages);
-      lastId.current = detail.messages.reduce((max, m) => Math.max(max, m.id), 0);
+      apply(await api.show(chatId));
       setError(null);
     } catch (e) {
       setError(chatErrorText(e, ''));
     }
-  }, [api, chatId]);
+  }, [api, chatId, apply]);
 
   useEffect(() => {
     let live = true;
     api.show(chatId).then(
-      (detail) => {
-        if (!live) return;
-        setChat(detail);
-        setMessages(detail.messages);
-        lastId.current = detail.messages.reduce((max, m) => Math.max(max, m.id), 0);
-      },
+      (detail) => live && apply(detail),
       (e: unknown) => live && setError(chatErrorText(e, ''))
     );
     return () => {
       live = false;
     };
-  }, [api, chatId]);
+  }, [api, chatId, apply]);
 
+  if (newFrom === null && chat !== null) {
+    const fromOthers = messages.filter((m) => m.kind === 'message' && !(m.author?.type === 'person' && m.author.profile_id === myId));
+    const first = unreadAtOpen > 0 ? fromOthers[Math.max(0, fromOthers.length - unreadAtOpen)] : undefined;
+    setNewFrom(first ? first.id : 0);
+  }
+
+  // One poll brings new lines, changed ones (edits, deletes, reactions, pins,
+  // thread replies), read marks for Seen, who is typing and the pins.
   const poll = useCallback(async () => {
     try {
-      merge(await api.after(chatId, lastId.current));
+      const state = await api.state(chatId, lastId.current, since.current);
+      merge(state.messages);
+      if (state.changed.length > 0) {
+        setMessages((prev) => prev.map((m) => state.changed.find((c) => c.id === m.id) ?? m));
+      }
+      setReadMarks(state.read_marks);
+      setTyping(state.typing);
+      setPins(state.pinned);
+      since.current = state.now;
     } catch {
       // A missed poll is retried by the next one.
     }
   }, [api, chatId, merge]);
+  useEffect(() => {
+    if (chat !== null) void poll();
+  }, [chat, poll]);
   usePoll(poll, THREAD_MS, chat !== null);
 
   // Mark what is on screen as read.
@@ -709,6 +760,59 @@ function OpenChat({
       setNotice(chatErrorText(e, ''));
     }
   }, [api, chatId, merge]);
+
+  const replace = useCallback((m: ChatMessage) => {
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? m : x)));
+    setPins((prev) => (m.pinned ? [m, ...prev.filter((p) => p.id !== m.id)] : prev.filter((p) => p.id !== m.id)));
+  }, []);
+
+  // Scroll to a message in place (a quote, a pin, a search result), loading earlier pages when it is further back.
+  const goTo = useCallback(
+    async (id: number, words = '') => {
+      setHighlight({ id, words });
+      let have = messages;
+      for (let i = 0; i < 10 && !have.some((m) => m.id === id) && have.length > 0; i++) {
+        try {
+          const earlier = await api.before(chatId, have[0].id);
+          if (earlier.length === 0) break;
+          have = [...earlier, ...have];
+          merge(earlier);
+        } catch {
+          break;
+        }
+      }
+      window.requestAnimationFrame(() => document.getElementById(`chat-msg-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    },
+    [api, chatId, merge, messages]
+  );
+
+  const actions: MessageActions = useMemo(
+    () => ({
+      onReply: (m) => {
+        setEditing(null);
+        setReplyTo(m);
+      },
+      onThread: (m) => setSide({ kind: 'thread', rootId: m.thread_root_id ?? m.id }),
+      onReact: (m, emoji) => {
+        api.react(m.id, emoji).then(replace, (e: unknown) => setNotice(chatErrorText(e, '')));
+      },
+      onPin: (m, on) => {
+        api.pinMessage(m.id, on).then(replace, (e: unknown) => setNotice(chatErrorText(e, '')));
+      },
+      onCopy: (m) => {
+        void navigator.clipboard?.writeText(m.body).catch(() => undefined);
+      },
+      onEdit: (m) => {
+        setReplyTo(null);
+        setEditing(m);
+      },
+      onDelete: (m) => {
+        api.deleteMessage(m.id).then(replace, (e: unknown) => setNotice(chatErrorText(e, '')));
+      },
+      onQuote: (id) => void goTo(id),
+    }),
+    [api, replace, goTo]
+  );
 
   if (error !== null) {
     return (
@@ -732,6 +836,10 @@ function OpenChat({
 
   const agents = chat.members.filter((m): m is ChatAgentMember => m.type === 'agent');
   const people = chat.members.filter((m) => m.type === 'person');
+  const toggleSide = (kind: 'details' | 'search') => {
+    if (kind === 'details') onToggleDetails();
+    setSide((s) => (s?.kind === kind ? null : { kind }));
+  };
 
   return (
     <>
@@ -743,6 +851,7 @@ function OpenChat({
             <h1 className="truncate text-base font-semibold">{chat.title}</h1>
             <p className="truncate text-sm text-muted-foreground">{subtitle(chat, t)}</p>
           </div>
+          <IconButton icon="search" label={t('search.open', 'Search in this chat')} pressed={side?.kind === 'search'} onClick={() => toggleSide('search')} />
           <IconButton
             icon="star"
             label={pinned ? t('pin.off', 'Unpin this chat') : t('pin.on', 'Pin this chat to the top')}
@@ -751,23 +860,56 @@ function OpenChat({
           />
           <IconButton
             icon="users"
-            label={detailsOpen ? t('details.hide', 'Hide details') : t('details.show', 'Show details')}
-            pressed={detailsOpen}
-            onClick={onToggleDetails}
+            label={side?.kind === 'details' ? t('details.hide', 'Hide details') : t('details.show', 'Show details')}
+            pressed={side?.kind === 'details'}
+            onClick={() => toggleSide('details')}
           />
         </header>
-        <Thread t={t} api={api} chat={chat} messages={messages} myId={myId} onMessage={(m) => merge([m])} onNotice={setNotice} />
+        <PinnedBar t={t} pinned={pins} onOpen={(id) => void goTo(id)} />
+        <Thread
+          t={t}
+          chat={chat}
+          messages={messages}
+          myId={myId}
+          layout={layout}
+          readMarks={readMarks}
+          typing={typing}
+          newFrom={newFrom}
+          highlight={highlight}
+          actions={actions}
+          onMessage={(m) => merge([m])}
+          onNotice={setNotice}
+          api={api}
+        />
         {notice !== null && (
           <p role="alert" className="mx-4 mb-2 rounded-control bg-error-tint px-3 py-2 text-sm text-error-text">
             {notice || t('error.generic', 'Something went wrong with Chat. Please try again.')}
           </p>
         )}
-        <Composer t={t} api={api} chat={chat} initialDraft={initialDraft} onSent={(m) => merge([m])} onError={setNotice} />
+        <Composer
+          t={t}
+          api={api}
+          chat={chat}
+          initialDraft={initialDraft}
+          replyTo={replyTo}
+          editing={editing}
+          onCancelReply={() => setReplyTo(null)}
+          onCancelEdit={() => setEditing(null)}
+          onSent={(m) => {
+            merge([m]);
+            setReplyTo(null);
+          }}
+          onEdited={(m) => {
+            replace(m);
+            setEditing(null);
+          }}
+          onError={setNotice}
+        />
       </section>
-      {detailsOpen && (
+      {side?.kind === 'details' && (
         <SidePanel
           t={t}
-          onClose={onToggleDetails}
+          onClose={() => toggleSide('details')}
           chat={chat}
           people={people}
           agents={agents}
@@ -785,6 +927,26 @@ function OpenChat({
             }
           }}
         />
+      )}
+      {side?.kind === 'thread' && (
+        <ThreadPane
+          key={side.rootId}
+          t={t}
+          api={api}
+          chat={chat}
+          rootId={side.rootId}
+          myId={myId}
+          layout={layout}
+          readMarks={readMarks}
+          actions={actions}
+          onPosted={(m) => {
+            if (m.in_chat) merge([m]);
+          }}
+          onClose={() => setSide(null)}
+        />
+      )}
+      {side?.kind === 'search' && (
+        <SearchPane t={t} api={api} chat={chat} people={people} onOpen={(id, words) => void goTo(id, words)} onClose={() => setSide(null)} />
       )}
       {adding !== null && (
         <AddMemberDialog
@@ -838,6 +1000,12 @@ function Thread({
   chat,
   messages,
   myId,
+  layout,
+  readMarks,
+  typing,
+  newFrom,
+  highlight,
+  actions,
   onMessage,
   onNotice,
 }: {
@@ -846,26 +1014,70 @@ function Thread({
   chat: ChatDetail;
   messages: ChatMessage[];
   myId: number;
+  layout: ChatLayout;
+  readMarks: ChatReadMark[];
+  typing: string[];
+  newFrom: number | null;
+  highlight: { id: number; words: string } | null;
+  actions: MessageActions;
   onMessage: (m: ChatMessage) => void;
   onNotice: (s: string | null) => void;
 }) {
+  const scroller = useRef<HTMLDivElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
-  const count = messages.length;
+  // Stays at the newest line while the reader is there; reading further up, nothing jumps.
+  const atBottom = useRef(true);
+  const newCount = newFrom ? messages.filter((m) => m.id >= newFrom && m.kind === 'message' && !(m.author?.type === 'person' && m.author.profile_id === myId)).length : 0;
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: 'end' });
-  }, [count]);
+    const el = scroller.current;
+    if (!el) return undefined;
+    const stick = () => {
+      if (atBottom.current) el.scrollTop = el.scrollHeight;
+    };
+    stick();
+    // Lines grow after they render (fonts, reactions, a pane opening beside them): stay at the bottom.
+    if (typeof ResizeObserver === 'undefined' || !el.firstElementChild) return undefined;
+    const observer = new ResizeObserver(stick);
+    observer.observe(el.firstElementChild);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [messages, typing.length]);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5" aria-live="polite">
-      <div className="flex min-h-full flex-col justify-end gap-3.5">
+    <div
+      ref={scroller}
+      className="min-h-0 flex-1 overflow-y-auto bg-muted/40 px-4 py-3.5"
+      aria-live="polite"
+      onScroll={(e) => {
+        const el = e.currentTarget;
+        atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      }}
+    >
+      <div className={cn('flex min-h-full flex-col justify-end', layout === 'bubbles' ? 'gap-3' : 'gap-1.5')}>
         {messages.length === 0 && <p className="self-center text-sm text-muted-foreground">{t('thread.empty', 'No messages yet. Say hello.')}</p>}
-        {messages.map((m) =>
-          m.kind === 'system' || m.kind === 'line' ? (
-            <SystemLine key={m.id} t={t} message={m} />
-          ) : (
-            <MessageRow key={m.id} t={t} api={api} message={m} chat={chat} myId={myId} onMessage={onMessage} onNotice={onNotice} />
-          )
-        )}
+        {messages.map((m) => (
+          <Fragment key={m.id}>
+            {newFrom !== null && newFrom > 0 && m.id === newFrom && newCount > 0 && <NewLine t={t} count={newCount} />}
+            {m.kind === 'system' || m.kind === 'line' ? (
+              <SystemLine t={t} message={m} />
+            ) : (
+              <MessageRow
+                t={t}
+                api={api}
+                message={m}
+                chat={chat}
+                myId={myId}
+                layout={layout}
+                readMarks={readMarks}
+                actions={actions}
+                highlight={highlight?.id === m.id ? highlight.words : undefined}
+                onMessage={onMessage}
+                onNotice={onNotice}
+              />
+            )}
+          </Fragment>
+        ))}
+        <TypingLine t={t} names={typing} />
         <div ref={bottom} />
       </div>
     </div>
@@ -955,6 +1167,11 @@ function MessageRow({
   message,
   chat,
   myId,
+  layout,
+  readMarks,
+  actions,
+  inThread = false,
+  highlight,
   onMessage,
   onNotice,
 }: {
@@ -963,14 +1180,17 @@ function MessageRow({
   message: ChatMessage;
   chat: ChatDetail;
   myId: number;
+  layout: ChatLayout;
+  readMarks: ChatReadMark[];
+  actions: MessageActions;
+  inThread?: boolean;
+  highlight?: string;
   onMessage: (m: ChatMessage) => void;
   onNotice: (s: string | null) => void;
 }) {
-  const { time } = useDateDisplay();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const author = message.author;
-  const sentAt = time(message.created_at);
   const isAgent = author?.type === 'agent';
   const held = message.status === 'held';
 
@@ -999,79 +1219,84 @@ function MessageRow({
     }
   };
 
-  return (
-    <div className="grid grid-cols-[2rem_minmax(0,1fr)] gap-2.5 text-sm leading-normal">
-      <Avatar name={author?.name ?? ''} kind={isAgent ? 'agent' : 'person'} size={32} />
-      <div className="min-w-0">
-        <div className="mb-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <b className="text-sm font-semibold text-foreground">{author?.name}</b>
-          {isAgent && <AgentTag t={t} />}
-          {isAgent && author?.works_for && (
-            <span>
-              {author.works_for.id === myId
-                ? t('msg.forYou', 'for you')
-                : t('msg.for', 'for {name}', {
-                    name: author.works_for.name.split(' ')[0],
-                  })}
-            </span>
-          )}
-          {/* null when the workspace hides dates (ui.hide_dates): then no time at all, not even in an attribute */}
-          {sentAt !== null && <time>{sentAt}</time>}
-        </div>
-        <div className={cn(isAgent && 'border-s-2 border-primary-tint ps-2.5', message.status === 'declined' && 'text-muted-foreground line-through')}>
-          {held ? (
-            <div className="grid max-w-[32.5rem] gap-1.5 rounded-card border-[1.5px] border-dashed border-input bg-background px-3.5 py-3">
-              <Body text={message.body} mentions={message.mentions} />
-              <footer className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+  // What only some messages carry: an agent's held line, a proposal card. Dashed: not happened yet.
+  const extra =
+    held || (message.kind === 'proposal' && message.proposal) || message.status === 'declined' ? (
+      <div className={cn(message.status === 'declined' && 'text-muted-foreground line-through')}>
+        {held ? (
+          <div className="grid max-w-[32.5rem] gap-1.5 rounded-card border-[1.5px] border-dashed border-input bg-background px-3.5 py-3">
+            <MessageBody text={message.body} mentions={message.mentions} highlight={highlight} />
+            <footer className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <Badge variant="warning">
+                {t('msg.waiting', 'Waiting for {name}', {
+                  name: message.waiting_for?.name.split(' ')[0] ?? '',
+                })}
+              </Badge>
+              {message.can_decide && (
+                <span className="ms-auto flex gap-1.5">
+                  <Button variant="outline" size="sm" disabled={busy} onClick={() => void decide(false)}>
+                    {t('msg.decline', 'Decline')}
+                  </Button>
+                  <Button size="sm" icon="check" loading={busy} onClick={() => void decide(true)}>
+                    {t('msg.let', 'Let it through')}
+                  </Button>
+                </span>
+              )}
+            </footer>
+          </div>
+        ) : (
+          <MessageBody text={message.body} mentions={message.mentions} highlight={highlight} />
+        )}
+        {message.kind === 'proposal' && message.proposal && (
+          <div className="mt-2 grid max-w-[32.5rem] gap-1.5 rounded-card border-[1.5px] border-dashed border-input bg-background px-3.5 py-3">
+            <b className="text-sm font-semibold">{message.proposal.summary}</b>
+            <footer className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {message.proposal.status === 'waiting' ? (
                 <Badge variant="warning">
                   {t('msg.waiting', 'Waiting for {name}', {
-                    name: message.waiting_for?.name.split(' ')[0] ?? '',
+                    name: message.proposal.waiting_for.name.split(' ')[0],
                   })}
                 </Badge>
-                {message.can_decide && (
-                  <span className="ms-auto flex gap-1.5">
-                    <Button variant="outline" size="sm" disabled={busy} onClick={() => void decide(false)}>
-                      {t('msg.decline', 'Decline')}
-                    </Button>
-                    <Button size="sm" icon="check" loading={busy} onClick={() => void decide(true)}>
-                      {t('msg.let', 'Let it through')}
-                    </Button>
-                  </span>
-                )}
-              </footer>
-            </div>
-          ) : (
-            <Body text={message.body} mentions={message.mentions} />
-          )}
-          {message.kind === 'proposal' && message.proposal && (
-            <div className="mt-2 grid max-w-[32.5rem] gap-1.5 rounded-card border-[1.5px] border-dashed border-input bg-background px-3.5 py-3">
-              <b className="text-sm font-semibold">{message.proposal.summary}</b>
-              <footer className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                {message.proposal.status === 'waiting' ? (
-                  <Badge variant="warning">
-                    {t('msg.waiting', 'Waiting for {name}', {
-                      name: message.proposal.waiting_for.name.split(' ')[0],
-                    })}
-                  </Badge>
-                ) : (
-                  <Badge variant={message.proposal.status === 'approved' ? 'success' : 'outline'}>{proposalStatus(message.proposal.status, t)}</Badge>
-                )}
-                <span className="ms-auto flex gap-1.5">
-                  <Button variant="outline" size="sm" onClick={() => router.push('/admin/approvals')}>
-                    {t('msg.view', 'View')}
+              ) : (
+                <Badge variant={message.proposal.status === 'approved' ? 'success' : 'outline'}>{proposalStatus(message.proposal.status, t)}</Badge>
+              )}
+              <span className="ms-auto flex gap-1.5">
+                <Button variant="outline" size="sm" onClick={() => router.push('/admin/approvals')}>
+                  {t('msg.view', 'View')}
+                </Button>
+                {message.proposal.can_decide && message.proposal.status === 'waiting' && (
+                  <Button size="sm" icon="check" loading={busy} onClick={() => void approveProposal(message.proposal!.id)}>
+                    {t('msg.approve', 'Approve')}
                   </Button>
-                  {message.proposal.can_decide && message.proposal.status === 'waiting' && (
-                    <Button size="sm" icon="check" loading={busy} onClick={() => void approveProposal(message.proposal!.id)}>
-                      {t('msg.approve', 'Approve')}
-                    </Button>
-                  )}
-                </span>
-              </footer>
-            </div>
-          )}
-        </div>
+                )}
+              </span>
+            </footer>
+          </div>
+        )}
       </div>
-    </div>
+    ) : undefined;
+
+  return (
+    <MessageItem
+      t={t}
+      message={message}
+      layout={layout}
+      myId={myId}
+      readMarks={readMarks}
+      actions={actions}
+      inThread={inThread}
+      highlight={highlight}
+      agentTag={isAgent ? <AgentTag t={t} /> : undefined}
+      forLine={
+        isAgent && author?.works_for
+          ? author.works_for.id === myId
+            ? t('msg.forYou', 'for you')
+            : t('msg.for', 'for {name}', { name: author.works_for.name.split(' ')[0] })
+          : null
+      }
+    >
+      {extra}
+    </MessageItem>
   );
 }
 
@@ -1090,30 +1315,6 @@ function proposalStatus(status: string, t: TranslateFn): string {
   }
 }
 
-/** The text, with the people and agents it mentions in the main colour. */
-function Body({ text, mentions }: { text: string; mentions: ChatMention[] }) {
-  const parts = useMemo(() => {
-    if (mentions.length === 0) return [text];
-    const names = mentions.map((m) => `@${m.name}`).sort((a, b) => b.length - a.length);
-    const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    return text.split(new RegExp(`(${escaped.join('|')})`, 'g'));
-  }, [text, mentions]);
-  const names = new Set(mentions.map((m) => `@${m.name}`));
-  return (
-    <p dir="auto" className="text-base whitespace-pre-wrap break-words">
-      {parts.map((p, i) =>
-        names.has(p) ? (
-          <span key={i} className="font-medium text-primary">
-            {p}
-          </span>
-        ) : (
-          <span key={i}>{p}</span>
-        )
-      )}
-    </p>
-  );
-}
-
 function AgentTag({ t }: { t: TranslateFn }) {
   return (
     <span className="inline-flex h-[1.125rem] items-center gap-0.5 rounded-control-sm bg-primary-tint px-1.5 text-xs font-semibold text-primary-tint-foreground">
@@ -1125,38 +1326,81 @@ function AgentTag({ t }: { t: TranslateFn }) {
 
 // ── Writing ──────────────────────────────────────────────────────────────────
 
+/** Seconds between "I'm typing" beats while the person types; the server keeps each for 6. */
+const TYPING_BEAT_MS = 3000;
+
 function Composer({
   t,
   api,
   chat,
   initialDraft,
+  replyTo = null,
+  editing = null,
+  threadRoot,
+  alsoLabel,
+  placeholder,
+  onCancelReply,
+  onCancelEdit,
   onSent,
+  onEdited,
   onError,
 }: {
   t: TranslateFn;
   api: ChatApi;
   chat: ChatDetail;
   initialDraft?: string;
+  replyTo?: ChatMessage | null;
+  editing?: ChatMessage | null;
+  /** In the thread pane: replies go under this message. */
+  threadRoot?: number;
+  /** In the thread pane: the "Also send to …" box's words. */
+  alsoLabel?: string;
+  placeholder?: string;
+  onCancelReply?: () => void;
+  onCancelEdit?: () => void;
   onSent: (m: ChatMessage) => void;
+  onEdited?: (m: ChatMessage) => void;
   onError: (s: string | null) => void;
 }) {
   const [draft, setDraft] = useState(initialDraft ?? '');
   const [sending, setSending] = useState(false);
   const [picked, setPicked] = useState<ChatMention[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [alsoToChat, setAlsoToChat] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
+  const lastBeat = useRef(0);
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  // Editing puts the message's words in the box; leaving edit clears it.
+  if ((editing?.id ?? null) !== editingId) {
+    setEditingId(editing?.id ?? null);
+    setDraft(editing ? editing.body : '');
+  }
+  useEffect(() => {
+    if (editing || replyTo) box.current?.focus();
+  }, [editing, replyTo]);
 
   const candidates = useMemo(() => {
     if (mentionQuery === null) return [];
     const q = mentionQuery.toLowerCase();
-    return chat.members
-      .map((m): ChatMention => (m.type === 'agent' ? { type: 'agent', id: m.agent_id, name: m.name } : { type: 'person', id: m.profile_id, name: m.name }))
-      .filter((m) => m.name.toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [chat.members, mentionQuery]);
+    const members = chat.members.map(
+      (m): ChatMention => (m.type === 'agent' ? { type: 'agent', id: m.agent_id, name: m.name } : { type: 'person', id: m.profile_id, name: m.name })
+    );
+    // UC.10: @everyone in a group tells every person in it.
+    const everyone: ChatMention[] = chat.type === 'group' ? [{ type: 'everyone', id: 0, name: 'everyone' }] : [];
+    return [...members, ...everyone].filter((m) => m.name.toLowerCase().includes(q)).slice(0, 8);
+  }, [chat.members, chat.type, mentionQuery]);
+
+  const beat = () => {
+    const now = Date.now();
+    if (now - lastBeat.current < TYPING_BEAT_MS) return;
+    lastBeat.current = now;
+    void api.typing(chat.id).catch(() => undefined);
+  };
 
   const onChange = (value: string) => {
     setDraft(value);
+    if (value !== '' && !editing) beat();
     const caret = box.current?.selectionStart ?? value.length;
     const before = value.slice(0, caret);
     const at = /(^|\s)@([^\s@]{0,30})$/.exec(before);
@@ -1179,8 +1423,18 @@ function Composer({
     setSending(true);
     onError(null);
     try {
-      const mentions = picked.filter((m) => text.includes(`@${m.name}`)).map(({ type, id }) => ({ type, id }));
-      onSent(await api.post(chat.id, text, mentions));
+      if (editing) {
+        onEdited?.(await api.edit(editing.id, text));
+      } else {
+        const mentions = picked.filter((m) => text.includes(`@${m.name}`)).map(({ type, id }) => ({ type, id }));
+        onSent(
+          await api.post(chat.id, text, mentions, {
+            ...(replyTo ? { reply_to: replyTo.id } : {}),
+            ...(threadRoot ? { thread_root: threadRoot, also_to_chat: alsoToChat } : {}),
+          })
+        );
+      }
+      // Sent: the box empties. Not sent: the words stay, so nothing is lost.
       setDraft('');
       setPicked([]);
     } catch (e) {
@@ -1191,48 +1445,63 @@ function Composer({
   };
 
   return (
-    <div className="relative mx-4 mb-4 grid gap-2 rounded-card border border-input px-3 py-2.5 focus-within:outline-2 focus-within:outline-ring">
-      {candidates.length > 0 && (
-        <ul
-          role="listbox"
-          aria-label={t('compose.mentionList', 'People and agents in this chat')}
-          className="absolute bottom-full start-0 mb-1 w-72 overflow-hidden rounded-card border border-border bg-popover py-1 shadow-md"
-        >
-          {candidates.map((c) => (
-            <li key={`${c.type}${c.id}`}>
-              <button
-                type="button"
-                role="option"
-                aria-selected="false"
-                className="flex w-full items-center gap-2 px-3 py-2 text-start text-sm hover:bg-muted"
-                onClick={() => pick(c)}
-              >
-                <Avatar name={c.name} kind={c.type === 'agent' ? 'agent' : 'person'} size={24} />
-                <span className="flex-1 truncate">{c.name}</span>
-                {c.type === 'agent' && <AgentTag t={t} />}
-              </button>
-            </li>
-          ))}
-        </ul>
+    <div className="grid gap-2 px-4 pb-4">
+      {replyTo && (
+        <ComposerBanner
+          tone="reply"
+          title={t('compose.replyingTo', 'Replying to {name}', { name: replyTo.author?.name ?? '' })}
+          text={replyTo.body}
+          closeLabel={t('compose.cancelReply', 'Stop replying')}
+          onClose={() => onCancelReply?.()}
+        />
       )}
-      <Textarea
-        ref={box}
-        value={draft}
-        rows={1}
-        maxLength={4000}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && candidates.length === 0) {
-            e.preventDefault();
-            void send();
-          }
-          if (e.key === 'Escape') setMentionQuery(null);
-        }}
-        aria-label={t('compose.label', 'Message')}
-        placeholder={t('compose.placeholder', 'Message {name} · type @ for a person or an agent', { name: chat.title })}
-        className="min-h-10 resize-none border-0 p-0 shadow-none focus-visible:outline-none"
-      />
-      <div className="flex items-center gap-1">
+      {editing && (
+        <ComposerBanner
+          tone="edit"
+          title={t('compose.editing', 'Editing')}
+          text={editing.body}
+          closeLabel={t('compose.cancelEdit', 'Stop editing')}
+          onClose={() => onCancelEdit?.()}
+        />
+      )}
+      <div className="relative flex items-end gap-1 rounded-card border border-input bg-card px-2 py-1.5 focus-within:outline-2 focus-within:outline-ring">
+        {candidates.length > 0 && (
+          <ul
+            role="listbox"
+            aria-label={t('compose.mentionList', 'People and agents in this chat')}
+            className="absolute bottom-full start-0 mb-1 w-72 overflow-hidden rounded-card border border-border bg-popover py-1 shadow-md"
+          >
+            <li className="px-3 pt-1 pb-1 text-xs font-medium text-muted-foreground">{t('compose.inThisChat', 'In this chat')}</li>
+            {candidates.map((c) => (
+              <li key={`${c.type}${c.id}`}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected="false"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-start text-sm hover:bg-muted"
+                  onClick={() => pick(c)}
+                >
+                  {c.type === 'everyone' ? (
+                    <span className="grid size-6 place-items-center rounded-full bg-muted">
+                      <Icon name="users" size={14} />
+                    </span>
+                  ) : (
+                    <Avatar name={c.name} kind={c.type === 'agent' ? 'agent' : 'person'} size={24} />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{c.type === 'everyone' ? '@everyone' : c.name}</span>
+                    {c.type === 'everyone' && (
+                      <span className="block text-xs text-muted-foreground">
+                        {t('compose.everyoneHint', 'Tells all {count} people', { count: String(chat.people_count) })}
+                      </span>
+                    )}
+                  </span>
+                  {c.type === 'agent' && <AgentTag t={t} />}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <IconButton
           icon="at"
           label={t('compose.mention', 'Mention a person or an agent')}
@@ -1241,11 +1510,265 @@ function Composer({
             box.current?.focus();
           }}
         />
-        <Button size="sm" icon="send" className="ms-auto rtl:[&_svg]:-scale-x-100" loading={sending} disabled={draft.trim() === ''} onClick={() => void send()}>
-          {t('compose.send', 'Send')}
+        <Textarea
+          ref={box}
+          value={draft}
+          rows={1}
+          maxLength={4000}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && candidates.length === 0) {
+              e.preventDefault();
+              void send();
+            }
+            if (e.key === 'Escape') {
+              if (mentionQuery !== null) setMentionQuery(null);
+              else if (editing) onCancelEdit?.();
+              else if (replyTo) onCancelReply?.();
+            }
+          }}
+          aria-label={t('compose.label', 'Message')}
+          placeholder={placeholder ?? t('compose.placeholderShort', 'Message {name}', { name: chat.title })}
+          className="min-h-10 flex-1 resize-none border-0 bg-transparent p-0 py-2 shadow-none focus-visible:outline-none"
+        />
+        <Button
+          type="button"
+          size="icon-sm"
+          className="mb-1 rtl:[&_svg]:-scale-x-100"
+          disabled={sending || draft.trim() === ''}
+          onClick={() => void send()}
+          aria-label={editing ? t('compose.save', 'Save') : t('compose.send', 'Send')}
+          title={editing ? t('compose.save', 'Save') : t('compose.send', 'Send')}
+        >
+          <Icon name={editing ? 'check' : 'send'} size={16} />
         </Button>
       </div>
+      {threadRoot !== undefined && alsoLabel && (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" className="size-4 accent-primary" checked={alsoToChat} onChange={(e) => setAlsoToChat(e.target.checked)} />
+          {alsoLabel}
+        </label>
+      )}
     </div>
+  );
+}
+
+// ── Threads and search (UC.6, UC.8) ──────────────────────────────────────────
+
+function ThreadPane({
+  t,
+  api,
+  chat,
+  rootId,
+  myId,
+  layout,
+  readMarks,
+  actions,
+  onPosted,
+  onClose,
+}: {
+  t: TranslateFn;
+  api: ChatApi;
+  chat: ChatDetail;
+  rootId: number;
+  myId: number;
+  layout: ChatLayout;
+  readMarks: ChatReadMark[];
+  actions: MessageActions;
+  onPosted: (m: ChatMessage) => void;
+  onClose: () => void;
+}) {
+  const [root, setRoot] = useState<ChatMessage | null>(null);
+  const [replies, setReplies] = useState<ChatMessage[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const thread = await api.thread(rootId);
+      setRoot(thread.root);
+      setReplies(thread.replies);
+    } catch (e) {
+      setNotice(chatErrorText(e, ''));
+    }
+  }, [api, rootId]);
+  useEffect(() => {
+    let live = true;
+    api.thread(rootId).then(
+      (thread) => {
+        if (!live) return;
+        setRoot(thread.root);
+        setReplies(thread.replies);
+      },
+      (e: unknown) => live && setNotice(chatErrorText(e, ''))
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, rootId]);
+  usePoll(load, THREAD_MS, root !== null);
+
+  // In the thread, reactions and the rest change this pane's copy too.
+  const local: MessageActions = {
+    ...actions,
+    onThread: () => undefined,
+    onReact: (m, emoji) => {
+      api.react(m.id, emoji).then(
+        (fresh) => {
+          setReplies((prev) => prev.map((x) => (x.id === fresh.id ? fresh : x)));
+          if (fresh.id === root?.id) setRoot(fresh);
+        },
+        (e: unknown) => setNotice(chatErrorText(e, ''))
+      );
+    },
+  };
+
+  return (
+    <ChatSidePane title={t('thread.title', 'Thread')} subtitle={chat.title} onClose={onClose} closeLabel={t('thread.close', 'Close the thread')}>
+      {root === null ? (
+        <Skeleton className="h-24 w-full" />
+      ) : (
+        <div className="-mx-4 -mt-4 flex min-h-full flex-col">
+          <div className="grid gap-3 px-4 pt-4">
+            <MessageRow t={t} api={api} message={root} chat={chat} myId={myId} layout={layout} readMarks={readMarks} actions={local} inThread onMessage={setRoot} onNotice={setNotice} />
+            <div className="flex items-center gap-3 text-sm text-muted-foreground" role="separator">
+              <span className="h-px flex-1 bg-border" />
+              {replies.length === 1 ? t('msg.oneReply', '1 reply') : t('msg.replies', '{count} replies', { count: String(replies.length) })}
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            {replies.map((m) => (
+              <MessageRow
+                key={m.id}
+                t={t}
+                api={api}
+                message={m}
+                chat={chat}
+                myId={myId}
+                layout={layout}
+                readMarks={readMarks}
+                actions={local}
+                inThread
+                onMessage={(x) => setReplies((prev) => prev.map((y) => (y.id === x.id ? x : y)))}
+                onNotice={setNotice}
+              />
+            ))}
+          </div>
+          {notice !== null && (
+            <p role="alert" className="mx-4 mt-2 rounded-control bg-error-tint px-3 py-2 text-sm text-error-text">
+              {notice || t('error.generic', 'Something went wrong with Chat. Please try again.')}
+            </p>
+          )}
+          <div className="sticky bottom-0 mt-auto bg-card pt-3">
+            <Composer
+              t={t}
+              api={api}
+              chat={chat}
+              threadRoot={root.id}
+              placeholder={t('thread.placeholder', 'Reply in thread')}
+              alsoLabel={t('thread.also', 'Also send to {chat}', { chat: chat.title })}
+              onSent={(m) => {
+                setReplies((prev) => [...prev, m]);
+                onPosted(m);
+              }}
+              onError={setNotice}
+            />
+          </div>
+        </div>
+      )}
+    </ChatSidePane>
+  );
+}
+
+function SearchPane({
+  t,
+  api,
+  chat,
+  people,
+  onOpen,
+  onClose,
+}: {
+  t: TranslateFn;
+  api: ChatApi;
+  chat: ChatDetail;
+  people: ChatMember[];
+  onOpen: (id: number, words: string) => void;
+  onClose: () => void;
+}) {
+  const { dateTime } = useDateDisplay();
+  const [query, setQuery] = useState('');
+  const [words, setWords] = useState('');
+  const [from, setFrom] = useState<number | null>(null);
+  const [results, setResults] = useState<ChatMessage[] | null>(null);
+
+  useEffect(() => {
+    if (words === '' && from === null) return;
+    let live = true;
+    api.search(chat.id, words, from).then(
+      (found) => live && setResults(found),
+      () => live && setResults([])
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, chat.id, words, from]);
+
+  const shown = words === '' && from === null ? null : results;
+
+  return (
+    <ChatSidePane title={t('search.title', 'Search in this chat')} subtitle={chat.title} onClose={onClose} closeLabel={t('search.close', 'Close search')}>
+      <SearchField
+        value={query}
+        onValueChange={(v) => {
+          setQuery(v);
+          if (v === '') setWords('');
+        }}
+        onSearch={(v) => setWords(v.trim())}
+        label={t('search.label', 'Words to find')}
+        clearLabel={t('list.clear', 'Clear search')}
+        placeholder={t('search.placeholder', 'Find words in this chat')}
+      />
+      <div role="group" aria-label={t('search.from', 'From')} className="flex flex-wrap gap-1.5">
+        {people.map((p) =>
+          p.type === 'person' ? (
+            <button
+              key={p.member_id}
+              type="button"
+              aria-pressed={from === p.profile_id}
+              onClick={() => setFrom(from === p.profile_id ? null : p.profile_id)}
+              className={cn(
+                'inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-sm',
+                from === p.profile_id ? 'border-primary-tint bg-primary-tint text-primary-tint-foreground' : 'border-border hover:bg-muted'
+              )}
+            >
+              <Avatar name={p.name} size={20} />
+              {p.name.split(' ')[0]}
+            </button>
+          ) : null
+        )}
+      </div>
+      {shown === null ? (
+        <p className="text-sm text-muted-foreground">{t('search.hint', 'Type words, or pick a person, to find their messages.')}</p>
+      ) : shown.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t('search.none', 'Nothing matches.')}</p>
+      ) : (
+        <ul className="grid gap-2">
+          {shown.map((m) => (
+            <li key={m.id}>
+              <button
+                type="button"
+                onClick={() => onOpen(m.id, words)}
+                className="grid w-full gap-1 rounded-control border border-border px-3 py-2 text-start hover:bg-muted"
+              >
+                <span className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{m.author?.name}</span>
+                  {dateTime(m.created_at)}
+                </span>
+                <MessageBody text={m.body} mentions={m.mentions} highlight={words} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </ChatSidePane>
   );
 }
 
