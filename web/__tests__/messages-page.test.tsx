@@ -12,7 +12,7 @@ import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, within } from '@testing-library/react';
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api/client', () => require('./helpers/client-via-mock').clientVia(() => mockApiClient));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockApiClient, user: { id: 7 } }),
 }));

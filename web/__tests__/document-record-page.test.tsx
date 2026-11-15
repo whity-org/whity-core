@@ -40,7 +40,7 @@ let authUser: { id: number; tenant_id: number } | null = { id: 10, tenant_id: 1 
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ user: authUser, apiClient: (...args: unknown[]) => rawApiClient(...args) }),
 }));
-jest.mock('@/lib/api/client', () => require('./helpers/client-via-mock').clientVia(() => rawApiClient));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => rawApiClient));
 // The VIEWER imports the module-level client rather than taking it from context,
 // so both specifiers route to the same spy — otherwise the viewer's own two
 // requests would be invisible to these assertions.

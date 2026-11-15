@@ -24,7 +24,7 @@ jest.mock('@/components/auth/public-shell', () => ({
 }));
 jest.mock('@/components/auth/turnstile-widget', () => ({ TurnstileWidget: () => <div data-testid="bot-check" /> }));
 
-jest.mock('@/lib/api/client', () => require('./helpers/fetch-like-api').fetchLikeClient());
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 
 import PublicChatPage from '@/app/chat/[workspace]/page';
 

@@ -7,7 +7,7 @@ import { act, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import PreviewFormPage from '@/app/(protected)/forms/[id]/preview/page';
 
-jest.mock('@/lib/api/client', () => require('./helpers/fetch-like-api').fetchLikeClient());
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 jest.mock('@/lib/direction-context', () => ({ useDirection: () => ({ dir: 'ltr' }) }));
 
 const client = jest.fn();

@@ -6,7 +6,7 @@ import { Suspense } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-jest.mock('@/lib/api/client', () => require('./helpers/fetch-like-api').fetchLikeClient());
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 
 import VerifyDocumentPage from '@/app/verify/[token]/page';
 import { PublicNameDialog } from '@/app/(protected)/admin/document-templates/public-name-dialog';

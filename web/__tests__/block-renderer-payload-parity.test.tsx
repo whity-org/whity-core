@@ -62,7 +62,7 @@ import type {
   PluginFeature,
 } from '../../templates/tauri-desktop/src/plugin-blocks/types';
 
-jest.mock('@/lib/api/client', () => require('./helpers/client-via-mock').clientVia(() => mockApiClient));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
 
 const mockInvoke = jest.requireMock('@tauri-apps/api/core').invoke as jest.Mock;

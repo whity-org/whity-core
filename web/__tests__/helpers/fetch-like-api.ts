@@ -4,7 +4,7 @@
  * function and asserting on the URL and the JSON body. Only the transport is
  * adapted; the paths, bodies and branches under test are the page's own.
  *
- * Use: jest.mock('@/lib/api/client', () => require('./helpers/fetch-like-api').fetchLikeClient());
+ * Use: jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
  */
 type Opts = {
   params?: { path?: Record<string, unknown>; query?: Record<string, unknown> };

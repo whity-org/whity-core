@@ -20,7 +20,7 @@ import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import type { Block } from '@/lib/plugin-features';
 import { ToastProvider } from '@/lib/toast-context';
 
-jest.mock('@/lib/api/client', () => require('./helpers/client-via-mock').clientVia(() => mockApiClient));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 
 const mockApiClient: jest.Mock = jest.fn();
 

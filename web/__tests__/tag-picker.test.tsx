@@ -13,7 +13,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 // useCallback, so a fresh wrapper each render would refetch on every render
 // (see EmailAddressesSettings test). Pass the jest.fn() itself.
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api/client', () => require('./helpers/client-via-mock').clientVia(() => mockApiClient));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockApiClient }),
 }));

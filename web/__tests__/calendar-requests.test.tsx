@@ -12,8 +12,7 @@ import type { CalendarBooking, CalendarService, CalendarStaff } from '@/lib/cale
 
 const mockApiClient = jest.fn();
 jest.mock('@/lib/api/client', () =>
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('./helpers/client-via-mock').clientVia(() => mockApiClient)
+  jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient)
 );
 
 const mockToast = jest.fn();

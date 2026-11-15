@@ -12,7 +12,6 @@ import React from 'react';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const push = jest.fn();
-jest.mock('@/lib/api/client', () => require('./helpers/fetch-like-api').fetchLikeClient());
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
 let mockNav: { id: string; href: string; label: string; icon?: string }[] = [];
@@ -44,7 +43,17 @@ const apiMock = jest.fn(async (path: string, init?: { params?: { query?: Record<
   const body = apiRoutes[url];
   return body === undefined ? { data: undefined, error: {}, response: { status: 404 } } : { data: body, response: { status: 200 } };
 });
-jest.mock('@/lib/api/client', () => ({ api: { GET: (...args: Parameters<typeof apiMock>) => apiMock(...args) } }));
+// Search goes over the wire (asserted on `fetch` below); the palette's own data
+// hook answers from `apiRoutes`.
+jest.mock('@/lib/api/client', () => {
+  const wire = jest.requireActual('./helpers/fetch-like-api').fetchLikeClient();
+  return {
+    api: {
+      GET: (...args: Parameters<typeof apiMock>) =>
+        args[0] === '/api/v1/search' ? wire.api.GET(...args) : apiMock(...args),
+    },
+  };
+});
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({
     user: { id: 1, tenant_id: 1 },

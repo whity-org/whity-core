@@ -68,7 +68,7 @@ let mockTransport: jest.Mock = mockApiClient;
 
 const mockApiPatch = jest.fn();
 jest.mock('@/lib/api/client', () => {
-  const via = require('./helpers/client-via-mock').clientVia(() => mockTransport);
+  const via = jest.requireActual('./helpers/client-via-mock').clientVia(() => mockTransport);
   return { ...via, api: { ...via.api, PATCH: (...args: unknown[]) => mockApiPatch(...args) } };
 });
 

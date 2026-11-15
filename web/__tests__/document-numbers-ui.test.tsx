@@ -4,7 +4,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api/client', () => require('./helpers/client-via-mock').clientVia(() => mockApiClient));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 import userEvent from '@testing-library/user-event';
 
 import { DocumentNumber, DocumentStateBadge } from '@/app/(protected)/admin/document-library/document-item';

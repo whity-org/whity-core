@@ -9,7 +9,7 @@ import userEvent from '@testing-library/user-event';
 
 const apiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient }) }));
-jest.mock('@/lib/api/client', () => require('./helpers/client-via-mock').clientVia(() => (...[url, init]: [string, RequestInit?]) =>
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => (...[url, init]: [string, RequestInit?]) =>
     // The errors inbox is stubbed through `fetch` below.
     url.includes('/errors') ? (globalThis.fetch as unknown as typeof apiClient)(url, init) : apiClient(...[url, init].slice(0, init === undefined ? 1 : 2) as [string])
   ));

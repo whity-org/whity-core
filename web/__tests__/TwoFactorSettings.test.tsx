@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 global.fetch = jest.fn();
 
 let mockApiClient: jest.Mock;
-jest.mock('@/lib/api/client', () => require('./helpers/client-via-mock').clientVia(() => mockApiClient));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 
 // Mock the auth context
 jest.mock('@/lib/auth-context', () => {

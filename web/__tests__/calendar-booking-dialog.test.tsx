@@ -10,8 +10,7 @@ import type { CalendarService, CalendarStaff } from '@/lib/calendar/api';
 
 const mockApiClient = jest.fn();
 jest.mock('@/lib/api/client', () =>
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  require('./helpers/client-via-mock').clientVia(() => mockApiClient)
+  jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient)
 );
 
 function respond(status: number, body: unknown) {

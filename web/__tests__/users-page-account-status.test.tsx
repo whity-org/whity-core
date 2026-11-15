@@ -37,7 +37,7 @@ const mockApiClient = jest.fn();
 const mockApiPatch = jest.fn();
 jest.mock('@/lib/api/client', () => {
   // List reads go through the URL-based mock; the status toggle has its own PATCH spy.
-  const via = require('./helpers/client-via-mock').clientVia(() => mockApiClient);
+  const via = jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient);
   return { ...via, api: { ...via.api, PATCH: (...args: unknown[]) => mockApiPatch(...args) } };
 });
 

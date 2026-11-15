@@ -7,7 +7,7 @@
  *
  * Use:
  *   const mockApiClient = jest.fn();
- *   jest.mock('@/lib/api/client', () => require('./helpers/client-via-mock').clientVia(() => mockApiClient));
+ *   jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
  */
 type Opts = {
   params?: { path?: Record<string, unknown>; query?: Record<string, unknown> };

@@ -10,7 +10,7 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 const hasPermission = jest.fn<boolean, [string]>();
-jest.mock('@/lib/api/client', () => require('./helpers/fetch-like-api').fetchLikeClient());
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ user: { tenant_id: 3 } }),
 }));

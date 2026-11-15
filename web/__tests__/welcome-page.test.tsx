@@ -28,7 +28,7 @@ jest.mock('@/components/auth-shell', () => ({
   ),
 }));
 
-jest.mock('@/lib/api/client', () => require('./helpers/fetch-like-api').fetchLikeClient());
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 
 import WelcomePage from '@/app/welcome/page';
 
