@@ -10516,6 +10516,13 @@ final class CoreApiSchemas
                 'book_anyway' => self::bool() + ['description' => 'Move even though the person is busy then (a taken room or closed hours still refuse). Never for agents.'],
                 'within_hours' => self::bool() + ['description' => 'Refuse a time outside the person\'s working hours, without the booking window\'s notice rules.'],
             ], ['starts_at']),
+            'CalendarDayCount' => self::object([
+                'date' => self::str() + ['description' => 'The workspace\'s calendar date, YYYY-MM-DD.'],
+                'profile_id' => self::int(),
+                'room_id' => self::int(true),
+                'service_id' => self::int(),
+                'count' => self::int(),
+            ], ['date', 'profile_id', 'room_id', 'service_id', 'count']),
             'CalendarViewChoices' => self::object([
                 'view' => self::str() + ['enum' => ['day', 'four_days', 'week', 'month', 'year', 'three_days'], 'description' => 'The view last chosen: Day, 4 days, Week, Month, Year, or 3 days on a phone.'],
                 'colour_by' => self::str() + ['enum' => ['person', 'service', 'room'], 'description' => 'What colours mean for this person: the person, the service, or the room or branch.'],
@@ -18378,6 +18385,16 @@ final class CoreApiSchemas
                     404 => self::errorResponse('No such service, person or customer'),
                     409 => self::errorResponse('That time was just taken'),
                     422 => self::errorResponse('Outside the booking window, or missing customer details'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/day-counts', 'calendar:read', [
+                'summary' => 'Count live bookings a day, by person, room and service, for up to a year',
+                'description' => 'For the Year view: each row is one day, person, room and service with its count. Days are the workspace\'s calendar dates.',
+                'tags' => ['calendar'],
+                'parameters' => $range,
+                'responses' => [
+                    200 => self::jsonResponse('Counts', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarDayCount')])),
+                    422 => self::errorResponse('A missing or reversed range, or more than a year'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/calendar/bookings/{id:\d+}', 'calendar:read', [
