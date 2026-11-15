@@ -10,6 +10,8 @@ use Whity\Core\Agent\AgentProposalEvents;
 use Whity\Core\Agent\AgentProposalRepository;
 use Whity\Core\Agent\ProposalTier;
 use Whity\Core\Audit\AuditLoggerInterface;
+use Whity\Core\Plugin\Tenant\ManifestImpact;
+use Whity\Core\Plugin\Tenant\WorkspacePluginProposalDiffs;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
@@ -45,6 +47,9 @@ final class AgentProposalsApiHandler
 {
     /** Most proposals approved in one go (AQ.1). */
     public const BULK_LIMIT = 50;
+
+    /** WHIT-1042: the longest reason a decline keeps. */
+    public const DECLINE_REASON_MAX = 1000;
 
     public function __construct(
         private readonly AgentProposalRepository $proposals,
@@ -106,7 +111,11 @@ final class AgentProposalsApiHandler
             return Response::error('arguments must be an object', 422);
         }
 
-        $outcome = $this->approveOne($tenantId, $profileId, $id, $arguments);
+        // WHIT-1042: a destructive impact plan is approved only with the
+        // person's tick naming what is lost.
+        $acknowledged = is_array($body) && ($body['acknowledgedDestructive'] ?? false) === true;
+
+        $outcome = $this->approveOne($tenantId, $profileId, $id, $arguments, $acknowledged);
         if ($outcome instanceof Response) {
             return $outcome;
         }
@@ -154,6 +163,13 @@ final class AgentProposalsApiHandler
                 $refused[] = ['id' => $id, 'reason' => 'open_on_its_own'];
                 continue;
             }
+            // WHIT-1042: an impact plan that failed its tests or deletes data
+            // is decided on its own, with its tick.
+            $blocked = self::impactPlanRefusal($proposal, false);
+            if ($blocked !== null) {
+                $refused[] = ['id' => $id, 'reason' => 'open_on_its_own'];
+                continue;
+            }
             $outcome = $this->approveOne($tenantId, $profileId, $id, null);
             if ($outcome instanceof Response) {
                 $refused[] = ['id' => $id, 'reason' => $outcome->getStatusCode() === 409 ? 'not_waiting' : 'not_found'];
@@ -171,11 +187,15 @@ final class AgentProposalsApiHandler
      * @param array<string, mixed>|null $arguments edited arguments, or null to run as proposed
      * @return array<string, mixed>|Response the presented proposal, or the refusal
      */
-    private function approveOne(int $tenantId, int $profileId, int $id, ?array $arguments): array|Response
+    private function approveOne(int $tenantId, int $profileId, int $id, ?array $arguments, bool $acknowledgedDestructive = false): array|Response
     {
         $proposal = $this->proposals->find($id, $tenantId);
         if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
             return Response::error('Proposal not found', 404);
+        }
+        $blocked = self::impactPlanRefusal($proposal, $acknowledgedDestructive);
+        if ($blocked !== null) {
+            return $blocked;
         }
 
         // WHIT-816: a workspace agent's proposal runs under the person's
@@ -250,18 +270,24 @@ final class AgentProposalsApiHandler
         [$tenantId, $profileId] = $caller;
         $id = (int) ($params['id'] ?? 0);
 
+        // WHIT-1042: why, for the agent to read back ("Ask Whity Builder to
+        // fix it" names the failing tests). Optional; cut to 1000 characters.
+        $body   = json_decode($request->getBody(), true);
+        $reason = is_array($body) && is_string($body['reason'] ?? null) ? trim($body['reason']) : '';
+        $reason = $reason === '' ? null : mb_substr($reason, 0, self::DECLINE_REASON_MAX);
+
         $proposal = $this->proposals->find($id, $tenantId);
         if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
             return Response::error('Proposal not found', 404);
         }
-        if (!$this->proposals->decide($id, $tenantId, $profileId, AgentProposalRepository::DECLINED)) {
+        if (!$this->proposals->decide($id, $tenantId, $profileId, AgentProposalRepository::DECLINED, null, $reason)) {
             return Response::error('This proposal is no longer waiting', 409);
         }
         $this->audit?->record('agent.proposal.declined', [
             'tenant_id'   => $tenantId,
             'target_type' => 'agent_proposal',
             'target_id'   => $id,
-            'metadata'    => ['tool' => $proposal['tool']],
+            'metadata'    => ['tool' => $proposal['tool'], 'with_reason' => $reason !== null],
         ]);
         $this->proposals->events()?->decided($tenantId, $id, AgentProposalEvents::DECLINED, $profileId, $profileId, (string) $proposal['tool']);
 
@@ -271,6 +297,30 @@ final class AgentProposalsApiHandler
             $this->proposals->agentNames($tenantId, [(string) $fresh['agent_principal_id']]),
             $this->actions?->forProposals($tenantId, [$id])[$id] ?? null,
         ) : null], 200);
+    }
+
+    /**
+     * Why an impact plan can't be approved as it stands (WHIT-1042,
+     * TplImpactPlan), or null. A Whity Builder publish or rollback whose tests
+     * failed is refused: the person asks the builder to fix it instead. One
+     * that stops serving existing data needs the person's tick naming what is
+     * lost. Proposals without an impact plan are untouched.
+     *
+     * @param array<string, mixed> $proposal
+     */
+    public static function impactPlanRefusal(array $proposal, bool $acknowledgedDestructive): ?Response
+    {
+        $plan = WorkspacePluginProposalDiffs::planOf($proposal['tool'] ?? null, $proposal['diff'] ?? null);
+        if ($plan === null) {
+            return null;
+        }
+        if (($plan['tests']['failed'] ?? 0) > 0) {
+            return Response::error('Its tests failed, so it can not be approved. Decline it, or ask the agent to fix it.', 422, ['code' => 'tests_failed']);
+        }
+        if ($plan['level'] === ManifestImpact::DESTRUCTIVE && !$acknowledgedDestructive) {
+            return Response::error('This stops showing data people entered. Tick that you understand, then approve.', 422, ['code' => 'acknowledge_destructive']);
+        }
+        return null;
     }
 
     /** @return array{0: int, 1: int}|Response */
@@ -318,6 +368,8 @@ final class AgentProposalsApiHandler
             'decidedAt'         => $proposal['decided_at'],
             'expiresAt'         => $proposal['expires_at'],
             'createdAt'         => $proposal['created_at'],
+            // WHIT-1042: why the person declined, when they said.
+            'declineReason'     => $proposal['decline_reason'] ?? null,
             // WHIT-812: once approved and run, what can be undone and until when.
             'action'            => $action !== null ? AgentActionsApiHandler::present($action, $agentNames) : null,
         ];

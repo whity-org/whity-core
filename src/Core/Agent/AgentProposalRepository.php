@@ -28,7 +28,7 @@ final class AgentProposalRepository
 
     private const COLUMNS = 'id, tenant_id, agent_principal_id, on_behalf_of_profile_id, tool, arguments, diff, scope,
                              permissions, summary, undo_window_seconds, status, result, decided_by_profile_id,
-                             decided_at, expires_at, created_at';
+                             decided_at, expires_at, created_at, decline_reason';
 
     public function __construct(
         private readonly PDO $db,
@@ -243,16 +243,17 @@ final class AgentProposalRepository
 
     /**
      * Move a waiting, unexpired proposal of $profileId's to $status, recording
-     * who decided and, for an edit, the new arguments. True only for the one
-     * caller that made the move.
+     * who decided and, for an edit, the new arguments; for a decline, why, when
+     * the person said (WHIT-1042). True only for the one caller that made the move.
      *
      * @param array<string, mixed>|null $arguments
      */
-    public function decide(int $id, int $tenantId, int $profileId, string $status, ?array $arguments = null): bool
+    public function decide(int $id, int $tenantId, int $profileId, string $status, ?array $arguments = null, ?string $declineReason = null): bool
     {
         $sql = 'UPDATE agent_proposals
                    SET status = :status, decided_by_profile_id = :profile, decided_at = NOW()'
-            . ($arguments !== null ? ', arguments = :arguments' : '') . '
+            . ($arguments !== null ? ', arguments = :arguments' : '')
+            . ($declineReason !== null ? ', decline_reason = :reason' : '') . '
                  WHERE id = :id AND tenant_id = :tenant_id AND on_behalf_of_profile_id = :profile
                    AND status = :waiting AND expires_at > :now';
         $params = [
@@ -265,6 +266,9 @@ final class AgentProposalRepository
         ];
         if ($arguments !== null) {
             $params[':arguments'] = self::encode($arguments === [] ? new \stdClass() : $arguments);
+        }
+        if ($declineReason !== null) {
+            $params[':reason'] = $declineReason;
         }
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
@@ -361,6 +365,7 @@ final class AgentProposalRepository
             'decided_at'              => $row['decided_at'] === null ? null : (string) $row['decided_at'],
             'expires_at'              => (string) $row['expires_at'],
             'created_at'              => (string) $row['created_at'],
+            'decline_reason'          => isset($row['decline_reason']) && $row['decline_reason'] !== '' ? (string) $row['decline_reason'] : null,
         ];
     }
 

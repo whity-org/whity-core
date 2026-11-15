@@ -7332,6 +7332,8 @@ final class CoreApiSchemas
                 'decidedAt' => self::str(true),
                 'expiresAt' => self::str(),
                 'createdAt' => self::str(),
+                // WHIT-1042: why the person declined, when they said.
+                'declineReason' => self::str(true),
                             // WHIT-812: once approved and run, what can be undone and until when.
                 'action' => ['allOf' => [SchemaBuilder::ref('AgentAction')], 'nullable' => true],
                 'agentPaused' => ['type' => 'boolean', 'description' => 'The agent is paused, so this can be declined but not approved until it is resumed'],
@@ -16099,12 +16101,20 @@ final class CoreApiSchemas
             'description' => $description,
             'tags' => ['me'],
             'parameters' => [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'ID of the proposal.', 'schema' => ['type' => 'integer']]],
-            'request' => $editable ? self::object(['arguments' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Edited arguments to run with instead of the agent\'s (optional).']], []) : null,
+            'request' => $editable
+                ? self::object([
+                    'arguments' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Edited arguments to run with instead of the agent\'s (optional).'],
+                    // WHIT-1042: the tick on a destructive impact plan.
+                    'acknowledgedDestructive' => ['type' => 'boolean', 'description' => 'Needed for a Whity Builder publish or roll back that stops showing data people entered: the person ticked that they understand what is lost.'],
+                ], [])
+                // WHIT-1042: the agent reads this back from get_proposal.
+                : self::object(['reason' => ['type' => 'string', 'maxLength' => 1000, 'description' => 'Why, for the agent to read back (optional), such as which tests to fix.']], []),
             'responses' => [
                 200 => self::jsonResponse('The proposal after the decision', 'AgentProposalResponse'),
                 404 => self::errorResponse('No such proposal made on your behalf'),
                 409 => self::errorResponse('The proposal is no longer waiting (decided or expired)'),
-            ] + self::authErrors(),
+            ] + ($editable ? [422 => self::errorResponse('An impact plan whose tests failed (code tests_failed), or a destructive one without acknowledgedDestructive (code acknowledge_destructive)')] : [])
+              + self::authErrors(),
         ];
 
         return [
@@ -16125,22 +16135,22 @@ final class CoreApiSchemas
                 'path' => '/api/me/agent-proposals/{id:\d+}/approve',
                 'requiredRole' => null,
                 'requiredPermission' => null,
-                'schema' => array_filter($decision(
+                'schema' => $decision(
                     'Approve an agent\'s proposal and run it for you',
                     'Runs the operation as your delegate, after checking again that you and the agent may. Edit the arguments by sending them. Runs once, however many times it is approved.',
                     true,
-                ), static fn (mixed $v): bool => $v !== null),
+                ),
             ],
             [
                 'method' => 'POST',
                 'path' => '/api/me/agent-proposals/{id:\d+}/decline',
                 'requiredRole' => null,
                 'requiredPermission' => null,
-                'schema' => array_filter($decision(
+                'schema' => $decision(
                     'Decline an agent\'s proposal',
-                    'Nothing runs. The agent can ask again.',
+                    'Nothing runs. The agent can ask again, and reads the reason when you give one.',
                     false,
-                ), static fn (mixed $v): bool => $v !== null),
+                ),
             ],
             [
                 'method' => 'POST',
