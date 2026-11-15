@@ -10517,13 +10517,13 @@ final class CoreApiSchemas
                 'within_hours' => self::bool() + ['description' => 'Refuse a time outside the person\'s working hours, without the booking window\'s notice rules.'],
             ], ['starts_at']),
             'CalendarViewChoices' => self::object([
-                'view' => self::str() + ['enum' => ['day', 'four_days', 'week', 'month', 'year', 'three_days']],
-                'colour_by' => self::str() + ['enum' => ['person', 'service', 'room']],
+                'view' => self::str() + ['enum' => ['day', 'four_days', 'week', 'month', 'year', 'three_days'], 'description' => 'The view last chosen: Day, 4 days, Week, Month, Year, or 3 days on a phone.'],
+                'colour_by' => self::str() + ['enum' => ['person', 'service', 'room'], 'description' => 'What colours mean for this person: the person, the service, or the room or branch.'],
                 'date' => self::str() + ['description' => 'The date in view, YYYY-MM-DD.'],
                 'hidden_people' => ['type' => 'array', 'items' => self::int(), 'description' => 'Staff profile ids unticked in the panel.'],
                 'hidden_rooms' => ['type' => 'array', 'items' => self::int(), 'description' => 'Room ids unticked in the panel.'],
                 'hidden_services' => ['type' => 'array', 'items' => self::int(), 'description' => 'Service ids unticked in the panel.'],
-                'also_show' => ['type' => 'array', 'items' => self::str() + ['enum' => ['team_events', 'time_off', 'cancelled']]],
+                'also_show' => ['type' => 'array', 'items' => self::str() + ['enum' => ['team_events', 'time_off', 'cancelled']], 'description' => 'What else the calendar shows besides bookings.'],
                 'sidebar_open' => self::bool() + ['description' => 'The person opened the app\'s sidebar on the calendar, so it stays open there.'],
             ], []),
             'CalendarBookingCancelRequest' => self::object([

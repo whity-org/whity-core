@@ -11336,9 +11336,15 @@ export interface components {
             reminders_sent: number;
         };
         CalendarViewChoices: {
-            /** @enum {string} */
+            /**
+             * @description The view last chosen: Day, 4 days, Week, Month, Year, or 3 days on a phone.
+             * @enum {string}
+             */
             view?: "day" | "four_days" | "week" | "month" | "year" | "three_days";
-            /** @enum {string} */
+            /**
+             * @description What colours mean for this person: the person, the service, or the room or branch.
+             * @enum {string}
+             */
             colour_by?: "person" | "service" | "room";
             /** @description The date in view, YYYY-MM-DD. */
             date?: string;
@@ -11348,6 +11354,7 @@ export interface components {
             hidden_rooms?: number[];
             /** @description Service ids unticked in the panel. */
             hidden_services?: number[];
+            /** @description What else the calendar shows besides bookings. */
             also_show?: ("team_events" | "time_off" | "cancelled")[];
             /** @description The person opened the app's sidebar on the calendar, so it stays open there. */
             sidebar_open?: boolean;

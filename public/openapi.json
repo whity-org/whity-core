@@ -74451,7 +74451,8 @@
                             "month",
                             "year",
                             "three_days"
-                        ]
+                        ],
+                        "description": "The view last chosen: Day, 4 days, Week, Month, Year, or 3 days on a phone."
                     },
                     "colour_by": {
                         "type": "string",
@@ -74459,7 +74460,8 @@
                             "person",
                             "service",
                             "room"
-                        ]
+                        ],
+                        "description": "What colours mean for this person: the person, the service, or the room or branch."
                     },
                     "date": {
                         "type": "string",
@@ -74495,7 +74497,8 @@
                                 "time_off",
                                 "cancelled"
                             ]
-                        }
+                        },
+                        "description": "What else the calendar shows besides bookings."
                     },
                     "sidebar_open": {
                         "type": "boolean",
