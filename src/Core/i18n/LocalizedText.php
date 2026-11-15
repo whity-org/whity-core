@@ -85,9 +85,11 @@ final class LocalizedText
 
         if (!is_array($raw)) {
             throw new LocalizedTextRejected(
-                $bareLanguage === null
-                    ? "{$field} must be an object of language code to text, for example {\"ar\": \"...\", \"en\": \"...\"}."
-                    : "{$field} must be text, or an object of language code to text, for example {\"ar\": \"...\", \"en\": \"...\"}."
+                match (true) {
+                    $languages !== null => "{$field} must be text, or an object with '" . implode("' and/or '", $languages) . "'.",
+                    $bareLanguage === null => "{$field} must be an object of language code to text, for example {\"ar\": \"...\", \"en\": \"...\"}.",
+                    default => "{$field} must be text, or an object of language code to text, for example {\"ar\": \"...\", \"en\": \"...\"}.",
+                }
             );
         }
 
@@ -112,6 +114,51 @@ final class LocalizedText
         }
 
         return $out;
+    }
+
+    /**
+     * A required Arabic/English label, as forms and calendar services keep
+     * them. A bare string is English: a label in one language is the ordinary
+     * case, not a defect. Other languages are ignored, because the label's
+     * renderers draw exactly these two.
+     *
+     * @return array<string, string>
+     *
+     * @throws LocalizedTextRejected When neither language has text.
+     */
+    public static function label(mixed $raw, string $field): array
+    {
+        return self::normalize($raw, $field, 'en', self::BILINGUAL, null, true);
+    }
+
+    /**
+     * An Arabic/English label that may be left out, encoded for its column.
+     *
+     * Null or blank clears it. An object replaces it. A BARE STRING SETS ONLY
+     * THE ENGLISH and keeps the Arabic in `$existing`, because a client that
+     * knows one language must not erase a translation it never saw.
+     *
+     * @param array<string, string> $existing What the column holds now.
+     *
+     * @throws LocalizedTextRejected On a wrong type, or text longer than `$maxLength`.
+     */
+    public static function optionalLabel(mixed $value, string $field, int $maxLength, array $existing = []): ?string
+    {
+        if ($value === null || $value === [] || (is_string($value) && trim($value) === '')) {
+            return null;
+        }
+
+        $label = self::label($value, $field);
+        if (is_string($value)) {
+            $label += $existing;
+        }
+        foreach ($label as $text) {
+            if (mb_strlen($text) > $maxLength) {
+                throw new LocalizedTextRejected("{$field} must be {$maxLength} characters or fewer.");
+            }
+        }
+
+        return self::encode($label);
     }
 
     /**

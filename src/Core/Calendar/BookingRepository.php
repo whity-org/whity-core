@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Calendar;
 
+use Whity\Core\i18n\LocalizedText;
 use DateTimeImmutable;
 use PDO;
 
@@ -334,9 +335,9 @@ final class BookingRepository
             'ics_sequence' => (int) ($r['ics_sequence'] ?? 0),
         ];
         if (array_key_exists('service_name', $r)) {
-            $out['service_name'] = \Whity\Core\Form\LocalizedLabel::decode((string) $r['service_name']);
+            $out['service_name'] = LocalizedText::decode((string) $r['service_name'], languages: LocalizedText::BILINGUAL);
             $out['staff_name'] = (string) $r['staff_name'];
-            $out['room_name'] = isset($r['room_name']) ? \Whity\Core\Form\LocalizedLabel::decode((string) $r['room_name']) : null;
+            $out['room_name'] = isset($r['room_name']) ? LocalizedText::decode((string) $r['room_name'], languages: LocalizedText::BILINGUAL) : null;
         }
 
         return $out;

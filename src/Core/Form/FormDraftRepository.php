@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 
 /**
@@ -59,7 +60,7 @@ final class FormDraftRepository
         return array_map(
             static fn (array $row): array => [
                 'form_id' => (int) $row['form_id'],
-                'form_name' => LocalizedLabel::decode(isset($row['form_name']) ? (string) $row['form_name'] : null),
+                'form_name' => LocalizedText::decode(isset($row['form_name']) ? (string) $row['form_name'] : null, languages: LocalizedText::BILINGUAL),
                 'step' => $row['step'] === null ? null : (int) $row['step'],
                 'updated_at' => (string) $row['updated_at'],
                 'open_to_members' => \Whity\Core\Db\DbBool::of($row['open_to_members'] ?? false),

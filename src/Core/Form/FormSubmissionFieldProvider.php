@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 use Whity\Core\Document\Fields\DocumentFieldProvider;
 use Whity\Core\Document\Fields\FieldLabels;
@@ -89,7 +90,7 @@ final class FormSubmissionFieldProvider implements DocumentFieldProvider
     {
         /** @var array<string, string> $name */
         $name = is_array($this->form['name'] ?? null) ? $this->form['name'] : [];
-        $label = LocalizedLabel::preferred($name);
+        $label = LocalizedText::resolve($name);
 
         return $label !== '' ? $label : (string) $this->form['form_key'];
     }
@@ -100,7 +101,7 @@ final class FormSubmissionFieldProvider implements DocumentFieldProvider
         foreach ($this->fields($tenantId) as $field) {
             /** @var array<string, string> $label */
             $label = is_array($field['label'] ?? null) ? $field['label'] : [];
-            $text = LocalizedLabel::preferred($label);
+            $text = LocalizedText::resolve($label);
             $items[] = [
                 'path' => self::path((string) $field['field_key']),
                 'label' => $text !== '' ? $text : (string) $field['field_key'],

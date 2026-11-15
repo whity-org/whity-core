@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Document\RouteTemplate;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 use Whity\Core\Db\DbBool;
 use Whity\Core\Document\Routing\RouteSatisfaction;
@@ -515,8 +516,8 @@ final class RouteTemplateRepository
 
         $forms = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $name = \Whity\Core\Form\LocalizedLabel::preferred(
-                \Whity\Core\Form\LocalizedLabel::decode(isset($row['name']) ? (string) $row['name'] : null)
+            $name = LocalizedText::resolve(
+                LocalizedText::decode(isset($row['name']) ? (string) $row['name'] : null, languages: LocalizedText::BILINGUAL)
             );
             $forms[] = ['id' => (int) $row['id'], 'name' => $name !== '' ? $name : (string) $row['form_key']];
         }

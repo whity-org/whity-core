@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 
 /**
@@ -442,8 +443,9 @@ final class FormSubmissionRepository
         // toward `sections` and DocumentRepository toward `variable_data`.
         if (array_key_exists('form_key', $row)) {
             $normalized['form_key'] = (string) $row['form_key'];
-            $normalized['form_name'] = LocalizedLabel::decode(
-                isset($row['form_name']) ? (string) $row['form_name'] : null
+            $normalized['form_name'] = LocalizedText::decode(
+                isset($row['form_name']) ? (string) $row['form_name'] : null,
+                languages: LocalizedText::BILINGUAL,
             );
         }
 

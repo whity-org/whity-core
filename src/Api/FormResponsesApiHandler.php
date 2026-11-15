@@ -9,7 +9,7 @@ use Whity\Core\Form\FieldType;
 use Whity\Core\Form\FormFieldRepository;
 use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormSubmissionRepository;
-use Whity\Core\Form\LocalizedLabel;
+use Whity\Core\i18n\LocalizedText;
 use Whity\Core\Form\ResponsesCsv;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -225,7 +225,7 @@ final class FormResponsesApiHandler
         return [
             'field_key' => (string) $field['field_key'],
             'field_type' => (string) $field['field_type'],
-            'label' => $label === [] ? ['en' => LocalizedLabel::preferred($label)] : $label,
+            'label' => $label === [] ? ['en' => LocalizedText::resolve($label)] : $label,
             'answered' => $question['answered'],
             'options' => $options,
         ];

@@ -7,7 +7,7 @@ namespace Whity\Core\Calendar;
 use DateTimeImmutable;
 use PDO;
 use Whity\Core\Db\DbBool;
-use Whity\Core\Form\LocalizedLabel;
+use Whity\Core\i18n\LocalizedText;
 
 /**
  * Rooms a service can need (design 3.3, `TplAppointments`). A room's name is
@@ -130,7 +130,7 @@ final class RoomRepository
     /** @param array{name: array<string, string>, unit_id: ?int, active: bool, sort_order: int} $v */
     private function bind(\PDOStatement $stmt, array $v): void
     {
-        $stmt->bindValue(':name', LocalizedLabel::encode($v['name']));
+        $stmt->bindValue(':name', LocalizedText::encode($v['name']));
         $stmt->bindValue(':unit_id', $v['unit_id'], $v['unit_id'] === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
         $stmt->bindValue(':active', $v['active'], PDO::PARAM_BOOL);
         $stmt->bindValue(':sort', $v['sort_order'], PDO::PARAM_INT);
@@ -144,7 +144,7 @@ final class RoomRepository
     {
         return [
             'id' => (int) $r['id'],
-            'name' => LocalizedLabel::decode((string) $r['name']),
+            'name' => LocalizedText::decode((string) $r['name'], languages: LocalizedText::BILINGUAL),
             'unit_id' => $r['unit_id'] !== null ? (int) $r['unit_id'] : null,
             'active' => DbBool::of($r['active']),
             'sort_order' => (int) $r['sort_order'],

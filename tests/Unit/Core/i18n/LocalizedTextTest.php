@@ -97,6 +97,41 @@ final class LocalizedTextTest extends TestCase
         LocalizedText::normalize(['fr' => 'Nom'], 'label', languages: LocalizedText::BILINGUAL, required: true);
     }
 
+    public function testALabelReadsABareStringAsEnglish(): void
+    {
+        $this->assertSame(['en' => 'Equipment request'], LocalizedText::label(' Equipment request ', 'name'));
+        $this->assertSame(['ar' => 'طلب معدات'], LocalizedText::label(['ar' => 'طلب معدات'], 'name'));
+        $this->assertSame(['en' => 'Equipment request'], LocalizedText::label(['ar' => '   ', 'en' => 'Equipment request'], 'name'));
+    }
+
+    public function testALabelWithNoArabicOrEnglishIsRefused(): void
+    {
+        $this->expectException(LocalizedTextRejected::class);
+        LocalizedText::label(['fr' => 'Demande'], 'name');
+    }
+
+    public function testABlankLabelIsRefused(): void
+    {
+        $this->expectException(LocalizedTextRejected::class);
+        LocalizedText::label('   ', 'name');
+    }
+
+    public function testAnOptionalLabelClearsOnBlankAndKeepsTheArabicForABareString(): void
+    {
+        $this->assertNull(LocalizedText::optionalLabel(null, 'help_text', 10));
+        $this->assertNull(LocalizedText::optionalLabel('  ', 'help_text', 10));
+        $this->assertNull(LocalizedText::optionalLabel([], 'help_text', 10));
+        $this->assertSame('{"en":"Help","ar":"مساعدة"}', LocalizedText::optionalLabel('Help', 'help_text', 10, ['ar' => 'مساعدة', 'en' => 'Old']));
+        $this->assertSame('{"en":"Help"}', LocalizedText::optionalLabel(['en' => 'Help'], 'help_text', 10, ['ar' => 'مساعدة']));
+    }
+
+    public function testAnOptionalLabelHasALimitPerLanguage(): void
+    {
+        $this->expectException(LocalizedTextRejected::class);
+        $this->expectExceptionMessage('help_text must be 4 characters or fewer.');
+        LocalizedText::optionalLabel(['ar' => 'مساعدة'], 'help_text', 4);
+    }
+
     public function testEncodeKeepsArabicReadable(): void
     {
         $this->assertSame('{"ar":"مجلس","en":"Board/1"}', LocalizedText::encode(['ar' => 'مجلس', 'en' => 'Board/1']));

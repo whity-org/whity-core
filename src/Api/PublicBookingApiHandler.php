@@ -17,7 +17,7 @@ use Whity\Core\Calendar\Ics;
 use Whity\Core\Calendar\Interval;
 use Whity\Core\Calendar\ManageLinks;
 use Whity\Core\Calendar\ServiceRepository;
-use Whity\Core\Form\LocalizedLabel;
+use Whity\Core\i18n\LocalizedText;
 use Whity\Core\Plugin\PublicForm\BotCheck;
 use Whity\Core\RateLimit\ClientIp;
 use Whity\Core\Request;
@@ -300,7 +300,7 @@ final class PublicBookingApiHandler
     {
         return $this->withLink($request, $params, function (int $tenantId, int $bookingId): Response {
             $booking = $this->booking->bookingOrFail($tenantId, $bookingId);
-            $service = is_array($booking['service'] ?? null) ? LocalizedLabel::preferred($booking['service']['name']) : '';
+            $service = is_array($booking['service'] ?? null) ? LocalizedText::resolve($booking['service']['name']) : '';
             $workspace = $this->tenants->findNameById($tenantId) ?? '';
             $body = Ics::calendar([[
                 'uid' => \Whity\Core\Calendar\EmailBookingMessenger::uid($tenantId, $bookingId),

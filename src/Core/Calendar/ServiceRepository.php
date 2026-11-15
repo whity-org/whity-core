@@ -7,7 +7,7 @@ namespace Whity\Core\Calendar;
 use DateTimeImmutable;
 use PDO;
 use Whity\Core\Db\DbBool;
-use Whity\Core\Form\LocalizedLabel;
+use Whity\Core\i18n\LocalizedText;
 
 /**
  * Services and who provides them (migration 248). Tenant first on every
@@ -125,8 +125,8 @@ final class ServiceRepository
     /** @param array<string, mixed> $v */
     private function bind(\PDOStatement $stmt, array $v): void
     {
-        $stmt->bindValue(':name', LocalizedLabel::encode($v['name']));
-        $stmt->bindValue(':description', LocalizedLabel::encode($v['description']));
+        $stmt->bindValue(':name', LocalizedText::encode($v['name']));
+        $stmt->bindValue(':description', LocalizedText::encode($v['description']));
         $stmt->bindValue(':duration', $v['duration_minutes'], PDO::PARAM_INT);
         $stmt->bindValue(':before', $v['buffer_before_minutes'], PDO::PARAM_INT);
         $stmt->bindValue(':after', $v['buffer_after_minutes'], PDO::PARAM_INT);
@@ -149,9 +149,9 @@ final class ServiceRepository
     {
         return [
             'id' => (int) $r['id'],
-            'name' => LocalizedLabel::decode((string) $r['name']),
+            'name' => LocalizedText::decode((string) $r['name'], languages: LocalizedText::BILINGUAL),
             // An empty label is an object, never a list, so a client always reads `{}`.
-            'description' => LocalizedLabel::decode((string) $r['description']) ?: new \stdClass(),
+            'description' => LocalizedText::decode((string) $r['description'], languages: LocalizedText::BILINGUAL) ?: new \stdClass(),
             'duration_minutes' => (int) $r['duration_minutes'],
             'buffer_before_minutes' => (int) $r['buffer_before_minutes'],
             'buffer_after_minutes' => (int) $r['buffer_after_minutes'],
