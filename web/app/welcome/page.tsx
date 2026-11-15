@@ -7,9 +7,12 @@ import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api/client';
 import { Button } from '@whity/ui/button';
 import { Alert, AlertDescription } from '@whity/ui/alert';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
+import { Badge } from '@whity/ui/badge';
+import { Icon } from '@whity/ui/icon';
+import { ToggleGroup } from '@whity/ui/toggle-group';
 import { Input } from '@/components/ui/input';
 import { AuthShell } from '@/components/auth-shell';
+import { OutcomeIcon } from '@/components/auth/public-outcome';
 import { MAIN_COLOUR_SWATCHES } from '@/components/branding-main-colour';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
 import type { components } from '@whity/api-client';
@@ -36,8 +39,8 @@ import type { components } from '@whity/api-client';
  * it talks to the backend with plain fetch rather than the API client (whose
  * 401 handling would try to refresh a session that doesn't exist).
  *
- * No card covers this exact screen; it is built to the nearest one (the
- * onboarding step in TplAuthInvite) inside the signed-out AuthShell.
+ * Its card is TplWelcomeWorkspace (design 3.4): the three states, timed out,
+ * and the create form's own refusals, inside the signed-out AuthShell.
  */
 
 type Setup = components['schemas']['SsoWorkspaceSetupResponse']['data'];
@@ -171,7 +174,7 @@ export default function WelcomePage() {
         if (code === 'name_required' || code === 'name_too_long') {
           setFieldError(code);
         } else {
-          setFormError(t('welcome.error.choice', 'Pick a language and a colour from the lists.'));
+          setFormError(t('welcome.error.choice', 'Pick a language and a colour from the choices.'));
         }
         return;
       }
@@ -182,25 +185,25 @@ export default function WelcomePage() {
         await load();
         return;
       }
-      setFormError(t('welcome.error.busy', 'Your workspace could not be created just now. Nothing was saved. Please try again.'));
+      setFormError(t('welcome.error.busy', 'We couldn’t make the workspace. Nothing was saved. Try again in a minute.'));
     } catch {
-      setFormError(t('welcome.error.busy', 'Your workspace could not be created just now. Nothing was saved. Please try again.'));
+      setFormError(t('welcome.error.busy', 'We couldn’t make the workspace. Nothing was saved. Try again in a minute.'));
     } finally {
       setSubmitting(false);
     }
   };
 
   const signInAgain = (
-    <Button asChild className="w-full">
-      <Link href="/login">{t('welcome.signInAgain', 'Back to sign in')}</Link>
+    <Button asChild size="lg" className="w-full">
+      <Link href="/login">{t('welcome.signInAgain', 'Sign in again')}</Link>
     </Button>
   );
-  const differentAccount = (
-    <p className="pt-2 text-center text-sm text-muted-foreground">
-      <Link href="/login" className="font-medium text-primary hover:underline">
-        {t('welcome.differentAccount', 'Sign in with a different account')}
-      </Link>
-    </p>
+  // The page holds no session, only the short-lived setup cookie: leaving is
+  // going back to sign-in, as any account (the card's "Sign out").
+  const signOut = (label: string) => (
+    <Button asChild variant="outline" className="w-full">
+      <Link href="/login">{label}</Link>
+    </Button>
   );
 
   if (status === 'loading') {
@@ -218,13 +221,13 @@ export default function WelcomePage() {
       <AuthShell
         title={
           status === 'error'
-            ? t('welcome.error.title', 'Something went wrong')
-            : t('welcome.expired.title', 'Please sign in again')
+            ? t('welcome.error.title', 'We couldn’t check your sign-in')
+            : t('welcome.expired.title', 'This page timed out')
         }
         subtitle={
           status === 'error'
-            ? t('welcome.error.subtitle', 'We could not check your sign-in. Please sign in again.')
-            : t('welcome.expired.subtitle', 'This sign-in has expired. It only lasts a few minutes.')
+            ? t('welcome.error.subtitle', 'Nothing was made. Sign in again to carry on.')
+            : t('welcome.expired.subtitle', 'Sign in again to carry on; nothing was made.')
         }
       >
         <div className="space-y-4" data-testid={status === 'error' ? 'welcome-error' : 'welcome-expired'}>
@@ -235,27 +238,54 @@ export default function WelcomePage() {
   }
 
   if (setup.state === 'waiting') {
+    const places = setup.workspaces ?? [];
+    const only = places.length === 1 ? places[0] : null;
     return (
       <AuthShell
-        title={t('welcome.waiting.title', 'Your place is waiting')}
-        subtitle={t('welcome.waiting.subtitle', 'You signed in as {email}.', { email: setup.email })}
+        icon={<OutcomeIcon name="clock" tone="dash" />}
+        title={
+          only
+            ? t('welcome.waiting.titleNamed', 'You’re waiting to join {workspace}', { workspace: only.name })
+            : t('welcome.waiting.title', 'Your place is waiting')
+        }
       >
         <div className="space-y-4" data-testid="welcome-waiting">
-          <p className="text-foreground">
-            {t(
-              'welcome.waiting.body',
-              'You already belong to a workspace, but you cannot use it yet. An administrator of that workspace can let you in.'
-            )}
+          {only ? (
+            <>
+              <div className="flex justify-center">
+                <Badge variant="outline">{waitingLabel(t, only.status)}</Badge>
+              </div>
+              <p className="text-center text-muted-foreground">
+                {t(
+                  'welcome.waiting.bodyNamed',
+                  '{workspace}’s administrators decide who joins. You can sign in with {email} once they let you in.',
+                  { workspace: only.name, email: setup.email }
+                )}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-center text-muted-foreground">
+                {t(
+                  'welcome.waiting.body',
+                  'Their administrators decide who joins. You can sign in with {email} once they let you in.',
+                  { email: setup.email }
+                )}
+              </p>
+              <ul className="divide-y divide-border rounded-card border border-border">
+                {places.map((w, i) => (
+                  <li key={`${w.name}-${i}`} className="flex min-h-12 flex-col justify-center px-4 py-2">
+                    <span className="font-medium text-foreground">{w.name}</span>
+                    <span className="text-sm text-muted-foreground">{waitingLabel(t, w.status)}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {signOut(t('welcome.signOut', 'Sign out'))}
+          <p className="text-center text-sm text-muted-foreground">
+            {t('welcome.waiting.noSecond', 'You can’t make another workspace while this one decides.')}
           </p>
-          <ul className="divide-y divide-border rounded-card border border-border">
-            {(setup.workspaces ?? []).map((w, i) => (
-              <li key={`${w.name}-${i}`} className="flex min-h-12 flex-col justify-center px-4 py-2">
-                <span className="font-medium text-foreground">{w.name}</span>
-                <span className="text-sm text-muted-foreground">{waitingLabel(t, w.status)}</span>
-              </li>
-            ))}
-          </ul>
-          {signInAgain}
         </div>
       </AuthShell>
     );
@@ -263,19 +293,20 @@ export default function WelcomePage() {
 
   if (setup.state === 'needs_invite') {
     return (
-      <AuthShell
-        title={t('welcome.invite.title', 'You need an invitation')}
-        subtitle={t('welcome.invite.subtitle', 'You signed in as {email}.', { email: setup.email })}
-      >
+      <AuthShell icon={<OutcomeIcon name="mail" tone="warn" />} title={t('welcome.invite.title', 'You need an invitation')}>
         <div className="space-y-4" data-testid="welcome-needs-invite">
-          <p className="text-foreground">
+          <p className="text-center text-muted-foreground">
             {t(
               'welcome.invite.body',
-              'You are not part of a workspace here yet. Ask an administrator of your company’s workspace to invite {email}, then sign in again.',
-              { email: setup.email }
+              'This Whity doesn’t let people make their own workspace. Ask your company’s Whity administrator to invite this address:'
             )}
           </p>
-          {signInAgain}
+          <CopyAddress
+            value={setup.email}
+            copyLabel={t('welcome.invite.copy', 'Copy')}
+            copiedLabel={t('welcome.invite.copied', 'Copied')}
+          />
+          {signOut(t('welcome.useAnotherAccount', 'Use another account'))}
         </div>
       </AuthShell>
     );
@@ -288,7 +319,8 @@ export default function WelcomePage() {
       title={t('welcome.create.title', 'Create your workspace')}
       subtitle={t(
         'welcome.create.subtitle',
-        'Your company’s own space. You will be its owner, and you can invite your team next.'
+        'You’re signed in as {email}, and you don’t belong to a workspace yet.',
+        { email: setup.email }
       )}
     >
       <form onSubmit={handleSubmit} className="space-y-5" data-testid="welcome-create-form" noValidate>
@@ -297,10 +329,6 @@ export default function WelcomePage() {
             <AlertDescription>{formError}</AlertDescription>
           </Alert>
         )}
-
-        <p className="text-sm text-muted-foreground" data-testid="welcome-email">
-          {t('welcome.create.signedInAs', 'You signed in as {email}.', { email: setup.email })}
-        </p>
 
         <div className="space-y-2">
           <label htmlFor="workspace-name" className="font-medium text-foreground">
@@ -325,26 +353,31 @@ export default function WelcomePage() {
             </p>
           ) : (
             <p id="workspace-name-hint" className="text-sm text-muted-foreground">
-              {t('welcome.name.hint', 'Usually your company’s name. You can change it later.')}
+              {t('welcome.name.hint', 'Your company’s name. You can change it later.')}
             </p>
           )}
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="workspace-language" className="font-medium text-foreground">
+          <span id="workspace-language-label" className="block font-medium text-foreground">
             {t('welcome.language.label', 'Main language')}
-          </label>
-          <Select value={locale} onValueChange={setChosenLocale} disabled={submitting}>
-            <SelectTrigger id="workspace-language" className="w-full" data-testid="welcome-language">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="ar" lang="ar">
-                العربية
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          </span>
+          {/* Two choices side by side, as the card's segmented control. */}
+          <div data-testid="welcome-language">
+            <ToggleGroup
+              type="single"
+              required
+              label={t('welcome.language.label', 'Main language')}
+              value={locale}
+              onChange={(next) => {
+                if (typeof next === 'string' && !submitting) setChosenLocale(next);
+              }}
+              options={[
+                { value: 'en', label: 'English' },
+                { value: 'ar', label: 'العربية' },
+              ]}
+            />
+          </div>
         </div>
 
         <fieldset className="space-y-2">
@@ -369,17 +402,53 @@ export default function WelcomePage() {
               />
             ))}
           </div>
-          <p className="text-sm text-muted-foreground">
-            {t('welcome.colour.hint', 'It appears on every screen, email and document. You can change it later.')}
-          </p>
         </fieldset>
 
-        <Button type="submit" className="w-full" disabled={submitting} data-testid="welcome-create-submit">
+        <Button type="submit" size="lg" className="w-full" disabled={submitting} data-testid="welcome-create-submit">
           {submitting ? t('welcome.create.pending', 'Creating your workspace…') : t('welcome.create.submit', 'Create workspace')}
         </Button>
 
-        {differentAccount}
+        <p className="text-center text-sm text-muted-foreground">
+          {t('welcome.create.inviteInstead', 'Waiting for an invitation instead? Ask for it at {email}.', {
+            email: setup.email,
+          })}{' '}
+          <Link href="/login" className="font-medium text-primary hover:underline">
+            {t('welcome.signOut', 'Sign out')}
+          </Link>
+        </p>
       </form>
     </AuthShell>
+  );
+}
+
+/** The exact address to give an administrator, with Copy (the card's note 4). */
+function CopyAddress({ value, copyLabel, copiedLabel }: { value: string; copyLabel: string; copiedLabel: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-card bg-muted px-4 py-3" data-testid="welcome-invite-address">
+      <span dir="ltr" className="min-w-0 truncate text-foreground">
+        {value}
+      </span>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          void navigator.clipboard
+            ?.writeText(value)
+            .then(() => setCopied(true))
+            .catch(() => setCopied(false));
+        }}
+      >
+        <Icon name={copied ? 'check' : 'copy'} />
+        <span aria-live="polite">{copied ? copiedLabel : copyLabel}</span>
+      </Button>
+    </div>
   );
 }

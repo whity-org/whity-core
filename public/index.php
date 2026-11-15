@@ -4041,6 +4041,14 @@ $documentQrHandler = new \Whity\Api\DocumentQrApiHandler(
     $roleChecker,
     $settingsService
 );
+// Built here rather than with the branding API below: the verification page
+// wears the issuer's brand (WHIT-1044). Its inputs are all built above.
+$brandingService = new \Whity\Core\Branding\BrandingService(
+    $settingsService,
+    $storageDriver,
+    new \Whity\Core\Branding\BrandingAssetValidator(new \Whity\Core\Branding\SvgSanitizer()),
+    $entitlementService
+);
 $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     $documentQrService,
     $documentRepository,
@@ -4049,6 +4057,7 @@ $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     new DatabaseSharedStore($db->getPdo()),
     $documentSourceRepository,
     $documentArtifactRepository,
+    $brandingService,
 );
 
 // `/api/documents/views` is registered BEFORE the `{id:\d+}` routes and cannot
@@ -5568,12 +5577,8 @@ $router->register('POST', '/api/settings/mail/test',         [$mailSettingsHandl
 // consumer until persisted documents became a second one, and those are wired
 // above this point. It is the same per-tenant routing driver described there —
 // shared, never rebuilt, so reads and writes can never split across backends.
-$brandingService = new \Whity\Core\Branding\BrandingService(
-    $settingsService,
-    $storageDriver,
-    new \Whity\Core\Branding\BrandingAssetValidator(new \Whity\Core\Branding\SvgSanitizer()),
-    $entitlementService
-);
+// $brandingService is built earlier, before the document verification handler
+// (WHIT-1044), which also sends the issuer's brand.
 $brandingHostRepo = new \Whity\Core\Branding\TenantHostRepository($db->getPdo());
 $hostResolver = new \Whity\Core\Branding\HostResolver(
     $brandingHostRepo,
@@ -5657,7 +5662,9 @@ $publicSignupHandler = new \Whity\Api\PublicSignupApiHandler(
     new DatabaseSharedStore($db->getPdo()),
     $auditLogger,
     // WHIT-917: the sign-in providers a visitor may join with, listed up front.
-    $joinProviders
+    $joinProviders,
+    // WHIT-1044: the workspace's logo and colour on the join pages.
+    $brandingService,
 );
 // The confirm pair first, so it can never be read as a workspace slug.
 $router->register('GET',  '/api/public/signup/confirm',               [$publicSignupHandler, 'preview'], null);

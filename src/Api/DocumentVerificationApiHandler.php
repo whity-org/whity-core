@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Document\DocumentArtifactRepository;
 use Whity\Core\Document\DocumentRepository;
 use Whity\Core\Document\DocumentSourceRepository;
@@ -94,6 +95,10 @@ final class DocumentVerificationApiHandler
         // still answers, with no kind and no page count.
         private readonly ?DocumentSourceRepository $sources = null,
         private readonly ?DocumentArtifactRepository $artifacts = null,
+        // The issuer's logo and colour (WHIT-1044). Sent only beside a code that
+        // verified, which already names the issuer: a refused code must not
+        // reveal whose code it was.
+        private readonly ?BrandingService $branding = null,
     ) {
     }
 
@@ -201,8 +206,7 @@ final class DocumentVerificationApiHandler
 
         $described = $detail === VerificationPresenter::DETAIL_DESCRIBED;
 
-        return Response::json([
-            'data' => VerificationPresenter::verified(
+        $data = VerificationPresenter::verified(
                 $tokenRow,
                 $document,
                 $this->qr->reference((string) $tokenRow['token']),
@@ -212,8 +216,37 @@ final class DocumentVerificationApiHandler
                     : null,
                 $described ? $this->publicKind($document, $tenantId) : null,
                 $described ? $this->pages((int) $tokenRow['document_id'], $tenantId) : null,
-            ),
-        ], 200);
+        );
+        // Only where the answer already names the issuer, so the logo tells a
+        // reader nothing the page does not.
+        // Absent rather than null when there is none, so the key set stays the
+        // minimum the tests pin.
+        $issuer = (string) ($data['issuer'] ?? '');
+        $brand = $issuer !== '' ? $this->brandFor($tenantId, $issuer) : null;
+        if ($brand !== null) {
+            $data['brand'] = $brand;
+        }
+
+        return Response::json(['data' => $data], 200);
+    }
+
+    /**
+     * The issuer's public brand for the page (WHIT-1044), or null without a
+     * branding service or when it cannot be read: the page then wears the
+     * host's brand.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function brandFor(int $tenantId, string $issuer): ?array
+    {
+        if ($this->branding === null) {
+            return null;
+        }
+        try {
+            return $this->branding->forPublicPage($tenantId, $issuer);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**

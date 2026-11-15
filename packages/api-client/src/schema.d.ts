@@ -16579,6 +16579,8 @@ export interface components {
                 /** @enum {string|null} */
                 email_signup_reason: "bot_check_unavailable" | null;
                 providers: components["schemas"]["SignupJoinProvider"][];
+                /** @description The workspace logo and colour for the page (WHIT-1044). */
+                brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
             };
         };
         PublicSignupPreviewResponse: {
@@ -16586,6 +16588,8 @@ export interface components {
                 workspace_name: string;
                 email: string;
                 requires_password: boolean;
+                /** @description The workspace logo and colour for the page (WHIT-1044). */
+                brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
             };
         };
         PublicSignupRequest: {
@@ -37883,6 +37887,8 @@ export interface operations {
                                 revision: string;
                                 issued_on: string | null;
                             };
+                            /** @description Only beside a code that verified and names its issuer: the issuer logo and colour (WHIT-1044). */
+                            brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
                         };
                     };
                 };

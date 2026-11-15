@@ -23,6 +23,8 @@ import { Input } from '@/components/ui/input';
 import { useCurrentLanguage, useTranslation } from '@whity/features/i18n';
 import { useThemeMode } from '@/lib/theme-mode-context';
 import { PublicShell } from '@/components/auth/public-shell';
+import { PublicOutcome } from '@/components/auth/public-outcome';
+import type { WorkspaceBrand } from '@/lib/branding-context';
 import { TurnstileWidget } from '@/components/auth/turnstile-widget';
 import { ProviderIcon } from '@/components/sso-login-buttons';
 import { api } from '@/lib/api/client';
@@ -41,6 +43,8 @@ interface SignupInfo {
   emailSignup: boolean;
   /** The instance's sign-in providers a visitor may join with. */
   providers: JoinProvider[];
+  /** The workspace's logo and colour (WHIT-1044); null wears the host's. */
+  brand: WorkspaceBrand | null;
 }
 
 /**
@@ -102,6 +106,7 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
             bot_check: { provider: string; site_key: string } | null;
             email_signup?: boolean;
             providers?: JoinProvider[];
+            brand?: WorkspaceBrand | null;
           };
         };
         const next: SignupInfo = {
@@ -113,6 +118,7 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
             : null,
           emailSignup: body.data.email_signup !== false,
           providers: Array.isArray(body.data.providers) ? body.data.providers : [],
+          brand: body.data.brand ?? null,
         };
         setInfo(next);
         if (outcome === 'pending') {
@@ -206,6 +212,8 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
     }
   };
 
+  const brand = info?.brand ?? null;
+
   if (phase === 'loading') {
     return (
       <PublicShell>
@@ -218,104 +226,100 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
     );
   }
 
-  if (phase === 'closed' || phase === 'error' || info === null) {
+  if (phase === 'error') {
     return (
       <PublicShell>
-        <Card className="border-t-4 border-t-primary" data-testid="join-closed">
-          <CardHeader>
-            <CardTitle>{t('join.closed.title', 'Sign-up isn’t open')}</CardTitle>
-            <CardDescription>
-              {phase === 'error'
-                ? t('join.closed.error', 'This page could not be loaded. Check your connection and try again.')
-                : t(
-                    'join.closed.description',
-                    'This workspace isn’t taking sign-ups right now. If you were invited, use the link in your invitation.'
-                  )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/login" className="text-sm font-medium text-primary hover:underline">
-              {t('join.signIn', 'Already have access? Sign in')}
-            </Link>
-          </CardContent>
-        </Card>
+        <PublicOutcome
+          testId="join-error"
+          icon="offline"
+          tone="warn"
+          title={t('join.error.title', 'This page didn’t load')}
+          description={t('join.closed.error', 'This page could not be loaded. Check your connection and try again.')}
+        >
+          <Button variant="outline" className="w-full" onClick={() => window.location.reload()}>
+            {t('join.error.retry', 'Try again')}
+          </Button>
+        </PublicOutcome>
+      </PublicShell>
+    );
+  }
+
+  // An unknown workspace reads exactly like a closed one (the card's note 4).
+  if (phase === 'closed' || info === null) {
+    return (
+      <PublicShell brand={brand}>
+        <PublicOutcome
+          testId="join-closed"
+          icon="lock"
+          tone="warn"
+          title={t('join.closed.title', 'This workspace isn’t taking sign-ups')}
+          description={t('join.closed.description', 'Ask the workspace to invite you, or check the link you were given.')}
+        />
       </PublicShell>
     );
   }
 
   if (phase === 'notReady') {
     return (
-      <PublicShell>
-        <Card className="border-t-4 border-t-primary" data-testid="join-not-ready">
-          <CardHeader>
-            <CardTitle>{t('join.notReady.title', 'This workspace isn’t taking sign-ups yet')}</CardTitle>
-            <CardDescription>
-              {t(
-                'join.notReady.description',
-                'Sign-up is being set up here. Please come back later, or contact the workspace if you were told to join now.'
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/login" className="text-sm font-medium text-primary hover:underline">
-              {t('join.signIn', 'Already have access? Sign in')}
-            </Link>
-          </CardContent>
-        </Card>
+      <PublicShell brand={brand}>
+        <PublicOutcome
+          testId="join-not-ready"
+          icon="lock"
+          tone="warn"
+          title={t('join.notReady.title', 'This workspace isn’t taking sign-ups yet')}
+          description={t(
+            'join.notReady.description',
+            'Sign-up is being set up here. Please come back later, or contact the workspace if you were told to join now.'
+          )}
+        />
       </PublicShell>
     );
   }
 
   if (phase === 'pending') {
     return (
-      <PublicShell>
-        <Card className="border-t-4 border-t-primary" data-testid="join-sso-pending">
-          <CardHeader>
-            <CardTitle>{t('joinConfirm.pending.title', 'Waiting for approval')}</CardTitle>
-            <CardDescription>
-              {t(
-                'join.sso.pending',
-                '{workspace} will review your request. You can sign in once it’s approved.',
-                { workspace: info.workspaceName }
-              )}
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      <PublicShell brand={brand}>
+        <PublicOutcome
+          testId="join-sso-pending"
+          icon="clock"
+          tone="dash"
+          title={t('joinConfirm.pending.title', 'Waiting for approval')}
+          description={t('join.sso.pending', '{workspace} approves each new customer. We’ll email you when you’re in.', {
+            workspace: info.workspaceName,
+          })}
+        />
       </PublicShell>
     );
   }
 
   if (phase === 'sent') {
     return (
-      <PublicShell>
-        <Card className="border-t-4 border-t-primary" data-testid="join-sent">
-          <CardHeader>
-            <CardTitle>{t('join.sent.title', 'Check your email')}</CardTitle>
-            <CardDescription>
-              {t(
-                'join.sent.description',
-                'If {email} can join {workspace}, we’ve sent it a link to finish signing up. The link works for 24 hours.',
-                { email: email.trim(), workspace: info.workspaceName }
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>{t('join.sent.spam', 'Nothing there after a few minutes? Check your spam folder.')}</p>
-            <Button variant="outline" onClick={() => setPhase('form')}>
-              {t('join.sent.again', 'Use a different email')}
-            </Button>
-          </CardContent>
-        </Card>
+      <PublicShell brand={brand}>
+        <PublicOutcome
+          testId="join-sent"
+          icon="mail"
+          title={t('join.sent.title', 'Check your email')}
+          description={t(
+            'join.sent.description',
+            'If {email} can join {workspace}, we’ve sent it a link to finish signing up. The link works for 24 hours.',
+            { email: email.trim(), workspace: info.workspaceName }
+          )}
+        >
+          <p className="text-sm text-muted-foreground">{t('join.sent.spam', 'Nothing there after a few minutes? Check your spam folder.')}</p>
+          <Button variant="outline" className="w-full" onClick={() => setPhase('form')}>
+            {t('join.sent.again', 'Use a different email')}
+          </Button>
+        </PublicOutcome>
       </PublicShell>
     );
   }
 
   return (
-    <PublicShell>
-      <Card className="border-t-4 border-t-primary">
+    <PublicShell brand={brand}>
+      <Card size="lg" className="text-base">
         <CardHeader>
-          <CardTitle>{t('join.title', 'Join {workspace}', { workspace: info.workspaceName })}</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl font-semibold">{t('join.title', 'Join {workspace}', { workspace: info.workspaceName })}</CardTitle>
+          <CardDescription className="text-base">
             {!info.emailSignup
               ? t('join.description.providerOnly', 'Sign up to use {workspace} with the account below.', {
                   workspace: info.workspaceName,
@@ -431,13 +435,14 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
               </div>
             )}
 
-            <Button type="submit" className="w-full" loading={submitting} data-testid="join-submit">
-              {t('join.submit', 'Sign up')}
+            <Button type="submit" size="lg" className="w-full" loading={submitting} data-testid="join-submit">
+              {t('join.submit', 'Join')}
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">
+              {t('join.alreadyJoined', 'Already joined?')}{' '}
               <Link href="/login" className="font-medium text-primary hover:underline">
-                {t('join.signIn', 'Already have access? Sign in')}
+                {t('join.signInLink', 'Sign in')}
               </Link>
             </p>
           </form>

@@ -12,6 +12,7 @@ use Whity\Api\PublicSignupApiHandler;
 use Whity\Api\WorkspaceSignupApiHandler;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Audit\AuditLogger;
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Hooks\HookManager;
@@ -59,6 +60,7 @@ final class CustomerSignupRealEngineTest extends TestCase
 
     private PDO $pdo;
     private PublicSignupApiHandler $public;
+    private SettingsService $settingsService;
     private WorkspaceSignupApiHandler $admin;
     private RoleChecker $roleChecker;
     private HookManager $hooks;
@@ -123,8 +125,11 @@ final class CustomerSignupRealEngineTest extends TestCase
             $bot,
             new CustomerSignupMailer(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $settingsService), 'https://app.test/join/confirm'),
             new DatabaseSharedStore($this->pdo),
-            $audit
+            $audit,
+            null,
+            new BrandingService($settingsService),
         );
+        $this->settingsService = $settingsService;
 
         $registry = new PermissionRegistry();
         $registry->registerCorePermissions();
@@ -165,6 +170,23 @@ final class CustomerSignupRealEngineTest extends TestCase
         self::assertSame(404, $this->request('tenant-a', 'someone@example.test')->getStatusCode());
         self::assertSame(0, (int) $this->scalar('SELECT COUNT(*) FROM customer_signups'));
         self::assertSame([], $this->sent);
+    }
+
+    /** WHIT-1044: both join pages wear the workspace's logo and colour, as the booking pages do. */
+    public function testTheJoinPagesSendTheWorkspaceBrand(): void
+    {
+        $this->configure(self::TENANT_A, self::ADMIN_A, 'open', $this->customerRole);
+        $this->settingsService->setTenant(self::TENANT_A, 'branding_main_color', '#b74c05');
+
+        $brand = $this->decode($this->info('tenant-a'))['data']['brand'];
+        self::assertSame(['name', 'logo_wide_url', 'logo_square_url', 'main_color', 'theme'], array_keys($brand), 'only public brand fields');
+        self::assertSame('tenant-a', $brand['name']);
+        self::assertSame('#b74c05', $brand['main_color']);
+        self::assertSame('#b74c05', $brand['theme']['light']['primary']);
+
+        self::assertSame(202, $this->request('tenant-a', 'branded@example.test', 'Branded Customer')->getStatusCode());
+        $preview = $this->decode($this->preview($this->tokenFromMail(0)))['data'];
+        self::assertSame('#b74c05', $preview['brand']['main_color'], 'the emailed link opens in the same brand');
     }
 
     public function testOpenModeJoinsAsACustomerOnceTheEmailIsConfirmed(): void

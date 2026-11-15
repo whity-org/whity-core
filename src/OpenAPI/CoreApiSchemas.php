@@ -11537,6 +11537,7 @@ final class CoreApiSchemas
                 // The operator's sign-in providers a visitor may join with: link
                 // to GET /api/v1/auth/sso/{provider_key}/start?join={workspace_slug}.
                 'providers' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupJoinProvider')],
+                'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'The workspace logo and colour for the page (WHIT-1044).'],
             ], [
                 'workspace_name', 'workspace_slug', 'approval_required', 'allowed_domains', 'bot_check',
                 'email_signup', 'email_signup_reason', 'providers',
@@ -11558,6 +11559,7 @@ final class CoreApiSchemas
                 'workspace_name' => self::str(),
                 'email' => self::str(),
                 'requires_password' => self::bool(),
+                'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'The workspace logo and colour for the page (WHIT-1044).'],
             ], ['workspace_name', 'email', 'requires_password'])),
             'PublicSignupConfirmRequest' => self::object([
                 'token' => self::str(),
@@ -16366,6 +16368,11 @@ final class CoreApiSchemas
                                                     'issued_on' => ['type' => 'string', 'nullable' => true],
                                                 ],
                                                 'required' => ['revision', 'issued_on'],
+                                            ],
+                                            'brand' => [
+                                                'nullable' => true,
+                                                'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')],
+                                                'description' => 'Only beside a code that verified and names its issuer: the issuer logo and colour (WHIT-1044).',
                                             ],
                                         ],
                                         'required' => ['verified'],
