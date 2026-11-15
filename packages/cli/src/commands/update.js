@@ -141,7 +141,7 @@ export async function update(options, deps) {
   }
 
   deps.log(m.updateStep7(to));
-  const started = await nextRun.compose(['up', '-d', '--wait', '--wait-timeout', '180', '--remove-orphans']);
+  const started = await nextRun.startAndWait(['--remove-orphans']);
   if (started.code !== 0) {
     throw failed(m.startFailed(started.stderr));
   }

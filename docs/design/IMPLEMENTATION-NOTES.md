@@ -1,5 +1,47 @@
 # Implementation notes
 
+# Owner decision: the installer is a server install, and it is `whity install` (16 Nov 2026)
+
+**Decision.** The owner chose the server install `SiteInstallerTerminal` draws ("Server install"),
+replacing register WS.20's local install at localhost:3000; and installing Whity is two npm lines,
+`npm install -g whity` then `whity install` (the plain npm name, claimed for this), with
+`curl -fsSL https://whity.dev/install.sh | sh` kept as a thin bootstrap that checks Node.js 20+
+and runs those two. The register's WS.20 still reads "local install"; it is for the owner and the
+design team to update, not engineering.
+
+**What `whity install` does (WHIT-1044, `packages/cli`).** Checks this server (system, CPUs,
+memory, free disk), Docker with Compose v2, ports 80 and 443 (or `--port`) and that the domain
+resolves, all before writing anything; asks the web address and the first owner's email on a
+terminal (`--domain`, `--email` answer them); downloads the release's compose file and images;
+writes `.env` the way `whity update` expects, plus `Caddyfile` and `docker-compose.override.yml`
+with a Caddy service (an update replaces only `docker-compose.yml`, so Caddy stays); starts the
+database, runs migrations and seed, starts everything and checks it; waits until the address
+answers over HTTPS before printing "Got a certificate"; checks the owner account exists; prints
+the address and `whity update`.
+
+**Where it differs from the card, and why.**
+- The card ends "Sign in with the link we emailed". A new server has no mail set up, so nothing
+  can be emailed; the line names the owner's email and says the first password is
+  `INITIAL_SYSTEM_ADMIN_PASSWORD` in `.env` (the tool keeps passwords out of terminal history,
+  WHIT-840). A sign-in link by email needs mail first; not built.
+- No certificate within three minutes (DNS not there yet, ports closed): an amber "No certificate
+  yet" with what to check and `docker compose restart caddy`, and the rest finishes. It never
+  prints the ✓ it didn't get.
+- Arabic and the ✓ ✗ marks only where the console shows them (Linux, macOS, Windows Terminal);
+  Windows PowerShell 5.1's classic console keeps English and plain marks, as WHIT-840 decided.
+- Node.js 20+ is needed on the server, besides Docker: the install is the `whity` command.
+
+**Publishing.** `packages/whity` is the plain `whity` package: only a bin that runs `@whity/cli` at
+the same version (both at 0.2.0; bump together). `publish-whity.yml` publishes it on a release to
+main, by npm trusted publishing like `publish-cli.yml`. The name has to be claimed on npmjs.com
+first, with that workflow file set as its trusted publisher; that first step is the owner's.
+
+**Order, so the live one-liner never breaks.** whity.dev serves `install.sh` from whity-core's
+develop on every whity-web deploy. So `install.sh` stays the local installer until `whity` 0.2.0 is
+on npm (the owner claims the name, then the next release publishes it); only then does it become
+the bootstrap, and whity.dev/install switch to the two npm lines and this output, in English and
+Arabic.
+
 # Design 3.5.1: US dollars (15 Nov 2026)
 
 3.5.1 makes US dollars the default currency (register CU.1–CU.5); the owner approved the plan on 15 Nov 2026. Core stays multi-currency: each workspace has a currency (`billing.default_currency`, USD for new workspaces) and every stored amount keeps its own row's currency. Workspaces that existed before 3.5.1 are pinned to the currency they had (JOD), and no stored amount is rewritten.

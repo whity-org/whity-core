@@ -49,7 +49,12 @@ export function renderNeedsSecret(env) {
 }
 
 /** The text of a new install's .env. All generated values are hex, so nothing in them needs quoting. */
-export function newEnvFile({ version, project, url, webPort, apiPort, bind, adminEmail }) {
+export function newEnvFile({ version, project, url, webPort, apiPort, bind, adminEmail, site = null }) {
+  // A server install (whity install --domain): Caddy in front, which update keeps.
+  const server = site
+    ? `\n# Served over HTTPS by Caddy (docker-compose.override.yml), one proxy in front of the web app.\n`
+      + `WHITY_DOMAIN=${site.domain}\nWHITY_HTTPS_PORT=${site.httpsPort}\nTRUSTED_PROXY_HOPS=1\n`
+    : '';
   return `# Whity settings and secrets. Keep this file private and never commit it.
 # Back it up too: a database backup alone can't decrypt what ENCRYPTION_KEY protects.
 COMPOSE_PROJECT_NAME=${project}
@@ -63,7 +68,7 @@ CORS_ALLOWED_ORIGINS=${url}
 BIND_ADDRESS=${bind}
 WEB_PORT_HOST=${webPort}
 APP_PORT_HOST=${apiPort}
-
+${server}
 DB_USER=whity
 DB_NAME=whity_core
 DB_PASSWORD=${hex(24)}
