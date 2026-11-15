@@ -62,5 +62,5 @@ A dashed edge marks something that has not happened or is not set down: a waitin
 
 ## Imagery
 
-- Show real screens on sheets: an approval, a document, a dashboard, with realistic example data in JOD.
+- Show real screens on sheets: an approval, a document, a dashboard, with realistic example data in US dollars.
 - Photography, when used: real work in real offices and shops, natural light, no posed handshakes or stock robots.

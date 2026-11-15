@@ -80,8 +80,8 @@
 
   function ro(t) { return h('div', { className: 'pw-ro', role: 'note' }, I('desktop', 20), h('span', null, t)); }
   function step(icon, t, s, cls) { return h('li', { className: cls || '' }, h('span', null, I(icon, 18)), h('div', null, h('b', null, t), h('small', null, s))); }
-  var route = h(F, null, back('Routes'), pagehead(['Documents', 'Routes'], 'Purchase orders', 'Used for purchase orders over JOD 500'), ro('You can read this route here. To change it, open it on a computer.'),
-    scroll(h('ol', { className: 'wm-route pw-steps' }, step('user', 'Awss Haddad prepares the order', 'Any buyer in Purchasing'), step('approval', 'Ahmad Khalil approves', 'Finance · reminded after 2 days'), step('approval', 'If the total is over JOD 2,000, Amro Saleh approves too', 'Owner'),
+  var route = h(F, null, back('Routes'), pagehead(['Documents', 'Routes'], 'Purchase orders', 'Used for purchase orders over $500'), ro('You can read this route here. To change it, open it on a computer.'),
+    scroll(h('ol', { className: 'wm-route pw-steps' }, step('user', 'Awss Haddad prepares the order', 'Any buyer in Purchasing'), step('approval', 'Ahmad Khalil approves', 'Finance · reminded after 2 days'), step('approval', 'If the total is over $2,000, Amro Saleh approves too', 'Owner'),
       step('robot', 'The purchasing agent sends it to the supplier', 'Agent · asks first', 'is-agent'), step('folder', 'Filed in Finance › Purchase orders', 'Kept for 7 years'))),
     tb('more', { action: h('div', { className: 'wm-actbar' }, h(W.Button, { variant: 'outline', icon: 'desktop' }, 'Open on a computer')) }));
   var p1 = phone('Route · read-only', route);
@@ -91,8 +91,8 @@
     tb('more', { action: h('div', { className: 'wm-actbar' }, h(W.Button, { variant: 'outline', icon: 'desktop' }, 'Open on a computer')) })));
   var p3 = phone('Open on a computer', route, { overlay: sheet('Open on a computer', h(F, null, gf('We’ll email you a link to this route. Open it on a computer to change the steps.'), h('div', { className: 'pw-link' }, h('span', null, 'app.whity.dev/routes/po-500'), h('button', { className: 'pw-ib', 'aria-label': 'Copy link' }, I('copy', 20))),
     h('div', { className: 'pw-stack' }, h(W.Button, { icon: 'mail' }, 'Email me the link'), h(W.Button, { variant: 'outline' }, 'Not now')))) });
-  var p4 = phone('Arabic · Route · read-only', h(F, null, back('المسارات'), pagehead(['المستندات', 'المسارات'], 'أوامر الشراء', 'لأوامر الشراء فوق 500 دينار'), ro('يمكنك قراءة هذا المسار هنا. لتغييره افتحه على جهاز كمبيوتر.'),
-    scroll(h('ol', { className: 'wm-route pw-steps' }, step('user', 'أوس حداد يجهّز الأمر', 'أي مشترٍ في المشتريات'), step('approval', 'أحمد خليل يوافق', 'المالية · تذكير بعد يومين'), step('approval', 'إذا تجاوز المجموع 2,000 دينار، يوافق عمرو صالح أيضاً', 'المالك'), step('robot', 'مساعد المشتريات يرسله إلى المورّد', 'مساعد · يستأذن أولاً', 'is-agent'))),
+  var p4 = phone('Arabic · Route · read-only', h(F, null, back('المسارات'), pagehead(['المستندات', 'المسارات'], 'أوامر الشراء', 'لأوامر الشراء فوق 500 دولار'), ro('يمكنك قراءة هذا المسار هنا. لتغييره افتحه على جهاز كمبيوتر.'),
+    scroll(h('ol', { className: 'wm-route pw-steps' }, step('user', 'أوس حداد يجهّز الأمر', 'أي مشترٍ في المشتريات'), step('approval', 'أحمد خليل يوافق', 'المالية · تذكير بعد يومين'), step('approval', 'إذا تجاوز المجموع 2,000 دولار، يوافق عمرو صالح أيضاً', 'المالك'), step('robot', 'مساعد المشتريات يرسله إلى المورّد', 'مساعد · يستأذن أولاً', 'is-agent'))),
     tb('more', { T: TA, action: h('div', { className: 'wm-actbar' }, h(W.Button, { variant: 'outline', icon: 'desktop' }, 'افتحه على كمبيوتر')) })), { dir: RT });
   var n = note('Builders on a phone', 'WHIT-1006. Yes: read-only is enough for wide canvases.', [
     'The route template editor and the role permissions grid are read-only under 640px. No canvas, no grid, no sideways scrolling.',

@@ -22,7 +22,7 @@ From the person's name at the foot of the sidebar, in tabs (W.3): **Profile**, *
 
 ## Billing
 
-The plan and what's billed with it, the next payment with **Pay now**, and Whity's invoices to the workspace. Amounts are JOD with 3 decimals; plan names and prices stay `[plan name]` and `[price]` in designs.
+The plan and what's billed with it, the next payment with **Pay now**, and Whity's invoices to the workspace. Amounts are in US dollars with 2 decimals; plan names and prices stay `[plan name]` and `[price]` in designs.
 
 ## Audit log
 
@@ -30,6 +30,6 @@ What happened, in sentences grouped by day (W.4): people in bold, agents as acto
 
 ## Platform (operators)
 
-A **Platform** sidebar group, shown only to the system tenant (W.2): Tenants (workspaces, with server-side search), Plans and pricing (plans as cards; prices typed as money, never minor units), Promotions (in JOD by default), System (the former statistics page, refreshing every minute), Errors (in plain words first; the stack trace on request), Notification delivery (whether mail and messages get through), and Platform settings (install-wide switches in sentences, with Email, File storage, Languages and Error tracking tabs).
+A **Platform** sidebar group, shown only to the system tenant (W.2): Tenants (workspaces, with server-side search), Plans and pricing (plans as cards; prices typed as money, never minor units), Promotions (in the workspace's currency by default), System (the former statistics page, refreshing every minute), Errors (in plain words first; the stack trace on request), Notification delivery (whether mail and messages get through), and Platform settings (install-wide switches in sentences, with Email, File storage, Languages and Error tracking tabs).
 
 The 2.9 Arabic card is billing (`TplBillingAr`).

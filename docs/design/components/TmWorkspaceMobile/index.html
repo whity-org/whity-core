@@ -46,9 +46,9 @@
   function badge(v, t) { return h(W.Badge, { variant: v }, t); }
 
   function meter(t, a, b, pct) { return h('div', { className: 'wm-meter2' }, h('div', null, h('span', null, t), h('b', null, a + ' of ' + b)), h('i', null, h('i', { style: { width: pct + '%' } }))); }
-  var billing = h(F, null, head('Billing', 'Example Bakery'), scroll(h('div', { className: 'wm-plan' }, h('small', null, 'Your plan'), h('b', null, 'Business'), h('small', null, 'JOD 49.000 a month · renews 1 December')),
+  var billing = h(F, null, head('Billing', 'Example Bakery'), scroll(h('div', { className: 'wm-plan' }, h('small', null, 'Your plan'), h('b', null, 'Business'), h('small', null, '$49.00 a month · renews 1 December')),
     h('div', { className: 'wm-check' }, meter('People', 14, 25, 56), meter('Agents', 4, 10, 40), meter('Storage', '3.1 GB', '50 GB', 6)),
-    grp(set(null, 'Next invoice', 'JOD 49.000 · 1 Dec'), set('card', 'Payment method', 'Visa •••• 4242'), set('invoice', 'Invoices', '11')), grp(set(null, 'Change plan', null, { link: true, ext: true }))), bottom({ active: 'more' }));
+    grp(set(null, 'Next invoice', '$49.00 · 1 Dec'), set('card', 'Payment method', 'Visa •••• 4242'), set('invoice', 'Invoices', '11')), grp(set(null, 'Change plan', null, { link: true, ext: true }))), bottom({ active: 'more' }));
   var activity = h(F, null, head('Activity and security'), scroll(h(W.Alert, { variant: 'warning', title: '2 people don’t use two-step sign-in' }, 'Awss Haddad and Ibrahim Mansour sign in with a password only.', h('div', { style: { marginTop: 10 } }, h(W.Button, { size: 'sm', variant: 'outline', icon: 'send' }, 'Remind them'))),
     gl('Recent'), h('div', { className: 'wm-group' }, ac('pause', null, 'Amro paused HR assistant', 'Yesterday at 18:02'), ac('ban', 'red', 'A sign-in to Amro’s account was blocked', 'Istanbul · yesterday at 23:14'), ac('role', null, 'Emad changed Ahmad’s role to Purchasing', 'Monday'), ac('robot', 'blue', 'Billing assistant sent 6 messages', 'All approved by Amro · this week')),
     h('a', { className: 'wm-cap', style: { color: 'var(--primary)', textAlign: 'center' } }, 'Full audit log, on the web')), bottom({ active: 'more' }));

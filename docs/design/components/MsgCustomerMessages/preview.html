@@ -41,14 +41,14 @@
   function bub(kids, time, btn) { return h('div', { className: 'x5-bub' }, kids, btn ? h('span', { className: 'btn' }, btn) : null, h('small', null, time)); }
   function v(t) { return h('span', { className: 'x5-var' }, t); }
   var wa = chan('Example Bakery', 'WhatsApp · business account', h(F, null,
-    bub(h(F, null, 'Hello ', v('Ahmad Khalil'), ', your invoice ', v('INV-1043'), ' for ', v('JOD 46.168'), ' is ready. Pay by ', v('20 Nov'), '.'), '09:12', 'View and pay'),
-    bub(h(F, null, 'A reminder: invoice ', v('INV-1043'), ' (', v('JOD 46.168'), ') was due on ', v('20 Nov'), '. If you’ve paid, thank you and ignore this.'), '09:00', 'View and pay'),
-    bub(h(F, null, 'Thank you, we received ', v('JOD 46.168'), ' for ', v('INV-1043'), '. Your receipt is attached.'), '14:40', 'Receipt (PDF)')));
+    bub(h(F, null, 'Hello ', v('Ahmad Khalil'), ', your invoice ', v('INV-1043'), ' for ', v('$46.17'), ' is ready. Pay by ', v('20 Nov'), '.'), '09:12', 'View and pay'),
+    bub(h(F, null, 'A reminder: invoice ', v('INV-1043'), ' (', v('$46.17'), ') was due on ', v('20 Nov'), '. If you’ve paid, thank you and ignore this.'), '09:00', 'View and pay'),
+    bub(h(F, null, 'Thank you, we received ', v('$46.17'), ' for ', v('INV-1043'), '. Your receipt is attached.'), '14:40', 'Receipt (PDF)')));
   var book = chan('Example Bakery', 'WhatsApp · bookings', h(F, null,
     bub(h(F, null, 'Booked: ', v('Cake tasting'), ' on ', v('Sun 15 Nov at 10:00'), ' at ', v('Abdali'), ' with ', v('Awss'), '.'), '18:02', 'Move or cancel'),
     bub(h(F, null, 'See you tomorrow at ', v('10:00'), ' for your ', v('cake tasting'), ' at ', v('Abdali'), '.'), '18:00 the day before', 'Move or cancel')));
   var sms = chan('Whity', 'SMS · sign-in', h(F, null, bub(h(F, null, v('482951'), ' is your Whity sign-in code. It works for 10 minutes. Never share it; Whity will never ask for it.'), '13:21'), bub(h(F, null, 'Example Bakery: your order ', v('#3021'), ' is ready to pick up at ', v('Abdali'), ' until ', v('20:00'), '.'), '16:45')));
-  var ar = chan('Example Bakery', 'واتساب', h(F, null, bub(h(F, null, 'مرحباً ', v('أحمد خليل'), '، فاتورتك ', v('INV-1043'), ' بقيمة ', v('46.168 د.أ'), ' جاهزة. يُرجى الدفع قبل ', v('20 تشرين الثاني'), '.'), '09:12', 'عرض ودفع'), bub(h(F, null, 'تم الحجز: ', v('تذوّق الكعك'), ' يوم ', v('الأحد 15 تشرين الثاني الساعة 10:00'), ' في ', v('العبدلي'), '.'), '18:02', 'تغيير أو إلغاء')), { dir: 'rtl' });
+  var ar = chan('Example Bakery', 'واتساب', h(F, null, bub(h(F, null, 'مرحباً ', v('أحمد خليل'), '، فاتورتك ', v('INV-1043'), ' بقيمة ', v('$46.17'), ' جاهزة. يُرجى الدفع قبل ', v('20 تشرين الثاني'), '.'), '09:12', 'عرض ودفع'), bub(h(F, null, 'تم الحجز: ', v('تذوّق الكعك'), ' يوم ', v('الأحد 15 تشرين الثاني الساعة 10:00'), ' في ', v('العبدلي'), '.'), '18:02', 'تغيير أو إلغاء')), { dir: 'rtl' });
   ReactDOM.createRoot(document.getElementById('root')).render(board(
     h('section', null, h('p', { className: 'x4-lab' }, 'Messages to a workspace’s customers · placeholders in blue'), h('div', { className: 'x5-msgs' }, wa, book, sms)),
     h('div', { className: 'x4-two' }, st('Arabic', ar), st('Rules', h('ul', { style: { margin: 0, paddingInlineStart: 18, display: 'grid', gap: 6 } }, h('li', null, 'Sent in the workspace’s name, never Whity’s (only sign-in codes come from Whity).'), h('li', null, 'One message, one purpose, one button: View and pay, Receipt, Move or cancel.'), h('li', null, 'Amounts to the currency’s decimals; dates and times in the workspace’s zone.'), h('li', null, 'Approved WhatsApp templates (utility) in English and Arabic; the customer’s language picks one.'), h('li', null, 'SMS only where WhatsApp isn’t available, and for sign-in codes: 160 characters, no links in codes.')))),

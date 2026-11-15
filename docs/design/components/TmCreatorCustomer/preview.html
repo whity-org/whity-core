@@ -25,7 +25,7 @@
 
   var dark = document.documentElement.getAttribute('data-theme') === 'dark';
   var inst = h(F, null, navbar(), q('Where should it live?', 'Your workspace runs on a Whity installation.', 1, 4),
-    h('div', { className: 'wm-pad', style: { paddingTop: 12 } }, choice('Whity', 'app.whity.dev · free trial, plans in JOD', true, 'world'), choice('Another installation', 'A company that runs Whity for its customers', false, 'link'), h(W.Input, { label: 'Installation address', placeholder: 'office.example.jo', dir: 'ltr', disabled: true })),
+    h('div', { className: 'wm-pad', style: { paddingTop: 12 } }, choice('Whity', 'app.whity.dev · free trial, plans in USD', true, 'world'), choice('Another installation', 'A company that runs Whity for its customers', false, 'link'), h(W.Input, { label: 'Installation address', placeholder: 'office.example.jo', dir: 'ltr', disabled: true })),
     h('div', { style: { flex: 1 } }), foot(h(W.Button, null, 'Continue')));
   var brand = h(F, null, navbar(), q('Make it yours', 'You can change all of this later.', 2, 4),
     h('div', { className: 'wm-pad', style: { paddingTop: 12 } }, h(W.Input, { label: 'Company name', defaultValue: 'Example Bakery' }), h('div', { className: 'wm-logo-pick' }, h('span', null, 'E'), h(W.Button, { variant: 'outline', icon: 'camera' }, 'Take or choose a logo')),

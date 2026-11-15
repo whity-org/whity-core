@@ -46,7 +46,7 @@
   function node(kind, ic, t, sub, sel) { return h('div', { className: 'wk-node is-' + kind + (sel ? ' is-sel' : '') }, h('span', null, I(ic, 16)), h('div', null, h('b', null, t), sub ? h('small', null, sub) : null)); }
   function line(plus) { return h('div', { className: 'wk-line' + (plus ? ' has-plus' : '') }); }
 
-  var rows = [{ id: 1, n: 'Purchases over JOD 500', s: h('span', { className: 'wk-sentence' }, 'When a ', h('b', null, 'purchase order'), ' is created over ', h('b', null, 'JOD 500'), ', ', h('b', null, 'Emad'), ' then ', h('b', null, 'Amro'), ' approve it'), r: 34, st: ['success', 'On'] },
+  var rows = [{ id: 1, n: 'Purchases over $500', s: h('span', { className: 'wk-sentence' }, 'When a ', h('b', null, 'purchase order'), ' is created over ', h('b', null, '$500'), ', ', h('b', null, 'Emad'), ' then ', h('b', null, 'Amro'), ' approve it'), r: 34, st: ['success', 'On'] },
     { id: 2, n: 'Late invoices', s: h('span', { className: 'wk-sentence' }, 'When an invoice is ', h('b', null, '7 days late'), ', ', h('b', null, 'Billing assistant'), ' sends a reminder; after ', h('b', null, '14 days'), ', Awss calls'), r: 12, st: ['success', 'On'] },
     { id: 3, n: 'Leave requests', s: h('span', { className: 'wk-sentence' }, 'When a ', h('b', null, 'leave form'), ' is sent, the ', h('b', null, 'manager'), ' approves, then ', h('b', null, 'HR'), ' files it'), r: 8, st: ['success', 'On'] },
     { id: 4, n: 'Low stock', s: h('span', { className: 'wk-sentence' }, 'When stock falls below its ', h('b', null, 'reorder level'), ', ', h('b', null, 'Stock assistant'), ' proposes an order'), r: 21, st: ['success', 'On'] },

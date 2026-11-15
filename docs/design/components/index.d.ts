@@ -18,8 +18,12 @@ export declare function avatarPattern(seed: string, hue?: number): string;
 export declare function brandHue(hex: string): number;
 /** WCAG contrast ratio of two hex colours. */
 export declare function contrast(a: string, b: string): number;
-/** JOD defaults to 3 decimals, other currencies to 2. */
+/** CU.1–CU.4: the currency defaults to USD ($312.00); symbol, decimals and words come from `currencies` (JOD 3 decimals, most others 2). */
 export declare function Money(props: { amount: number; currency?: string; decimals?: number; className?: string }): React.ReactElement;
+export interface CurrencyInfo { sym: string | null; dec: number; sub: number; en: [string, string]; subEn: [string, string]; ar: string[]; subAr: string[]; arShort: string }
+export declare const currencies: Record<string, CurrencyInfo>;
+/** "$312.00", "−$35.00", "JOD 312.000". */
+export declare function moneyText(amount: number, currency?: string, decimals?: number): string;
 export declare function Skeleton(props: { width?: number | string; height?: number | string; className?: string }): React.ReactElement;
 export declare function Card(props: React.HTMLAttributes<HTMLElement> & { title?: React.ReactNode; description?: React.ReactNode; action?: React.ReactNode; footer?: React.ReactNode; variant?: 'default' | 'outline'; interactive?: boolean; selected?: boolean }): React.ReactElement;
 export declare function Dialog(props: { title: React.ReactNode; description?: React.ReactNode; children?: React.ReactNode; footer?: React.ReactNode; onClose?: () => void; inline?: boolean }): React.ReactElement;
@@ -49,7 +53,7 @@ export type Bilingual = { en: string; ar?: string };
 export type LabelLike = string | Bilingual;
 export type Localised<T> = T | { en: T; ar?: T };
 export declare const docLabels: Record<string, Bilingual>;
-export declare function amountInWords(amount: number, lang: DocLang): string;
+export declare function amountInWords(amount: number, lang: DocLang, currency?: string): string;
 export declare function DocLabel(props: { l: LabelLike; lead?: DocLang; single?: boolean; vars?: Record<string, string | number>; className?: string }): React.ReactElement;
 export interface DocColumn { key: string; label: LabelLike; type?: 'money'; align?: 'start' | 'end'; mono?: boolean; width?: string }
 export declare function Doc(props: {

@@ -1,10 +1,25 @@
-# Whity design system 3.4: handoff
+# Whity design system 3.5: handoff
 
-This folder is the Whity brand and design system, exported for building. Unzip it at the root of whity-core so it lands in `docs/design/`. It replaces 3.3 (and 3.2, 2.9, 2.2). Keep the files the team added (`IMPLEMENTATION-NOTES.md`, `DESIGN-ASKS.md` and the like); the zip doesn't contain them.
+This folder is the Whity brand and design system, exported for building. Unzip it at the root of whity-core so it lands in `docs/design/`. It replaces 3.4 (and 3.3, 3.2, 2.9, 2.2). Keep the files the team added (`IMPLEMENTATION-NOTES.md`, `DESIGN-ASKS.md` and the like); the zip doesn't contain them.
 
 **Source of truth:** `00-decision-register.md`. Every value in this folder comes from it. Where anything disagrees with the register, the register wins. Change the register first, then the files, and only with the owner's agreement.
 
-## What's new since 3.3
+## 3.5 update, 15 November 2026: US dollars
+
+The owner chose US dollars everywhere (register CU.1–CU.5).
+- Money is written $312.00: the symbol, then the number, 2 decimals, in English and Arabic. Currencies without a symbol keep their code (JOD 312.000).
+- `Money`, `MoneyInput`, `Doc`, `DocAmount` and the document tables now take the currency from the workspace (default USD). New exports: `Whity.currencies`, `Whity.moneyText(amount, currency)`, and `Whity.amountInWords(amount, lang, currency)` with cents (dinars keep fils).
+- Every card, email, website page and doc was switched; sample amounts were rounded to cents so receipts and invoices still add up. Screenshots and the guide PDF are rebuilt.
+- To build: drop any hard-coded 3 decimals; read decimals from the currency. Keep JoFotara and the 16% sales tax for Jordanian workspaces.
+
+## What's new since 3.4
+
+- **The calendar, like Google Calendar** (CV.1–CV.11, section 27): the sidebar starts as the rail on calendar screens; a left panel with a mini month and people and rooms as coloured checkboxes; Colour by person, service or room, each person's choice; Day, 4 days, Week, Month and Year; details beside a booking; click or drag to create, drag to move, pull to resize, the customer asked first and Undo; the phone's Day, 3 days and Month. Cards `TplCalendarWeek`, `TplCalendarViews`, `TplCalendarEditing`, `TplCalendarPhone`; `TplCalendarStaff` is now the booking sheet and setup.
+- **One chat** (UC.1–UC.13, section 27): team Chat and customer Messages are one. Three panes; bubbles or compact rows; replies, threads, reactions, mentions, pins, search, files, photos, voice with its text, seen and typing; blocks inside messages; bots set by the workspace; groups with people, agents and bots; blocking unwanted senders. Cards `TplChatHub`, `TplChatCompact`, `TplChatParts`, `TplChatPhone`. They replace 3.4's `TplMessagesInbox`, `PwMessages` and `PwCalendar`.
+- Cards drawn before 3.5 still say Messages in the sidebar; build it as Chat.
+- **The guide PDF** is now 3.5 (279 pages).
+
+## What was new in 3.4 (since 3.3)
 
 Engineering's asks after 3.3 are answered one by one in `ANSWERS-3.4.md`.
 
@@ -15,7 +30,6 @@ Engineering's asks after 3.3 are answered one by one in `ANSWERS-3.4.md`.
 - **Emails**: 25 now (ten new: bookings, forms, signing, joining, a message reply), English and Arabic, in `handoff/emails/`.
 - **Decisions**: hosted in the EU is confirmed (Q34.1); saved blocks' per-document parts use stable keys (E.23a, `handoff/editor/whity-document.ts`); section 19 is the store (Q34.3).
 - **Dark mode on every card**, Arabic and email cards included.
-- **The guide PDF** is now 3.4 (266 pages) with the new screens.
 
 ## What was new in 3.3 (since 3.2)
 
@@ -40,7 +54,7 @@ Engineering's asks after 3.3 are answered one by one in `ANSWERS-3.4.md`.
 | --- | --- |
 | `00-decision-register.md` | Every decision with its number |
 | `README.md`, `01-…` to `29-…md` | The guideline sections. 12 is the engineering handoff; 13 the app map (every screen with its cards); 18 the document editor; 19–25 the app screens; 26 mobile; 27 work and operations; 28 the roadmap; 29 the websites |
-| `PLAN.md` | The build plan: editor M0–M8, app screens A0–A15, form printouts P1, websites W1–W8, emails E1–E2, each with "done when" |
+| `PLAN.md` | The build plan: editor M0–M8, app screens A0–A17, form printouts P1, websites W1–W8, emails E1–E2, each with "done when" |
 | `ANSWERS-3.4.md` | Answers to engineering's asks after 3.3 |
 | `cards.html` | Every card, by group, with live links, screenshots and sizes |
 | `components/<Name>/` | One folder per card: `README.md` (the spec), `preview.html`, `index.html` (opens on its own; add `#theme=dark`) |
@@ -55,7 +69,7 @@ Engineering's asks after 3.3 are answered one by one in `ANSWERS-3.4.md`.
 | `handoff/print/` | Form printouts: the engine's needs, theme options and blocks (FP) |
 | `sites/` | The websites as static HTML in English and Arabic (20 pages each), with their own `README.md`; whity.dev reads its plans from `GET /api/public/plans` with a fallback (WS.5); includes `llms.txt`, `.well-known/security.txt` and the brand kit zip |
 | `business/` | The one-page business model (English and Arabic) sent to reviewers; decisions BM.1–BM.11 in the register |
-| `Whity-Brand-Guidelines-v3.4.pdf` | The whole guideline as one PDF (266 pages), with screens; the register is the appendix |
+| `Whity-Brand-Guidelines-v3.5.pdf` | The whole guideline as one PDF (279 pages), with screens; the register is the appendix |
 | `CLAUDE-snippet.md`, `HANDOFF-PROMPT.md` | Rules for `CLAUDE.md`, and the prompt to start with |
 
 ## Open points the owner may still change

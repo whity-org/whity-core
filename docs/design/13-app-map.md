@@ -16,8 +16,8 @@ Sidebar groups: (top) Dashboard · Inbox · Approvals — People — AI — Docu
 | A01 | Dashboard (home) | `/dashboard`; `/admin` redirects here | `TplHome`, `TplHomeMember`; operators' platform cards from `TplAdminDashboard`; shell states `AppShellCollapsed`, `AppShellMobile` | section 20; one merged waiting list (Inbox and Approvals), app home cards in the plugin manifest |
 | A02 | Inbox (documents awaiting a decision) | `/admin/inbox` | `TplInbox` | section 21; states composed by the app |
 | A03 | Approvals (agent proposals) | new: `/admin/approvals` | `TplAgentApprovals`, `TplAgentApprovalsAr`, `ApprovalQueue` | server 10 |
-| A03a | Messages (conversations with customers) | new: `/admin/messages`; a customer's own at `/messages`; public chat at `/chat/{workspace}` | `TplMessagesInbox`, `TplChatBox`, `TplSettingsMessages`; phone `PwMessages` (SC.1–SC.3) | ADR 0016; settings at `/admin/settings/messages` |
-| A04 | Calendar (day, week, month; new booking; booking sheet with Move and Cancel; events) | `/calendar` | `TplCalendarStaff` (SU.3); phone `PwCalendar` | section 21; ADR 0017; times in the workspace's zone, week from `week_start`, weekend from `weekend_days` |
+| A03a | Chat: team and customers in one (UC, 3.5; was Messages) | `/chat` (`/admin/messages` redirects); a customer's own at `/messages`; public chat at `/chat/{workspace}` | `TplChatHub`, `TplChatCompact`, `TplChatParts`, `TplChatPhone`; the visitor's box `TplChatBox`; settings `TplSettingsMessages` and bots in `TplChatParts`. 3.4's `TplMessagesInbox` and `PwMessages` are replaced | ADR 0016; settings at `/admin/settings/messages` |
+| A04 | Calendar (day, week, month; new booking; booking sheet with Move and Cancel; events) | `/calendar` | `TplCalendarWeek`, `TplCalendarViews`, `TplCalendarEditing` (CV, 3.5); the booking sheet `TplCalendarStaff`; phone `TplCalendarPhone` (replaces `PwCalendar`) | section 21; ADR 0017; times in the workspace's zone, week from `week_start`, weekend from `weekend_days` |
 | A04b | Calendar services · service | `/calendar/services`, `/calendar/services/[id]` | `TplCalendarStaff` (Services tab) | section 21; Overview only (no access list or history in the API yet) |
 | A04c | Hours and time off | `/calendar/hours` | `TplCalendarStaff` (Hours and time off) | section 21; own hours on `calendar:write`, anyone's on `calendar:manage` |
 | A04d | Calendar settings | `/calendar/settings` | `TplCalendarStaff` (Settings tab) | section 21; `calendar:manage` |
@@ -45,7 +45,7 @@ Sidebar groups: (top) Dashboard · Inbox · Approvals — People — AI — Docu
 | A40 | Tenants · tenant | `/admin/tenants`, `/[id]` | `TplTenants` | section 25; server-side search; "workspace" in the interface |
 | A41 | Plugins: Store and Installed tabs (one sidebar item) | `/admin/plugins`, `/admin/plugins/store`, `/admin/plugins/store/<plugin>` | `TplPluginStore`, `TplPluginDetail`, `TplPluginInstall`, `TplPluginsInstalled`; `PluginCard` | section 19 |
 | A42 | Billing · plans | `/admin/billing`, `/billing` | `TplBilling`, `TplBillingAr`, `TplPlans` | section 25; money in normal units |
-| A43 | Promotions | `/admin/promotions` | `TplPromotions` | section 25; JOD default |
+| A43 | Promotions | `/admin/promotions` | `TplPromotions` | section 25; the workspace's currency by default |
 | A44 | Audit logs · errors · System | `/admin/audit-logs`, `/admin/errors`, `/admin/stats` (System, operators only, H.3) | `TplAuditLog`, `TplErrors`, `TplSystem` | section 25 |
 | A45 | Languages · translations | `/admin/languages`, `/admin/translations` | `TplSettingsTranslations`; languages in `TplPlatformSettings` | section 25 |
 | A46 | Tags · tag groups | `/admin/tags`, `/admin/tag-groups` | `TplSettingsTags` | section 25 |
@@ -195,3 +195,16 @@ Build-ready in `handoff/emails/` (English and Arabic, with placeholders).
 | Every print block with its spec | Whity Render, the editor's page view | `DocFormBlocks` |
 
 **Every surface (3.4, SU.1–SU.10):** `verify/[token]` → `TplVerifyDocument`; `billing/return` → `TplPaymentReturn`; `calendar` on a computer → `TplCalendarStaff` (on a phone `PwCalendar`); `agents/[id]/persona` → `TplAgentPersona`; WhatsApp and SMS to customers → `MsgCustomerMessages`; link previews → `SiteShareCards`; `install.sh` output → `SiteInstallerTerminal`; `booking/[token]` → `TplBookingManage`; booking, form, signing, joining and reply emails → `EmailBookings`, `EmailForms`, `EmailJoining`.
+
+## Version 3.5 (CV, UC)
+
+| Surface | Cards |
+| --- | --- |
+| The calendar like Google Calendar: week, the left panel, colour by, details | `TplCalendarWeek` |
+| Day, 4 days, Month, Year | `TplCalendarViews` |
+| Creating, moving and resizing on the grid, conflicts, keys | `TplCalendarEditing` |
+| The calendar on a phone | `TplCalendarPhone` |
+| One chat for team and customers, three panes, threads | `TplChatHub` |
+| Compact rows, group details, search in a chat | `TplChatCompact` |
+| The parts of a message, blocks, bots, groups, blocking, Arabic | `TplChatParts` |
+| Chat on a phone | `TplChatPhone` |

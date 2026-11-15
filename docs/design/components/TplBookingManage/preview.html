@@ -44,7 +44,7 @@
   function seal(k, ic, t, p) { return h(F, null, h('div', { style: { display: 'flex', gap: 14, alignItems: 'center' } }, h('span', { className: 'x5-seal ' + k }, I(ic, 26)), h('h1', null, t)), p ? h('p', null, p) : null); }
   function dl(rows) { return h('dl', null, rows.map(function (r, i) { return h(F, { key: i }, h('dt', null, r[0]), h('dd', null, r[1])); })); }
   function stack(kids) { return h('div', { style: { display: 'grid', gap: 10 } }, kids); }
-  var ROWS = [['What', 'Cake tasting, 45 minutes'], ['When', 'Sunday 15 November, 10:00'], ['Where', 'Abdali branch, Amman'], ['With', 'Awss Haddad'], ['Deposit', h('span', { className: 'x4-mono' }, 'JOD 10.000 paid')]];
+  var ROWS = [['What', 'Cake tasting, 45 minutes'], ['When', 'Sunday 15 November, 10:00'], ['Where', 'Abdali branch, Amman'], ['With', 'Awss Haddad'], ['Deposit', h('span', { className: 'x4-mono' }, '$10.00 paid')]];
 
   var booked = card(h(F, null, seal('ok', 'success', 'You’re booked', 'Hello Ahmad Khalil. Here is your booking; keep this link to change it.'), dl(ROWS),
     stack([h(W.Button, { size: 'lg', icon: 'calendar' }, 'Add to my calendar'), h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } }, h(W.Button, { variant: 'outline', icon: 'sync' }, 'Move it'), h(W.Button, { variant: 'outline', icon: 'close' }, 'Cancel it'))]),
@@ -60,16 +60,16 @@
     h('p', { className: 'x4-small', style: { margin: 0 } }, 'Your deposit carries over. We’ll email you the new time with a calendar file.')));
 
   var cancel = card(h(F, null, h('h1', null, 'Cancel your booking?'), dl(ROWS.slice(0, 3)),
-    h(W.Alert, { variant: 'info', title: 'Your deposit comes back' }, 'JOD 10.000 goes back to the card you paid with, within 5 days.'),
+    h(W.Alert, { variant: 'info', title: 'Your deposit comes back' }, '$10.00 goes back to the card you paid with, within 5 days.'),
     h('div', { className: 'wy-field' }, h('span', { className: 'wy-field__label' }, 'Tell the bakery why (optional)'), h(W.Textarea, { rows: 2, placeholder: 'For example: I’m travelling that week' })),
     stack([h(W.Button, { size: 'lg', variant: 'destructive' }, 'Yes, cancel my booking'), h(W.Button, { variant: 'outline' }, 'No, keep it')])));
 
-  var arabic = card(h(F, null, seal('ok', 'success', 'تم حجزك', 'مرحباً أحمد خليل. هذا حجزك؛ احتفظ بهذا الرابط لتغييره.'), dl([['ماذا', 'تذوّق الكعك، 45 دقيقة'], ['متى', 'الأحد 15 تشرين الثاني، 10:00'], ['أين', 'فرع العبدلي، عمّان'], ['مع', 'أوس حداد'], ['العربون', h('span', { className: 'x4-mono', dir: 'ltr' }, 'JOD 10.000')]]),
+  var arabic = card(h(F, null, seal('ok', 'success', 'تم حجزك', 'مرحباً أحمد خليل. هذا حجزك؛ احتفظ بهذا الرابط لتغييره.'), dl([['ماذا', 'تذوّق الكعك، 45 دقيقة'], ['متى', 'الأحد 15 تشرين الثاني، 10:00'], ['أين', 'فرع العبدلي، عمّان'], ['مع', 'أوس حداد'], ['العربون', h('span', { className: 'x4-mono', dir: 'ltr' }, '$10.00')]]),
     stack([h(W.Button, { size: 'lg', icon: 'calendar' }, 'أضِف إلى تقويمي'), h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } }, h(W.Button, { variant: 'outline', icon: 'sync' }, 'غيّر الموعد'), h(W.Button, { variant: 'outline', icon: 'close' }, 'ألغِ الحجز'))]),
     h('p', { className: 'x4-small', style: { margin: 0 } }, 'يمكنك التغيير أو الإلغاء حتى السبت 14 تشرين الثاني، 10:00.')), { dir: 'rtl' });
 
   var moved = card(h(F, null, seal('ok', 'sync', 'Moved to Monday 16 November, 11:00', 'Same place, same people. The new time is in your email with a calendar file.'), h(W.Button, { variant: 'outline', icon: 'calendar' }, 'Add the new time to my calendar')), { w: 380 });
-  var cancelled = card(h(F, null, seal('no', 'close', 'Your booking is cancelled', 'JOD 10.000 goes back to your card within 5 days. We’ve emailed you a confirmation.'), h(W.Button, { variant: 'outline', icon: 'calendar' }, 'Book another time')), { w: 380 });
+  var cancelled = card(h(F, null, seal('no', 'close', 'Your booking is cancelled', '$10.00 goes back to your card within 5 days. We’ve emailed you a confirmation.'), h(W.Button, { variant: 'outline', icon: 'calendar' }, 'Book another time')), { w: 380 });
   var late = card(h(F, null, seal('warn', 'clock', 'It’s too late to change this online', 'Your booking is in less than 24 hours. Message or call the bakery and they’ll help.'), stack([h(W.Button, { variant: 'outline', icon: 'comment' }, 'Message Example Bakery'), h(W.Button, { variant: 'outline', icon: 'phone' }, h('span', { dir: 'ltr' }, '+962 6 000 0000'))])), { w: 380 });
   var taken = card(h(F, null, h('h1', null, 'Move your booking'), h(W.Alert, { variant: 'warning', title: '11:00 was just taken' }, 'Someone booked it a moment ago. Nothing changed: your booking is still Sunday 15 November, 10:00. Pick another time.'), h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 } }, TIMES.map(function (t) { return chip(t, false, t === '09:00' || t === '11:00' || t === '14:00'); }))), { w: 380 });
   var gone = card(h(F, null, seal('no', 'search', 'This booking link doesn’t work', 'It may be from an old email, or the booking already happened. Your latest email from Example Bakery has the right link.'), h(W.Button, { variant: 'outline' }, 'Book a new time')), { w: 380 });
