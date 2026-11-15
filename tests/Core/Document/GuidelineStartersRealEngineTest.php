@@ -220,7 +220,12 @@ final class GuidelineStartersRealEngineTest extends TestCase
      */
     private function samples(array $starter): array
     {
-        return array_column($starter['own_fields'], 'sample', 'key');
+        $samples = [];
+        foreach ($starter['own_fields'] as $field) {
+            $samples[(string) $field['key']] = (string) ($field['sample'] ?? '');
+        }
+
+        return $samples;
     }
 
     public function testANewWorkspaceGetsEveryStarter(): void
