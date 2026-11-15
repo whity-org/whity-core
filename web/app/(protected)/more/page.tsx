@@ -19,6 +19,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useThemeMode } from '@/lib/theme-mode-context';
 import { useShellNav } from '@/components/shell/use-shell-nav';
 import { TenantSwitcher } from '@/components/sidebar';
+import { InstallOffer } from '@/components/pwa/install-offer';
 import { localizedName } from '@/lib/localized-name';
 import { SETTINGS_MENU_HREF } from '@/components/settings/settings-area';
 
@@ -66,6 +67,8 @@ export default function MorePage() {
         </span>
         <Icon name="chevron-right" size={18} className="text-muted-foreground" />
       </Link>
+
+      <InstallOffer />
 
       {memberships.length > 1 && (
         <TenantSwitcher memberships={memberships} activeTenantId={user?.tenant_id} collapsed={false} />
