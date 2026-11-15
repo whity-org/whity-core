@@ -3,6 +3,8 @@
  * side `/api/v1/me/messages/…` and the public chat `/api/v1/public/chat/…`.
  */
 
+import type { WorkspaceBrand } from '@/lib/branding-context';
+
 export type ConversationStatus = 'open' | 'pending' | 'closed';
 
 export interface MessagingPerson {
@@ -86,6 +88,8 @@ export interface PublicChatInfo {
   greeting: string | null;
   max_length: number;
   bot_check: { provider: string; site_key: string } | null;
+  /** The workspace's logo and colour for the chat box (WHIT-1014); null keeps the host's. */
+  brand?: WorkspaceBrand | null;
 }
 
 /** A message still waiting to leave: an agent's held reply, or one in the queue. */

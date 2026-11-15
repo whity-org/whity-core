@@ -11,6 +11,7 @@ use Whity\Api\InboundMessagesApiHandler;
 use Whity\Api\MeMessagesApiHandler;
 use Whity\Api\MessagesApiHandler;
 use Whity\Api\PublicChatApiHandler;
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Http\HttpFetcher;
@@ -31,6 +32,8 @@ use Whity\Core\RateLimit\ClientIp;
 use Whity\Core\Request;
 use Whity\Core\Security\EncryptedSecretStore;
 use Whity\Core\Settings\GlobalSettingsRepository;
+use Whity\Core\Settings\SettingsService;
+use Whity\Core\Settings\TenantSettingsRepository;
 use Whity\Core\Store\DatabaseSharedStore;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Http\Response;
@@ -272,6 +275,33 @@ final class MessagingRealEngineTest extends TestCase
         self::assertSame(0, $source->count(self::B, self::STAFF_A, true));
     }
 
+    public function testTheChatBoxCarriesTheWorkspacesOwnBrand(): void
+    {
+        // WHIT-1044 (card TplChatBox): the chat box wears the workspace's logo and colour, as booking pages do (WHIT-1014).
+        $settings = new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo));
+        $settings->setTenant(self::A, 'branding_main_color', '#b74c05');
+        $settings->setTenant(self::A, 'support_email', 'owner@example.com');
+        $chat = new PublicChatApiHandler(
+            $this->pdo,
+            $this->messaging,
+            $this->settings,
+            new TenantHostRepository($this->pdo),
+            new HostResolver(new TenantHostRepository($this->pdo), 'whity.test'),
+            new BotCheck(new GlobalSettingsRepository($this->pdo), new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'), new HttpFetcher()),
+            new DatabaseSharedStore($this->pdo),
+            'pepper',
+            new BrandingService($settings),
+        );
+        $this->settings->save(self::A, true, null, null);
+
+        $info = json_decode($chat->info(new Request('GET', '/api/public/chat/bakery', ['Host' => 'app.whity.test']), ['workspace' => 'bakery'])->getBody(), true);
+        $brand = $info['data']['brand'];
+        self::assertSame(['name', 'logo_wide_url', 'logo_square_url', 'main_color', 'theme'], array_keys($brand), 'only public brand fields');
+        self::assertSame('Example Bakery', $brand['name']);
+        self::assertSame('#b74c05', $brand['main_color']);
+        self::assertStringNotContainsString('owner@example.com', (string) json_encode($info));
+    }
+
     public function testWebChatForVisitorsHidesNotesAndChecksTheToken(): void
     {
         $chat = new PublicChatApiHandler(
@@ -295,6 +325,7 @@ final class MessagingRealEngineTest extends TestCase
         self::assertSame(404, $chat->info($req('GET'), $params)->getStatusCode(), 'off by default');
         $this->settings->save(self::A, true, 'Hello! How can we help?', null);
         self::assertSame('Hello! How can we help?', json_decode($chat->info($req('GET'), $params)->getBody(), true)['data']['greeting']);
+        self::assertNull(json_decode($chat->info($req('GET'), $params)->getBody(), true)['data']['brand'], 'no branding service, no brand');
 
         $bot = $chat->start($req('POST', ['message' => 'buy now', 'website' => 'spam.example']), $params);
         self::assertSame(201, $bot->getStatusCode());

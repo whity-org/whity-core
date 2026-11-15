@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * A signed-in customer's conversation with the workspace (ADR 0016 §5):
+ * A signed-in customer's conversation with the workspace (ADR 0016 §5, card
+ * `TplChatBox`, signed in: the thread and the box, their name at the foot):
  * `/messages`, shown in their menu when the workspace has web chat on or they
  * already have a conversation. Ownership is the whole check, server side.
  *
@@ -12,7 +13,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AreaError } from '@whity/ui/page-states';
 import { useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
-import { ChatThread, type ChatTransport } from '@/components/messages/chat-thread';
+import { TenantLogo } from '@whity/ui/tenant-logo';
+import { ChatHeader, ChatThread, type ChatTransport } from '@/components/messages/chat-thread';
+import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useBranding } from '@/lib/branding-context';
@@ -26,6 +29,8 @@ interface MyConversation {
 export default function MyMessagesPage() {
   const t = useTranslation('common');
   const branding = useBranding();
+  const { user } = useAuth();
+  const me = user?.display_name || user?.email || '';
   const [conversationId, setConversationId] = useState<number | null>(null);
   const known = useRef<number | null>(null);
 
@@ -97,7 +102,7 @@ export default function MyMessagesPage() {
       ) : list.loading ? (
         <div aria-busy="true" className="h-64 animate-pulse rounded-card bg-muted/40" />
       ) : (
-        <section className="overflow-hidden rounded-card border border-border bg-card">
+        <section className="mx-auto max-w-2xl overflow-hidden rounded-card border border-border bg-card">
           <ChatThread
             key={current ?? 'new'}
             className="h-[32rem]"
@@ -105,6 +110,8 @@ export default function MyMessagesPage() {
             workspaceName={workspaceName}
             greeting={null}
             maxLength={4000}
+            header={<ChatHeader name={workspaceName} logo={<TenantLogo name={workspaceName} src={branding.logoSquareUrl} size={40} showName={false} />} />}
+            footer={me ? t('chat.signedInAs', 'Signed in as {name}', { name: me }) : undefined}
           />
         </section>
       )}

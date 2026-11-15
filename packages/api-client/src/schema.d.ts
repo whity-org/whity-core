@@ -16334,6 +16334,8 @@ export interface components {
                     provider?: string;
                     site_key?: string;
                 } | null;
+                /** @description The brand of the workspace, for the chat box (WHIT-1014). */
+                brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
             };
         };
         PublicChatStartResponse: {

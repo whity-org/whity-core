@@ -91703,6 +91703,15 @@
                                         "type": "string"
                                     }
                                 }
+                            },
+                            "brand": {
+                                "nullable": true,
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                                    }
+                                ],
+                                "description": "The brand of the workspace, for the chat box (WHIT-1014)."
                             }
                         },
                         "required": [
