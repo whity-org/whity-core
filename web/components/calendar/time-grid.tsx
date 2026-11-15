@@ -544,6 +544,7 @@ export function TimeGrid({
                               else if (event.key === 'ArrowRight') shift(rtl ? -1 : 1, 0);
                               else if (event.key === 'Enter' && keyed !== null && keyed.key === item.key) {
                                 setKeyed(null);
+                                // @date-display-ignore: a calendar day for the grid, not a timestamp rendered here
                                 onChange?.(item, { date: keyed.date, startMinute: keyed.startMinute, endMinute: keyed.endMinute }, 'move');
                               } else if (event.key === 'Escape' && keyed !== null) {
                                 setKeyed(null);

@@ -408,6 +408,7 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
     (slot: GridSlot) => {
       if (!canWrite) return;
       const fixed = slot.endMinute !== null;
+      // @date-display-ignore: a calendar day for the grid, not a timestamp rendered here
       setDraft({ date: slot.date, startMinute: slot.startMinute, endMinute: slot.endMinute ?? Math.min(24 * 60, slot.startMinute + defaultLength), fixed });
     },
     [canWrite, defaultLength]
@@ -511,10 +512,12 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
   );
 
   const pending = asking ?? busy ?? saving;
+  // @date-display-ignore: a calendar day for the grid, not a timestamp rendered here
   const preview: GridPreview | null = pending
     ? { key: pending.item.key, date: pending.to.date, startMinute: pending.to.startMinute, endMinute: pending.to.endMinute, how: pending.how }
     : draft
-      ? { key: null, date: draft.date, startMinute: draft.startMinute, endMinute: draft.endMinute, how: 'create' }
+      ? // @date-display-ignore: a calendar day for the grid, not a timestamp rendered here
+        { key: null, date: draft.date, startMinute: draft.startMinute, endMinute: draft.endMinute, how: 'create' }
       : null;
 
   const askTitle = (change: Change) => {
