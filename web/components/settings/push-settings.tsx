@@ -60,7 +60,18 @@ export function PushSettings() {
     };
   }, [language]);
 
+  // Chat first (WHIT-1077): on by default, like every kind, until turned off.
   const kinds: Kind[] = [
+    {
+      id: 'chat-messages',
+      types: ['chat.message'],
+      label: t('settings.push.kind.chat', 'Chat messages'),
+    },
+    {
+      id: 'chat-mentions',
+      types: ['chat.mention'],
+      label: t('settings.push.kind.chatMention', 'Mentions in chat'),
+    },
     {
       id: 'documents-waiting',
       types: ['document.routing.awaiting'],

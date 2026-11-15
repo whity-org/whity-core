@@ -57,7 +57,11 @@ final class PushPayload
             'title' => self::cut($title, self::MAX_TITLE),
             'body'  => self::cut($line, self::MAX_BODY),
             'url'   => self::link($message->type, $data),
-            'tag'   => 'n' . $notificationId,
+            // A caller may group its pushes under one tag (a chat: each new
+            // one replaces the last on the device); else one per notification.
+            'tag'   => is_string($data['push_tag'] ?? null) && preg_match('/^[a-z0-9-]{1,40}$/', $data['push_tag']) === 1
+                ? $data['push_tag']
+                : 'n' . $notificationId,
             'lang'  => $ar ? 'ar' : 'en',
             'dir'   => $ar ? 'rtl' : 'ltr',
         ];

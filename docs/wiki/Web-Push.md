@@ -4,7 +4,7 @@ People can turn on notifications for each device they use Whity on: a desktop br
 
 ## What a person sees
 
-- **Asked once, after a tap.** Home shows a card: "Get told when something needs you?" The browser's own permission prompt appears only after **Turn on notifications** is tapped, never when a page loads. **Not now** is remembered.
+- **Asked after sign-in, answered once.** Every signed-in person sees a card at the top of the app: "Get notified when someone messages you in chat?" The browser's own permission prompt appears only after **Turn on notifications** is tapped, never when a page loads. **Not now** asks again after 14 days; **Don't ask again**, or any answer to the browser's prompt, ends it in that browser. Public pages never show it.
 - **Settings › Preferences › Notifications:** this device on or off, the person's other devices (each can be turned off), and which kinds come as a notification. Sign-in and security notifications always come.
 - **iPhone and iPad:** Safari offers notifications only to a web app on the Home Screen (iOS 16.4 and later). In Safari the card is not shown and Preferences says to add Whity to the Home Screen first.
 - **Signing out** stops the browser getting anyone's notifications, so a shared device is safe.
@@ -19,6 +19,10 @@ A notification shown in Whity also goes as a push to every device the person tur
 These are the same rules as email (`EmailGate`). Security and account notifications always go. Nothing is sent for anything that happened before a device was turned on.
 
 **A burst can't flood a phone.** A person gets at most 4 pushes a minute and 30 an hour per workspace. The rest are held, and one "N more things are waiting for you" follows when the minute (or hour) is over. Security notifications are never held.
+
+## Team chat
+
+Each new line in a team chat is pushed to the chat's other people who have a device on, except the author and anyone looking at that chat right now (open in a focused window; the chat screen says so every 20 seconds). A chat's pushes share one tag, so the newest replaces the last on the device and counts what's unread: "3 new messages in #Front desk". Mentions are their own kind, "Amro Saleh mentioned you in #Front desk", so a person can keep mentions while turning ordinary chat messages off. Both kinds are on until turned off. An agent's line held for approval is pushed only once approved.
 
 ## Self-hosting
 

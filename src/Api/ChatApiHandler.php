@@ -178,6 +178,24 @@ final class ChatApiHandler
         });
     }
 
+    /**
+     * POST /api/chat/chats/{id}/focus `{focused: bool}`: the person is looking
+     * at this chat in a focused window (sent every ChatPushNotifier::HEARTBEAT
+     * seconds), or stopped. No push for that chat while they look (WHIT-1077).
+     *
+     * @param array<string, string> $params
+     */
+    public function focus(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            $body = JsonBody::parsed($request);
+            $focused = ($body['focused'] ?? true) !== false;
+            $this->chat->focus($t, $v, (int) ($params['id'] ?? 0), $focused);
+
+            return Response::json(['data' => ['focused' => $focused]]);
+        });
+    }
+
     /** @param array<string, string> $params */
     public function approve(Request $request, array $params = []): Response
     {

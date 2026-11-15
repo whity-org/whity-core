@@ -32,8 +32,14 @@ export type PushDevice = {
   failing: boolean;
 };
 
-/** "Not now" on the ask card, remembered in this browser. */
-export const PUSH_ASK_DISMISSED_KEY = 'whity-push-ask-dismissed';
+/** "Don't ask again" on the ask card, remembered in this browser (WHIT-1077). */
+export const PUSH_ASK_NEVER_KEY = 'whity-push-ask-never';
+
+/** "Not now": the time (ms) the card may show again. */
+export const PUSH_ASK_SNOOZE_KEY = 'whity-push-ask-snoozed-until';
+
+/** How long "Not now" waits before asking again. */
+export const PUSH_ASK_SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
 
 /** What this browser can do about push, before anything is asked. */
 export function pushSupport(): PushSupport {
@@ -137,17 +143,22 @@ export async function forgetPushOnSignOut(): Promise<void> {
   }
 }
 
-export function pushAskDismissed(): boolean {
+/** Whether the card is waiting: "Don't ask again", or "Not now" less than 14 days ago. */
+export function pushAskDismissed(now = Date.now()): boolean {
   try {
-    return window.localStorage.getItem(PUSH_ASK_DISMISSED_KEY) === '1';
+    if (window.localStorage.getItem(PUSH_ASK_NEVER_KEY) === '1') return true;
+    const until = Number(window.localStorage.getItem(PUSH_ASK_SNOOZE_KEY) ?? '');
+    return Number.isFinite(until) && until > now;
   } catch {
     return false;
   }
 }
 
-export function dismissPushAsk(): void {
+/** "Not now" snoozes for 14 days; "Don't ask again" (or any answer to the browser) stops it. */
+export function dismissPushAsk(how: 'snooze' | 'never', now = Date.now()): void {
   try {
-    window.localStorage.setItem(PUSH_ASK_DISMISSED_KEY, '1');
+    if (how === 'never') window.localStorage.setItem(PUSH_ASK_NEVER_KEY, '1');
+    else window.localStorage.setItem(PUSH_ASK_SNOOZE_KEY, String(now + PUSH_ASK_SNOOZE_MS));
   } catch {
     // Private window: asked again next time, which is harmless.
   }

@@ -9,7 +9,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { PushOffer } from '@/components/pwa/push-offer';
 import { PushSettings } from '@/components/settings/push-settings';
-import { PUSH_ASK_DISMISSED_KEY } from '@/lib/pwa/push';
+import { PUSH_ASK_NEVER_KEY, PUSH_ASK_SNOOZE_KEY, PUSH_ASK_SNOOZE_MS } from '@/lib/pwa/push';
 
 jest.mock('@/lib/api/client', () => ({ api: { GET: jest.fn(), POST: jest.fn(), PUT: jest.fn(), DELETE: jest.fn() } }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -96,18 +96,41 @@ describe('the notifications ask (PW.11)', () => {
       body: { endpoint: ENDPOINT, keys: { p256dh: 'p', auth: 'a' } },
     });
     await waitFor(() => expect(screen.queryByTestId('push-offer')).toBeNull());
-    expect(window.localStorage.getItem(PUSH_ASK_DISMISSED_KEY)).toBe('1');
+    expect(window.localStorage.getItem(PUSH_ASK_NEVER_KEY)).toBe('1');
   });
 
-  it('is asked once: Not now is remembered', async () => {
+  it('is worded around chat', async () => {
+    render(<PushOffer />);
+    expect(await screen.findByText('Get notified when someone messages you in chat?')).toBeTruthy();
+  });
+
+  it('Not now waits 14 days, then asks again', async () => {
     const { unmount } = render(<PushOffer />);
     await userEvent.click(await screen.findByRole('button', { name: 'Not now' }));
     expect(screen.queryByTestId('push-offer')).toBeNull();
+    const until = Number(window.localStorage.getItem(PUSH_ASK_SNOOZE_KEY));
+    expect(until - Date.now()).toBeGreaterThan(PUSH_ASK_SNOOZE_MS - 60_000);
+    unmount();
+
+    const again = render(<PushOffer />);
+    await waitFor(() => expect(mockApi.GET).toHaveBeenCalled());
+    expect(screen.queryByTestId('push-offer')).toBeNull();
+    again.unmount();
+
+    window.localStorage.setItem(PUSH_ASK_SNOOZE_KEY, String(Date.now() - 1));
+    render(<PushOffer />);
+    expect(await screen.findByTestId('push-offer')).toBeTruthy();
+    expect(requestPermission).not.toHaveBeenCalled();
+  });
+
+  it("Don't ask again stops it", async () => {
+    const { unmount } = render(<PushOffer />);
+    await userEvent.click(await screen.findByRole('button', { name: "Don't ask again" }));
+    expect(window.localStorage.getItem(PUSH_ASK_NEVER_KEY)).toBe('1');
     unmount();
     render(<PushOffer />);
     await waitFor(() => expect(mockApi.GET).toHaveBeenCalled());
     expect(screen.queryByTestId('push-offer')).toBeNull();
-    expect(requestPermission).not.toHaveBeenCalled();
   });
 
   it('is not shown once the browser was answered', async () => {

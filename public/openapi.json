@@ -11335,6 +11335,108 @@
                 }
             }
         },
+        "/api/v1/chat/chats/{id}/focus": {
+            "post": {
+                "operationId": "post_api_v1_chat_chats_id_focus",
+                "summary": "Say the caller is looking at this chat in a focused window (every 20 seconds), or stopped",
+                "tags": [
+                    "chat"
+                ],
+                "description": "While a person looks at a chat, its new lines are not pushed to their devices (WHIT-1077).",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChatFocusRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatDoneResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Chat not found, or you are not in it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/chat/chats/{id}/members": {
             "post": {
                 "operationId": "post_api_v1_chat_chats_id_members",
@@ -74386,6 +74488,15 @@
                 "required": [
                     "data"
                 ]
+            },
+            "ChatFocusRequest": {
+                "type": "object",
+                "properties": {
+                    "focused": {
+                        "type": "boolean",
+                        "description": "True while the chat is open in a focused window; false when it stops."
+                    }
+                }
             },
             "ChatLink": {
                 "type": "object",

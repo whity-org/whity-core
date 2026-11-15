@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Integration\Notification\Push;
 
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\RecipientProfiles;
@@ -18,11 +16,9 @@ use Whity\Core\Notification\NotificationRepository;
 use Whity\Core\Notification\Push\Base64Url;
 use Whity\Core\Notification\Push\PushBranding;
 use Whity\Core\Notification\Push\PushDigestJob;
-use Whity\Core\Notification\Push\PushHttpClient;
 use Whity\Core\Notification\Push\PushSubscriptionRepository;
 use Whity\Core\Notification\Push\PushTransport;
 use Whity\Core\Notification\Push\VapidKeys;
-use Whity\Core\Notification\Push\WebPushCrypto;
 use Whity\Core\Notification\TenantNotificationSettingsRepository;
 use Whity\Core\Queue\CoreJobs;
 use Whity\Core\Queue\JobRegistry;
@@ -313,67 +309,5 @@ final class PushChannelRealEngineTest extends TestCase
         $this->drain();
 
         self::assertCount(PushTransport::PER_MINUTE + 1, $phone->received);
-    }
-}
-
-/** A browser: its keys, and what it decrypted. */
-final class FakeBrowser
-{
-    public \OpenSSLAsymmetricKey $key;
-    public string $auth;
-    public int $status = 201;
-    /** @var list<array<string, string>> */
-    public array $received = [];
-
-    public function __construct(public readonly string $endpoint)
-    {
-        $this->key = WebPushCrypto::newKey();
-        $this->auth = random_bytes(16);
-    }
-
-    public function p256dh(): string
-    {
-        $d = openssl_pkey_get_details($this->key);
-        \assert(is_array($d));
-
-        return Base64Url::encode(VapidKeys::uncompressedPoint($d['ec']['x'], $d['ec']['y']));
-    }
-}
-
-/** A push service: checks the VAPID signature and hands the message to the browser. */
-final class FakePushService implements PushHttpClient
-{
-    /** @var array<string, FakeBrowser> */
-    public array $browsers = [];
-    /** @var list<array<string, string>> */
-    public array $headers = [];
-    /** @var list<string> */
-    public array $audiences = [];
-
-    public function __construct(private readonly string $vapidPublic)
-    {
-    }
-
-    public function post(string $url, array $headers, string $body): int
-    {
-        $this->headers[] = $headers;
-        if (preg_match('/^vapid t=([^,]+), k=(.+)$/', $headers['Authorization'] ?? '', $m) !== 1 || $m[2] !== $this->vapidPublic) {
-            return 401;
-        }
-        $claims = (array) JWT::decode($m[1], new Key(WebPushCrypto::publicKeyFromPoint((string) Base64Url::decode($this->vapidPublic)), 'ES256'));
-        $this->audiences[] = (string) $claims['aud'];
-
-        $browser = $this->browsers[$url] ?? null;
-        if ($browser === null) {
-            return 404;
-        }
-        if ($browser->status >= 300) {
-            return $browser->status;
-        }
-        $payload = json_decode(WebPushCrypto::decrypt($body, $browser->key, $browser->auth), true);
-        \assert(is_array($payload));
-        $browser->received[] = $payload;
-
-        return $browser->status;
     }
 }

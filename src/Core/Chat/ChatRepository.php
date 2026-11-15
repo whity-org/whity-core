@@ -375,6 +375,28 @@ final class ChatRepository
         return (int) $stmt->fetchColumn();
     }
 
+    /**
+     * How many lines people and agents wrote above `$readMark` that the person
+     * has not written themselves, leaving out system lines ("Amro added Ahmad")
+     * and declined agent lines: what a push counts as new
+     * messages (WHIT-1077).
+     */
+    public function unreadLines(int $tenantId, int $chatId, int $readMark, int $profileId): int
+    {
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM messages x
+            WHERE x.tenant_id = :tid AND x.conversation_id = :cid AND x.id > :mark
+              AND x.source IN ('chat.person', 'chat.agent') AND x.status = 'noted'
+              AND (x.author_profile_id IS NULL OR x.author_profile_id <> :pid OR x.by_agent = :agent)");
+        $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':cid', $chatId, PDO::PARAM_INT);
+        $stmt->bindValue(':mark', $readMark, PDO::PARAM_INT);
+        $stmt->bindValue(':pid', $profileId, PDO::PARAM_INT);
+        $stmt->bindValue(':agent', true, PDO::PARAM_BOOL);
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn();
+    }
+
     public function maxMessageId(int $tenantId, int $chatId): int
     {
         $stmt = $this->db->prepare('SELECT MAX(id) FROM messages WHERE tenant_id = :tid AND conversation_id = :cid');

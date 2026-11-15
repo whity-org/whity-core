@@ -5716,7 +5716,15 @@ $router->register('POST',  '/api/messages/settings/inbound-secret',       [$mess
 // caller (or the calling agent) is not in answers 404. What an agent may do in
 // a chat is set per chat, by the person who added it.
 $chatRepository = new \Whity\Core\Chat\ChatRepository($db->getPdo());
-$chatHandler = new \Whity\Api\ChatApiHandler(new \Whity\Core\Chat\ChatService($chatRepository));
+// WHIT-1077: each chat line is pushed to the chat's other people who have a
+// device on and aren't looking at that chat.
+$chatHandler = new \Whity\Api\ChatApiHandler(new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core\Chat\ChatPushNotifier(
+    $notificationDispatcher,
+    $chatRepository,
+    new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
+    new \Whity\Core\Store\DatabaseSharedStore($db->getPdo()),
+    $logger,
+)));
 $router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null);
 $router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null);
@@ -5725,6 +5733,7 @@ $router->register('GET',    '/api/chat/chats/{id:\d+}/messages',                
 $router->register('POST',   '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'post'],          null);
 $router->register('POST',   '/api/chat/chats/{id:\d+}/proposals',               [$chatHandler, 'shareProposal'], null);
 $router->register('POST',   '/api/chat/chats/{id:\d+}/read',                    [$chatHandler, 'markRead'],      null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/focus',                   [$chatHandler, 'focus'],         null);
 $router->register('POST',   '/api/chat/chats/{id:\d+}/members',                 [$chatHandler, 'addMember'],     null);
 $router->register('DELETE', '/api/chat/chats/{id:\d+}/members/{member:\d+}',    [$chatHandler, 'removeMember'],  null);
 $router->register('POST',   '/api/chat/messages/{id:\d+}/approve',              [$chatHandler, 'approve'],       null);
