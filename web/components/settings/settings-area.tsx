@@ -31,38 +31,76 @@ import { LICENSING_VIEW } from '@/lib/capabilities';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import type { components } from '@whity/api-client';
 import { MY_SETTINGS_PAGES, SETTINGS_HOME_HREF } from '@/lib/settings/my-settings';
+import { useNavItemLabels } from '@/lib/nav-item-labels';
+import { useBranding } from '@/lib/branding-context';
+import { TenantLogo } from '@whity/ui/tenant-logo';
+import { CALENDAR_MANAGE } from '@/lib/calendar/api';
+
+/** The system tenant: the one that runs the install (mirrors use-shell-nav). */
+const SYSTEM_TENANT_ID = 0;
 import { ScopeChip, useCurrentWorkspace } from '@/components/settings/scope';
 
 type SettingsTab = components['schemas']['SettingsTab'];
 
-type GroupId = 'mine' | 'here' | 'workspace' | 'security' | 'email' | 'data' | 'advanced' | 'devices';
+type GroupId = 'mine' | 'here' | 'workspace' | 'security' | 'email' | 'data' | 'advanced';
 
 /** Your own settings (WHIT-1081): above the workspace's, for everyone. */
 const PERSONAL_GROUPS: readonly GroupId[] = ['mine', 'here'];
 
-/** D1's groups, in order. A page the server adds later lands in Advanced. */
+/**
+ * The workspace's groups, in order (D1, regrouped by WHIT-1082): Workspace,
+ * Security, Messages and notifications, Data, Advanced. A page the server adds
+ * later lands in Advanced.
+ */
 const GROUP_OF: Readonly<Record<string, GroupId>> = {
   general: 'workspace',
   branding: 'workspace',
+  'document-themes': 'workspace',
+  billing: 'workspace',
+  plugins: 'workspace',
   security: 'security',
   sso: 'security',
   signup: 'security',
   'customer-signup': 'security',
-  'public-forms': 'security',
+  devices: 'security',
+  'audit-logs': 'security',
   messages: 'email',
   email: 'email',
   'email-domains': 'email',
+  'notification-log': 'email',
   storage: 'data',
   fields: 'data',
   tags: 'data',
   'tag-groups': 'data',
   languages: 'data',
   translations: 'data',
+  'public-forms': 'data',
+  bookings: 'data',
   'feature-flags': 'advanced',
   'error-tracking': 'advanced',
 };
 
-const GROUP_ORDER: GroupId[] = ['mine', 'here', 'workspace', 'security', 'email', 'data', 'advanced', 'devices'];
+const GROUP_ORDER: GroupId[] = ['mine', 'here', 'workspace', 'security', 'email', 'data', 'advanced'];
+
+/**
+ * Workspace pages that used to be the sidebar's Workspace group (WHIT-1082),
+ * by their navigation item id, with the id their link takes here. They keep
+ * their routes and permissions; the server's navigation still decides who
+ * sees each. The system tenant keeps them in its Platform group instead.
+ */
+export const WORKSPACE_PAGE_NAV_IDS: Readonly<Record<string, string>> = {
+  'tenant-billing': 'billing',
+  plugins: 'plugins',
+  'audit-logs': 'audit-logs',
+  notifications: 'notification-log',
+};
+
+/** Document themes (A15) had no link anywhere; they are a workspace setting. */
+const DOCUMENT_THEMES_HREF = '/admin/document-themes';
+const DOCUMENT_THEMES_PERMISSION = 'documents:themes';
+
+/** Booking rules stay in the calendar's own pages; Settings links there. */
+const BOOKINGS_HREF = '/calendar/settings';
 
 /** Licensed devices keep their own route, `/licensing`, and their own permission. */
 const DEVICES_HREF = '/licensing';
@@ -93,7 +131,14 @@ export const SETTINGS_AREA_PREFIXES = [
   '/admin/tag-groups',
   '/admin/translations',
   DEVICES_HREF,
+  DOCUMENT_THEMES_HREF,
 ] as const;
+
+/**
+ * Pages in the area for a workspace, but in the Platform group for the system
+ * tenant (WHIT-1082): the sidebar lights Settings for them only outside it.
+ */
+export const WORKSPACE_PAGE_PREFIXES = ['/billing', '/admin/plugins', '/admin/audit-logs', '/admin/notifications'] as const;
 
 /**
  * On a phone the menu is its own page (PwSettings, PW.8); More opens it. It is
@@ -129,6 +174,12 @@ const ROW_ICON: Readonly<Record<string, IconName>> = {
   'feature-flags': 'trigger',
   'error-tracking': 'error',
   devices: 'desktop',
+  'document-themes': 'branding',
+  billing: 'billing',
+  plugins: 'plugin',
+  'audit-logs': 'audit',
+  'notification-log': 'notification',
+  bookings: 'calendar',
 };
 
 function readLastOpened(): string | null {
@@ -164,13 +215,19 @@ export function SettingsArea({ children }: { children: ReactNode }) {
   const t = useTranslation('admin');
   const tc = useTranslation('common');
   const ta = useTranslation('auth');
-  const { name: workspaceName } = useCurrentWorkspace();
+  const { id: workspaceId, name: workspaceName } = useCurrentWorkspace();
+  // The system tenant runs the install: its workspace-wide pages stay in Platform.
+  const isSystemTenant = workspaceId === SYSTEM_TENANT_ID;
   const pathname = usePathname() ?? '';
   const { items: navItems } = useNavigation();
+  const navLabels = useNavItemLabels();
+  const { logoSquareUrl } = useBranding();
   const { has } = useCapabilities();
   const canSeeDevices = has(LICENSING_VIEW);
   // WHIT-955: the workspace's own fields on its records (A9).
   const canManageFields = has('fields:manage');
+  const canEditThemes = has(DOCUMENT_THEMES_PERMISSION);
+  const canManageBookings = has(CALENDAR_MANAGE);
   const language = useLanguageCode();
 
   // The server words the tabs in the caller's language, so a switch needs them again.
@@ -186,11 +243,16 @@ export function SettingsArea({ children }: { children: ReactNode }) {
         ? t('settingsArea.group.here', 'You in {workspace}').replace('{workspace}', workspaceName)
         : t('settingsArea.group.hereNoName', 'You in this workspace'),
       workspace: t('settingsArea.group.workspace', 'Workspace'),
-      security: t('settingsArea.group.security', 'Sign-in and security'),
-      email: t('settingsArea.group.email', 'Email'),
+      security: t('settingsArea.group.security', 'Security'),
+      email: t('settingsArea.group.email', 'Messages and notifications'),
       data: t('settingsArea.group.data', 'Data'),
       advanced: t('settingsArea.group.advanced', 'Advanced'),
-      devices: t('settingsArea.group.devices', 'Devices'),
+    };
+    const workspacePageLabels: Record<string, string> = {
+      billing: t('settingsArea.billing', 'Plan and billing'),
+      plugins: navLabels.plugins ?? 'Plugins',
+      'audit-logs': navLabels['audit-logs'] ?? 'Audit Logs',
+      'notification-log': navLabels.notifications ?? 'Notification log',
     };
 
     const dataLabels: Record<string, string> = {
@@ -229,7 +291,20 @@ export function SettingsArea({ children }: { children: ReactNode }) {
       links.push({ id: 'fields', href: '/admin/settings/fields', label: t('settingsArea.fields', 'Fields'), group: 'data' });
     }
     if (canSeeDevices) {
-      links.push({ id: 'devices', href: DEVICES_HREF, label: t('settingsArea.devices', 'Licensed devices'), group: 'devices' });
+      links.push({ id: 'devices', href: DEVICES_HREF, label: t('settingsArea.devices', 'Licensed devices'), group: 'security' });
+    }
+    if (canEditThemes) {
+      links.push({ id: 'document-themes', href: DOCUMENT_THEMES_HREF, label: t('settingsArea.documentThemes', 'Document themes'), group: 'workspace' });
+    }
+    if (canManageBookings) {
+      links.push({ id: 'bookings', href: BOOKINGS_HREF, label: t('settingsArea.bookings', 'Bookings'), group: 'data' });
+    }
+    if (!isSystemTenant) {
+      for (const [navId, id] of Object.entries(WORKSPACE_PAGE_NAV_IDS)) {
+        // The server's navigation decides who sees each, by its own permission.
+        const item = navItems.find((nav) => nav.id === navId);
+        if (item) links.push({ id, href: item.href, label: workspacePageLabels[id] ?? item.label, group: GROUP_OF[id] });
+      }
     }
     // Within a group, the order GROUP_OF lists them in (yours in their own order).
     const rank = (id: string) => {
@@ -243,7 +318,7 @@ export function SettingsArea({ children }: { children: ReactNode }) {
       label: groupLabels[group],
       links: links.filter((link) => link.group === group).sort((a, b) => rank(a.id) - rank(b.id)),
     })).filter((group) => group.links.length > 0);
-  }, [tabs, navItems, canSeeDevices, canManageFields, t, tc, ta, workspaceName]);
+  }, [tabs, navItems, navLabels, canSeeDevices, canManageFields, canEditThemes, canManageBookings, isSystemTenant, t, tc, ta, workspaceName]);
 
   const onMenu = pathname === SETTINGS_MENU_HREF;
   // Read when the menu opens; the page you leave it for is written back below.
@@ -253,7 +328,9 @@ export function SettingsArea({ children }: { children: ReactNode }) {
 
   // The page you are on is the one marked next time you open the menu.
   const current = useMemo(() => {
-    const all = groups.flatMap((group) => group.links.map((link) => ({ ...link, groupLabel: group.label })));
+    const all = groups.flatMap((group) =>
+      group.links.map((link) => ({ ...link, groupLabel: group.label, groupId: group.id })),
+    );
     // The longest matching address wins, so a record page maps to its list page.
     return all
       .filter((link) => isActive(pathname, link.href))
@@ -428,7 +505,24 @@ export function SettingsArea({ children }: { children: ReactNode }) {
           </p>
         </div>
       )}
-      <div className={cn('min-w-0', onMenu && 'max-sm:hidden')}>{children}</div>
+      <div className={cn('min-w-0', onMenu && 'max-sm:hidden')}>
+        {/* A workspace page says whose it is: a change here reaches everyone in it (WHIT-1082). */}
+        {current && !PERSONAL_GROUPS.includes(current.groupId) && current.href !== BOOKINGS_HREF && workspaceName && (
+          <p
+            data-testid="workspace-scope"
+            className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+          >
+            <TenantLogo name={workspaceName} src={logoSquareUrl} size={20} showName={false} />
+            <span>
+              {t('settingsArea.workspaceScope', 'Workspace settings for {workspace}. A change here applies to everyone in it.').replace(
+                '{workspace}',
+                workspaceName,
+              )}
+            </span>
+          </p>
+        )}
+        {children}
+      </div>
     </div>
   );
 }

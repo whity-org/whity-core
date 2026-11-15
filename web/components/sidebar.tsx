@@ -334,10 +334,7 @@ export function Sidebar() {
       phoneTabBar
       pinnedGroupIds={PINNED_GROUP_IDS}
       collapsibleGroups
-      searchable
-      searchPlaceholder={t('sidebar.search.placeholder', 'Search pages')}
-      clearSearchLabel={t('sidebar.search.clear', 'Clear search')}
-      searchNoResultsLabel={t('sidebar.search.noResults', 'No matching pages')}
+      // One search (WHIT-1082): the top bar's, Ctrl+K. The sidebar's own filter box went.
       navLabel={t('sidebar.navLabel', 'Main')}
       openNavLabel={t('sidebar.openNav', 'Open navigation')}
       closeNavLabel={t('sidebar.closeNav', 'Close navigation')}

@@ -25,6 +25,8 @@ import {
   PLATFORM_SETTINGS_TABS,
   SETTINGS_AREA_NAV_IDS,
   SETTINGS_AREA_PREFIXES,
+  WORKSPACE_PAGE_NAV_IDS,
+  WORKSPACE_PAGE_PREFIXES,
 } from '@/components/settings/settings-area';
 import { SETTINGS_HOME_HREF } from '@/lib/settings/my-settings';
 
@@ -82,9 +84,9 @@ export function resolveIcon(name: string | undefined): Icon {
  */
 const NAV_GROUP_ORDER = [
   'overview',
-  // Register, section 27: Work follows the top items, then Operations.
+  // Register, section 27: Work follows the top items. Operations, which held
+  // only Contacts, folded into Work (WHIT-1082).
   'work',
-  'operations',
   'people',
   'ai',
   'documents',
@@ -100,6 +102,7 @@ const NAV_GROUP_ORDER = [
  * heading of its own.
  */
 const LEGACY_NAV_GROUPS: Readonly<Record<string, string>> = {
+  operations: 'work',
   access: 'people',
   records: 'documents',
   extend: 'platform',
@@ -235,8 +238,15 @@ export function useShellNav(): ShellNav {
     // entry at the foot, opening the area's own sub-nav. Since WHIT-1081 your
     // own settings are in the same area, so the entry is there for everyone,
     // members who can change nothing of the workspace's included.
+    // Billing, Plugins, Audit log and Notification log join it too for a
+    // workspace (WHIT-1082); the system tenant keeps them in Platform.
     const inSettingsArea = (item: { id: string; group?: string }) =>
-      item.group === 'settings' || (SETTINGS_AREA_NAV_IDS as readonly string[]).includes(item.id);
+      item.group === 'settings' ||
+      (SETTINGS_AREA_NAV_IDS as readonly string[]).includes(item.id) ||
+      (!isSystemTenant && item.id in WORKSPACE_PAGE_NAV_IDS);
+    const settingsPrefixes: readonly string[] = isSystemTenant
+      ? SETTINGS_AREA_PREFIXES
+      : [...SETTINGS_AREA_PREFIXES, ...WORKSPACE_PAGE_PREFIXES];
     const regrouped = navItems
       .filter((item) => !inSettingsArea(item) && item.id !== ACCOUNT_SETTINGS_ITEM_ID)
       .map((item) =>
@@ -275,14 +285,14 @@ export function useShellNav(): ShellNav {
             icon: <IconSettings size={20} />,
             active:
               !Object.values(PLATFORM_SETTINGS_TABS).includes(pathname ?? '') &&
-              SETTINGS_AREA_PREFIXES.some(
+              settingsPrefixes.some(
                 (prefix) => pathname === prefix || (pathname ?? '').startsWith(`${prefix}/`),
               ),
           },
         ],
       },
     ];
-  }, [navItems, pathname, groupLabels, itemLabels, counts, t]);
+  }, [navItems, pathname, groupLabels, itemLabels, counts, t, isSystemTenant]);
 
   const hrefOf = useMemo(() => {
     const byId = new Map(navItems.map((item) => [item.id, item.href]));
