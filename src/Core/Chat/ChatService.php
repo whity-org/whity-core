@@ -149,6 +149,16 @@ final class ChatService
         return $this->presentMessages($tenantId, $rows, $viewer);
     }
 
+    /**
+     * Throws "not found" unless the viewer is in this team chat (for pinning it, UC.1).
+     *
+     * @throws ChatException
+     */
+    public function assertMember(int $tenantId, ChatViewer $viewer, int $chatId): void
+    {
+        $this->open($tenantId, $viewer, $chatId);
+    }
+
     public function markRead(int $tenantId, ChatViewer $viewer, int $chatId, int $messageId): void
     {
         [, , $me] = $this->open($tenantId, $viewer, $chatId);

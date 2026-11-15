@@ -3,7 +3,7 @@
  * messages: the server's own sentence for a refusal, ours otherwise.
  */
 
-import type { ChatDetail, ChatDirectory, ChatMessage, ChatMode, ChatReads, ChatSummary, ChatLink } from '@/lib/chat-wire';
+import type { ChatDetail, ChatDirectory, ChatInbox, ChatMessage, ChatMode, ChatReads, ChatSummary, ChatLink } from '@/lib/chat-wire';
 
 type ApiClient = (path: string, init?: RequestInit) => Promise<Response>;
 
@@ -16,17 +16,18 @@ export class ChatError extends Error {
   }
 }
 
-async function call<T>(api: ApiClient, path: string, init?: RequestInit): Promise<T> {
+async function whole<T>(api: ApiClient, path: string, init?: RequestInit): Promise<T> {
   const response = await api(path, init);
-  const body = (await response.json().catch(() => null)) as {
-    data?: T;
-    error?: string;
-  } | null;
+  const body = (await response.json().catch(() => null)) as (T & { error?: string }) | null;
   if (!response.ok) {
     const plain = response.status >= 400 && response.status < 500 && body?.error ? body.error : '';
     throw new ChatError(plain, response.status);
   }
-  return body?.data as T;
+  return body as T;
+}
+
+async function call<T>(api: ApiClient, path: string, init?: RequestInit): Promise<T> {
+  return (await whole<{ data?: T }>(api, path, init))?.data as T;
 }
 
 function json(method: string, body: unknown): RequestInit {
@@ -41,6 +42,10 @@ function json(method: string, body: unknown): RequestInit {
 export function chatApi(api: ApiClient) {
   return {
     list: () => call<ChatSummary[]>(api, '/api/v1/chat/chats'),
+    // One chat (UC.1): team chats and customer conversations in one list.
+    inbox: () => whole<ChatInbox>(api, '/api/v1/chat/inbox'),
+    pin: (id: number, pinned: boolean) => call<unknown>(api, `/api/v1/chat/inbox/${id}/pin`, json('POST', { pinned })),
+    readCustomer: (id: number, messageId: number) => call<unknown>(api, `/api/v1/chat/inbox/${id}/read`, json('POST', { message_id: messageId })),
     show: (id: number) => call<ChatDetail>(api, `/api/v1/chat/chats/${id}`),
     after: (id: number, after: number) => call<ChatMessage[]>(api, `/api/v1/chat/chats/${id}/messages?after=${after}`),
     before: (id: number, before: number) => call<ChatMessage[]>(api, `/api/v1/chat/chats/${id}/messages?before=${before}`),

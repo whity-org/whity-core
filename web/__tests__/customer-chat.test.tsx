@@ -1,10 +1,10 @@
 /**
- * Messages (ADR 0016, WHIT-939): the staff inbox.
+ * A customer conversation inside Chat (design 3.5, UC.3, WHIT-1093; it was the
+ * Messages page, ADR 0016, WHIT-939).
  *
  * What would go wrong unnoticed: a reply posted as a note (or the reverse), a
  * held agent reply shown as if it had gone, a note shown like a customer
- * message, and a person without access seeing an empty inbox instead of
- * being told they cannot see it.
+ * message, and someone without the reply permission given a box to write in.
  */
 
 import React from 'react';
@@ -20,11 +20,6 @@ jest.mock('@/lib/auth-context', () => ({
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
 
-let held: string[] = ['messages:read', 'messages:reply', 'messages:manage'];
-jest.mock('@/hooks/useCapabilities', () => ({
-  useCapabilities: () => ({ has: (c: string) => held.includes(c), loading: false }),
-}));
-
 jest.mock('@whity/features/i18n', () => ({
   useTranslation:
     () =>
@@ -36,11 +31,29 @@ jest.mock('@whity/features/datetime', () => ({
   useDateDisplay: () => ({ dateTime: (v: string | null) => v, time: (v: string | null) => v, date: (v: string | null) => v }),
 }));
 
-jest.mock('@/components/admin/admin-header', () => ({
-  AdminHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
-}));
+import { CustomerChat } from '@/components/chat/customer-chat';
 
-import MessagesPage from '@/app/(protected)/admin/messages/page';
+let canReply = true;
+let canManage = true;
+const onRead = jest.fn();
+
+function Chat({ unread = 0, details = false }: { unread?: number; details?: boolean }) {
+  return (
+    <CustomerChat
+      id={42}
+      canReply={canReply}
+      canManage={canManage}
+      unreadAtOpen={unread}
+      detailsOpen={details}
+      pinned={false}
+      onPin={() => undefined}
+      onToggleDetails={() => undefined}
+      onBack={() => undefined}
+      onChanged={() => undefined}
+      onRead={onRead}
+    />
+  );
+}
 
 function json(status: number, body: unknown) {
   return Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) });
@@ -108,30 +121,33 @@ function routes(url: string, init?: RequestInit) {
 }
 
 beforeEach(() => {
-  held = ['messages:read', 'messages:reply', 'messages:manage'];
+  canReply = true;
+  canManage = true;
+  onRead.mockReset();
   mockApiClient.mockReset();
   mockApiClient.mockImplementation(routes);
   addToast.mockReset();
-  window.history.replaceState(null, '', '/admin/messages');
 });
 
-test('lists conversations with status counts and opens one', async () => {
-  render(<MessagesPage />);
+test('shows the conversation, marks it read, and puts the "n new" line above the unread', async () => {
+  render(<Chat unread={1} />);
 
-  expect(await screen.findByText('Sara')).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: /Open\s*1/ })).toBeInTheDocument();
-  // Closed grows for ever, so its tab carries no count (TplMessagesInbox).
-  expect(screen.getByRole('tab', { name: 'Closed' })).toBeInTheDocument();
-  expect(screen.getByText('Unassigned', { selector: 'span[data-variant]' })).toBeInTheDocument();
-
-  await userEvent.click(screen.getByRole('button', { name: /Sara/ }));
   expect(await screen.findByText('Check the oven')).toBeInTheDocument();
-  expect(window.location.search).toBe('?c=42');
+  expect(screen.getByText('Only the team sees this')).toBeInTheDocument();
+  expect(screen.getByRole('separator')).toHaveTextContent('1 new');
+  await waitFor(() => expect(onRead).toHaveBeenCalledWith(3));
+});
+
+test('the details pane says how to reach the customer', async () => {
+  render(<Chat details />);
+
+  const pane = await screen.findByRole('complementary', { name: 'Sara' });
+  expect(within(pane).getByText('sara@example.test')).toBeInTheDocument();
+  expect(within(pane).getByText('Unassigned')).toBeInTheDocument();
 });
 
 test('a held agent reply says it has not gone, and can be cancelled', async () => {
-  window.history.replaceState(null, '', '/admin/messages?c=42');
-  render(<MessagesPage />);
+  render(<Chat />);
 
   expect(await screen.findByText(/Not sent yet\. Sends at 2026-11-11 08:05:00/)).toBeInTheDocument();
   expect(screen.getByText(/Agent for Lina/)).toBeInTheDocument();
@@ -141,8 +157,7 @@ test('a held agent reply says it has not gone, and can be cancelled', async () =
 });
 
 test('a reply goes to replies and a note goes to notes', async () => {
-  window.history.replaceState(null, '', '/admin/messages?c=42');
-  render(<MessagesPage />);
+  render(<Chat />);
   await screen.findByText('Two cakes please', { selector: 'p' });
 
   const box = screen.getByRole('textbox', { name: 'Your reply' });
@@ -155,7 +170,7 @@ test('a reply goes to replies and a note goes to notes', async () => {
     )
   );
 
-  await userEvent.click(screen.getByRole('button', { name: 'Internal note' }));
+  await userEvent.click(screen.getByRole('radio', { name: 'Internal note' }));
   await userEvent.type(screen.getByRole('textbox', { name: 'Your note' }), 'Called her');
   await userEvent.click(screen.getByRole('button', { name: 'Add note' }));
   await waitFor(() =>
@@ -164,28 +179,20 @@ test('a reply goes to replies and a note goes to notes', async () => {
 });
 
 test('without the reply permission there is no composer', async () => {
-  held = ['messages:read'];
-  window.history.replaceState(null, '', '/admin/messages?c=42');
-  render(<MessagesPage />);
+  canReply = false;
+  canManage = false;
+  render(<Chat />);
 
   expect(await screen.findByText(/Replying needs the “Reply to customers” permission/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /^Assign/ })).not.toBeInTheDocument();
 });
 
-test('a 403 says the person cannot see Messages', async () => {
-  mockApiClient.mockImplementation(() => json(403, { error: 'Forbidden' }));
-  render(<MessagesPage />);
-
-  expect(await screen.findByText('You can’t see Messages')).toBeInTheDocument();
-});
-
 test('assigning to me sends my id', async () => {
-  window.history.replaceState(null, '', '/admin/messages?c=42');
   mockApiClient.mockImplementation((url: string, init?: RequestInit) =>
     init?.method === 'PATCH' ? json(200, { data: conversation }) : routes(url, init)
   );
-  render(<MessagesPage />);
+  render(<Chat />);
 
   const header = await screen.findByRole('heading', { name: 'Sara', level: 2 });
   await userEvent.click(within(header.closest('header') as HTMLElement).getByRole('button', { name: 'Assign' }));
@@ -199,8 +206,7 @@ test('assigning to me sends my id', async () => {
 });
 
 test('Edit stops a held reply and puts its words in the composer', async () => {
-  window.history.replaceState(null, '', '/admin/messages?c=42');
-  render(<MessagesPage />);
+  render(<Chat />);
 
   await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
   await waitFor(() => expect(mockApiClient).toHaveBeenCalledWith('/api/v1/messages/3/cancel', { method: 'POST' }));
@@ -208,7 +214,6 @@ test('Edit stops a held reply and puts its words in the composer', async () => {
 });
 
 test('a failed reply says why and can be sent again', async () => {
-  window.history.replaceState(null, '', '/admin/messages?c=42');
   mockApiClient.mockImplementation((url: string, init?: RequestInit) =>
     url === '/api/v1/messages/conversations/42' && !init?.method
       ? json(200, {
@@ -221,7 +226,7 @@ test('a failed reply says why and can be sent again', async () => {
         })
       : routes(url, init)
   );
-  render(<MessagesPage />);
+  render(<Chat />);
 
   expect(await screen.findByText(/Not sent: The address bounced\./)).toBeInTheDocument();
   await userEvent.click(screen.getByRole('button', { name: 'Try again' }));

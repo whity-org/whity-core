@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Core\Chat\ChatException;
+use Whity\Core\Chat\ChatInbox;
 use Whity\Core\Chat\ChatService;
 use Whity\Core\Chat\ChatViewer;
 use Whity\Core\Request;
+use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\JsonBody;
 use Whity\Mcp\Auth\McpPrincipal;
+use Whity\Sdk\Rbac\PermissionResolver;
 
 /**
  * Team chat, `/api/chat/…` (CH.1, CH.2).
@@ -27,8 +30,58 @@ use Whity\Mcp\Auth\McpPrincipal;
  */
 final class ChatApiHandler
 {
-    public function __construct(private readonly ChatService $chat)
+    public function __construct(
+        private readonly ChatService $chat,
+        private readonly ?ChatInbox $inbox = null,
+        private readonly ?PermissionResolver $permissions = null,
+    ) {
+    }
+
+    /**
+     * One chat (UC.1): the viewer's team chats and, when they may read customer
+     * conversations, the workspace's customer conversations, in one list.
+     *
+     * @param array<string, string> $params
+     */
+    public function inbox(Request $request, array $params = []): Response
     {
+        return $this->guard($request, function (int $t, ChatViewer $v): Response {
+            $customers = $this->readsCustomers($t, $v);
+
+            return Response::json(['data' => $this->theInbox()->list($t, $v, $customers), 'customers' => $customers]);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function pin(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            if ($v->isAgent()) {
+                return Response::error('Agents can\'t pin chats.', 403);
+            }
+            $pinned = (JsonBody::parsed($request)['pinned'] ?? true) !== false;
+            $this->theInbox()->pin($t, $v, (int) ($params['id'] ?? 0), $pinned, $this->readsCustomers($t, $v));
+
+            return Response::json(['data' => ['pinned' => $pinned]]);
+        });
+    }
+
+    /**
+     * How far the viewer has read a customer conversation in Chat.
+     *
+     * @param array<string, string> $params
+     */
+    public function readCustomer(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            if ($v->isAgent()) {
+                return Response::error('Chat not found', 404);
+            }
+            $messageId = (int) (JsonBody::parsed($request)['message_id'] ?? 0);
+            $this->theInbox()->readCustomer($t, $v, (int) ($params['id'] ?? 0), $messageId, $this->readsCustomers($t, $v));
+
+            return Response::json(['data' => ['ok' => true]]);
+        });
     }
 
     /** @param array<string, string> $params */
@@ -251,6 +304,23 @@ final class ChatApiHandler
 
             return Response::error('Something went wrong with Chat. Please try again.', 500);
         }
+    }
+
+    private function theInbox(): ChatInbox
+    {
+        if ($this->inbox === null) {
+            throw new \LogicException('ChatApiHandler was built without its ChatInbox.');
+        }
+
+        return $this->inbox;
+    }
+
+    /** People who may read the workspace's customer conversations see them in Chat; agents never through Chat. */
+    private function readsCustomers(int $tenantId, ChatViewer $viewer): bool
+    {
+        return !$viewer->isAgent()
+            && $this->permissions !== null
+            && $this->permissions->hasPermission($viewer->profileId, $tenantId, CorePermissions::MESSAGES_READ);
     }
 
     private static function agentPrincipalId(Request $request): ?string

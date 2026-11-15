@@ -1142,18 +1142,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // granting person may decide them, so there is nobody a permission
         // could usefully keep out.
     ];
-    $items[] = [
-        'id' => 'messages',
-        'label' => 'Messages',
-        'href' => '/admin/messages',
-        'icon' => 'messages',
-        'group' => 'overview',
-        'order' => 7,
-        // After Calendar (6).
-        // ADR 0016: conversations with customers. Gated like its routes: the list
-        // is the workspace's, not the caller's own.
-        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::MESSAGES_READ,
-    ];
+    // One chat (design 3.5, UC.1, WHIT-1093): customer conversations moved
+    // into Chat, so there is no Messages item; /admin/messages redirects there.
     $items[] = [
         'id' => 'my-messages',
         'label' => 'Messages',
@@ -1170,9 +1160,12 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'href' => '/chat',
         'icon' => 'comment',
         'group' => 'overview',
-        'order' => 9,
-        // Team chat (CH.1): the team's own chats, people and agents together.
-        // Ungated like its routes; shown to the people who work here, never to
+        // After Approvals (3) and the forms items (4, 5), where Messages (7)
+        // and Chat (9) stood: one item now, as the 3.5 cards draw it.
+        'order' => 6,
+        // One chat (UC.1): the team's chats, people and agents together, and
+        // for people who may read them the customer conversations. Ungated
+        // like its routes; shown to the people who work here, never to
         // customers.
         'visibleIf' => 'chat-for-staff',
     ];
@@ -5729,13 +5722,23 @@ $router->register('POST',  '/api/messages/settings/inbound-secret',       [$mess
 $chatRepository = new \Whity\Core\Chat\ChatRepository($db->getPdo());
 // WHIT-1077: each chat line is pushed to the chat's other people who have a
 // device on and aren't looking at that chat.
-$chatHandler = new \Whity\Api\ChatApiHandler(new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core\Chat\ChatPushNotifier(
+$chatService = new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core\Chat\ChatPushNotifier(
     $notificationDispatcher,
     $chatRepository,
     new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
     new \Whity\Core\Store\DatabaseSharedStore($db->getPdo()),
     $logger,
-)));
+));
+// One chat (UC.1, WHIT-1093): team chats and, for people with messages.read,
+// the customer conversations, in one list with each person's pins.
+$chatHandler = new \Whity\Api\ChatApiHandler(
+    $chatService,
+    new \Whity\Core\Chat\ChatInbox($db->getPdo(), $chatService),
+    $permissionResolver,
+);
+$router->register('GET',    '/api/chat/inbox',                                  [$chatHandler, 'inbox'],         null);
+$router->register('POST',   '/api/chat/inbox/{id:\d+}/pin',                     [$chatHandler, 'pin'],           null);
+$router->register('POST',   '/api/chat/inbox/{id:\d+}/read',                    [$chatHandler, 'readCustomer'],  null);
 $router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null);
 $router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null);
