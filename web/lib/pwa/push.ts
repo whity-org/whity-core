@@ -24,11 +24,12 @@ import { isIosSafari, isStandalone } from '@/lib/pwa/install-offer';
 export type PushSupport = 'ready' | 'needs-install' | 'denied' | 'unsupported';
 
 /**
- * Where a person turns notifications on and chooses kinds: the Preferences
- * tab, scrolled to the Notifications card (WHIT-1078). Every entry links here:
- * More on a phone, the account menu, Ctrl+K.
+ * Where a person turns notifications on and chooses kinds (WHIT-1078): its own
+ * page since WHIT-1081, You in [workspace] › Notifications. Every entry links
+ * here: More on a phone, the account menu, Ctrl+K. The old address
+ * (`/settings?tab=preferences#notifications`) still redirects to it.
  */
-export const NOTIFICATIONS_HREF = '/settings?tab=preferences#notifications';
+export const NOTIFICATIONS_HREF = '/settings/notifications';
 
 /** The Notifications card's anchor. */
 export const NOTIFICATIONS_ANCHOR = 'notifications';

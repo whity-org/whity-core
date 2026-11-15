@@ -249,7 +249,7 @@ describe('AppCommandPalette commands', () => {
   it('goes to the notifications settings by name (WHIT-1078)', () => {
     const input = openWith('/go notif');
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(push).toHaveBeenCalledWith('/settings?tab=preferences#notifications');
+    expect(push).toHaveBeenCalledWith('/settings/notifications');
   });
 
   it('says so when no command matches', () => {
