@@ -47,10 +47,34 @@ final class AmountInWordsTest extends TestCase
         self::assertSame('Five Jordanian dinars', AmountInWords::write(-5000, 'JOD', 'en'));
     }
 
-    public function testNoOtherCurrencyIsGivenDinarWords(): void
+    /** @return iterable<string, array{int, string, string, string}> */
+    public static function otherCurrencies(): iterable
     {
-        self::assertNull(AmountInWords::write(5000, 'USD', 'en'));
+        // CU.3's example, and the rest as the design's bundle writes them.
+        yield 'USD 301.60' => [30160, 'USD', 'Three hundred and one US dollars and sixty cents', 'ثلاثمئة وواحد دولار أمريكي وستون سنتاً'];
+        yield 'USD 18,652.35' => [1865235, 'USD', 'Eighteen thousand six hundred and fifty-two US dollars and thirty-five cents', 'ثمانية عشر ألفاً وستمئة واثنان وخمسون دولاراً أمريكياً وخمسة وثلاثون سنتاً'];
+        yield 'USD one' => [100, 'USD', 'One US dollar', 'دولار أمريكي واحد'];
+        yield 'USD two' => [200, 'USD', 'Two US dollars', 'دولاران أمريكيان'];
+        yield 'USD only cents' => [60, 'USD', 'Sixty cents', 'ستون سنتاً'];
+        yield 'USD one cent' => [1, 'USD', 'One cent', 'سنت واحد'];
+        yield 'EUR 12.50' => [1250, 'EUR', 'Twelve euros and fifty cents', 'اثنا عشر يورو وخمسون سنتاً'];
+        yield 'SAR 99.99' => [9999, 'SAR', 'Ninety-nine Saudi riyals and ninety-nine halalas', 'تسعة وتسعون ريالاً سعودياً وتسعة وتسعون هللة'];
+        yield 'AED 3.50' => [350, 'AED', 'Three UAE dirhams and fifty fils', 'ثلاثة دراهم إماراتية وخمسون فلساً'];
+    }
+
+    #[DataProvider('otherCurrencies')]
+    public function testWritesEachCurrencyWithItsOwnSubUnit(int $minor, string $currency, string $english, string $arabic): void
+    {
+        self::assertSame($english, AmountInWords::write($minor, $currency, 'en'));
+        self::assertSame($arabic, AmountInWords::write($minor, $currency, 'ar'));
+    }
+
+    public function testACurrencyWithoutWordsAnswersNull(): void
+    {
+        self::assertNull(AmountInWords::write(5000, 'GBP', 'en'));
         self::assertNull(AmountInWords::write(5000, 'JOD', 'fr'));
+        self::assertTrue(AmountInWords::supports('usd'));
+        self::assertFalse(AmountInWords::supports('GBP'));
     }
 
     public function testBeyondWhatTheWordsCoverIsNull(): void
