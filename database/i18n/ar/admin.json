@@ -874,7 +874,7 @@
         "billing.plans.title": "فعّل مساحة عملك",
         "billing.price.add": "إضافة سعر",
         "billing.price.amount": "السعر",
-        "billing.price.amountInvalid": "أدخل السعر كمبلغ، مثل 49.000.",
+        "billing.price.amountInvalid": "أدخل السعر كمبلغ، مثل 49.00.",
         "billing.price.currency": "العملة (رمز ISO)",
         "billing.price.dialog.description": "يمكن أن تحمل الباقة سعرًا فعّالًا واحدًا لكل عملة وفترة وأساس مقاعد. أوقف السعر الحالي قبل استبداله.",
         "billing.price.dialog.title": "تسعير «{plan}»",

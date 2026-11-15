@@ -11382,6 +11382,8 @@ final class CoreApiSchemas
                 'installable' => ['type' => 'boolean', 'description' => 'Whether the web app offers a manifest and service worker so it can be installed as an app. An instance setting (app.installable, else the PWA_ENABLED environment variable, else on).'],
                 // WHIT-932: the brand.remove_badge entitlement, read the other way round.
                 'builtOnWhity' => ['type' => 'boolean', 'description' => 'Whether this workspace\'s public pages show "Built on Whity". False when its plan removes the credit.'],
+                // CU.4: the workspace currency, so the app writes money in it.
+                'currency' => ['type' => 'string', 'description' => 'The workspace currency as an ISO 4217 code (billing.default_currency; USD by default). Amounts with a currency of their own show in that one.'],
             ], ['siteName', 'logoWideUrl', 'logoSquareUrl', 'faviconUrl', 'mainColor', 'theme', 'installable']),
             // GET /api/branding — the standard data envelope around Branding.
             'BrandingResponse' => self::dataEnvelope(SchemaBuilder::ref('Branding')),

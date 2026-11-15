@@ -1,4 +1,5 @@
 import { parseWireDate } from '@whity/features/datetime';
+import { moneyText, parseMoney } from '@whity/ui/money/currency';
 import type { AgentProposal } from '@/components/agents/proposals';
 
 /**
@@ -29,25 +30,32 @@ const AMOUNT_KEYS = ['amount', 'total', 'grand_total', 'value'];
 const CURRENCY_KEYS = ['currency', 'currency_code'];
 
 /**
- * The amount a proposal is about, when its arguments say one: "JOD 312.000".
- * Amounts are typed in normal units with the currency's decimals (register,
- * money), so they are shown as given, with three decimals for JOD-like
- * currencies and two otherwise. Null when the call has no amount.
- *
- * @param raw "JOD 312" without padding, for adding up.
+ * The amount an agent's call names, in the currency it names, as minor units
+ * of that currency. Null when the call has no amount, no currency, or a figure
+ * with more decimals than the currency has.
  */
-export function proposalAmount(proposal: AgentProposal, raw = false): string | null {
+export function proposalMoney(proposal: AgentProposal): { currency: string; minor: number } | null {
   const args = (proposal.arguments ?? {}) as Record<string, unknown>;
   const amountKey = AMOUNT_KEYS.find((key) => typeof args[key] === 'number' || (typeof args[key] === 'string' && /^-?\d+(\.\d+)?$/.test(args[key] as string)));
   if (amountKey === undefined) return null;
-  const currencyKey = CURRENCY_KEYS.find((key) => typeof args[key] === 'string' && (args[key] as string).length === 3);
-  const currency = currencyKey ? (args[currencyKey] as string).toUpperCase() : null;
-  if (currency === null) return null;
+  const currencyKey = CURRENCY_KEYS.find((key) => typeof args[key] === 'string' && /^[A-Za-z]{3}$/.test(args[key] as string));
+  if (currencyKey === undefined) return null;
+  const currency = (args[currencyKey] as string).toUpperCase();
   const value = Number(args[amountKey]);
   if (!Number.isFinite(value)) return null;
-  if (raw) return `${currency} ${value}`;
-  const decimals = ['JOD', 'KWD', 'BHD', 'OMR', 'TND', 'IQD', 'LYD'].includes(currency) ? 3 : 2;
-  return `${currency} ${value.toFixed(decimals)}`;
+  try {
+    // Through the decimal string, never `value * 1000`: the exponent is the
+    // currency's own (2 for USD, 3 for JOD), and too many decimals is refused.
+    return { currency, minor: parseMoney(String(value), currency) };
+  } catch {
+    return null;
+  }
+}
+
+/** The amount as people read it (CU.2: $312.00, JOD 312.000), or null. */
+export function proposalAmount(proposal: AgentProposal): string | null {
+  const money = proposalMoney(proposal);
+  return money === null ? null : moneyText(money.minor, money.currency);
 }
 
 /* ── Decided (TplApprovalsDecided) ─────────────────────────────────────────── */

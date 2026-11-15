@@ -10983,6 +10983,8 @@ export interface components {
             installable: boolean;
             /** @description Whether this workspace's public pages show "Built on Whity". False when its plan removes the credit. */
             builtOnWhity?: boolean;
+            /** @description The workspace currency as an ISO 4217 code (billing.default_currency; USD by default). Amounts with a currency of their own show in that one. */
+            currency?: string;
         };
         BrandingHostRequest: {
             host?: string | null;
