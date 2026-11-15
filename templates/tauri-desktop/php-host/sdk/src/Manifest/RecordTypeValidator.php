@@ -18,7 +18,7 @@ use Whity\Sdk\Expression\Expression;
  *     "fields": {
  *       "customer":  { "type": "text", "label": {...}, "required": true },
  *       "cake_type": { "type": "choice", "label": {...}, "options": [{ "value": "wedding", "label": {...} }] },
- *       "price":     { "type": "money", "label": {...}, "currency": "JOD" },
+ *       "price":     { "type": "money", "label": {...}, "currency": "USD" },
  *       "pickup_on": { "type": "date", "label": {...} }
  *     },
  *     "lifecycle": {
@@ -179,7 +179,7 @@ final class RecordTypeValidator
         }
         if ($type === 'money') {
             if (!is_string($field['currency'] ?? null) || preg_match('/^[A-Z]{3}$/', $field['currency']) !== 1) {
-                $errors[] = "{$path}.currency: required on money, an ISO 4217 code such as \"JOD\"";
+                $errors[] = "{$path}.currency: required on money, an ISO 4217 code such as \"USD\"";
             }
         } elseif (isset($field['currency'])) {
             $errors[] = "{$path}.currency: on money fields only";

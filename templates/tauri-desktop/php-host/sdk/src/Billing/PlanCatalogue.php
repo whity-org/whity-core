@@ -10,7 +10,7 @@ namespace Whity\Sdk\Billing;
  * Resolve it from the container:
  *
  *     $plans = \Whity\app(\Whity\Sdk\Billing\PlanCatalogue::class);
- *     $terms = $plans->activePrice('whity-builder.pro', 'month', 'JOD');
+ *     $terms = $plans->activePrice('whity-builder.pro', 'month', 'USD');
  *
  * A billing plugin uses it to price a plan the way the host prices it,
  * without reading the host's tables. It can only read. Plans and prices are

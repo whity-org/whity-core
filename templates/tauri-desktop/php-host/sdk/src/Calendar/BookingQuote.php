@@ -9,7 +9,7 @@ use DateTimeImmutable;
 /**
  * A booking about to be made, as a payment step sees it (SDK 1.98, ADR 0017).
  * Times are UTC. The price is the service's shown price in minor units
- * (JOD 12.500 is 12500), or null when the service shows none.
+ * ($12.50 is 1250, JOD 12.500 is 12500), or null when the service shows none.
  */
 final class BookingQuote
 {

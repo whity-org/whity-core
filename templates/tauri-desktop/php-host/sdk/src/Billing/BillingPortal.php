@@ -30,7 +30,7 @@ namespace Whity\Sdk\Billing;
  * gives it back in {@see BillingNotice}; it never parses it.
  *
  * MONEY IS IN MINOR UNITS, with the currency's own exponent. The dinar has
- * three decimals: 49.000 JOD is 49000.
+ * three decimals: 49.000 JOD is 49000, and $49.00 is 4900.
  *
  * FAILURE is always a {@see BillingPortalException}. The host maps its reason
  * onto an answer and never shows its message to a customer.
