@@ -14,6 +14,11 @@
  * bookings green; a column beside the calendar with the Requests waiting for
  * an OK and Today at a glance (below the calendar on a narrow screen).
  *
+ * COMPUTER (TplCalendarStaff, WHIT-1044): the title with Today and New
+ * booking beside it; then Day, Week and Month with the range between ‹ and ›,
+ * and who and where as filters at the end; then the sections as tabs, Bookings
+ * first. The phone keeps its own order (PwCalendar).
+ *
  * PHONE. Day is the default on a narrow screen. Week becomes a list of days
  * (seven columns of 40px are unreadable for anyone, and the people this is
  * sized for are over 50); Month shows a count per day that opens the day.
@@ -57,6 +62,10 @@ import { useCalendarWords } from './use-calendar-words';
 import { useNewIntent } from '@/lib/commands/new-intent';
 
 const EVERYONE = 'everyone';
+/** The workspace's first day, as the ISO weekday the calendar's words take. */
+const WEEKDAY_ISO: Readonly<Record<string, number>> = {
+  monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 7,
+};
 const ALL_BRANCHES = 'all';
 /** How far ahead the Requests card looks (the API allows 62 days at a time). */
 const REQUESTS_AHEAD_DAYS = 60;
@@ -74,6 +83,8 @@ export function CalendarScreen() {
     return <NoAccess area={t('area', 'the calendar')} permission="calendar:read" />;
   }
 
+  if (!basics.error && basics.data !== null) return <CalendarBody basics={basics.data} />;
+
   return (
     <div className="space-y-4">
       <AdminHeader
@@ -88,13 +99,11 @@ export function CalendarScreen() {
           onRetry={basics.refetch}
           area={t('area', 'the calendar')}
         />
-      ) : basics.data === null ? (
+      ) : (
         <div role="status" aria-busy="true" aria-label={t('loading', 'Loading the calendar')} className="space-y-3">
           <Skeleton className="h-10 w-full max-w-xl rounded-control" />
           <Skeleton className="h-[60vh] w-full rounded-card" />
         </div>
-      ) : (
-        <CalendarBody basics={basics.data} />
       )}
     </div>
   );
@@ -206,10 +215,25 @@ function CalendarBody({
     return [...fromBookings, ...fromEvents];
   }, [data, serviceById, staffName, t, words]);
 
+  // Week reads as its range, "15 – 21 Nov 2026" (TplCalendarStaff).
+  const weekTitle = (() => {
+    const first = range.days[0];
+    const last = range.days[range.days.length - 1];
+    if (first === undefined || last === undefined) return null;
+    const start = first.month === last.month
+      ? dates.calendarLabel(labelInstant(first, timeZone), 'dayNumber')
+      : dates.calendarLabel(labelInstant(first, timeZone), 'dayMonth');
+    const end = dates.calendarLabel(labelInstant(last, timeZone), 'dayMonth');
+    if (start === null || end === null) return null;
+    return t('toolbar.weekRange', '{start} – {end} {year}', { start, end, year: String(last.year) });
+  })();
   const title =
     view === 'day'
       ? dates.calendarLabel(labelInstant(anchor, timeZone), 'fullDate')
-      : dates.calendarLabel(labelInstant(view === 'week' ? range.days[3] : anchor, timeZone), 'monthYear');
+      : view === 'week'
+        ? weekTitle ?? dates.calendarLabel(labelInstant(range.days[3], timeZone), 'monthYear')
+        : dates.calendarLabel(labelInstant(anchor, timeZone), 'monthYear');
+  const weekStartsOn = words.weekday(WEEKDAY_ISO[settings.week_start] ?? 1);
 
   const notSetUp = services.length === 0 && staff.length === 0;
   const filtered = person !== EVERYONE;
@@ -247,6 +271,33 @@ function CalendarBody({
 
   return (
     <div className="space-y-4">
+      <AdminHeader
+        title={t('title', 'Calendar')}
+        description={t('descriptionWeek', 'Bookings and events, in the workspace’s time zone. The week starts on {day}.', {
+          day: weekStartsOn,
+        })}
+        action={
+          // From 768px the page's main actions sit beside its title; the phone keeps them in its toolbar.
+          <div className="flex items-center gap-2 max-md:hidden">
+            <Button variant="outline" onClick={() => setAnchor(today)} data-testid="calendar-today">
+              {t('toolbar.today', 'Today')}
+            </Button>
+            {access.canWrite && (
+              <Button variant="outline" onClick={() => { setEditing(null); setEventOpen(true); }} data-testid="calendar-add-event">
+                {t('toolbar.addEvent', 'Add event')}
+              </Button>
+            )}
+            {access.canWrite && services.length > 0 && (
+              <Button onClick={() => setNewBooking(true)} data-testid="calendar-new-booking">
+                <Icon name="plus" />
+                {t('toolbar.newBooking', 'New booking')}
+              </Button>
+            )}
+          </div>
+        }
+      />
+      <CalendarNav active="calendar" part="phone" />
+
       {!access.loading && !access.canWrite && (
         <ReadOnlyNotice
           title={t('readOnly.title', 'You can see the calendar but not book')}
@@ -254,9 +305,10 @@ function CalendarBody({
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      {/* The phone's toolbar (PwCalendar): Today, ‹ ›, the date, and its buttons. */}
+      <div className="flex flex-wrap items-center gap-2 md:hidden">
         <div className="flex items-center gap-1">
-          <Button variant="outline" onClick={() => setAnchor(today)} data-testid="calendar-today">
+          <Button variant="outline" onClick={() => setAnchor(today)} data-testid="calendar-today-phone">
             {t('toolbar.today', 'Today')}
           </Button>
           <Button
@@ -265,7 +317,6 @@ function CalendarBody({
             onClick={() => setAnchor(stepAnchor(view, anchor, -1))}
             aria-label={t('toolbar.previous', 'Previous')}
             title={t('toolbar.previous', 'Previous')}
-            data-testid="calendar-previous"
           >
             <Icon name="chevron-left" />
           </Button>
@@ -275,23 +326,22 @@ function CalendarBody({
             onClick={() => setAnchor(stepAnchor(view, anchor, 1))}
             aria-label={t('toolbar.next', 'Next')}
             title={t('toolbar.next', 'Next')}
-            data-testid="calendar-next"
           >
             <Icon name="chevron-right" />
           </Button>
         </div>
         {/* On a phone the date takes its own line above the buttons, so it never
             breaks inside a word. */}
-        <h2 className="order-first min-w-0 basis-full text-lg font-semibold break-words text-foreground sm:order-none sm:flex-1 sm:basis-auto" data-testid="calendar-title" aria-live="polite">
+        <p className="order-first min-w-0 basis-full text-lg font-semibold break-words text-foreground" aria-live="polite">
           {title ?? ''}
-        </h2>
+        </p>
         {access.canWrite && (
-          <Button variant="outline" onClick={() => { setEditing(null); setEventOpen(true); }} data-testid="calendar-add-event">
+          <Button variant="outline" onClick={() => { setEditing(null); setEventOpen(true); }}>
             {t('toolbar.addEvent', 'Add event')}
           </Button>
         )}
         {access.canWrite && services.length > 0 && (
-          <Button onClick={() => setNewBooking(true)} data-testid="calendar-new-booking">
+          <Button onClick={() => setNewBooking(true)}>
             <Icon name="plus" />
             {t('toolbar.newBooking', 'New booking')}
           </Button>
@@ -312,44 +362,75 @@ function CalendarBody({
             { value: 'month', label: t('view.month', 'Month') },
           ]}
         />
-        {staff.length > 0 && (
-          <div className="w-full sm:w-64">
-            <label htmlFor="calendar-person" className="sr-only">
-              {t('toolbar.person', 'Whose calendar')}
-            </label>
-            <FieldSelect
-              id="calendar-person"
-              value={person}
-              onChange={setPerson}
-              options={[
-                { value: EVERYONE, label: t('toolbar.everyone', 'Everyone') },
-                ...staff.map((s) => ({ value: String(s.profile_id), label: s.display_name })),
-              ]}
-            />
-          </div>
-        )}
-        {usedUnits.length > 0 && (
-          <div className="w-full sm:w-64">
-            <label htmlFor="calendar-branch" className="sr-only">
-              {t('toolbar.branch', 'Branch')}
-            </label>
-            <FieldSelect
-              id="calendar-branch"
-              value={branch}
-              onChange={setBranch}
-              options={[
-                { value: ALL_BRANCHES, label: t('toolbar.allBranches', 'All branches') },
-                ...usedUnits.map((u) => ({ value: String(u.id), label: u.name })),
-              ]}
-            />
-          </div>
-        )}
-        <p className="text-sm text-muted-foreground" data-testid="calendar-zone">
-          {t('toolbar.zone', 'Times in {zone}', { zone: timeZone })}
-        </p>
+        {/* From 768px the range sits between ‹ and › beside the view. */}
+        <div className="flex items-center gap-1 max-md:hidden">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setAnchor(stepAnchor(view, anchor, -1))}
+            aria-label={t('toolbar.previous', 'Previous')}
+            title={t('toolbar.previous', 'Previous')}
+            data-testid="calendar-previous"
+          >
+            <Icon name="chevron-left" />
+          </Button>
+          <h2 className="min-w-0 px-1 text-base font-medium text-foreground" data-testid="calendar-title" aria-live="polite">
+            {title ?? ''}
+          </h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setAnchor(stepAnchor(view, anchor, 1))}
+            aria-label={t('toolbar.next', 'Next')}
+            title={t('toolbar.next', 'Next')}
+            data-testid="calendar-next"
+          >
+            <Icon name="chevron-right" />
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 md:ms-auto">
+          {staff.length > 0 && (
+            <div className="w-full sm:w-52">
+              <label htmlFor="calendar-person" className="sr-only">
+                {t('toolbar.person', 'Whose calendar')}
+              </label>
+              <FieldSelect
+                id="calendar-person"
+                value={person}
+                onChange={setPerson}
+                options={[
+                  { value: EVERYONE, label: t('toolbar.everyone', 'Everyone') },
+                  ...staff.map((s) => ({ value: String(s.profile_id), label: s.display_name })),
+                ]}
+              />
+            </div>
+          )}
+          {usedUnits.length > 0 && (
+            <div className="w-full sm:w-52">
+              <label htmlFor="calendar-branch" className="sr-only">
+                {t('toolbar.branch', 'Branch')}
+              </label>
+              <FieldSelect
+                id="calendar-branch"
+                value={branch}
+                onChange={setBranch}
+                options={[
+                  { value: ALL_BRANCHES, label: t('toolbar.allBranches', 'All branches') },
+                  ...usedUnits.map((u) => ({ value: String(u.id), label: u.name })),
+                ]}
+              />
+            </div>
+          )}
+          <p className="text-sm text-muted-foreground" data-testid="calendar-zone">
+            {t('toolbar.zone', 'Times in {zone}', { zone: timeZone })}
+          </p>
+        </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <CalendarNav active="calendar" part="desktop" />
+
+      {/* The week gets the full width up to 1536px (TplCalendarStaff); Requests and Today sit under it, beside it on wider screens. */}
+      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="min-w-0 space-y-4">
       {error ? (
         <LoadProblem

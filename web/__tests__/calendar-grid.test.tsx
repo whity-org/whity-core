@@ -68,6 +68,60 @@ describe('TimeGrid', () => {
   });
 });
 
+describe('TimeGrid week (TplCalendarStaff, WHIT-1044)', () => {
+  const booked: GridItem[] = [{ ...items[0], booking: { id: 1 } as unknown as GridItem['booking'] }];
+
+  it('heads each day with its date and how many bookings it has', () => {
+    render(
+      <TimeGrid
+        days={weekDays(WED, 'saturday')}
+        items={booked}
+        timeZone={AMMAN}
+        weekendDays={['friday', 'saturday']}
+        today={WED}
+        showPerson={false}
+        onOpen={() => {}}
+      />
+    );
+    const counts = screen.getAllByTestId('calendar-day-count').map((el) => el.textContent);
+    expect(counts[0]).toBe('1 booking');
+    expect(counts.slice(1).every((text) => text === '0 bookings')).toBe(true);
+  });
+
+  it('reads a booking as time and service, over the customer and the person', () => {
+    render(
+      <TimeGrid
+        days={weekDays(WED, 'saturday')}
+        items={booked}
+        timeZone={AMMAN}
+        weekendDays={['friday', 'saturday']}
+        today={WED}
+        showPerson
+        onOpen={() => {}}
+      />
+    );
+    const [first, second] = Array.from(screen.getByTestId('calendar-item').children).map((el) => el.textContent);
+    expect(first).toBe('09:00 Cake tasting');
+    expect(second).toBe('Rana Haddad · Lina Saleh');
+  });
+
+  it('marks now with a line on today’s column only', () => {
+    render(
+      <TimeGrid
+        days={weekDays(WED, 'saturday')}
+        items={[]}
+        timeZone={AMMAN}
+        weekendDays={['friday', 'saturday']}
+        today={WED}
+        showPerson={false}
+        onOpen={() => {}}
+      />
+    );
+    const line = screen.getByTestId('calendar-now');
+    expect(line.closest('[data-testid="calendar-day-column"]')).toHaveAttribute('data-date', '2026-11-11');
+  });
+});
+
 describe('MonthGrid', () => {
   it('heads the month with the workspace’s first day', () => {
     render(

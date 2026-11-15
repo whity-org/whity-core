@@ -506,15 +506,9 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="text-sm font-medium">
-                  {t('login.password.label', 'Password')}
-                </label>
-                {/* WC-password-reset-2fa-recovery: self-service reset entry point. */}
-                <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
-                  {t('login.password.forgot', 'Forgot password?')}
-                </Link>
-              </div>
+              <label htmlFor="password" className="text-sm font-medium">
+                {t('login.password.label', 'Password')}
+              </label>
               <Input
                 id="password"
                 type="password"
@@ -538,6 +532,14 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={isFormDisabled}>
               {buttonText}
             </Button>
+
+            {/* WC-password-reset-2fa-recovery: self-service reset entry point,
+                under the button as TplSignInTwoColumn draws it (WHIT-1044). */}
+            <p className="text-center">
+              <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground hover:underline">
+                {t('login.password.forgotYour', 'Forgot your password?')}
+              </Link>
+            </p>
 
             {/* WC-235: self-service registration entry point. The prompt and
                 the link text are SEPARATE keys because they are separate
