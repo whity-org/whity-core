@@ -27,7 +27,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@whity/features/i18n';
-import { useDateDisplay } from '@whity/features/datetime';
+import { useDateDisplay, wallClockAt } from '@whity/features/datetime';
 import {
   assignLanes,
   dateKey,
@@ -74,10 +74,8 @@ function useNowMinute(timeZone: string): number | null {
 
 function minuteNow(timeZone: string): number | null {
   try {
-    const parts = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
-    const hour = Number(parts.find((p) => p.type === 'hour')?.value);
-    const minute = Number(parts.find((p) => p.type === 'minute')?.value);
-    return Number.isFinite(hour) && Number.isFinite(minute) ? hour * 60 + minute : null;
+    const clock = wallClockAt(new Date(), timeZone);
+    return clock.hour * 60 + clock.minute;
   } catch {
     return null;
   }
