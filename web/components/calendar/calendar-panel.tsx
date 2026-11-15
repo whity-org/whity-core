@@ -15,7 +15,7 @@ import { useState, type ReactNode } from 'react';
 import { Button } from '@whity/ui/button';
 import { Icon } from '@whity/ui/icon';
 import { useTranslation } from '@whity/features/i18n';
-import { useDateDisplay } from '@whity/features/datetime';
+import { offsetMinutesAt, useDateDisplay } from '@whity/features/datetime';
 import { cn } from '@/lib/utils';
 import {
   addDays,
@@ -64,10 +64,13 @@ export interface CalendarPanelProps {
 export function zoneLabel(timeZone: string): string {
   const city = (timeZone.split('/').pop() ?? timeZone).replace(/_/g, ' ');
   try {
-    const part = new Intl.DateTimeFormat('en-GB', { timeZone, timeZoneName: 'shortOffset' })
-      .formatToParts(new Date())
-      .find((p) => p.type === 'timeZoneName')?.value;
-    return part ? `${city} (${part})` : city;
+    // An offset, not a date: "GMT+3", "GMT+5:30", "GMT" for UTC itself.
+    const minutes = offsetMinutesAt(new Date(), timeZone);
+    const sign = minutes < 0 ? '-' : '+';
+    const hours = Math.floor(Math.abs(minutes) / 60);
+    const rest = Math.abs(minutes) % 60;
+    const offset = minutes === 0 ? 'GMT' : `GMT${sign}${hours}${rest === 0 ? '' : `:${String(rest).padStart(2, '0')}`}`;
+    return `${city} (${offset})`;
   } catch {
     return city;
   }
@@ -238,6 +241,7 @@ export function CalendarPanel(props: CalendarPanelProps) {
         today={props.today}
         shownFrom={props.shownFrom}
         shownTo={props.shownTo}
+        // @date-display-ignore: a callback that jumps to a date, not a timestamp rendered here
         onPickDate={props.onPickDate}
       />
       <label className="flex h-10 items-center gap-2 rounded-control border border-input bg-background ps-3 pe-1 text-sm text-muted-foreground focus-within:outline-2 focus-within:outline-ring">
