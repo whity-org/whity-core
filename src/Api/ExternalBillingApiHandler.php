@@ -835,7 +835,7 @@ final class ExternalBillingApiHandler
      */
     private function monthlyPrice(int $tenantId, string $planKey, string $preferredPeriod): ?float
     {
-        $currency = strtoupper($this->setting($tenantId, SettingsRegistry::BILLING_DEFAULT_CURRENCY, 'JOD'));
+        $currency = strtoupper($this->setting($tenantId, SettingsRegistry::BILLING_DEFAULT_CURRENCY, 'USD'));
         $statement = $this->pdo->prepare(
             'SELECT pp.unit_amount, pp.billing_period
                FROM plan_prices pp
@@ -893,7 +893,7 @@ final class ExternalBillingApiHandler
         $currency = strtoupper($this->setting(
             $tenantId,
             SettingsRegistry::BILLING_DEFAULT_CURRENCY,
-            'JOD'
+            'USD'
         ));
 
         $statement = $this->pdo->prepare(
@@ -956,7 +956,7 @@ final class ExternalBillingApiHandler
         $currency = strtoupper($this->setting(
             $tenantId,
             SettingsRegistry::BILLING_DEFAULT_CURRENCY,
-            'JOD'
+            'USD'
         ));
 
         $bridge = $this->pluginBridge();

@@ -54,7 +54,7 @@ final class CalendarSettings
             max(1, $int(SettingsRegistry::CALENDAR_PAYMENT_HOLD_MINUTES, 15)),
             self::weekday($effective[SettingsRegistry::CALENDAR_WEEK_START] ?? 'saturday') ?? 6,
             self::weekdays($effective[SettingsRegistry::CALENDAR_WEEKEND_DAYS] ?? 'friday,saturday'),
-            $effective[SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? 'JOD',
+            $effective[SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? 'USD',
             ($effective[SettingsRegistry::CALENDAR_INSTANT_BOOKING] ?? 'true') !== 'false',
         );
     }

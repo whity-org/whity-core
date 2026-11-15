@@ -78,6 +78,8 @@ final class WorkspaceServerRealEngineTest extends TestCase
         $_GET = [];
 
         $this->pdo = SchemaFromMigrations::make(true);
+        // This install sells in dinars; the default has been US dollars since 3.5.1.
+        $this->pdo->exec("INSERT INTO app_settings (setting_key, value) VALUES ('billing.default_currency', 'JOD')");
 
         $this->exec("INSERT INTO tenants (id, name, slug) VALUES (0, 'system', 'system') ON CONFLICT DO NOTHING");
         $this->exec('INSERT INTO tenants (id, name, slug) VALUES (' . self::TENANT_A . ", 'Example Bakery', 'bakery')");
