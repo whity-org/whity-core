@@ -34,6 +34,9 @@ final class NotificationSummaryApiHandler
         private readonly PushSubscriptionRepository $pushSubscriptions,
     ) {}
 
+    /**
+     * @param array<string, string> $params Route parameters (none).
+     */
     public function summary(Request $request, array $params = []): Response
     {
         $ctx = $this->resolveClaims($request);
@@ -106,7 +109,7 @@ final class NotificationSummaryApiHandler
         );
         $stmt->execute([$profileId]);
 
-        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        return array_values(array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN)));
     }
 
     /**
