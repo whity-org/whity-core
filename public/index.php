@@ -5012,6 +5012,9 @@ $router->register('POST',   '/api/data-types/{type}/bulk',           [$dataTypes
 // core or a plugin) dispatches a notification (hook-subscriber mode).
 // E2: the `email` channel is delivered through core mail, not only logged.
 $transportRegistry = \Whity\Core\Notification\CoreTransports::make($logger, $brandedEmailSender, $profileEmailRepository);
+// WHIT-1074: web push. Registered here so the dispatcher adds `push` for a
+// person with a device on; the worker sends it.
+$transportRegistry->register(\Whity\Core\Notification\Push\PushTransport::fromEnv($db->getPdo(), $logger, $_ENV));
 $notificationRepository = new \Whity\Core\Notification\NotificationRepository($db->getPdo());
 // Per-user preference resolver — the dispatcher consults it to filter a
 // recipient's channels (transactional types always bypass; #c56a6455).

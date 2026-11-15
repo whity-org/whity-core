@@ -31,6 +31,11 @@ use Whity\Core\Settings\SettingsService;
  * off by the workspace or the person (EM.1).
  *
  * Without a database (a unit test, a CLI without one) layers 2-4 answer yes.
+ *
+ * **Web push uses the same gate** (WHIT-1074): layers 2 and 4 take a channel,
+ * so `allows($tenant, $person, $type, 'push')` reads the workspace's `push`
+ * channel switch and the person's choice for the kind on `push`, and security
+ * types go through exactly as they do for email.
  */
 final class EmailGate
 {
@@ -61,13 +66,13 @@ final class EmailGate
      * Layer 2: whether the workspace sends email to its people. On unless its
      * `email` channel was turned off.
      */
-    public function workspace(int $tenantId): bool
+    public function workspace(int $tenantId, string $channel = self::CHANNEL): bool
     {
         if ($this->db === null || $tenantId <= 0) {
             return true;
         }
         try {
-            $row = (new TenantNotificationSettingsRepository($this->db))->findForChannel($tenantId, self::CHANNEL);
+            $row = (new TenantNotificationSettingsRepository($this->db))->findForChannel($tenantId, $channel);
         } catch (\Throwable) {
             return true;
         }
@@ -105,7 +110,7 @@ final class EmailGate
      * Layer 4: the person's own choice for this kind of email. An exact
      * (type, email) row wins over the (`*`, email) row; no row means on.
      */
-    public function person(int $tenantId, ?int $profileId, string $type): bool
+    public function person(int $tenantId, ?int $profileId, string $type, string $channel = self::CHANNEL): bool
     {
         if ($this->db === null || $profileId === null || $profileId <= 0 || $this->isSecurity($type)) {
             return true;
@@ -113,7 +118,7 @@ final class EmailGate
         $exact = null;
         $every = null;
         foreach ((new NotificationPreferenceRepository($this->db))->listForProfile($tenantId, $profileId) as $pref) {
-            if ($pref['channel'] !== self::CHANNEL) {
+            if ($pref['channel'] !== $channel) {
                 continue;
             }
             if ($pref['type'] === $type) {
@@ -130,17 +135,23 @@ final class EmailGate
      * Layers 2 and 4 together: whether the workspace's email of this type may
      * reach this person. Security types always may.
      */
-    public function allows(int $tenantId, ?int $profileId, string $type): bool
+    public function allows(int $tenantId, ?int $profileId, string $type, string $channel = self::CHANNEL): bool
     {
         if ($this->isSecurity($type)) {
             return true;
         }
 
-        return $this->workspace($tenantId) && $this->person($tenantId, $profileId, $type);
+        return $this->workspace($tenantId, $channel) && $this->person($tenantId, $profileId, $type, $channel);
     }
 
     /** Security and account emails can't be turned off by a workspace or a person. */
     public function isSecurity(string $type): bool
+    {
+        return self::isSecurityType($type);
+    }
+
+    /** {@see isSecurity()} without an instance, for channels that only need this answer. */
+    public static function isSecurityType(string $type): bool
     {
         foreach (NotificationPreferenceResolver::DEFAULT_TRANSACTIONAL_PREFIXES as $prefix) {
             if (str_starts_with($type, $prefix)) {

@@ -72,6 +72,19 @@ final class CoreJobs
                 entitlements: new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo))
             ));
             $transports ??= CoreTransports::make($logger, $coreSender, new \Whity\Core\Identity\ProfileEmailRepository($pdo));
+            // WHIT-1074: web push to the devices a person turned on, and the
+            // one digest push for a burst the rate limit held back.
+            if (!$transports->has(\Whity\Core\Notification\Push\PushTransport::CHANNEL)) {
+                $transports->register(\Whity\Core\Notification\Push\PushTransport::fromEnv($pdo, $logger, $_ENV));
+            }
+            $pushTransport = $transports->resolve(0, \Whity\Core\Notification\Push\PushTransport::CHANNEL);
+            $registry->register(
+                \Whity\Core\Notification\Push\PushDigestJob::NAME,
+                new \Whity\Core\Notification\Push\PushDigestJob(
+                    static fn (): ?\Whity\Core\Notification\Push\PushTransport => $pushTransport instanceof \Whity\Core\Notification\Push\PushTransport ? $pushTransport : null
+                ),
+                false
+            );
             $registry->register(
                 SendNotificationDeliveryJob::NAME,
                 new SendNotificationDeliveryJob(
