@@ -36,8 +36,11 @@ the same version (both at 0.2.0; bump together). `publish-whity.yml` publishes i
 main, by npm trusted publishing like `publish-cli.yml`. The name has to be claimed on npmjs.com
 first, with that workflow file set as its trusted publisher; that first step is the owner's.
 
-**whity.dev/install** (whity-web) shows the two npm lines, the one-line alternative and this
-output, in English and Arabic.
+**Order, so the live one-liner never breaks.** whity.dev serves `install.sh` from whity-core's
+develop on every whity-web deploy. So `install.sh` stays the local installer until `whity` 0.2.0 is
+on npm (the owner claims the name, then the next release publishes it); only then does it become
+the bootstrap, and whity.dev/install switch to the two npm lines and this output, in English and
+Arabic.
 
 # Design 3.5.1: US dollars (15 Nov 2026)
 
