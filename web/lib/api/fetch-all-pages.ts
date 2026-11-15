@@ -13,14 +13,17 @@
  * whether it got there. Callers MUST branch on `complete` — the whole point is
  * that a truncated set is never mistaken for the full one.
  *
- * Two entry points, one walk: {@link fetchAllPages} for the raw `apiClient`
- * from `useAuth()`, {@link fetchAllPagesTyped} for the openapi-fetch client in
+ * Two entry points, one walk: {@link fetchAllPages} for a path the spec can't name
+ * (a plugin's list, or one built at run time), {@link fetchAllPagesTyped} for the openapi-fetch client in
  * `lib/api/client`. They differ only in how a page is requested and how failure
  * is signalled (a non-ok `Response` versus an undefined `data`), so the
  * termination and completeness rules — the parts that are easy to get subtly
  * wrong — exist exactly once, in `walkPages`.
  */
 
+import { apiFetch } from '@/lib/api/client';
+
+/** A page requester: `apiFetch`, or a wrapper that adds a signal or a guard. */
 type ApiClient = (url: string, options?: RequestInit) => Promise<Response>;
 
 /** The `pagination` block every paginated core endpoint returns. */
@@ -133,21 +136,36 @@ async function walkPages<T>(
 /**
  * Fetch every page of `path` and concatenate the `data` arrays.
  *
- * @param apiClient The authenticated fetch wrapper from `useAuth()`.
+ * Pages go through `apiFetch` (same session rules as the typed client). A
+ * caller that needs to add to each request — an abort signal, a hang guard —
+ * passes its own requester first. A requester that is the old `useAuth()`
+ * `apiClient` still works, so screens can drop it one at a time.
+ *
  * @param path      List endpoint path; an existing query string is preserved.
  * @param perPage   Rows per request. Defaults to the server maximum.
  */
 export async function fetchAllPages<T>(
-  apiClient: ApiClient,
   path: string,
-  perPage: number = MAX_PER_PAGE
+  perPage?: number
+): Promise<FetchAllPagesResult<T>>;
+export async function fetchAllPages<T>(
+  requester: ApiClient | null | undefined,
+  path: string,
+  perPage?: number
+): Promise<FetchAllPagesResult<T>>;
+export async function fetchAllPages<T>(
+  first: string | ApiClient | null | undefined,
+  second?: string | number,
+  third?: number
 ): Promise<FetchAllPagesResult<T>> {
+  const request: ApiClient = typeof first === 'function' ? first : apiFetch;
+  const path = (typeof first === 'string' ? first : second) as string;
+  const perPage =
+    (typeof first === 'string' ? (second as number | undefined) : third) ?? MAX_PER_PAGE;
   const separator = path.includes('?') ? '&' : '?';
 
   return walkPages<T>(async (page, size) => {
-    const response = await apiClient(
-      `${path}${separator}page=${page}&per_page=${size}`
-    );
+    const response = await request(`${path}${separator}page=${page}&per_page=${size}`);
     if (!response.ok) {
       return { ok: false };
     }

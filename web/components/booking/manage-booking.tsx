@@ -34,6 +34,7 @@ import {
 import { useTranslation } from '@whity/features/i18n';
 import { safeTimeZone, toZonedIso, zonedDate } from '@whity/features/datetime';
 import { PublicShell } from '@/components/auth/public-shell';
+import { OutcomeIcon } from '@/components/auth/public-outcome';
 import {
   PublicBookingError,
   icsUrl,
@@ -65,6 +66,8 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
   const [attempt, setAttempt] = useState(0);
   const [taking, setTaking] = useState(false);
   const [takeProblem, setTakeProblem] = useState<string | null>(null);
+  // WHIT-1014: the workspace's brand, from the first answer (later answers leave it out).
+  const [brand, setBrand] = useState<PublicBooking['brand']>(null);
 
   useEffect(() => {
     if (!isManageToken(initialToken)) return;
@@ -74,6 +77,7 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
       .then((found) => {
         if (cancelled) return;
         setBooking(found);
+        setBrand(found.brand ?? null);
         setPhase('ready');
       })
       .catch((error: unknown) => {
@@ -90,7 +94,7 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
   if (phase === 'loading') {
     return (
       <PublicShell wide>
-        <Card className="border-t-4 border-t-primary text-sm" aria-busy="true" data-testid="manage-loading">
+        <Card className="text-sm" aria-busy="true" data-testid="manage-loading">
           <CardHeader>
             <Skeleton className="h-7 w-1/2" />
           </CardHeader>
@@ -108,36 +112,37 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
   if (phase !== 'ready' || booking === null) {
     return (
       <PublicShell wide>
-        <Card className="border-t-4 border-t-primary text-sm" data-testid={`manage-${phase}`}>
-          <CardHeader>
+        <Card className="text-sm" data-testid={`manage-${phase}`}>
+          <CardHeader className="flex items-center gap-4">
+            <OutcomeIcon name={phase === 'invalid' ? 'search' : 'offline'} tone={phase === 'invalid' ? 'muted' : 'warn'} />
             <CardTitle className="text-xl font-semibold">
               {phase === 'invalid'
-                ? t('manage.invalid.title', 'This link is invalid or has expired')
+                ? t('manage.invalid.title', 'This booking link doesn’t work')
                 : phase === 'tooMany'
                 ? t('tooMany.title', 'Too many tries')
                 : t('manage.failed.title', 'Your booking didn’t load')}
             </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <CardDescription className="text-sm">
               {phase === 'invalid'
                 ? t(
                     'manage.invalid.description',
-                    'A booking link stops working when the booking starts, when it is cancelled, and when it is moved (the newest email has the new link). To change a booking, use the link in your latest email, or contact the business.'
+                    'It may be from an old email, or the booking already happened, was moved or was cancelled. Your latest email from the business has the right link.'
                   )
                 : phase === 'tooMany'
                 ? t('error.tooMany', 'Too many tries from this connection. Wait a few minutes and try again.')
                 : t('failed.description', 'Check your connection and try again.')}
             </CardDescription>
-          </CardHeader>
-          {phase !== 'invalid' && (
-            <CardContent>
+            {phase !== 'invalid' && (
               <Button variant="outline" onClick={() => {
                   setPhase('loading');
                   setAttempt((n) => n + 1);
                 }}>
                 {t('action.retry', 'Try again')}
               </Button>
-            </CardContent>
-          )}
+            )}
+          </CardContent>
         </Card>
       </PublicShell>
     );
@@ -169,26 +174,43 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
   };
 
   return (
-    <PublicShell wide>
-      <Card className="border-t-4 border-t-primary text-sm" data-testid="manage-card">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold">
-            {workspaceName
-              ? t('manage.title', 'Your booking with {workspace}', { workspace: workspaceName })
-              : t('manage.titlePlain', 'Your booking')}
-          </CardTitle>
-          <CardDescription className="text-sm">
-            {booking.status === 'cancelled'
-              ? t('manage.cancelled', 'This booking is cancelled. There is nothing more to do here.')
-              : booking.status === 'expired'
-              ? t('manage.expired', 'This booking wasn’t paid in time, so the time was given back. There is nothing more to do here.')
-              : suggested
-              ? t('manage.suggestedDescription', '{workspace} can’t do the time you asked for and suggests this one. Take it, pick another time, or cancel.', { workspace: workspaceName })
-              : requested
-              ? t('manage.requestedDescription', 'Your request is waiting for an answer. The time is held for you; you’ll get an email when it is accepted.')
-              : t('manage.description', 'You can add it to your calendar, move it to another time, or cancel it.')}
-          </CardDescription>
-        </CardHeader>
+    <PublicShell wide brand={brand}>
+      <Card className="text-sm" data-testid="manage-card">
+        {/* Moving has its own heading (the card's "Move your booking"). */}
+        {mode === 'view' && (
+          <CardHeader className="gap-3">
+            <div className="flex items-center gap-4">
+              {booking.status === 'confirmed' && <OutcomeIcon name="success" tone="ok" />}
+              {booking.status === 'cancelled' && <OutcomeIcon name="close" tone="muted" />}
+              {requested && <OutcomeIcon name="clock" tone="dash" />}
+              <CardTitle className="text-xl font-semibold">
+                {booking.status === 'confirmed'
+                  ? t('manage.booked', 'You’re booked')
+                  : booking.status === 'cancelled'
+                  ? t('manage.cancelledTitle', 'Your booking is cancelled')
+                  : workspaceName
+                  ? t('manage.title', 'Your booking with {workspace}', { workspace: workspaceName })
+                  : t('manage.titlePlain', 'Your booking')}
+              </CardTitle>
+            </div>
+            <CardDescription className="text-sm">
+              {booking.status === 'confirmed' && booking.customer.name
+                ? t('manage.hello', 'Hello {name}. Here is your booking with {workspace}; keep this link to change it.', {
+                    name: booking.customer.name,
+                    workspace: workspaceName,
+                  })
+                : booking.status === 'cancelled'
+                ? t('manage.cancelled', 'There is nothing more to do here. To come another time, book again.')
+                : booking.status === 'expired'
+                ? t('manage.expired', 'This booking wasn’t paid in time, so the time was given back. There is nothing more to do here.')
+                : suggested
+                ? t('manage.suggestedDescription', '{workspace} can’t do the time you asked for and suggests this one. Take it, pick another time, or cancel.', { workspace: workspaceName })
+                : requested
+                ? t('manage.requestedDescription', 'Your request is waiting for an answer. The time is held for you; you’ll get an email when it is accepted.')
+                : t('manage.description', 'Here is your booking; keep this link to change it.')}
+            </CardDescription>
+          </CardHeader>
+        )}
         <CardContent className="space-y-5">
           {notice && (
             <Alert variant="success" data-testid="manage-notice">
@@ -205,31 +227,36 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
                 </Alert>
               )}
               {open && (
-                <div className="flex flex-wrap gap-2">
+                <div className="grid gap-2">
                   {suggested && (
-                    <Button onClick={() => void takeSuggestion()} loading={taking} data-testid="manage-take">
+                    <Button size="lg" onClick={() => void takeSuggestion()} loading={taking} data-testid="manage-take">
                       {t('manage.take', 'Take this time')}
                     </Button>
                   )}
-                  <Button asChild variant="outline" data-testid="manage-ics">
+                  {/* The main button, unless a suggested time is waiting to be taken. */}
+                  <Button asChild size={suggested ? 'default' : 'lg'} variant={suggested ? 'outline' : 'default'} data-testid="manage-ics">
                     <a href={icsUrl(token)} download="booking.ics">
                       <Icon name="calendar" />
-                      {t('action.addToCalendar', 'Add to calendar')}
+                      {t('action.addToMyCalendar', 'Add to my calendar')}
                     </a>
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setNotice(null);
-                      setMode('move');
-                    }}
-                    data-testid="manage-move"
-                  >
-                    {t('manage.move.action', 'Move to another time')}
-                  </Button>
-                  <Button variant="outline" onClick={() => setCancelling(true)} data-testid="manage-cancel">
-                    {t('manage.cancel.action', 'Cancel booking')}
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setNotice(null);
+                        setMode('move');
+                      }}
+                      data-testid="manage-move"
+                    >
+                      <Icon name="sync" />
+                      {t('manage.move.action', 'Move it')}
+                    </Button>
+                    <Button variant="outline" onClick={() => setCancelling(true)} data-testid="manage-cancel">
+                      <Icon name="close" />
+                      {t('manage.cancel.action', 'Cancel it')}
+                    </Button>
+                  </div>
                 </div>
               )}
             </>
@@ -317,7 +344,7 @@ function MovePanel({
       }
       setProblem(
         error instanceof PublicBookingError && error.status === 404
-          ? t('manage.invalid.title', 'This link is invalid or has expired')
+          ? t('manage.invalid.title', 'This booking link doesn’t work')
           : words.errorText(error, t('manage.move.error', 'The booking couldn’t be moved. Try again.'))
       );
     } finally {
@@ -328,9 +355,9 @@ function MovePanel({
   return (
     <div className="space-y-4" data-testid="manage-move-panel">
       <div className="space-y-1">
-        <h2 className="text-base font-semibold text-foreground">{t('manage.move.title', 'Move to another time')}</h2>
+        <h2 className="text-xl font-semibold text-foreground">{t('manage.move.title', 'Move your booking')}</h2>
         <p className="text-sm text-muted-foreground">
-          {t('manage.move.now', 'Now: {when}', {
+          {t('manage.move.now', 'Now: {when}. Pick a new day and time; everything else stays the same.', {
             when: whenAt(booking.starts_at),
           })}
         </p>
@@ -364,12 +391,14 @@ function MovePanel({
           <AlertDescription className="text-sm">{problem}</AlertDescription>
         </Alert>
       )}
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => void save()} loading={saving} disabled={slot === null} data-testid="move-submit">
-          {t('manage.move.submit', 'Move to this time')}
+      <div className="grid gap-2">
+        <Button size="lg" onClick={() => void save()} loading={saving} disabled={slot === null} data-testid="move-submit">
+          {slot
+            ? t('manage.move.submitTo', 'Move to {when}', { when: whenAt(slot.starts_at) })
+            : t('manage.move.submit', 'Move to this time')}
         </Button>
-        <Button variant="outline" onClick={onBack} disabled={saving}>
-          {t('action.back', 'Back')}
+        <Button variant="ghost" onClick={onBack} disabled={saving}>
+          {t('manage.move.keep', 'Keep the original time')}
         </Button>
       </div>
     </div>
@@ -411,7 +440,7 @@ function CancelDialog({
     } catch (error) {
       setProblem(
         error instanceof PublicBookingError && error.status === 404
-          ? t('manage.invalid.title', 'This link is invalid or has expired')
+          ? t('manage.invalid.title', 'This booking link doesn’t work')
           : words.errorText(error, t('manage.cancel.error', 'The booking couldn’t be cancelled. Try again.'))
       );
     } finally {
@@ -423,7 +452,7 @@ function CancelDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="manage-cancel-dialog">
         <DialogHeader>
-          <DialogTitle>{t('manage.cancel.title', 'Cancel this booking?')}</DialogTitle>
+          <DialogTitle>{t('manage.cancel.title', 'Cancel your booking?')}</DialogTitle>
           <DialogDescription>
             {t(
               'manage.cancel.description',
@@ -435,7 +464,9 @@ function CancelDialog({
         </DialogHeader>
         <div className="space-y-1.5">
           <label htmlFor="cancel-reason" className="text-sm font-medium text-foreground">
-            {t('manage.cancel.reason', 'Reason (optional)')}
+            {workspaceName
+              ? t('manage.cancel.reasonFor', 'Tell {workspace} why (optional)', { workspace: workspaceName })
+              : t('manage.cancel.reason', 'Reason (optional)')}
           </label>
           <Textarea id="cancel-reason" className="text-sm" rows={2} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
         </div>
@@ -446,10 +477,10 @@ function CancelDialog({
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            {t('manage.cancel.keep', 'Keep booking')}
+            {t('manage.cancel.keep', 'No, keep it')}
           </Button>
           <Button variant="destructive" onClick={() => void confirm()} loading={saving} data-testid="manage-cancel-confirm">
-            {t('manage.cancel.confirm', 'Cancel booking')}
+            {t('manage.cancel.confirm', 'Yes, cancel my booking')}
           </Button>
         </DialogFooter>
       </DialogContent>

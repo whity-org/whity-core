@@ -89,6 +89,34 @@ final class BrandingService
     }
 
     /**
+     * The brand a workspace's public pages show a visitor (WHIT-1014): the
+     * name, the logos, the main colour and the token sets derived from it.
+     * Public by nature (the same values the branding endpoint serves on the
+     * workspace's own host), and nothing else.
+     *
+     * The name is the workspace's own site name when it set one, else the
+     * workspace's name, never the instance's: a visitor booking a bakery on a
+     * shared host should read the bakery's name, not the operator's. Logos and
+     * the colour resolve as everywhere else (workspace, then global default).
+     *
+     * @return array{name: string, logo_wide_url: ?string, logo_square_url: ?string, main_color: ?string, theme: array{light: array<string, string>, dark: array<string, string>}|null}
+     */
+    public function forPublicPage(int $tenantId, string $workspaceName): array
+    {
+        $effective = $this->effective($tenantId);
+        $ownName = in_array(SettingsRegistry::SITE_NAME, $this->settings->overriddenKeys($tenantId), true)
+            && trim($effective->siteName) !== '';
+
+        return [
+            'name' => $ownName ? $effective->siteName : $workspaceName,
+            'logo_wide_url' => $effective->logoWideUrl,
+            'logo_square_url' => $effective->logoSquareUrl,
+            'main_color' => $effective->mainColor,
+            'theme' => $effective->theme,
+        ];
+    }
+
+    /**
      * Whether the web app is installable (#1733), from the value an operator
      * STORED on the settings screen, else the `PWA_ENABLED` environment
      * variable, else on.

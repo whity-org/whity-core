@@ -19,6 +19,7 @@ import { DisplayPreferencesSettings } from '@/components/display-preferences-set
 import { EmailAddressesSettings } from '@/components/EmailAddressesSettings';
 import { LanguageSwitcher, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import { ProfileForm } from './profile-form';
+import { PushSettings } from '@/components/settings/push-settings';
 
 const TABS = ['profile', 'security', 'sessions', 'preferences'] as const;
 type TabId = (typeof TABS)[number];
@@ -41,7 +42,7 @@ function SettingsPageInner() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">{t('settings.title', 'Settings')}</h1>
+        <h1 className="text-2xl font-semibold">{t('settings.title', 'My settings')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {t('settings.subtitle', 'Manage your account and security preferences')}
         </p>
@@ -50,9 +51,9 @@ function SettingsPageInner() {
       <Tabs value={tab} onValueChange={(next) => router.replace(`${pathname}?tab=${next}`, { scroll: false })}>
         <TabsList>
           <TabsTrigger value="profile">{t('settings.tab.profile', 'Profile')}</TabsTrigger>
-          <TabsTrigger value="security">{t('settings.tab.security', 'Sign-in and security')}</TabsTrigger>
-          <TabsTrigger value="sessions">{t('settings.tab.sessions', 'Sessions and devices')}</TabsTrigger>
-          <TabsTrigger value="preferences">{t('settings.tab.preferences', 'Preferences')}</TabsTrigger>
+          <TabsTrigger value="security">{t('settings.tab.security', 'Password and two-step')}</TabsTrigger>
+          <TabsTrigger value="sessions">{t('settings.tab.sessions', 'Where you’re signed in')}</TabsTrigger>
+          <TabsTrigger value="preferences">{t('settings.tab.preferences', 'Language and display')}</TabsTrigger>
         </TabsList>
 
         {/* Profile — self-service edit (WC-64) */}
@@ -148,6 +149,8 @@ function SettingsPageInner() {
 
         <TabsContent value="preferences" className="space-y-6 pt-4">
           <DisplayPreferencesSettings />
+
+          <PushSettings />
 
           {/* Language. This also sets the interface DIRECTION: each language
               carries its own 'ltr'/'rtl', so choosing Arabic mirrors the interface.

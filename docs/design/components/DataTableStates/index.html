@@ -10,13 +10,13 @@
   function col() { return h.apply(null, ['div', { style: { display: 'grid', gap: 12, alignContent: 'start' } }].concat([].slice.call(arguments))); }
   ReactDOM.createRoot(document.getElementById('root')).render(h('div', { style: { display: 'grid', gap: 20 } },
   col(cap('Loading: skeleton rows in the real columns'), h(W.DataTable, { columns: [{ key: 'no', label: 'Invoice', sortable: true, render: function (r) { return h('span', { className: 'wy-mono' }, r.no); } }, { key: 'cust', label: 'Customer', sortable: true }, { key: 'date', label: 'Issued' },
-  { key: 'amt', label: 'Total', align: 'end', sortable: true, render: function (r) { return h(W.Money, { amount: r.amt, decimals: 3 }); } },
+  { key: 'amt', label: 'Total', align: 'end', sortable: true, render: function (r) { return h(W.Money, { amount: r.amt }); } },
   { key: 'st', label: 'Payment', render: function (r) { return h(W.Badge, { variant: r.st === 'Paid' ? 'success' : r.st === 'Overdue' ? 'destructive' : 'outline' }, r.st); } }], rows: [], state: 'loading', selectable: true })),
   col(cap('Empty: says why and what to do'), h(W.DataTable, { columns: [{ key: 'no', label: 'Invoice', sortable: true, render: function (r) { return h('span', { className: 'wy-mono' }, r.no); } }, { key: 'cust', label: 'Customer', sortable: true }, { key: 'date', label: 'Issued' },
-  { key: 'amt', label: 'Total', align: 'end', sortable: true, render: function (r) { return h(W.Money, { amount: r.amt, decimals: 3 }); } },
+  { key: 'amt', label: 'Total', align: 'end', sortable: true, render: function (r) { return h(W.Money, { amount: r.amt }); } },
   { key: 'st', label: 'Payment', render: function (r) { return h(W.Badge, { variant: r.st === 'Paid' ? 'success' : r.st === 'Overdue' ? 'destructive' : 'outline' }, r.st); } }], rows: [], empty: h(W.EmptyState, { icon: 'invoice', title: 'No overdue invoices', description: 'Everything due by today has been paid.', action: h(W.Button, { variant: 'outline', size: 'sm' }, 'Show all invoices') }) })),
   col(cap('Error: what happened, and a way to try again'), h(W.DataTable, { columns: [{ key: 'no', label: 'Invoice', sortable: true, render: function (r) { return h('span', { className: 'wy-mono' }, r.no); } }, { key: 'cust', label: 'Customer', sortable: true }, { key: 'date', label: 'Issued' },
-  { key: 'amt', label: 'Total', align: 'end', sortable: true, render: function (r) { return h(W.Money, { amount: r.amt, decimals: 3 }); } },
+  { key: 'amt', label: 'Total', align: 'end', sortable: true, render: function (r) { return h(W.Money, { amount: r.amt }); } },
   { key: 'st', label: 'Payment', render: function (r) { return h(W.Badge, { variant: r.st === 'Paid' ? 'success' : r.st === 'Overdue' ? 'destructive' : 'outline' }, r.st); } }], rows: [], state: 'error', errorText: 'Invoices didn’t load: the connection timed out.' }))));
 </script>
 </body>

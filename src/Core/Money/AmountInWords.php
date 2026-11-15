@@ -5,21 +5,23 @@ declare(strict_types=1);
 namespace Whity\Core\Money;
 
 /**
- * An amount of Jordanian dinars written in words, in English or Arabic (16).
+ * An amount written in words, in English or Arabic (16, CU.3).
  *
- * The design's `Whity.amountInWords`, working in whole fils so no float is
- * involved. One dinar is 1000 fils.
+ * The design's `Whity.amountInWords(amount, lang, currency)`, working in whole
+ * minor units so no float is involved. Each currency brings its own nouns and
+ * sub-unit: one US dollar is 100 cents, one Jordanian dinar is 1000 fils.
  *
  * The Arabic follows accounting usage as section 16 draws it: the noun's form
  * follows the last two digits. Section 16 still asks for an Arabic-speaking
  * accountant's review before this is relied on, so nothing here claims it meets
- * any invoicing rule. Only JOD is written: another currency's sub-unit and gender
- * would be different words, so the caller gets null rather than wrong ones.
+ * any invoicing rule. Only the currencies in {@see self::WORDS} are written:
+ * another currency's nouns and gender would be different words, so the caller
+ * gets null rather than wrong ones.
  */
 final class AmountInWords
 {
-    /** The design's words stop at millions, so this is the most it can write. */
-    private const MAX_FILS = 999_999_999_999;
+    /** The design's words stop at millions, so this is the most whole units it can write. */
+    private const MAX_UNITS = 999_999_999;
 
     private const EN_ONES = [
         'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
@@ -36,40 +38,89 @@ final class AmountInWords
         1 => ['ألف', 'ألفان', 'آلاف', 'ألفاً'],
         2 => ['مليون', 'مليونان', 'ملايين', 'مليوناً'],
     ];
-    /** one, two, 3-10, 11-99, otherwise */
-    private const AR_DINARS = ['دينار أردني واحد', 'ديناران أردنيان', 'دنانير أردنية', 'ديناراً أردنياً', 'دينار أردني'];
-    private const AR_FILS = ['فلس واحد', 'فلسان', 'فلسات', 'فلساً', 'فلس'];
+    /**
+     * Each currency's nouns, from the design's `Whity.currencies`. English is
+     * [one, many]; Arabic is [one, two, 3-10, 11-99, otherwise].
+     *
+     * @var array<string, array{en: list<string>, subEn: list<string>, ar: list<string>, subAr: list<string>}>
+     */
+    private const WORDS = [
+        'USD' => [
+            'en' => ['US dollar', 'US dollars'],
+            'subEn' => ['cent', 'cents'],
+            'ar' => ['دولار أمريكي واحد', 'دولاران أمريكيان', 'دولارات أمريكية', 'دولاراً أمريكياً', 'دولار أمريكي'],
+            'subAr' => ['سنت واحد', 'سنتان', 'سنتات', 'سنتاً', 'سنت'],
+        ],
+        'EUR' => [
+            'en' => ['euro', 'euros'],
+            'subEn' => ['cent', 'cents'],
+            'ar' => ['يورو واحد', 'يوروان', 'يوروات', 'يورو', 'يورو'],
+            'subAr' => ['سنت واحد', 'سنتان', 'سنتات', 'سنتاً', 'سنت'],
+        ],
+        'JOD' => [
+            'en' => ['Jordanian dinar', 'Jordanian dinars'],
+            'subEn' => ['fils', 'fils'],
+            'ar' => ['دينار أردني واحد', 'ديناران أردنيان', 'دنانير أردنية', 'ديناراً أردنياً', 'دينار أردني'],
+            'subAr' => ['فلس واحد', 'فلسان', 'فلسات', 'فلساً', 'فلس'],
+        ],
+        'SAR' => [
+            'en' => ['Saudi riyal', 'Saudi riyals'],
+            'subEn' => ['halala', 'halalas'],
+            'ar' => ['ريال سعودي واحد', 'ريالان سعوديان', 'ريالات سعودية', 'ريالاً سعودياً', 'ريال سعودي'],
+            'subAr' => ['هللة واحدة', 'هللتان', 'هللات', 'هللة', 'هللة'],
+        ],
+        'AED' => [
+            'en' => ['UAE dirham', 'UAE dirhams'],
+            'subEn' => ['fils', 'fils'],
+            'ar' => ['درهم إماراتي واحد', 'درهمان إماراتيان', 'دراهم إماراتية', 'درهماً إماراتياً', 'درهم إماراتي'],
+            'subAr' => ['فلس واحد', 'فلسان', 'فلسات', 'فلساً', 'فلس'],
+        ],
+    ];
 
     /**
-     * @param int    $minor    The amount in the currency's minor units (fils for JOD).
-     * @param string $currency ISO code. Anything but JOD answers null.
+     * @param int    $minor    The amount in the currency's minor units (cents for USD, fils for JOD).
+     * @param string $currency ISO code. One without words here answers null.
      * @param string $language 'en' or 'ar'.
      */
     public static function write(int $minor, string $currency, string $language): ?string
     {
-        if (strtoupper($currency) !== 'JOD' || !in_array($language, ['en', 'ar'], true)) {
+        $code = strtoupper(trim($currency));
+        $words = self::WORDS[$code] ?? null;
+        if ($words === null || !in_array($language, ['en', 'ar'], true)) {
             return null;
         }
 
-        $fils = abs($minor);
-        if ($fils > self::MAX_FILS) {
+        $perMajor = Currency::minorUnitsPerMajor($code);
+        $magnitude = abs($minor);
+        $units = intdiv($magnitude, $perMajor);
+        if ($units > self::MAX_UNITS) {
             return null;
         }
+        $sub = $magnitude % $perMajor;
 
-        $dinars = intdiv($fils, 1000);
-        $remainder = $fils % 1000;
-
-        return $language === 'ar' ? self::arabic($dinars, $remainder) : self::english($dinars, $remainder);
+        return $language === 'ar'
+            ? self::arabic($units, $sub, $words['ar'], $words['subAr'])
+            : self::english($units, $sub, $words['en'], $words['subEn']);
     }
 
-    private static function english(int $dinars, int $fils): string
+    /** Whether {@see self::write()} has words for this currency. */
+    public static function supports(string $currency): bool
+    {
+        return isset(self::WORDS[strtoupper(trim($currency))]);
+    }
+
+    /**
+     * @param list<string> $nouns
+     * @param list<string> $subNouns
+     */
+    private static function english(int $units, int $sub, array $nouns, array $subNouns): string
     {
         $parts = [];
-        if ($dinars > 0 || $fils === 0) {
-            $parts[] = self::enInteger($dinars) . ' Jordanian ' . ($dinars === 1 ? 'dinar' : 'dinars');
+        if ($units > 0 || $sub === 0) {
+            $parts[] = self::enInteger($units) . ' ' . ($units === 1 ? $nouns[0] : $nouns[1]);
         }
-        if ($fils > 0) {
-            $parts[] = self::enInteger($fils) . ' fils';
+        if ($sub > 0) {
+            $parts[] = self::enInteger($sub) . ' ' . ($sub === 1 ? $subNouns[0] : $subNouns[1]);
         }
 
         return ucfirst(implode(' and ', $parts));
@@ -120,14 +171,18 @@ final class AmountInWords
         return implode(' ', $parts);
     }
 
-    private static function arabic(int $dinars, int $fils): string
+    /**
+     * @param list<string> $nouns
+     * @param list<string> $subNouns
+     */
+    private static function arabic(int $units, int $sub, array $nouns, array $subNouns): string
     {
         $parts = [];
-        if ($dinars > 0 || $fils === 0) {
-            $parts[] = self::arCount($dinars, self::AR_DINARS);
+        if ($units > 0 || $sub === 0) {
+            $parts[] = self::arCount($units, $nouns);
         }
-        if ($fils > 0) {
-            $parts[] = self::arCount($fils, self::AR_FILS);
+        if ($sub > 0) {
+            $parts[] = self::arCount($sub, $subNouns);
         }
 
         return implode(' و', $parts);

@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { Card } from '@whity/ui/card';
 import { AreaError } from '@whity/ui/page-states';
 import { useTranslation } from '@whity/features/i18n';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 
 interface Totals {
@@ -21,17 +21,16 @@ interface Totals {
 
 export function PlatformCards() {
   const t = useTranslation('common');
-  const { apiClient } = useAuth();
 
   const stats = useFetch<Totals>(async () => {
-    const response = await apiClient('/api/v1/admin/stats');
+    const { data: statsBody, response } = await api.GET('/api/v1/admin/stats');
     if (!response.ok) throw new Error(t('dashboard.platform.error', 'The platform numbers could not be loaded.'));
     // The endpoint answers `{ status, timestamp, stats: { totals, ... } }`.
-    const body = (await response.json()) as { stats?: { totals?: Totals } };
-    const totals = body.stats?.totals;
+    const body = statsBody as { stats?: { totals?: Totals } } | undefined;
+    const totals = body?.stats?.totals;
     if (totals === undefined) throw new Error(t('dashboard.platform.error', 'The platform numbers could not be loaded.'));
     return totals;
-  }, [apiClient]);
+  }, []);
 
   const cards: Array<{ key: string; label: string; value: number | undefined }> = [
     { key: 'tenants', label: t('dashboard.platform.tenants', 'Workspaces'), value: stats.data?.tenants },

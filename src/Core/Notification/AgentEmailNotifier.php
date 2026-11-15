@@ -28,7 +28,8 @@ use Whity\Sdk\Hooks\Events;
  *   (`agents.notify_by_email`). Agents that are personal credentials (not a
  *   workspace agent) always may.
  * - **Per person:** Preferences › Notifications turns the kind off
- *   (`agent.needs_approval` on `email`).
+ *   (`agent.needs_approval` on `email`, or all email), and the workspace can
+ *   turn its email off; both through {@see \Whity\Core\Mail\EmailGate}.
  * - **At most one an hour** per agent and person, except sign-in approvals.
  *   The email says how many more wait, so a quiet hour loses nothing.
  *
@@ -48,7 +49,6 @@ final class AgentEmailNotifier
     public function __construct(
         private readonly PDO $db,
         private readonly AgentProposalRepository $proposals,
-        private readonly NotificationPreferenceRepository $preferences,
         private readonly ProfileEmailRepository $emails,
         private readonly SharedStoreInterface $store,
         private readonly BrandedEmailSender $sender,
@@ -100,10 +100,10 @@ final class AgentEmailNotifier
         $tool = (string) ($proposal['tool'] ?? '');
         $assignmentId = AgentAssignmentRepository::idFromPrincipal($principal);
 
-        if ($assignmentId !== null && !$this->agentEmails($assignmentId, $tenantId)) {
+        if ($assignmentId !== null && !$this->sender->gate()->agent($tenantId, $assignmentId)) {
             return false;
         }
-        if (!$this->personWants($tenantId, $profileId)) {
+        if (!$this->sender->gate()->allows($tenantId, $profileId, self::TYPE_NEEDS_APPROVAL)) {
             return false;
         }
         if (!self::isSignInApproval($tool)) {
@@ -160,37 +160,6 @@ final class AgentEmailNotifier
     }
 
     /** The agent's own setting on its admin page; on unless turned off. */
-    private function agentEmails(int $assignmentId, int $tenantId): bool
-    {
-        $stmt = $this->db->prepare(
-            'SELECT a.notify_by_email
-               FROM agent_assignments aa
-               JOIN agents a ON a.id = aa.agent_id AND a.tenant_id = aa.tenant_id
-              WHERE aa.id = :id AND aa.tenant_id = :tenant_id'
-        );
-        $stmt->execute([':id' => $assignmentId, ':tenant_id' => $tenantId]);
-        // A row, not a column: fetchColumn() answers false both for "no row" and
-        // for a false the driver returns as a real boolean.
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!is_array($row) || $row['notify_by_email'] === null) {
-            return true;
-        }
-
-        return \Whity\Core\Db\DbBool::of($row['notify_by_email']);
-    }
-
-    /** Preferences › Notifications; on unless the person turned it off. */
-    private function personWants(int $tenantId, int $profileId): bool
-    {
-        foreach ($this->preferences->listForProfile($tenantId, $profileId) as $pref) {
-            if ($pref['type'] === self::TYPE_NEEDS_APPROVAL && $pref['channel'] === self::CHANNEL) {
-                return $pref['enabled'];
-            }
-        }
-
-        return true;
-    }
-
     private function displayName(int $profileId): ?string
     {
         $stmt = $this->db->prepare('SELECT display_name FROM profiles WHERE id = :id');

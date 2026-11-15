@@ -1,0 +1,52 @@
+<!-- @dsCard group="Templates · 3.4" height=2578 width=1344 subtitle="#1734: Whity’s console, a white-labelled workspace, and Arabic" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Two-column sign-in</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4]]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  function form(t, sub, o) { o = o || {}; return h('div', { className: 'x4-authc', style: { border: 0, background: 'none', padding: 0, width: 360 }, dir: o.dir }, h('h1', null, t), h('p', null, sub),
+    h(W.Button, { variant: 'outline', icon: 'key' }, o.ar ? 'المتابعة بحساب Whity ID' : 'Continue with Whity ID'), h('div', { className: 'wy-auth__or' }, o.ar ? 'أو بالبريد الإلكتروني' : 'or with email'), h(W.Input, { label: o.ar ? 'البريد الإلكتروني' : 'Email', placeholder: 'you@company.jo' }), h(W.Input, { label: o.ar ? 'كلمة المرور' : 'Password', type: 'password', defaultValue: 'password' }), h(W.Button, { size: 'lg' }, o.ar ? 'تسجيل الدخول' : 'Sign in'), h('div', { className: 'x4-authc__foot' }, o.ar ? 'نسيت كلمة المرور؟' : 'Forgot your password?')); }
+  function whityPanel(ar) { return h('div', { className: 'x4-split__brand' }, h('div', { className: 'x4-sheetwrap' }, h('span', { className: 'x4-plane' }), h('div', { className: 'x4-sheet', dir: ar ? 'rtl' : undefined }, h('span', { className: 'x4-small', style: { color: '#6b7076', fontFamily: 'var(--font-mono)', letterSpacing: '.05em' } }, ar ? 'وثيقة مطبوعة؟' : 'HOLDING A PRINTED PAGE?'), h('h2', null, ar ? 'تحقّق أنها أصلية.' : 'Check it’s genuine.'), h('p', null, ar ? 'امسح رمز QR في أسفل الصفحة. لا حاجة إلى حساب.' : 'Scan the QR code at the foot of the page. No account needed.'),
+    h('div', null, h(W.Button, { icon: 'qr' }, ar ? 'تحقّق من مستند' : 'Verify a document'))))); }
+  function tenantPanel() { return h('div', { className: 'x4-split__brand is-tenant', style: { '--tenant': '#b74c05' } }, h('div', { style: { display: 'grid', gap: 18, maxWidth: 380 } }, h('span', { style: { background: '#fff', borderRadius: 16, padding: 12, width: 'max-content' } }, h(W.TenantLogo, { name: 'Example Bakery', size: 48, showName: false })), h('h2', { style: { margin: 0, fontSize: 32, fontWeight: 600 } }, 'Example Bakery'), h('p', { style: { margin: 0, fontSize: 18, opacity: .92 } }, 'Documents from Example Bakery carry a QR code. Scan it to check that a paper is genuine.'), h('div', null, h('button', { className: 'wy-btn wy-btn--outline', style: { background: '#fff', color: '#1a1a1a', borderColor: '#fff' } }, I('qr'), 'Verify a document')))); }
+  var whity = h('div', { className: 'x4-split' }, whityPanel(), h('div', { className: 'x4-split__form' }, h('div', { style: { display: 'grid', gap: 22 } }, h(W.Lockup, { height: 28 }), form('Sign in to Whity', 'The console for this Whity.'))));
+  var tenant = h('div', { className: 'x4-split wy-theme-partner' }, tenantPanel(), h('div', { className: 'x4-split__form' }, h('div', { style: { display: 'grid', gap: 22 } }, form('Sign in', 'Example Office, for Example Bakery’s team and customers.'), h('div', { style: { display: 'flex', justifyContent: 'center' } }, h(W.BuiltOnWhity, null)))));
+  var ar = h('div', { className: 'x4-split', dir: 'rtl' }, whityPanel(true), h('div', { className: 'x4-split__form' }, h('div', { style: { display: 'grid', gap: 22 } }, h(W.Lockup, { height: 28 }), form('سجّل الدخول إلى Whity', 'وحدة التحكم في Whity هذه.', { ar: true, dir: 'rtl' }))));
+  ReactDOM.createRoot(document.getElementById('root')).render(board(frame('Whity’s own console · sheets on paper, the plane under Verify', whity, 700), frame('A white-labelled workspace · its colour and logo, no Whity pattern', tenant, 700), frame('Arabic · mirrored', ar, 700),
+    note('Two-column sign-in (#1734, brand-ask-signin-two-column)', ['From 1024px the page splits in two: the brand side at the start, the form at the end. Under 1024px only the form shows, with Verify a document as a line under it.', 'Whity’s own console uses sheets on paper (section 10): one sheet with one message, the plane under the one action that matters, Verify a document. Never Blueprint here.', 'A white-labelled workspace fills the brand side with its main colour, its square logo on a white tile, its name and one sentence. No Whity pattern; Built on Whity under the form where the plan shows it.', 'The form is the same card as today: Whity ID first, then email and password. Nothing else competes with it.', 'Arabic mirrors the page: the brand side on the right.'])));
+</script>
+</body>
+</html>

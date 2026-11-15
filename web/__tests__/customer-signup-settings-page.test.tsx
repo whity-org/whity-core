@@ -9,9 +9,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
-}));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 
 jest.mock('@/hooks/useCapabilities', () => ({
   useCapabilities: () => ({ has: (c: string) => c === 'signup:manage', loading: false }),
@@ -179,4 +177,42 @@ test('Reject asks first, and a turned-away request can be found and approved lat
 
   fireEvent.click(screen.getByTestId('customer-signup-approve-9'));
   await waitFor(() => expect(calls).toEqual(['reject', 'approve']));
+});
+
+test('team invites take a number per customer, empty for no limit (WHIT-1043, SC.11)', async () => {
+  const sent: unknown[] = [];
+  routes({
+    'GET /api/v1/signup/settings': () => json(settings({ customer_invites: true, invites_per_customer: 0 })),
+    'GET /api/v1/signup/requests': () => json({ data: [], pagination: {} }),
+    'PUT /api/v1/signup/settings': (init) => {
+      sent.push(JSON.parse(String(init?.body)));
+      return json(settings({ customer_invites: true, invites_per_customer: 5 }));
+    },
+  });
+
+  render(<CustomerSignupSettingsPage />);
+  const field = await screen.findByLabelText('[t] People per customer');
+  expect(field).toHaveValue('');
+  expect(field).toHaveAttribute('placeholder', '[t] No limit');
+
+  fireEvent.change(field, { target: { value: '5' } });
+  fireEvent.click(await screen.findByRole('button', { name: '[t] Save changes' }));
+
+  await waitFor(() => expect(sent).toHaveLength(1));
+  expect(sent[0]).toMatchObject({ customer_invites: true, invites_per_customer: 5 });
+});
+
+test('a bad number per customer is explained in the page’s own words', async () => {
+  routes({
+    'GET /api/v1/signup/settings': () => json(settings({ customer_invites: true })),
+    'GET /api/v1/signup/requests': () => json({ data: [], pagination: {} }),
+    'PUT /api/v1/signup/settings': () =>
+      json({ error: 'Validation failed', details: { code: 'invites_per_customer_invalid' } }, 422),
+  });
+
+  render(<CustomerSignupSettingsPage />);
+  fireEvent.change(await screen.findByLabelText('[t] People per customer'), { target: { value: 'many' } });
+  fireEvent.click(await screen.findByRole('button', { name: '[t] Save changes' }));
+
+  expect(await screen.findByText(/^\[t\] Enter a whole number from 1 to 1000/)).toBeInTheDocument();
 });

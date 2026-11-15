@@ -31,11 +31,11 @@ import { AgentStatusBadge } from '@/components/agents/agent-status';
 import { MayReadPicker } from '@/components/agents/may-read-picker';
 import { WorkspaceActivityPanel } from '@/components/agents/workspace-activity-panel';
 import { useFetch } from '@/hooks/useFetch';
-import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   localized,
-  refusal,
+  refusalText,
   startOfToday,
   templateGroups,
   toolsetsFromSplits,
@@ -71,7 +71,6 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
 export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAgent; onChanged: () => void }) {
   const t = useTranslation('admin');
   const arabic = useFormattingLocale() === 'ar';
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
 
   const dates = useDateDisplay();
@@ -83,10 +82,10 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
   const [tab, setTab] = useState('overview');
 
   const splits = useFetch<{ toolsets: string[] }[]>(async () => {
-    const response = await apiClient('/api/v1/mcp/splits');
+    const response = await apiFetch('/api/v1/mcp/splits');
     if (!response.ok) return [];
     return ((await response.json()) as { data?: { toolsets: string[] }[] }).data ?? [];
-  }, [apiClient]);
+  }, []);
   const offered = toolsetsFromSplits(splits.data ?? [], draft.toolsets);
 
   const set = <K extends keyof AgentDraft>(key: K, value: AgentDraft[K]) => setDraft((current) => ({ ...current, [key]: value }));
@@ -105,13 +104,12 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
     setSaving(true);
     setError(null);
     try {
-      const response = await apiClient(`/api/v1/agents/${initial.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draft),
+      const { error: refused, response } = await api.PATCH('/api/v1/agents/{id}', {
+        params: { path: { id: initial.id } },
+        body: draft as never,
       });
       if (!response.ok) {
-        setError(await refusal(response, t('agents.error.save', 'This agent could not be saved. Try again.')));
+        setError(refusalText(refused, t('agents.error.save', 'This agent could not be saved. Try again.')));
         return;
       }
       setSaved(draft);
@@ -125,9 +123,12 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
   };
 
   const setArchived = async (archived: boolean) => {
-    const response = await apiClient(`/api/v1/agents/${initial.id}/${archived ? 'archive' : 'restore'}`, { method: 'POST' });
+    const params = { params: { path: { id: initial.id } } };
+    const { error, response } = archived
+      ? await api.POST('/api/v1/agents/{id}/archive', params)
+      : await api.POST('/api/v1/agents/{id}/restore', params);
     if (!response.ok) {
-      addToast(await refusal(response, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
+      addToast(refusalText(error, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
       return;
     }
     const name = localized(saved.name, saved.nameAr, arabic);
@@ -141,9 +142,12 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
   };
 
   const setPaused = async (paused: boolean) => {
-    const response = await apiClient(`/api/v1/agents/${initial.id}/${paused ? 'pause' : 'resume'}`, { method: 'POST' });
+    const params = { params: { path: { id: initial.id } } };
+    const { error, response } = paused
+      ? await api.POST('/api/v1/agents/{id}/pause', params)
+      : await api.POST('/api/v1/agents/{id}/resume', params);
     if (!response.ok) {
-      addToast(await refusal(response, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
+      addToast(refusalText(error, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
       return;
     }
     const name = localized(saved.name, saved.nameAr, arabic);
@@ -426,7 +430,7 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
                   {t('agentRecord.notifications.email', 'Email the person it works for when something needs them')}
                 </label>
                 <p className="text-sm text-muted-foreground">
-                  {t('agentRecord.notifications.emailHelp', 'At most one email an hour, except sign-in approvals. The email only opens Whity: nothing is approved from it. Each person can still turn these off in Preferences › Notifications.')}
+                  {t('agentRecord.notifications.emailHelp', 'At most one email an hour, except sign-in approvals. The email only opens Whity: nothing is approved from it. Each person can still turn these off in My settings.')}
                 </p>
               </div>
             </div>

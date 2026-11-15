@@ -8,9 +8,8 @@ import React, { Suspense } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import FillFormPage from '@/app/(protected)/forms/[id]/page';
-import { apiClient } from '@/lib/api-client';
 
-jest.mock('@/lib/api-client', () => ({ apiClient: jest.fn() }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 jest.mock('@/lib/direction-context', () => ({ useDirection: () => ({ dir: 'ltr' }) }));
 
 let held: string[] = [];
@@ -22,7 +21,11 @@ jest.mock('@/hooks/useCapabilities', () => ({
   }),
 }));
 
-const client = apiClient as unknown as jest.Mock;
+// The typed client is adapted onto `fetch`, so the stub below keeps its URL-and-init shape.
+const client = jest.fn();
+beforeEach(() => {
+  global.fetch = client as unknown as typeof fetch;
+});
 
 const rendered = {
   form: { id: 7, name: { en: 'Supplier request' }, description: null, status: 'published' },

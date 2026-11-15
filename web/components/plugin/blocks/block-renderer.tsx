@@ -153,7 +153,7 @@ import {
 } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
 import { ConfirmAction } from '@whity/ui/confirm-action';
-import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api/client';
 import { Button } from '@whity/ui/button';
 import {
   Card,
@@ -3365,7 +3365,7 @@ function SecretFieldRenderer({ block }: { block: SecretFieldBlock }) {
   }, []);
 
   React.useEffect(() => {
-    apiClient(block.endpoint)
+    apiFetch(block.endpoint)
       .then(applyResponse)
       .then((applied) => {
         if (!applied) setStatus((current) => (current === 'forbidden' ? current : 'error'));
@@ -3376,7 +3376,7 @@ function SecretFieldRenderer({ block }: { block: SecretFieldBlock }) {
   const save = async () => {
     setSaving(true);
     try {
-      const res = await apiClient(block.endpoint, {
+      const res = await apiFetch(block.endpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value }),
@@ -3396,7 +3396,7 @@ function SecretFieldRenderer({ block }: { block: SecretFieldBlock }) {
 
   const remove = async () => {
     try {
-      const res = await apiClient(block.endpoint, { method: 'DELETE' });
+      const res = await apiFetch(block.endpoint, { method: 'DELETE' });
       if (await applyResponse(res)) {
         addToast(t('blocks.secretField.removed', 'Removed.'), 'success');
       } else {

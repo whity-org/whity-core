@@ -54,6 +54,7 @@ import { CalendarNav } from './calendar-nav';
 import { EventDialog } from './event-dialog';
 import { useCalendarAccess, useCalendarBasics } from './use-calendar-basics';
 import { useCalendarWords } from './use-calendar-words';
+import { useNewIntent } from '@/lib/commands/new-intent';
 
 const EVERYONE = 'everyone';
 const ALL_BRANCHES = 'all';
@@ -124,8 +125,14 @@ function CalendarBody({
   const [suggesting, setSuggesting] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [newBooking, setNewBooking] = useState(false);
+  // ⌘K `/new booking` (WHIT-1069): New booking, when this person could press it.
+  useNewIntent('booking', () => {
+    if (access.canWrite && services.length > 0) setNewBooking(true);
+  });
   const [eventOpen, setEventOpen] = useState(false);
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
+  // Phone month: the day whose bookings are listed under the grid.
+  const [monthDay, setMonthDay] = useState<CalendarDate | null>(null);
 
   const range = viewRange(view, anchor, settings.week_start);
   const query = rangeQuery(range, timeZone);
@@ -207,6 +214,15 @@ function CalendarBody({
   const notSetUp = services.length === 0 && staff.length === 0;
   const filtered = person !== EVERYONE;
   const nothing = data !== null && items.length === 0;
+
+  // The chosen day, when it is in the month shown; otherwise today if it is in
+  // this month, otherwise the first of the month.
+  const listedDay: CalendarDate =
+    monthDay !== null && monthDay.year === anchor.year && monthDay.month === anchor.month
+      ? monthDay
+      : today.year === anchor.year && today.month === anchor.month
+        ? today
+        : { year: anchor.year, month: anchor.month, day: 1 };
 
   const openDay = (date: CalendarDate) => {
     setAnchor(date);
@@ -369,7 +385,18 @@ function CalendarBody({
           onClear={() => setPerson(EVERYONE)}
         />
       ) : view === 'month' ? (
-        <MonthGrid {...gridProps} weeks={monthWeeks(anchor, settings.week_start)} month={anchor.month} />
+        <>
+          <MonthGrid
+            {...gridProps}
+            weeks={monthWeeks(anchor, settings.week_start)}
+            month={anchor.month}
+            selected={listedDay}
+            onSelectDay={setMonthDay}
+          />
+          <div className="md:hidden" data-testid="calendar-month-day-list">
+            <AgendaList {...gridProps} days={[listedDay]} />
+          </div>
+        </>
       ) : view === 'week' ? (
         <>
           <div className="hidden md:block">

@@ -47,7 +47,44 @@ final class CoreJobs
             // dispatcher enqueues it, never a public caller. It needs the
             // notification data layer + the transport registry (defaulting to the
             // built-in log transports so a fresh deployment never hard-fails).
-            $transports ??= CoreTransports::make($logger);
+            //
+            // E2: the `email` channel is delivered through core mail, the same
+            // sender and gate as the web app. The mailer is built on the first
+            // send, so a worker boot never reads mail settings.
+            $mailSettings = new \Whity\Core\Settings\SettingsService(
+                new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                new \Whity\Core\Settings\TenantSettingsRepository($pdo)
+            );
+            $coreSender = new \Whity\Core\Mail\BrandedEmailSender(
+                new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
+                    $mailSettings,
+                    new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+                    $logger ?? new \Psr\Log\NullLogger()
+                )),
+                new \Whity\Core\Mail\EmailLayout(),
+                $mailSettings,
+                $logger
+            );
+            $coreSender->useGate(new \Whity\Core\Mail\EmailGate($mailSettings, $pdo));
+            $coreSender->useBranding(new \Whity\Core\Branding\BrandingService(
+                $mailSettings,
+                entitlements: new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo))
+            ));
+            $transports ??= CoreTransports::make($logger, $coreSender, new \Whity\Core\Identity\ProfileEmailRepository($pdo));
+            // WHIT-1074: web push to the devices a person turned on, and the
+            // one digest push for a burst the rate limit held back.
+            if (!$transports->has(\Whity\Core\Notification\Push\PushTransport::CHANNEL)) {
+                $transports->register(\Whity\Core\Notification\Push\PushTransport::fromEnv($pdo, $logger, $_ENV));
+            }
+            $pushTransport = $transports->resolve(0, \Whity\Core\Notification\Push\PushTransport::CHANNEL);
+            $registry->register(
+                \Whity\Core\Notification\Push\PushDigestJob::NAME,
+                new \Whity\Core\Notification\Push\PushDigestJob(
+                    static fn (): ?\Whity\Core\Notification\Push\PushTransport => $pushTransport instanceof \Whity\Core\Notification\Push\PushTransport ? $pushTransport : null
+                ),
+                false
+            );
             $registry->register(
                 SendNotificationDeliveryJob::NAME,
                 new SendNotificationDeliveryJob(
@@ -90,10 +127,14 @@ final class CoreJobs
                         // alert actually go out?" is asked precisely when
                         // things are already going wrong, and the trail that
                         // answers it was the one with the hole.
-                        new \Whity\Core\Audit\AuditLogger($pdo, $logger)
+                        new \Whity\Core\Audit\AuditLogger($pdo, $logger),
+                        // E2: the person can turn these emails off like any other.
+                        $coreSender->gate()
                     ),
                     $logger,
-                    \Whity\Core\Http\FrontendUrls::fromEnv()->link(\Whity\Core\Http\FrontendUrls::ERROR_DETAILS)
+                    \Whity\Core\Http\FrontendUrls::fromEnv()->link(\Whity\Core\Http\FrontendUrls::ERROR_DETAILS),
+                    // At most NotifyErrorGroupJob::EMAILS_PER_HOUR alerts emailed an hour.
+                    new \Whity\Core\Store\DatabaseSharedStore($pdo)
                 ),
                 false
             );
@@ -117,12 +158,8 @@ final class CoreJobs
                 $pdo,
                 $calendarSettings,
                 null,
-                new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
-                    $calendarSettings,
-                    new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
-                    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
-                    $calendarLogger
-                )),
+                // E2: the same sender as every core email: the workspace's brand and gate.
+                $coreSender,
                 \Whity\Core\Http\FrontendUrls::fromEnv(),
                 $calendarQueue,
                 $calendarLogger
@@ -140,6 +177,8 @@ final class CoreJobs
                 $calendarSettings,
                 $calendarLogger
             );
+            // E2: the same email gate as the web app (workspace, agent and person switches).
+            $summarySender->useGate(new \Whity\Core\Mail\EmailGate($calendarSettings, $pdo));
             $summarySender->useBranding(new \Whity\Core\Branding\BrandingService(
                 $calendarSettings,
                 entitlements: new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo))
@@ -150,7 +189,6 @@ final class CoreJobs
                     $pdo,
                     $calendarSettings,
                     new \Whity\Core\Agent\AgentStatsRepository($pdo),
-                    new \Whity\Core\Notification\NotificationPreferenceRepository($pdo),
                     new \Whity\Core\Identity\ProfileEmailRepository($pdo),
                     new \Whity\Core\Store\DatabaseSharedStore($pdo),
                     $summarySender,
@@ -166,12 +204,7 @@ final class CoreJobs
                         $pdo,
                         $calendarSettings,
                         null,
-                        new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
-                            $calendarSettings,
-                            new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
-                            \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
-                            $calendarLogger
-                        )),
+                        $coreSender,
                         \Whity\Core\Http\FrontendUrls::fromEnv(),
                         $calendarQueue,
                         $calendarLogger

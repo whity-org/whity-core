@@ -1698,6 +1698,26 @@ export interface paths {
         patch: operations["patch_api_v1_chat_chats_id"];
         trace?: never;
     };
+    "/api/v1/chat/chats/{id}/focus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Say the caller is looking at this chat in a focused window (every 20 seconds), or stopped
+         * @description While a person looks at a chat, its new lines are not pushed to their devices (WHIT-1077).
+         */
+        post: operations["post_api_v1_chat_chats_id_focus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat/chats/{id}/members": {
         parameters: {
             query?: never;
@@ -3417,6 +3437,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/document-themes/form-printout-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview form printouts with unsaved theme options
+         * @description Design 3.4 (`TplFormPrintStyle`): the workspace’s latest form response (or `submissionId`) printed with the `form`, `letterhead` and `accent` options in the body over the workspace theme. A free workspace previews the standard layout, as it would print. One render against the limits.
+         */
+        post: operations["post_api_v1_document_themes_form_printout_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/document-themes/resolve": {
         parameters: {
             query?: never;
@@ -4227,6 +4267,26 @@ export interface paths {
          * @description Always sent as an attachment with `nosniff`. Only a file attached to this submission, in this workspace, and named by one of its answers.
          */
         get: operations["get_api_v1_form_submissions_id_files_fileid"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/form-submissions/{id}/printout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Print a response in the automatic layout
+         * @description Design 3.4 (P1): the response laid out from its form’s sections and questions in the workspace theme’s form printout options, as it would print now. Not stored: the record is the PDF its route’s final step makes. `lang` is `en` or `ar`; left out, the language of the person who sent it. One render against the workspace’s limits.
+         */
+        get: operations["get_api_v1_form_submissions_id_printout"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5207,7 +5267,7 @@ export interface paths {
         put?: never;
         /**
          * Decline an agent's proposal
-         * @description Nothing runs. The agent can ask again.
+         * @description Nothing runs. The agent can ask again, and reads the reason when you give one.
          */
         post: operations["post_api_v1_me_agent_proposals_id_decline"];
         delete?: never;
@@ -5946,6 +6006,41 @@ export interface paths {
         /** Resolve which of a batch of requests the caller is permitted to make */
         post: operations["post_api_v1_me_permitted_actions"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/push-subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The web push public key of the instance and the devices of the caller with push on, in the active workspace */
+        get: operations["get_api_v1_me_push_subscriptions"];
+        put?: never;
+        /** Turn web push on for this browser (its PushSubscription JSON), for the caller in the active workspace */
+        post: operations["post_api_v1_me_push_subscriptions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/push-subscriptions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Turn web push off for one device of the caller */
+        delete: operations["delete_api_v1_me_push_subscriptions_id"];
         options?: never;
         head?: never;
         patch?: never;
@@ -8233,8 +8328,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List the role grants addressed at one resource
-         * @description Returns both grant shapes: a null `profile_id` is the "everyone at this resource" grant, a set `profile_id` grants to that one profile. Always scoped to the caller's tenant, so a resource belonging to another tenant yields an empty list rather than an error.
+         * List the role grants at one resource, or made to one profile
+         * @description With `resource_id`: the grants at that record, in both shapes: a null `profile_id` is the "everyone at this resource" grant, a set `profile_id` grants to that one profile. With `profile_id` instead: the grants of this type made to that profile by name, which are the records they stand at. Everyone-grants are left out there, because on their own they give nobody access. Pass one of the two, not both. Anyone may list their own grants (`profile_id` = their own profile); listing another person's, or the grants at a resource, needs `roles:read`. Always scoped to the caller's tenant, so another tenant's resource or profile yields an empty list rather than an error.
          */
         get: operations["get_api_v1_resource_role_grants"];
         put?: never;
@@ -10619,6 +10714,7 @@ export interface components {
             decidedAt: string | null;
             expiresAt: string;
             createdAt: string;
+            declineReason?: string | null;
             action: components["schemas"]["AgentAction"] | null;
             /** @description The agent is paused, so this can be declined but not approved until it is resumed */
             agentPaused?: boolean;
@@ -11293,6 +11389,10 @@ export interface components {
             data: {
                 [key: string]: boolean;
             };
+        };
+        ChatFocusRequest: {
+            /** @description True while the chat is open in a focused window; false when it stops. */
+            focused?: boolean;
         };
         ChatLink: {
             /** @enum {string} */
@@ -12594,6 +12694,7 @@ export interface components {
             edges: components["schemas"]["DocumentRouteEdge"][];
             /** @enum {string} */
             default_quorum: "all" | "any" | "majority";
+            values?: components["schemas"]["RouteStepValue"][];
         };
         DocumentRouteActionRequest: {
             /**
@@ -12615,6 +12716,10 @@ export interface components {
             resume_from?: "sender" | "start" | null;
             /** @description With `noted`: the note is meant for the author. Notes are internal by default. */
             to_author?: boolean;
+            /** @description The values the step asks for, by key. Only with an approval, `acknowledged` or `forwarded`; required ones must be filled in. */
+            values?: {
+                [key: string]: string;
+            };
         };
         DocumentRouteActionResponse: {
             data: components["schemas"]["DocumentTrailEvent"];
@@ -12641,6 +12746,9 @@ export interface components {
                 /** @enum {string} */
                 satisfied_by?: "act" | "delivery";
                 allow_send_back?: boolean;
+                inputs?: components["schemas"]["RouteStepInput"][];
+                /** @description The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this step leaves out: not asked, not counted in the quorum, not printed among the approvals. */
+                exclude_named_in?: string[];
                 /** @enum {string|null} */
                 kind?: "sign" | "finalise" | null;
                 /** @description On a signing step: the capacity the signer signs in, such as "Director". At most 200 characters. */
@@ -12712,6 +12820,8 @@ export interface components {
             sign_capacity?: string | null;
             sign_on_behalf_of?: string | null;
             final_template_id?: number | null;
+            inputs?: components["schemas"]["RouteStepInput"][];
+            exclude_named_in?: string[];
             rejection_count: number;
         };
         DocumentSignature: {
@@ -12876,6 +12986,11 @@ export interface components {
                         logo?: "wide" | "square" | "none";
                         /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                         lines?: ("address" | "taxId" | "phone" | "email")[];
+                        /**
+                         * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                         * @enum {string}
+                         */
+                        layout?: "start" | "centred" | "bilingual";
                     };
                 } | null;
             } | null;
@@ -13211,6 +13326,11 @@ export interface components {
                     logo?: "wide" | "square" | "none";
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines?: ("address" | "taxId" | "phone" | "email")[];
+                    /**
+                     * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                     * @enum {string}
+                     */
+                    layout?: "start" | "centred" | "bilingual";
                 };
                 /**
                  * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
@@ -13219,6 +13339,78 @@ export interface components {
                 titleFace?: "readex" | "noto";
                 /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
                 largePrint?: boolean;
+                /** @description How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout. */
+                form?: {
+                    /**
+                     * @description Standard: `letterhead`.
+                     * @enum {string}
+                     */
+                    header?: "letterhead" | "centred" | "bilingual";
+                    /**
+                     * @description Standard: `decisionLine`.
+                     * @enum {string}
+                     */
+                    officeDetails?: "decisionLine" | "strip";
+                    /**
+                     * @description Standard: `topAndEnd`.
+                     * @enum {string}
+                     */
+                    decision?: "topAndEnd" | "top" | "end";
+                    /**
+                     * @description Standard: `mark`.
+                     * @enum {string}
+                     */
+                    sectionStyle?: "mark" | "number" | "eyebrow" | "rail" | "tab" | "plane";
+                    /**
+                     * @description Standard: `stacked`.
+                     * @enum {string}
+                     */
+                    questions?: "stacked" | "twoColumns";
+                    /**
+                     * @description Standard: `countAndContinued`.
+                     * @enum {string}
+                     */
+                    longAnswers?: "countAndContinued" | "plain";
+                    /**
+                     * @description Standard: `allOptions`.
+                     * @enum {string}
+                     */
+                    choices?: "allOptions" | "chosenOnly";
+                    /**
+                     * @description Standard: `word`.
+                     * @enum {string}
+                     */
+                    yesNo?: "word" | "threeColumns";
+                    /**
+                     * @description Standard: `collapseAndMark`.
+                     * @enum {string}
+                     */
+                    empty?: "collapseAndMark" | "hide" | "printAll";
+                    /**
+                     * @description Standard: `confirmedAndDrawn`.
+                     * @enum {string}
+                     */
+                    signatures?: "confirmedAndDrawn" | "confirmedOnly" | "withPaperLines";
+                    /**
+                     * @description Standard: `list`.
+                     * @enum {string}
+                     */
+                    approvals?: "list" | "cards";
+                    /** @description What the footer prints beside "Page x of y", which always prints. */
+                    footer?: {
+                        reference?: boolean;
+                        /** @enum {boolean} */
+                        pageCount?: true;
+                        marks?: boolean;
+                        qrEveryPage?: boolean;
+                    };
+                    /** @description Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan. */
+                    marks?: {
+                        /** @description The image embedded as a data: URI, at most 300 KB. */
+                        src: string;
+                        alt?: string;
+                    }[];
+                };
             };
         };
         DocumentThemeListResponse: {
@@ -13239,6 +13431,11 @@ export interface components {
                 logo?: "wide" | "square" | "none";
                 /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                 lines?: ("address" | "taxId" | "phone" | "email")[];
+                /**
+                 * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                 * @enum {string}
+                 */
+                layout?: "start" | "centred" | "bilingual";
             };
         };
         DocumentThemePatch: {
@@ -13268,6 +13465,11 @@ export interface components {
                     logo?: "wide" | "square" | "none";
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines?: ("address" | "taxId" | "phone" | "email")[];
+                    /**
+                     * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                     * @enum {string}
+                     */
+                    layout?: "start" | "centred" | "bilingual";
                 };
                 /**
                  * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
@@ -13276,6 +13478,78 @@ export interface components {
                 titleFace?: "readex" | "noto";
                 /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
                 largePrint?: boolean;
+                /** @description How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout. */
+                form?: {
+                    /**
+                     * @description Standard: `letterhead`.
+                     * @enum {string}
+                     */
+                    header?: "letterhead" | "centred" | "bilingual";
+                    /**
+                     * @description Standard: `decisionLine`.
+                     * @enum {string}
+                     */
+                    officeDetails?: "decisionLine" | "strip";
+                    /**
+                     * @description Standard: `topAndEnd`.
+                     * @enum {string}
+                     */
+                    decision?: "topAndEnd" | "top" | "end";
+                    /**
+                     * @description Standard: `mark`.
+                     * @enum {string}
+                     */
+                    sectionStyle?: "mark" | "number" | "eyebrow" | "rail" | "tab" | "plane";
+                    /**
+                     * @description Standard: `stacked`.
+                     * @enum {string}
+                     */
+                    questions?: "stacked" | "twoColumns";
+                    /**
+                     * @description Standard: `countAndContinued`.
+                     * @enum {string}
+                     */
+                    longAnswers?: "countAndContinued" | "plain";
+                    /**
+                     * @description Standard: `allOptions`.
+                     * @enum {string}
+                     */
+                    choices?: "allOptions" | "chosenOnly";
+                    /**
+                     * @description Standard: `word`.
+                     * @enum {string}
+                     */
+                    yesNo?: "word" | "threeColumns";
+                    /**
+                     * @description Standard: `collapseAndMark`.
+                     * @enum {string}
+                     */
+                    empty?: "collapseAndMark" | "hide" | "printAll";
+                    /**
+                     * @description Standard: `confirmedAndDrawn`.
+                     * @enum {string}
+                     */
+                    signatures?: "confirmedAndDrawn" | "confirmedOnly" | "withPaperLines";
+                    /**
+                     * @description Standard: `list`.
+                     * @enum {string}
+                     */
+                    approvals?: "list" | "cards";
+                    /** @description What the footer prints beside "Page x of y", which always prints. */
+                    footer?: {
+                        reference?: boolean;
+                        /** @enum {boolean} */
+                        pageCount?: true;
+                        marks?: boolean;
+                        qrEveryPage?: boolean;
+                    };
+                    /** @description Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan. */
+                    marks?: {
+                        /** @description The image embedded as a data: URI, at most 300 KB. */
+                        src: string;
+                        alt?: string;
+                    }[];
+                };
             };
         };
         DocumentThemeRef: {
@@ -13299,6 +13573,11 @@ export interface components {
                     logo?: "wide" | "square" | "none";
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines?: ("address" | "taxId" | "phone" | "email")[];
+                    /**
+                     * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                     * @enum {string}
+                     */
+                    layout?: "start" | "centred" | "bilingual";
                 };
             } | null;
             /**
@@ -13330,6 +13609,8 @@ export interface components {
                     labelAr: string;
                 }[];
             }[];
+            /** @description The Form printouts tab (design 3.4): the entitlement that unlocks it, whether this workspace holds it (allowed), each option with its standard value and English and Arabic labels, the footer parts and the marks limit. */
+            form?: Record<string, never>;
         };
         DocumentThemeSchemaResponse: {
             data: components["schemas"]["DocumentThemeSchema"];
@@ -13353,6 +13634,11 @@ export interface components {
                 logo?: "wide" | "square" | "none";
                 /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                 lines?: ("address" | "taxId" | "phone" | "email")[];
+                /**
+                 * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                 * @enum {string}
+                 */
+                layout?: "start" | "centred" | "bilingual";
             };
             /**
              * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
@@ -13361,6 +13647,78 @@ export interface components {
             titleFace?: "readex" | "noto";
             /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
             largePrint?: boolean;
+            /** @description How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout. */
+            form?: {
+                /**
+                 * @description Standard: `letterhead`.
+                 * @enum {string}
+                 */
+                header?: "letterhead" | "centred" | "bilingual";
+                /**
+                 * @description Standard: `decisionLine`.
+                 * @enum {string}
+                 */
+                officeDetails?: "decisionLine" | "strip";
+                /**
+                 * @description Standard: `topAndEnd`.
+                 * @enum {string}
+                 */
+                decision?: "topAndEnd" | "top" | "end";
+                /**
+                 * @description Standard: `mark`.
+                 * @enum {string}
+                 */
+                sectionStyle?: "mark" | "number" | "eyebrow" | "rail" | "tab" | "plane";
+                /**
+                 * @description Standard: `stacked`.
+                 * @enum {string}
+                 */
+                questions?: "stacked" | "twoColumns";
+                /**
+                 * @description Standard: `countAndContinued`.
+                 * @enum {string}
+                 */
+                longAnswers?: "countAndContinued" | "plain";
+                /**
+                 * @description Standard: `allOptions`.
+                 * @enum {string}
+                 */
+                choices?: "allOptions" | "chosenOnly";
+                /**
+                 * @description Standard: `word`.
+                 * @enum {string}
+                 */
+                yesNo?: "word" | "threeColumns";
+                /**
+                 * @description Standard: `collapseAndMark`.
+                 * @enum {string}
+                 */
+                empty?: "collapseAndMark" | "hide" | "printAll";
+                /**
+                 * @description Standard: `confirmedAndDrawn`.
+                 * @enum {string}
+                 */
+                signatures?: "confirmedAndDrawn" | "confirmedOnly" | "withPaperLines";
+                /**
+                 * @description Standard: `list`.
+                 * @enum {string}
+                 */
+                approvals?: "list" | "cards";
+                /** @description What the footer prints beside "Page x of y", which always prints. */
+                footer?: {
+                    reference?: boolean;
+                    /** @enum {boolean} */
+                    pageCount?: true;
+                    marks?: boolean;
+                    qrEveryPage?: boolean;
+                };
+                /** @description Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan. */
+                marks?: {
+                    /** @description The image embedded as a data: URI, at most 300 KB. */
+                    src: string;
+                    alt?: string;
+                }[];
+            };
         };
         DocumentThemeUsage: {
             /** @description Documents whose draft names the theme */
@@ -13542,6 +13900,11 @@ export interface components {
                 en?: string;
             } | null;
             reference_format?: string | null;
+            /**
+             * @description `submit`: when the form is sent. `approval`: when its route finishes approved.
+             * @enum {string}
+             */
+            reference_assign?: "submit" | "approval";
             submission_count?: number;
             open_to_members?: boolean;
             members_opened_at?: string | null;
@@ -13800,6 +14163,21 @@ export interface components {
         FormListResponse: {
             data: components["schemas"]["Form"][];
         };
+        FormPrintoutPreviewRequest: {
+            /** @description Unsaved `form` options (FormPrintoutStyle) to preview. */
+            form?: Record<string, never>;
+            /** @description Unsaved letterhead options, `layout` among them. */
+            letterhead?: Record<string, never>;
+            /** @description An unsaved print colour. */
+            accent?: string;
+            /** @description The response to print. Left out, the workspace’s latest. */
+            submissionId?: number;
+            /**
+             * @description The printout’s language. Left out, the language of the person who sent it.
+             * @enum {string}
+             */
+            lang?: "en" | "ar";
+        };
         FormPublicLinkClosedResponse: {
             data: components["schemas"]["Form"];
             meta?: {
@@ -14036,8 +14414,13 @@ export interface components {
             banner?: components["schemas"]["FormBannerInput"];
             /** @description The title and description of each section, by `section_key`. */
             sections?: components["schemas"]["FormSectionText"][];
-            /** @description The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none. */
+            /** @description The reference each submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}` or `{ANSWER:subject|human=IRB-AAU|animal=AUB-AAU} {SEQ}/{STEP:meeting_no}/{AY:9}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}; {AY:m}, the academic year starting in month m, as 2026-2027; {ANSWER:question}, an answer, optionally looked up in a list (`|answer=text`, `|*=text` for any other); {STEP:key}, a value entered during review (only with `reference_assign` `approval`). {SEQ} is required, and each different prefix, year or answer counts on its own. Dates are UTC. Null gives none. */
             reference_format?: string | null;
+            /**
+             * @description When the reference is given: `submit` (default) when the form is sent, or `approval` when its route finishes approved, before the final document is made.
+             * @enum {string}
+             */
+            reference_assign?: "submit" | "approval";
             /** @description The public link asks visitors to sign in: only the workspace's members and customers can send it, under their own name, so it can be sent back to them for changes. */
             public_requires_sign_in?: boolean;
             /** @description The document template a route's final document stage uses when it names none; null for none. */
@@ -14513,6 +14896,9 @@ export interface components {
                     en?: string;
                 };
                 role: string;
+                roles?: string[];
+                /** @enum {string} */
+                kind?: "member" | "customer";
             }[] | null;
             selection_token?: string;
             access_token?: string;
@@ -14632,6 +15018,9 @@ export interface components {
                     en?: string;
                 };
                 role: string;
+                roles?: string[];
+                /** @enum {string} */
+                kind?: "member" | "customer";
             }[];
         };
         MeIdentity: {
@@ -15447,6 +15836,9 @@ export interface components {
                         en?: string;
                     };
                     role: string;
+                    roles?: string[];
+                    /** @enum {string} */
+                    kind?: "member" | "customer";
                 }[];
             };
         };
@@ -15879,6 +16271,8 @@ export interface components {
             workspace?: {
                 name: string;
             };
+            /** @description Only on the manage link: the brand of the workspace (WHIT-1014). */
+            brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
             time_zone?: string;
         };
         PublicBookingMoveRequest: {
@@ -15916,6 +16310,8 @@ export interface components {
                 provider?: string;
                 site_key?: string;
             } | null;
+            /** @description The brand of the workspace, for the page (WHIT-1014). */
+            brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
         };
         PublicBookingRequest: {
             /** @description The service. */
@@ -15948,6 +16344,8 @@ export interface components {
                     provider?: string;
                     site_key?: string;
                 } | null;
+                /** @description The brand of the workspace, for the chat box (WHIT-1014). */
+                brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
             };
         };
         PublicChatStartResponse: {
@@ -16181,6 +16579,8 @@ export interface components {
                 /** @enum {string|null} */
                 email_signup_reason: "bot_check_unavailable" | null;
                 providers: components["schemas"]["SignupJoinProvider"][];
+                /** @description The workspace logo and colour for the page (WHIT-1044). */
+                brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
             };
         };
         PublicSignupPreviewResponse: {
@@ -16188,12 +16588,31 @@ export interface components {
                 workspace_name: string;
                 email: string;
                 requires_password: boolean;
+                /** @description The workspace logo and colour for the page (WHIT-1044). */
+                brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
             };
         };
         PublicSignupRequest: {
             email: string;
             display_name: string;
             bot_token?: string;
+        };
+        PublicWorkspaceBrand: {
+            /** @description The site name the workspace set, else its name. */
+            name: string;
+            logo_wide_url: string | null;
+            logo_square_url: string | null;
+            /** @description The workspace main colour as #rrggbb, or null for Whity Blue. */
+            main_color: string | null;
+            /** @description Token values derived from the main colour (decision 2.8), keyed by token name without the leading dashes; null when no main colour is set. */
+            theme: {
+                light: {
+                    [key: string]: string;
+                };
+                dark: {
+                    [key: string]: string;
+                };
+            } | null;
         };
         PublishWorkspacePluginRequest: {
             /** @description The plugin.json object (format whity.plugin/1). See sdk/resources/plugin-manifest.schema.json. */
@@ -16231,6 +16650,26 @@ export interface components {
         };
         PurchasablePlanListResponse: {
             data: components["schemas"]["PurchasablePlan"][];
+        };
+        PushDevice: {
+            id: number;
+            endpoint_hash: string;
+            user_agent: string;
+            created_at: string;
+            last_success_at: string | null;
+            failing: boolean;
+        };
+        PushSubscriptionRequest: {
+            endpoint: string;
+            keys: {
+                p256dh: string;
+                auth: string;
+            };
+        };
+        PushSubscriptionsResponse: {
+            id?: number;
+            public_key: string;
+            data: components["schemas"]["PushDevice"][];
         };
         RecentDocument: {
             /** @enum {string} */
@@ -16342,6 +16781,11 @@ export interface components {
                     logo: "wide" | "square" | "none";
                     /** @description The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`. */
                     lines: ("address" | "taxId" | "phone" | "email")[];
+                    /**
+                     * @description Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).
+                     * @enum {string}
+                     */
+                    layout?: "start" | "centred" | "bilingual";
                 };
                 /**
                  * @description The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).
@@ -16350,6 +16794,78 @@ export interface components {
                 titleFace: "readex" | "noto";
                 /** @description Large print: an 11pt body in print, with headings scaled by the same steps. */
                 largePrint: boolean;
+                /** @description How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout. */
+                form?: {
+                    /**
+                     * @description Standard: `letterhead`.
+                     * @enum {string}
+                     */
+                    header?: "letterhead" | "centred" | "bilingual";
+                    /**
+                     * @description Standard: `decisionLine`.
+                     * @enum {string}
+                     */
+                    officeDetails?: "decisionLine" | "strip";
+                    /**
+                     * @description Standard: `topAndEnd`.
+                     * @enum {string}
+                     */
+                    decision?: "topAndEnd" | "top" | "end";
+                    /**
+                     * @description Standard: `mark`.
+                     * @enum {string}
+                     */
+                    sectionStyle?: "mark" | "number" | "eyebrow" | "rail" | "tab" | "plane";
+                    /**
+                     * @description Standard: `stacked`.
+                     * @enum {string}
+                     */
+                    questions?: "stacked" | "twoColumns";
+                    /**
+                     * @description Standard: `countAndContinued`.
+                     * @enum {string}
+                     */
+                    longAnswers?: "countAndContinued" | "plain";
+                    /**
+                     * @description Standard: `allOptions`.
+                     * @enum {string}
+                     */
+                    choices?: "allOptions" | "chosenOnly";
+                    /**
+                     * @description Standard: `word`.
+                     * @enum {string}
+                     */
+                    yesNo?: "word" | "threeColumns";
+                    /**
+                     * @description Standard: `collapseAndMark`.
+                     * @enum {string}
+                     */
+                    empty?: "collapseAndMark" | "hide" | "printAll";
+                    /**
+                     * @description Standard: `confirmedAndDrawn`.
+                     * @enum {string}
+                     */
+                    signatures?: "confirmedAndDrawn" | "confirmedOnly" | "withPaperLines";
+                    /**
+                     * @description Standard: `list`.
+                     * @enum {string}
+                     */
+                    approvals?: "list" | "cards";
+                    /** @description What the footer prints beside "Page x of y", which always prints. */
+                    footer?: {
+                        reference?: boolean;
+                        /** @enum {boolean} */
+                        pageCount?: true;
+                        marks?: boolean;
+                        qrEveryPage?: boolean;
+                    };
+                    /** @description Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan. */
+                    marks?: {
+                        /** @description The image embedded as a data: URI, at most 300 KB. */
+                        src: string;
+                        alt?: string;
+                    }[];
+                };
             };
             /** @description Where each token came from, by its path (`accent`, `letterhead.lines`…): a theme ref, `document` for an override, or `branding.main_color` */
             sources: {
@@ -16363,6 +16879,7 @@ export interface components {
         };
         ResourceRoleGrant: {
             id: number;
+            resource_id: number;
             role_id: number;
             profile_id: number | null;
         };
@@ -16521,6 +17038,27 @@ export interface components {
         RouteFinalisationResponse: {
             data: components["schemas"]["RouteFinalisation"];
         };
+        RouteStepInput: {
+            /** @description Small letters, digits and _, up to 40 characters. Templates print it as `route.value.<key>`. */
+            key: string;
+            /** @description What the person filling it in reads. At most 80 characters. */
+            label: string;
+            /** @description The label in Arabic, when it differs. */
+            label_ar?: string | null;
+            /** @description Whether approving needs it. True when absent. */
+            required?: boolean;
+            /** @description Longest value, 1 to 200. 100 when absent. */
+            max_length?: number;
+        };
+        RouteStepValue: {
+            key: string;
+            value: string;
+            step_id: number;
+            /** @description The trail entry it was entered with. */
+            event_id: number;
+            entered_by: number | null;
+            entered_at: string;
+        };
         RouteTemplate: {
             id: number;
             name: string;
@@ -16592,6 +17130,9 @@ export interface components {
             /** @enum {string|null} */
             kind?: "finalise" | null;
             final_template_id?: number | null;
+            inputs?: components["schemas"]["RouteStepInput"][];
+            /** @description The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this stage leaves out: not asked, not counted in the quorum, not printed among the approvals. */
+            exclude_named_in?: string[];
             canvas_x?: number;
             canvas_y?: number;
         };
@@ -16627,6 +17168,7 @@ export interface components {
                         }[];
                     };
                     can_send_back?: boolean;
+                    values?: components["schemas"]["RouteStepValue"][];
                     finalisation?: components["schemas"]["RouteFinalisation"];
                 })[];
                 /** @description Display names by profile id, for the people on these routes. */
@@ -16664,7 +17206,12 @@ export interface components {
             blocks: {
                 [key: string]: unknown;
             }[];
-            /** @description Keys of the parts each document fills itself (E.23) */
+            /** @description E.23a: the parts each document fills itself, in reading order, by stable key */
+            perDocumentParts: components["schemas"]["SavedBlockPart"][];
+            /**
+             * @deprecated
+             * @description Deprecated in 3.4, kept one release: the keys of perDocumentParts
+             */
             perDocumentKeys: string[];
             /** @description Starts at 1; goes up by one on every change of blocks */
             version: number;
@@ -16704,11 +17251,32 @@ export interface components {
             blocks: {
                 [key: string]: unknown;
             }[];
-            /** @description Keys used by perDocument marks in the blocks; at most 200 */
+            /** @description E.23a: labels, required and placeholders by key; which parts exist comes from the blocks. At most 200 */
+            per_document_parts?: components["schemas"]["SavedBlockPart"][];
+            /**
+             * @deprecated
+             * @description Deprecated in 3.4: accepted and ignored
+             */
             per_document_keys?: string[];
         };
         SavedBlockListResponse: {
             data: components["schemas"]["SavedBlock"][];
+        };
+        SavedBlockPart: {
+            /** @description Stable key (pd_ + 8 characters), minted once when the part is marked */
+            key: string;
+            label: {
+                en: string;
+                ar?: string;
+            };
+            /** @enum {string} */
+            kind: "text" | "field";
+            /** @description Blocks issuing until a document fills it */
+            required?: boolean;
+            /** @description Inline[] shown, dashed, until a document fills it */
+            placeholder?: {
+                [key: string]: unknown;
+            }[];
         };
         SavedBlockResponse: {
             data: components["schemas"]["SavedBlock"];
@@ -16727,7 +17295,12 @@ export interface components {
             blocks?: {
                 [key: string]: unknown;
             }[];
-            /** @description Keys used by perDocument marks in the blocks */
+            /** @description E.23a: labels, required and placeholders by key; left out, they are kept */
+            per_document_parts?: components["schemas"]["SavedBlockPart"][];
+            /**
+             * @deprecated
+             * @description Deprecated in 3.4: accepted and ignored
+             */
             per_document_keys?: string[];
             /** @description The version the change was made against; a different current version is 409 changed */
             version?: number;
@@ -17019,6 +17592,8 @@ export interface components {
             role_customer_safe: boolean | null;
             allowed_domains: string[];
             customer_invites: boolean;
+            /** @description How many people one customer may invite; 0 is no limit (WHIT-1043). */
+            invites_per_customer: number;
             eligible_roles: components["schemas"]["SignupEligibleRole"][];
             pending_count: number;
             workspace_slug: string | null;
@@ -17042,6 +17617,8 @@ export interface components {
             allowed_domains?: string[];
             /** @description Whether customers may invite colleagues into their own role, as customers (POST /api/v1/team-invitations). Off by default. */
             customer_invites?: boolean;
+            /** @description How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043). */
+            invites_per_customer?: number;
         };
         SimpleMessageResponse: {
             message: string;
@@ -17528,6 +18105,10 @@ export interface components {
         TeamInvitationListResponse: {
             data: {
                 enabled: boolean;
+                /** @description How many people you may invite; 0 is no limit (WHIT-1043). */
+                limit: number;
+                /** @description How many places your invitations take: open, accepted and not sent. */
+                used: number;
                 items: components["schemas"]["TeamInvitationItem"][];
             };
         };
@@ -27239,6 +27820,86 @@ export interface operations {
             };
         };
     };
+    post_api_v1_chat_chats_id_focus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatFocusRequest"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDoneResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_chat_chats_id_members: {
         parameters: {
             query?: never;
@@ -36370,6 +37031,111 @@ export interface operations {
             };
         };
     };
+    post_api_v1_document_themes_form_printout_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormPrintoutPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description The PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No form response to preview yet */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Some options are not valid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The document render limit has been reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description PDFs are turned off, or the render service is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_document_themes_resolve: {
         parameters: {
             query?: never;
@@ -37121,6 +37887,8 @@ export interface operations {
                                 revision: string;
                                 issued_on: string | null;
                             };
+                            /** @description Only beside a code that verified and names its issuer: the issuer logo and colour (WHIT-1044). */
+                            brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
                         };
                     };
                 };
@@ -40682,6 +41450,103 @@ export interface operations {
                 };
             };
             /** @description The file could not be read from storage */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_form_submissions_id_printout: {
+        parameters: {
+            query?: {
+                /** @description The printout language, `en` or `ar`. Left out, the language of the person who sent the response. */
+                lang?: "en" | "ar";
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Submission not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The render service refused the printout */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The document render limit has been reached */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description PDFs are turned off, or the render service is unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -45987,6 +46852,8 @@ export interface operations {
                     arguments?: {
                         [key: string]: unknown;
                     };
+                    /** @description Needed for a Whity Builder publish or roll back that stops showing data people entered: the person ticked that they understand what is lost. */
+                    acknowledgedDestructive?: boolean;
                 };
             };
         };
@@ -46054,6 +46921,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description An impact plan whose tests failed (code tests_failed), or a destructive one without acknowledgedDestructive (code acknowledge_destructive) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Internal server error */
             500: {
                 headers: {
@@ -46075,7 +46951,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Why, for the agent to read back (optional), such as which tests to fix. */
+                    reason?: string;
+                };
+            };
+        };
         responses: {
             /** @description The proposal after the decision */
             200: {
@@ -46084,6 +46967,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentProposalResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Missing or invalid authentication */
@@ -49910,6 +50802,225 @@ export interface operations {
             };
             /** @description Missing 'checks' list, or more than 200 checks */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_push_subscriptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The public key and the devices of the caller */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushSubscriptionsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_push_subscriptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionRequest"];
+            };
+        };
+        responses: {
+            /** @description Stored; the new id with the devices of the caller */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushSubscriptionsResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a push subscription from a known push service, or no active workspace */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_me_push_subscriptions_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The remaining devices of the caller */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushSubscriptionsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a device of the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -61394,8 +62505,10 @@ export interface operations {
             query: {
                 /** @description A registered resource type (e.g. `ou`, `acme:record`) */
                 resource_type: string;
-                /** @description The record the grants are addressed at */
-                resource_id: number;
+                /** @description The record the grants are addressed at. Required unless profile_id is given */
+                resource_id?: number;
+                /** @description List the grants made to this profile by name instead */
+                profile_id?: number;
             };
             header?: never;
             path?: never;
@@ -61403,7 +62516,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The grants at this resource */
+            /** @description The grants */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -61421,7 +62534,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Insufficient permissions */
+            /** @description Listing another person's grants, or the grants at a resource, without roles:read */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -61448,7 +62561,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description resource_type is unregistered, or resource_id is missing/invalid */
+            /** @description resource_type is unregistered, neither or both of resource_id and profile_id were given, or one is invalid */
             422: {
                 headers: {
                     [name: string]: unknown;

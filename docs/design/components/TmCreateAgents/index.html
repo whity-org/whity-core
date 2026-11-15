@@ -24,7 +24,7 @@
   var chat = h(F, null, h('div', { className: 'wm-head' }, h('div', { className: 'wm-head__top' }, h('h1', null, 'Billing assistant'), h(W.Avatar, { name: 'Amro Saleh', size: 36 })), h('div', { className: 'wm-seg' }, h('span', { className: 'is-on' }, 'Chat'), h('span', null, 'Agents today'))),
     h('div', { className: 'wm-body' }, h('div', { className: 'wm-chat' },
       h('div', { className: 'wm-bub is-me' }, 'Who still owes us money from October?'),
-      h('div', { className: 'wm-bub is-agent' }, h('small', null, 'Billing assistant'), '3 customers owe JOD 512.000 in total. Example Café is the oldest, 12 days late.',
+      h('div', { className: 'wm-bub is-agent' }, h('small', null, 'Billing assistant'), '3 customers owe $512.00 in total. Example Café is the oldest, 12 days late.',
         h('div', { className: 'wm-prop' }, h('b', null, 'Send them reminders?'), h('span', { style: { fontSize: 15, color: 'var(--muted-foreground)' } }, 'By WhatsApp, in their language. You approve each one.'), h(W.Button, { variant: 'outline', icon: 'check' }, 'Prepare 3 reminders'))))),
     bottom({ active: 'agents', action: h('div', { className: 'wm-compose' }, h('span', { className: 'wm-compose__in' }, 'Ask the Billing assistant…'), h('span', { className: 'wm-mic', 'aria-label': 'Hold to speak' }, I('microphone', 22))) }));
   function act(who, t, time, kind) { return h('div', { className: 'wm-li' + (kind ? ' is-agent' : '') }, h('span', { className: 'wm-li__ic' }, I(kind === 'propose' ? 'approval' : 'robot', 20)), h('div', { style: { minWidth: 0 } }, h('b', { style: { whiteSpace: 'normal' } }, t), h('small', null, who)), h('div', { className: 'wm-li__end' }, time)); }

@@ -468,6 +468,12 @@ final class SettingsApiHandler
             // surface. Refused rather than silently written, so the caller
             // learns which surface owns the key instead of watching a write
             // vanish from a screen that never showed it.
+            // A core key with its own screen (customer sign-up's starting role
+            // must be customer-safe, which only that screen checks).
+            if ($catalog->isCoreKey($key) && !$catalog->isAdminVisible($key)) {
+                $details[$key] = "{$key} is managed on its own settings screen, not on the settings API.";
+                continue;
+            }
             if (!$catalog->isCoreKey($key) && !$catalog->isAdminVisible($key)) {
                 $details[$key] = "{$key} is declared by the '"
                     . (string) $catalog->sourceOf($key)

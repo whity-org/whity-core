@@ -9,9 +9,9 @@ import { BookingDialog } from '@/components/calendar/booking-dialog';
 import type { CalendarService, CalendarStaff } from '@/lib/calendar/api';
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
-}));
+jest.mock('@/lib/api/client', () =>
+  jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient)
+);
 
 function respond(status: number, body: unknown) {
   return Promise.resolve({ ok: status >= 200 && status < 300, status, json: async () => body });

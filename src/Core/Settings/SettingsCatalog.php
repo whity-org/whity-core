@@ -286,13 +286,14 @@ final class SettingsCatalog implements HostWiredService
     /**
      * Whether core's own settings screens publish this key.
      *
-     * True for every core text key (they ARE those screens) and, for a plugin
+     * True for every core text key (they ARE those screens) except the keys
+     * with their own screen ({@see SettingsRegistry::isOwnScreen()}), and, for a plugin
      * key, only when the declaration opted in with `admin => true`.
      */
     public function isAdminVisible(string $key): bool
     {
         if (SettingsRegistry::isKnown($key)) {
-            return true;
+            return !SettingsRegistry::isOwnScreen($key);
         }
 
         return $this->plugins?->get($key)?->isAdminVisible() === true;

@@ -28,6 +28,8 @@ jest.mock('@/components/auth-shell', () => ({
   ),
 }));
 
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
+
 import WelcomePage from '@/app/welcome/page';
 
 function json(status: number, body: unknown) {
@@ -53,7 +55,8 @@ test('offers to create a workspace, prefilled with their name, and goes straight
   await renderPage();
 
   expect(await screen.findByText('Create your workspace')).toBeInTheDocument();
-  expect(screen.getByTestId('welcome-email')).toHaveTextContent('amro@example.test');
+  // TplWelcomeWorkspace: the address they signed in with is in the line under the title.
+  expect(screen.getByText(/You’re signed in as amro@example.test/)).toBeInTheDocument();
   const name = screen.getByLabelText('Workspace name') as HTMLInputElement;
   expect(name.value).toBe('Amro Saleh');
 
@@ -68,7 +71,7 @@ test('offers to create a workspace, prefilled with their name, and goes straight
   const [url, init] = (global.fetch as jest.Mock).mock.calls[1];
   expect(url).toBe('/api/v1/auth/sso/workspace');
   expect(init.method).toBe('POST');
-  expect(init.headers['X-Requested-With']).toBe('XMLHttpRequest');
+  // The typed client sends the CSRF header itself.
   expect(JSON.parse(init.body)).toEqual({ name: 'Example Bakery', locale: 'en', main_color: '#b74c05' });
 });
 
@@ -92,7 +95,9 @@ test('with creating switched off, it says plainly that they need an invitation, 
   await renderPage();
 
   expect(await screen.findByText('You need an invitation')).toBeInTheDocument();
-  expect(screen.getByTestId('welcome-needs-invite')).toHaveTextContent('awss@example.test');
+  expect(screen.getByTestId('welcome-invite-address')).toHaveTextContent('awss@example.test');
+  expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Use another account' })).toHaveAttribute('href', '/login');
   expect(screen.queryByTestId('welcome-create-form')).not.toBeInTheDocument();
 });
 
@@ -103,8 +108,10 @@ test('a place waiting somewhere is named, and no workspace is offered', async ()
 
   await renderPage();
 
-  expect(await screen.findByText('Your place is waiting')).toBeInTheDocument();
-  expect(screen.getByTestId('welcome-waiting')).toHaveTextContent('Example Bakery');
+  expect(await screen.findByText('You’re waiting to join Example Bakery')).toBeInTheDocument();
+  expect(screen.getByTestId('welcome-waiting')).toHaveTextContent('Waiting for an administrator');
+  expect(screen.getByTestId('welcome-waiting')).toHaveTextContent('You can’t make another workspace while this one decides.');
+  expect(screen.getByRole('link', { name: 'Sign out' })).toHaveAttribute('href', '/login');
   expect(screen.queryByTestId('welcome-create-form')).not.toBeInTheDocument();
 });
 
@@ -129,4 +136,20 @@ test('when something changed since sign-in, the page shows where things stand no
 
   expect(await screen.findByTestId('welcome-needs-invite')).toBeInTheDocument();
   expect(mockPush).not.toHaveBeenCalled();
+});
+
+test('the main language is two choices side by side, and the chosen one is sent', async () => {
+  (global.fetch as jest.Mock)
+    .mockResolvedValueOnce(json(200, { data: { state: 'create', email: 'amro@example.test', suggested_name: 'Amro Saleh' } }))
+    .mockResolvedValueOnce(json(200, { user: { id: 1 } }));
+
+  await renderPage();
+  fireEvent.click(await screen.findByRole('button', { name: 'العربية' }));
+  expect(screen.getByRole('button', { name: 'العربية' })).toHaveAttribute('aria-pressed', 'true');
+  await act(async () => {
+    fireEvent.click(screen.getByTestId('welcome-create-submit'));
+  });
+
+  await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/dashboard'));
+  expect(JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body)).toMatchObject({ locale: 'ar' });
 });

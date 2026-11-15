@@ -17,3 +17,8 @@
 - **Global, hosted in the EU** (WS.17, WS.18): never describe Whity as built for one country; say "hosted in the EU" or "stored in the EU", not "GDPR compliant".
 - **Motion** (06-motion, LT.4): Lottie only at the moments listed, one scene at most on a screen, never blocking, colours from the tokens, last frame for Calm, Off and reduce motion; loops only while really waiting.
 - **Emails** (EM.1): build from `handoff/emails/`; one main button, 17px text, the workspace's brand, no actions inside approval emails.
+- **The web app on a phone** (PW.1–PW.11): under 640px the web app uses the phone's tab bar, rows, sheets and bottom bars (`Pw*` cards), not a squeezed desktop.
+- **Public pages wear the workspace's brand** (SU.1, SU.10, SC): verify, booking, join, chat and form pages need no sign-in, show the workspace's logo and colour, and say what to do next in plain words, never "error".
+- **Form printouts** (FP.1–FP.12, `handoff/print/FORM-PRINTOUTS.md`): any form prints a record automatically; paid plans and trials customise every part, free workspaces print the standard layout; a printout already made never changes.
+- **Calendar** (CV.1–CV.11): on calendar screens the sidebar starts as the rail; Colour by is each person's choice and the name is always written on the booking; every drag has a keyboard and Move-button path; a customer's booking asks before it moves.
+- **One chat** (UC.1–UC.13): Chat replaces Messages; team, customers, agents and bots in one list; bubbles or compact rows per person; bots follow rules and never decide; agents still propose through approvals.

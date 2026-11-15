@@ -33,7 +33,11 @@ import {
 } from "@tanstack/react-table"
 import {
   IconArrowsSort,
+  IconCheck,
   IconChevronDown,
+  IconFilter,
+  IconPlus,
+  IconX,
   IconChevronUp,
   IconLayoutColumns,
   IconSearch,
@@ -55,6 +59,7 @@ import { Input } from "./input"
 import { Pagination } from "./pagination"
 import { Skeleton } from "./skeleton"
 import { EmptyState, ErrorState, type EmptyStateProps } from "./empty-state"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "./sheet"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -301,7 +306,68 @@ export interface DataTableProps<TData> {
    * for the few tables that only make sense as a grid.
    */
   phoneLayout?: "stack" | "scroll"
+  /** The phone's list chrome (`PwLists`, PW.4); only with `phoneLayout="stack"`. */
+  phone?: DataTablePhone
   className?: string
+}
+
+/**
+ * Lists on a phone (`PwLists`): under 640px a stacked table also gets the phone
+ * app's controls. Sort is a button by the list (a sheet, one choice per line);
+ * Select turns the boxes on, with Cancel, the count and Clear all / Choose all
+ * at the top and the bulk actions in a bar in the tab bar's place; search,
+ * Filter and the page's main button sit at the bottom, above the tab bar;
+ * filters on show are chips with a cross. Desktop is untouched.
+ */
+export type DataTablePhoneLabels = NonNullable<DataTablePhone["labels"]>
+
+/**
+ * The phone controls' words for every table below it, so an app translates
+ * them once (the web shell mounts it) instead of on every screen. A table's
+ * own `phone.labels` wins over it.
+ */
+const DataTablePhoneLabelsContext = React.createContext<DataTablePhoneLabels>({})
+
+export function DataTablePhoneLabelsProvider({
+  labels,
+  children,
+}: {
+  labels: DataTablePhoneLabels
+  children: React.ReactNode
+}) {
+  return <DataTablePhoneLabelsContext.Provider value={labels}>{children}</DataTablePhoneLabelsContext.Provider>
+}
+
+export interface DataTablePhone {
+  /** The page's main action, the "+" at the end of the bottom bar. */
+  mainAction?: { label: string; onClick?: () => void; href?: string }
+  /** Filters in a bottom sheet, opened by Filter in the bottom bar. */
+  filters?: {
+    content: React.ReactNode
+    /** Filters on show, as chips under the list's controls. */
+    chips?: { id: string; label: string; onRemove: () => void }[]
+    onClear?: () => void
+  }
+  labels?: {
+    sort?: string
+    sortTitle?: string
+    /** "{column}, lowest first" */
+    ascending?: (column: string) => string
+    /** "{column}, highest first" */
+    descending?: (column: string) => string
+    defaultOrder?: string
+    select?: string
+    cancel?: string
+    /** "{count} chosen" */
+    chosen?: (count: number) => string
+    clearAll?: string
+    chooseAll?: string
+    filter?: string
+    filtersTitle?: string
+    clearFilters?: string
+    done?: string
+    removeFilter?: (label: string) => string
+  }
 }
 
 function isServerPagination(
@@ -466,15 +532,36 @@ function SelectRowCell<TData>({ latest, rowId }: { latest: SelectionRef<TData>; 
   )
 }
 
+/**
+ * True under 640px, where a stacked table takes the phone's list chrome
+ * (PwLists). Rendered only there, not merely hidden, so a wide window has one
+ * search box rather than two and the sheets never mount.
+ */
+function usePhoneWidth(): boolean {
+  const [phone, setPhone] = React.useState(false)
+  React.useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
+    const query = window.matchMedia("(max-width: 639.98px)")
+    const update = () => setPhone(query.matches)
+    update()
+    query.addEventListener?.("change", update)
+    return () => query.removeEventListener?.("change", update)
+  }, [])
+  return phone
+}
+
 /** `.wy-bulkbar`: the dark bar with the count, the total, the actions and Clear. */
 function BulkBar<TData>({
   selection,
   data,
   getRowId,
+  phone = false,
 }: {
   selection: DataTableSelection<TData>
   data: TData[]
   getRowId?: (row: TData, index: number) => string
+  /** On a phone the bar takes the tab bar's place at the bottom (PwLists). */
+  phone?: boolean
 }) {
   const count = selection.selected.size
   const rows = data.filter((row, index) => selection.selected.has(getRowId ? getRowId(row, index) : String(index)))
@@ -483,7 +570,11 @@ function BulkBar<TData>({
       data-slot="data-table-bulk-bar"
       role="region"
       aria-live="polite"
-      className="sticky bottom-4 z-[2] mt-3 flex flex-wrap items-center gap-2 rounded-control-lg bg-foreground py-2 ps-3.5 pe-2.5 text-sm text-background shadow-float"
+      className={cn(
+        "sticky bottom-4 z-[2] mt-3 flex flex-wrap items-center gap-2 rounded-control-lg bg-foreground py-2 ps-3.5 pe-2.5 text-sm text-background shadow-float",
+        phone &&
+          "max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-50 max-sm:mt-0 max-sm:rounded-none max-sm:px-4 max-sm:pt-2.5 max-sm:pb-[calc(0.625rem+env(safe-area-inset-bottom))]"
+      )}
     >
       <span className="me-auto font-semibold tabular-nums">
         {selection.labels?.count?.(count) ?? `${count} selected`}
@@ -531,10 +622,17 @@ export function DataTable<TData>({
   sorting: serverSorting,
   search: serverSearch,
   phoneLayout = "stack",
+  phone,
   className,
 }: DataTableProps<TData>) {
   // Totals are a grid by nature, so a table with a foot keeps scrolling.
   const stack = phoneLayout === "stack" && !totals
+  // The phone's list chrome (PwLists): Select mode, and the two sheets.
+  const [phoneSelectMode, setPhoneSelectMode] = React.useState(false)
+  const [sortSheetOpen, setSortSheetOpen] = React.useState(false)
+  const [filterSheetOpen, setFilterSheetOpen] = React.useState(false)
+  const isPhone = usePhoneWidth()
+  const sharedPhoneLabels = React.useContext(DataTablePhoneLabelsContext)
   const [clientSorting, setClientSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = React.useState("")
@@ -801,6 +899,31 @@ export function DataTable<TData>({
     .getAllLeafColumns()
     .filter((column) => column.getCanHide())
 
+  // ── The phone's list chrome (PwLists) ───────────────────────────────────
+  const phoneLabels: DataTablePhoneLabels = { ...sharedPhoneLabels, ...phone?.labels }
+  const sortableColumns = table
+    .getAllLeafColumns()
+    .filter((column) => column.getCanSort() && typeof column.columnDef.header === "string")
+  const headerOf = (id: string) => {
+    const header = table.getAllLeafColumns().find((column) => column.id === id)?.columnDef.header
+    return typeof header === "string" ? header : id
+  }
+  const ascendingLabel = phoneLabels.ascending ?? ((column: string) => `${column}, lowest first`)
+  const descendingLabel = phoneLabels.descending ?? ((column: string) => `${column}, highest first`)
+  const currentSort = sortingState[0]
+  const currentSortLabel = currentSort
+    ? (currentSort.desc ? descendingLabel : ascendingLabel)(headerOf(currentSort.id))
+    : (phoneLabels.defaultOrder ?? "Default order")
+  const chosenCount = selection?.selected.size ?? 0
+  // A choice made on a wider window carries the boxes over to the phone.
+  const phoneSelecting = hasSelection && (phoneSelectMode || chosenCount > 0)
+  const phoneBottomBar =
+    stack && isPhone && (showSearchInput || phone?.filters != null || phone?.mainAction != null)
+  const phoneToolbar = stack && isPhone && (sortableColumns.length > 0 || hasSelection)
+  const chips = phone?.filters?.chips ?? []
+  const pageIds = hasSelection ? pageRowIds(latestCells) : []
+  const allOnPageChosen = pageIds.length > 0 && pageIds.every((id) => selection?.selected.has(id))
+
   if (isLoading) {
     const visibleCount = table.getVisibleLeafColumns().length
     return (
@@ -855,9 +978,9 @@ export function DataTable<TData>({
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      {(showSearchInput || enableColumnVisibility) && (
+      {((showSearchInput && !phoneBottomBar) || enableColumnVisibility) && (
         <div className="flex items-center justify-between gap-2">
-          {showSearchInput ? (
+          {showSearchInput && !phoneBottomBar ? (
             <div className="relative w-full max-w-xs">
               <IconSearch className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -895,6 +1018,92 @@ export function DataTable<TData>({
             </DropdownMenu>
           )}
         </div>
+      )}
+
+      {phoneToolbar && (
+        <div data-slot="data-table-phone-toolbar" className="flex min-h-11 items-center gap-2 sm:hidden">
+          {phoneSelecting ? (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-primary"
+                onClick={() => {
+                  setPhoneSelectMode(false)
+                  selection?.onSelectedChange(new Set())
+                }}
+              >
+                {phoneLabels.cancel ?? "Cancel"}
+              </Button>
+              <span className="flex-1 text-center text-base font-semibold tabular-nums" aria-live="polite">
+                {phoneLabels.chosen?.(chosenCount) ?? `${chosenCount} chosen`}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-primary"
+                onClick={() => {
+                  const next = new Set(selection?.selected)
+                  for (const id of pageIds) {
+                    if (allOnPageChosen) next.delete(id)
+                    else next.add(id)
+                  }
+                  selection?.onSelectedChange(next)
+                }}
+              >
+                {allOnPageChosen ? (phoneLabels.clearAll ?? "Clear all") : (phoneLabels.chooseAll ?? "Choose all")}
+              </Button>
+            </>
+          ) : (
+            <>
+              {sortableColumns.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="min-w-0 gap-1.5 px-2 text-muted-foreground"
+                  aria-label={`${phoneLabels.sort ?? "Sort"}: ${currentSortLabel}`}
+                  onClick={() => setSortSheetOpen(true)}
+                  data-testid="data-table-phone-sort"
+                >
+                  <IconArrowsSort className="size-4 shrink-0" />
+                  <span className="truncate text-sm">{currentSortLabel}</span>
+                </Button>
+              ) : (
+                <span />
+              )}
+              <span className="flex-1" />
+              {hasSelection && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-primary"
+                  onClick={() => setPhoneSelectMode(true)}
+                  data-testid="data-table-phone-select"
+                >
+                  {phoneLabels.select ?? "Select"}
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {stack && isPhone && chips.length > 0 && (
+        <ul className="flex flex-wrap gap-2 sm:hidden" data-slot="data-table-phone-chips">
+          {chips.map((chip) => (
+            <li key={chip.id}>
+              <button
+                type="button"
+                onClick={chip.onRemove}
+                aria-label={phoneLabels.removeFilter?.(chip.label) ?? `Remove filter: ${chip.label}`}
+                className="flex min-h-9 items-center gap-1 rounded-full bg-primary-tint px-3 text-sm text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {chip.label}
+                <IconX className="size-3.5" aria-hidden />
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
 
       {errorState ? (
@@ -1090,7 +1299,8 @@ export function DataTable<TData>({
                       data-label={role === "line" && typeof header === "string" ? header : undefined}
                       className={cn(
                         (cell.column.columnDef.meta as { className?: string } | undefined)?.className,
-                        role && PHONE_CELL[role]
+                        role && PHONE_CELL[role],
+                        role === "select" && !phoneSelecting && "max-sm:hidden"
                       )}
                       style={enableColumnResizing ? { width: cell.column.getSize() } : undefined}
                     >
@@ -1119,7 +1329,129 @@ export function DataTable<TData>({
       )}
 
       {selection && selection.selected.size > 0 && (
-        <BulkBar selection={selection} data={data} getRowId={getRowId} />
+        <BulkBar selection={selection} data={data} getRowId={getRowId} phone={stack} />
+      )}
+
+      {phoneBottomBar && !phoneSelecting && (
+        <div
+          data-slot="data-table-phone-bar"
+          className="sticky bottom-0 z-[3] -mx-4 flex items-center gap-2 border-t border-border bg-card px-4 py-2 sm:hidden"
+        >
+          {showSearchInput ? (
+            <div className="relative min-w-0 flex-1">
+              <IconSearch className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={serverSearch ? searchDraft : globalFilter}
+                onChange={(event) => handleSearchInput(event.target.value)}
+                placeholder={globalFilterPlaceholder}
+                aria-label={globalFilterPlaceholder}
+                className="h-11 ps-9 text-base"
+              />
+            </div>
+          ) : (
+            <span className="flex-1" />
+          )}
+          {phone?.filters && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 gap-1.5"
+              onClick={() => setFilterSheetOpen(true)}
+              data-testid="data-table-phone-filter"
+            >
+              <IconFilter className="size-4" />
+              {phoneLabels.filter ?? "Filter"}
+              {chips.length > 0 && <span className="tabular-nums">({chips.length})</span>}
+            </Button>
+          )}
+          {phone?.mainAction &&
+            (phone.mainAction.href ? (
+              <a
+                href={phone.mainAction.href}
+                aria-label={phone.mainAction.label}
+                className="grid size-11 shrink-0 place-items-center rounded-control-lg bg-primary text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <IconPlus className="size-5" />
+              </a>
+            ) : (
+              <Button
+                type="button"
+                aria-label={phone.mainAction.label}
+                onClick={phone.mainAction.onClick}
+                className="size-11 shrink-0 p-0"
+              >
+                <IconPlus className="size-5" />
+              </Button>
+            ))}
+        </div>
+      )}
+
+      {stack && isPhone && sortableColumns.length > 0 && (
+        <Sheet open={sortSheetOpen} onOpenChange={setSortSheetOpen}>
+          <SheetContent side="bottom" className="gap-3 rounded-t-2xl pb-[calc(1.25rem+env(safe-area-inset-bottom))] text-base">
+            <SheetHeader>
+              <SheetTitle className="text-lg font-semibold">{phoneLabels.sortTitle ?? "Sort"}</SheetTitle>
+              <SheetDescription className="sr-only">{currentSortLabel}</SheetDescription>
+            </SheetHeader>
+            <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border" role="radiogroup">
+              {[
+                { key: "none", label: phoneLabels.defaultOrder ?? "Default order", id: null as string | null, desc: false },
+                ...sortableColumns.flatMap((column) => {
+                  const header = headerOf(column.id)
+                  return [
+                    { key: `${column.id}:asc`, label: ascendingLabel(header), id: column.id as string | null, desc: false },
+                    { key: `${column.id}:desc`, label: descendingLabel(header), id: column.id as string | null, desc: true },
+                  ]
+                }),
+              ].map((option) => {
+                const on =
+                  option.id === null
+                    ? !currentSort
+                    : currentSort?.id === option.id && !!currentSort.desc === option.desc
+                return (
+                  <li key={option.key}>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => {
+                        table.setSorting(option.id === null ? [] : [{ id: option.id, desc: option.desc }])
+                        setSortSheetOpen(false)
+                      }}
+                      className="flex min-h-12 w-full items-center gap-3 px-4 text-start outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    >
+                      <span className="flex-1">{option.label}</span>
+                      {on && <IconCheck className="size-4 text-primary" aria-hidden />}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </SheetContent>
+        </Sheet>
+      )}
+
+      {stack && isPhone && phone?.filters && (
+        <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+          <SheetContent side="bottom" className="gap-4 rounded-t-2xl pb-[calc(1.25rem+env(safe-area-inset-bottom))] text-base">
+            <SheetHeader>
+              <SheetTitle className="text-lg font-semibold">{phoneLabels.filtersTitle ?? "Filters"}</SheetTitle>
+              <SheetDescription className="sr-only">{phoneLabels.filtersTitle ?? "Filters"}</SheetDescription>
+            </SheetHeader>
+            <div className="flex flex-col gap-3">{phone.filters.content}</div>
+            <div className="flex gap-2">
+              {phone.filters.onClear && (
+                <Button type="button" variant="outline" className="h-11 flex-1" onClick={phone.filters.onClear}>
+                  {phoneLabels.clearFilters ?? "Clear all"}
+                </Button>
+              )}
+              <Button type="button" className="h-11 flex-[2]" onClick={() => setFilterSheetOpen(false)}>
+                {phoneLabels.done ?? "Done"}
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
       )}
 
       {pagination && rows.length > 0 && (

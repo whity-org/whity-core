@@ -301,6 +301,30 @@ final class PluginSettingsResolutionRealEngineTest extends TestCase
         self::assertSame('x', $this->settings->effective(self::TENANT_A)[self::KEY_CURSOR]);
     }
 
+    /**
+     * WHIT-1035: customer sign-up's keys have their own screen, which checks
+     * the starting role is customer-safe; the generic API neither shows nor
+     * writes them.
+     */
+    public function testACoreKeyWithItsOwnScreenIsAbsentFromReadsAndRefusedOnWrites(): void
+    {
+        $handler = $this->makeHandler();
+        TenantContext::setTenantId(self::TENANT_A);
+
+        $body = $this->decode($handler->get($this->req('GET', '/api/settings')));
+        self::assertArrayNotHasKey('signup.role_id', $body['data']['effective'] ?? []);
+        self::assertNotContains('signup.role_id', array_column($body['data']['registry'] ?? [], 'key'));
+
+        $response = $handler->patch($this->req('PATCH', '/api/settings', [
+            'settings' => ['signup.role_id' => '1', 'signup.mode' => 'open'],
+        ]));
+        self::assertSame(422, $response->getStatusCode());
+        $details = $this->decode($response)['details'] ?? [];
+        self::assertStringContainsString('its own settings screen', $details['signup.role_id'] ?? '');
+        self::assertSame(0, $this->countRows('signup.role_id'));
+        self::assertSame(0, $this->countRows('signup.mode'));
+    }
+
     public function testCoreKeysAreUnaffectedOnTheApiSurface(): void
     {
         $handler = $this->makeHandler();

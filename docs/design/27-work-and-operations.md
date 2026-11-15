@@ -4,7 +4,7 @@ Sixteen areas of everyday work, designed for the web and the phone in full (X.1)
 
 ## Sidebar
 
-A **Work** group follows the top items: Tasks, Boards, Meetings, Appointments, Applications, Flows. **Operations** holds Inventory, Money and expenses, and Subscriptions. **Chat** sits among the top items, for people and agents together (CH.1). On the phone they're under More › My work, and anything waiting for a person also shows on Home and in the Inbox.
+A **Work** group follows the top items: Tasks, Boards, Meetings, Appointments, Applications, Flows. **Operations** holds Inventory, Money and expenses, and Subscriptions. **Chat** sits among the top items: people, agents, bots and customers together (CH.1, UC.1; it replaced Messages in 3.5). **Calendar** follows it; on calendar screens the sidebar starts as the rail (CV.1). On the phone they're under More › My work, and anything waiting for a person also shows on Home and in the Inbox.
 
 ## Tasks, on Taskaat
 
@@ -27,6 +27,8 @@ Everyday meetings and **formal meeting bodies** (X.3): committees with a chair, 
 
 **Customers and staff** both book (AP.1). Staff see a day or week calendar with people and rooms as columns: booked, checked in, requests needing an OK, and blocked time. Customers book on the tenant's **booking page** or in the customer app: service, day, time, then a WhatsApp confirmation and reminders. Staff set their availability, breaks and services on the web or the phone. Cards: `TplAppointments`, `TplBookingPage`, `TmAppointmentsMobile`.
 
+**The calendar, like Google Calendar (3.5, CV.1–CV.11).** Day, 4 days, Week, Month and Year; a left panel with New booking, a mini month, search and people and rooms as coloured checkboxes; **Colour by** person, service or room, each person's own choice; details beside a booking; click or drag to create, drag to move, pull to resize, with the customer asked first and Undo; every change also by keys or the Move button. On a phone: Day, 3 days and Month, a drawer, sheets, press and hold to move. Cards: `TplCalendarWeek`, `TplCalendarViews`, `TplCalendarEditing`, `TplCalendarPhone`; the booking sheet and setup `TplCalendarStaff`; a customer's own booking `TplBookingManage`.
+
 ## Inventory
 
 Stock in every place, plus **recipes and batches** (IN.1). Stock shows each item per place against its reorder level; the **Stock assistant** proposes reorders as purchase orders grouped by supplier, with why. Items you make have a **recipe**: ingredients for one batch, the batch cost and the cost per unit, the selling price and margin. **Making a batch** takes the ingredients out of stock, adds the product with a batch number and expiry date, and prints labels; a shortage says what to do. Batches near their date are flagged and sold first. On the phone: stock by place with a scanner, an item and its batches, making a batch with a stepper, and transfers. Cards: `TplInventory`, `TplRecipe`, `TmInventoryMobile`.
@@ -46,6 +48,8 @@ Requests people send (X.4), **reviewed in stages with a scoring panel** (AA.1). 
 ## Chat, with people and agents
 
 **One chat for everyone** (CH.1): agents are teammates who join direct chats, groups and project chats. They're always marked: the robot face, an **Agent** tag, who they work for in that chat, and a blue edge or tint on what they write. Adding an agent (CH.2) says what it can read (from now on by default), who it works for there, and what it may do, action by action, never more than that person; everyone sees it join. Proposals appear as dashed cards with who must decide; hand-offs between agents and "is drafting" are visible lines. Beside each chat: the people, the agents, and what each agent may do here. On the phone the fourth tab is **Chat** (CH.3). Cards: `TplChat`, `TplChatAddAgent`, `TmChat`.
+
+**One chat (3.5, UC.1–UC.13).** Team chat and customer messages are one place: one list with tabs (All, Unread, Customers, Team, Groups, Agents and bots), three panes (list, conversation, details or a thread), **bubbles or compact rows** as each person chooses. Replies, threads, reactions, mentions, pins, search, files, photos, voice with its text, seen and typing; rich **blocks** (records, payment links, booking times, forms, polls, approvals); **bots** that follow the workspace's rules; internal notes and assigning in customer chats; admins can **block** unwanted senders. Cards: `TplChatHub`, `TplChatCompact`, `TplChatParts`, `TplChatPhone`.
 
 ## Agents
 
@@ -82,7 +86,7 @@ The builder, filling in, the public form and responses (section 22) stay. On the
 | Documents | `TplLibrary`, `TplDocRecord`, `TplDocRouting`, editor cards | `TmDocumentsMobile`, `TmDocEditMobile` |
 | Flows | `TplFlows`, `TplFlowBuilder`, `TplFlowEditor` | `TmFlowsMobile` |
 | Agents | `TplAgents`, `TplAgentPresets`, `TplAgentRecord`, `TplAgentInstructions`, `TplAgentScope` | `TmAgentsManage`, `TmAgentSetup` |
-| Agent chats (Chat) | `TplChat`, `TplChatAddAgent` | `TmChat`, `TmCreateAgents` |
+| Chat (people, agents, bots, customers) | `TplChatHub`, `TplChatCompact`, `TplChatParts`, `TplChat`, `TplChatAddAgent` | `TplChatPhone`, `TmChat`, `TmCreateAgents` |
 | Meetings | `TplMeetings`, `TplMeeting` | `TmMeetingsMobile` |
 | Inventory | `TplInventory`, `TplRecipe` | `TmInventoryMobile`, stock count in `TmFormsMobile` |
 | Tasks | `TplTasks` | `TmTasks` |
@@ -94,4 +98,4 @@ The builder, filling in, the public form and responses (section 22) stay. On the
 | Applications | `TplApplications`, `TplApplication` | `TmApplicationsMobile` |
 | Money and expenses | `TplMoney`, `TplLedger` | `TmMoneyMobile`, receipts in `TmCreateFlows` |
 | Subscriptions and tiers | `TplSubscriptions`, `TplBilling`, `TplPlans` | `TmSubscriptionsMobile`, `TmWorkspaceMobile` |
-| Appointments | `TplAppointments`, `TplBookingPage` | `TmAppointmentsMobile` |
+| Appointments and calendar | `TplCalendarWeek`, `TplCalendarViews`, `TplCalendarEditing`, `TplCalendarStaff`, `TplAppointments`, `TplBookingPage`, `TplBookingManage` | `TplCalendarPhone`, `TmAppointmentsMobile` |

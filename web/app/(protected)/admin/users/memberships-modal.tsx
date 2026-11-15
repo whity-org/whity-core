@@ -2,8 +2,8 @@
 
 import { roleLabel } from '@whity/features/roles';
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import { api, apiFetch } from '@/lib/api/client';
+import type { components } from '@whity/api-client';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import {
@@ -72,7 +72,7 @@ export function MembershipsModal({
   user,
   canManage,
 }: MembershipsModalProps) {
-  const { user: actor, apiClient } = useAuth();
+  const { user: actor } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const isSystemAdmin = actor?.tenant_id === SYSTEM_TENANT_ID;
@@ -129,11 +129,11 @@ export function MembershipsModal({
 
     const fetchTenants = async (): Promise<void> => {
       try {
-        // The raw client, not the typed one: `per_page` is a real query
+        // apiFetch, not the typed client: `per_page` is a real query
         // parameter the tenants list honours but does not declare in the
         // published schema, so the generated types reject it. Same call the
         // Tenants admin page makes, and the same reason.
-        const response = await apiClient('/api/v1/tenants?per_page=100');
+        const response = await apiFetch('/api/v1/tenants?per_page=100');
         if (!response.ok) {
           throw new Error(t('users.memberships.error.tenants', 'Failed to load tenants'));
         }
@@ -149,7 +149,7 @@ export function MembershipsModal({
     };
 
     void fetchTenants();
-  }, [isOpen, isSystemAdmin, apiClient, addToast, t]);
+  }, [isOpen, isSystemAdmin, addToast, t]);
 
   // A system administrator MUST name the tenant. Omitting `tenant_id` means "the
   // caller's tenant", which for them resolves to whichever membership the server

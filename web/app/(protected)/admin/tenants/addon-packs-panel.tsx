@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useTranslation } from '@whity/features/i18n';
 import { useRecordResource } from '@whity/features/record';
@@ -57,15 +57,15 @@ export function AddonPacksPanel({ tenantId }: { tenantId: number }) {
   const resource = useRecordResource<Loaded>(
     async () => {
       const [heldRes, plansRes] = await Promise.all([
-        apiClient(`/api/v1/tenants/${tenantId}/addons`),
-        apiClient('/api/v1/plans'),
+        api.GET('/api/v1/tenants/{id}/addons', { params: { path: { id: tenantId } } }),
+        api.GET('/api/v1/plans'),
       ]);
-      if (heldRes.status === 403 || plansRes.status === 403) return 'forbidden';
-      if (!heldRes.ok || !plansRes.ok) {
+      if (heldRes.response.status === 403 || plansRes.response.status === 403) return 'forbidden';
+      if (!heldRes.response.ok || !plansRes.response.ok) {
         throw new Error(t('tenants.record.addons.error', "Failed to load this workspace's add-on packs"));
       }
-      const held = ((await heldRes.json()).data ?? []) as HeldPack[];
-      const plans = ((await plansRes.json()).data ?? []) as PlanRow[];
+      const held = ((heldRes.data as { data?: unknown[] } | undefined)?.data ?? []) as HeldPack[];
+      const plans = ((plansRes.data as { data?: unknown[] } | undefined)?.data ?? []) as PlanRow[];
       return { held, packs: plans.filter((plan) => plan.is_addon === true) };
     },
     [tenantId, version],
@@ -79,10 +79,9 @@ export function AddonPacksPanel({ tenantId }: { tenantId: number }) {
   const save = async (planId: number, quantity: number) => {
     setSaving(true);
     try {
-      const res = await apiClient(`/api/v1/tenants/${tenantId}/addons`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan_id: planId, quantity }),
+      const { response: res } = await api.PUT('/api/v1/tenants/{id}/addons', {
+        params: { path: { id: tenantId } },
+        body: { plan_id: planId, quantity },
       });
       if (!res.ok) {
         addToast(t('tenants.record.addons.saveError', 'The add-on packs were not changed'), 'error');

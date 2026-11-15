@@ -81,7 +81,7 @@ test.describe('Self-service profile management (WC-64)', () => {
     // previously orphaned /settings page). Clicking it lands on Settings.
     await adminPage.shell.openAccountSettings();
     await page.waitForURL('**/settings');
-    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Profile' })).toBeVisible();
     await expect(page.getByLabel('Email Address')).toBeVisible();
   });
@@ -99,7 +99,7 @@ test.describe('Self-service profile management (WC-64)', () => {
     try {
       const { page } = session;
       await page.goto('/settings');
-      await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
 
       // Edit the email and supply the current password to authorize the change.
       await page.getByLabel('Email Address').fill(newEmail);
@@ -142,7 +142,7 @@ test.describe('Self-service profile management (WC-64)', () => {
     try {
       const { page } = session;
       await page.goto('/settings');
-      await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
 
       await page.getByLabel('New Password', { exact: true }).fill(newPassword);
       await page.getByLabel('Confirm New Password').fill(newPassword);

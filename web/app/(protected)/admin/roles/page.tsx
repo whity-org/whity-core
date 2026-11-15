@@ -14,6 +14,7 @@ import { RolesScreen } from '@whity/features/roles';
 import type { Role, RoleScopeSeam, RoleTenantOption } from '@whity/features/roles';
 import { webRolesAdapter } from '@/lib/roles-adapter';
 import { useAuth } from '@/lib/auth-context';
+import { apiFetch } from '@/lib/api/client';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useTranslation } from '@whity/features/i18n';
 import { useToast } from '@/lib/toast-context';
@@ -40,7 +41,7 @@ export default function Page() {
   const { hasPermission } = useCapabilities();
   const { addToast } = useToast();
   const router = useRouter();
-  const { user, apiClient } = useAuth();
+  const { user } = useAuth();
   const isSystemAdmin = user?.tenant_id === SYSTEM_TENANT_ID;
 
   // The Roles feature's own copy lives in the `admin` domain, but the shared UI
@@ -79,7 +80,7 @@ export default function Page() {
   // omitted, the create request carries no ownership fields and behaves exactly
   // as it did.
   //
-  // The RAW client, not the typed one: `per_page` is a real query parameter the
+  // apiFetch, not the typed client: `per_page` is a real query parameter the
   // tenants list honours but does not declare in the published schema, so the
   // generated types reject it. Same call, and the same reason, as the
   // memberships modal.
@@ -87,7 +88,7 @@ export default function Page() {
     if (!isSystemAdmin) return undefined;
     return {
       loadTenants: async (): Promise<RoleTenantOption[]> => {
-        const response = await apiClient('/api/v1/tenants?per_page=100');
+        const response = await apiFetch('/api/v1/tenants?per_page=100');
         if (!response.ok) {
           throw new Error(t('roles.create.scope.error', 'Failed to load tenants'));
         }
@@ -95,7 +96,7 @@ export default function Page() {
         return body.data.map((tenant) => ({ id: tenant.id, name: tenant.name }));
       },
     };
-  }, [isSystemAdmin, apiClient, t]);
+  }, [isSystemAdmin, t]);
 
   return (
     <RolesScreen

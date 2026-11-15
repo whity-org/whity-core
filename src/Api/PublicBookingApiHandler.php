@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use DateTimeImmutable;
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Calendar\BookingRepository;
@@ -80,6 +81,8 @@ final class PublicBookingApiHandler
         private readonly HostResolver $hosts,
         private readonly BotCheck $bot,
         private readonly SharedStoreInterface $store,
+        // WHIT-1014: the workspace's own brand on its public pages. Null: none sent.
+        private readonly ?BrandingService $branding = null,
     ) {
     }
 
@@ -115,6 +118,9 @@ final class PublicBookingApiHandler
 
             return Response::json(['data' => [
                 'workspace' => ['name' => $workspace['name'], 'slug' => $workspace['slug']],
+                // WHIT-1014: on a shared host the page's own branding is the
+                // instance's, so the workspace's brand comes with the page.
+                'brand' => $this->brandFor($tenantId, $workspace['name']),
                 'settings' => array_intersect_key($settings->toApi(), array_flip(['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days'])),
                 'services' => $services,
                 'staff' => array_map(static fn (array $s): array => ['profile_id' => $s['profile_id'], 'display_name' => $s['display_name']], $staff),
@@ -230,8 +236,11 @@ final class PublicBookingApiHandler
             $booking = $this->booking->bookingOrFail($tenantId, $bookingId);
             $settings = $this->booking->settingsFor($tenantId);
 
+            $name = $this->tenants->findNameById($tenantId) ?? '';
+
             return Response::json(['data' => self::forCustomer($booking) + [
-                'workspace' => ['name' => $this->tenants->findNameById($tenantId) ?? ''],
+                'workspace' => ['name' => $name],
+                'brand' => $this->brandFor($tenantId, $name),
                 'time_zone' => $settings->zone->getName(),
             ]]);
         });
@@ -294,11 +303,14 @@ final class PublicBookingApiHandler
             $service = is_array($booking['service'] ?? null) ? LocalizedLabel::preferred($booking['service']['name']) : '';
             $workspace = $this->tenants->findNameById($tenantId) ?? '';
             $body = Ics::calendar([[
-                'uid' => 'booking-' . $bookingId . '-' . $tenantId . '@whity',
+                'uid' => \Whity\Core\Calendar\EmailBookingMessenger::uid($tenantId, $bookingId),
                 'start' => Interval::fromApi($booking['starts_at']) ?? $this->booking->now(),
                 'end' => Interval::fromApi($booking['ends_at']) ?? $this->booking->now(),
                 'summary' => trim($service . ($workspace !== '' ? ' · ' . $workspace : '')),
                 'description' => (string) $booking['staff_name'],
+                // E2: the same revision as the emails' files, so opening this
+                // one never rolls a calendar back to an older time.
+                'sequence' => (int) ($booking['ics_sequence'] ?? 0),
             ]]);
 
             return new Response(200, $body, [
@@ -411,6 +423,24 @@ final class PublicBookingApiHandler
         }
 
         return null;
+    }
+
+    /**
+     * The workspace's public brand (WHIT-1014), or null without a branding
+     * service or when it cannot be read: the page then keeps the host's.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function brandFor(int $tenantId, string $workspaceName): ?array
+    {
+        if ($this->branding === null) {
+            return null;
+        }
+        try {
+            return $this->branding->forPublicPage($tenantId, $workspaceName);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**

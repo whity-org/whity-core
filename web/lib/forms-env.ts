@@ -4,18 +4,18 @@ import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { FormsScreenEnv } from '@whity/features/forms';
 import type { Transport } from '@whity/features/record';
-import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 
 /**
- * The web transport: the cookie-authenticated `apiClient`, mapped into the
+ * The web transport: the cookie-authenticated `apiFetch`, mapped into the
  * `{ status, body }` seam every feature package is written over.
  */
 const webTransport: Transport = {
   async request(method: string, path: string, body?: unknown) {
     // A FormData body is a multipart upload: the browser writes its own
     // Content-Type with the boundary, so none is set here.
-    const response = await apiClient(path, {
+    const response = await apiFetch(path, {
       method,
       ...(body instanceof FormData
         ? { body }

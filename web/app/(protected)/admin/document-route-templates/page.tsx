@@ -20,7 +20,7 @@
 
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -51,7 +51,6 @@ import { useTranslation } from '@whity/features/i18n';
 import type { RouteTemplateGraphWire, RouteTemplateSummary } from './types';
 
 export default function RouteTemplatesPage() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
   const router = useRouter();
@@ -60,13 +59,13 @@ export default function RouteTemplatesPage() {
   const canWrite = hasPermission(ROUTE_TEMPLATES_WRITE);
 
   const { data, loading, error, refetch } = useFetch(async () => {
-    const response = await apiClient('/api/v1/document-route-templates');
+    const { data: listBody, response } = await api.GET('/api/v1/document-route-templates');
     if (!response.ok) {
       throw new Error(t('routeTemplates.error.load', 'Failed to load route templates'));
     }
-    const body = await response.json();
+    const body = listBody as unknown as { data?: RouteTemplateSummary[] };
     return (body.data ?? []) as RouteTemplateSummary[];
-  }, [apiClient]);
+  }, []);
 
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
@@ -79,25 +78,27 @@ export default function RouteTemplatesPage() {
   const sentences = useFetch(async () => {
     const rows = data ?? [];
     const [rolesRes, groupsRes] = await Promise.all([
-      apiClient('/api/v1/roles?per_page=100').catch(() => null),
-      apiClient('/api/v1/user-groups?per_page=100').catch(() => null),
+      api.GET('/api/v1/roles', { params: { query: { per_page: 100 } } }).catch(() => null),
+      api.GET('/api/v1/user-groups', { params: { query: { per_page: 100 } } }).catch(() => null),
     ]);
-    const nameMap = async (res: Response | null) => {
+    const nameMap = (res: { data?: unknown; response: Response } | null) => {
       const map = new Map<number, string>();
-      if (res?.ok) {
-        const body = (await res.json().catch(() => null)) as { data?: { id: number; name: string }[] } | null;
+      if (res?.response.ok) {
+        const body = (res.data ?? null) as { data?: { id: number; name: string }[] } | null;
         for (const item of body?.data ?? []) map.set(item.id, item.name);
       }
       return map;
     };
-    const roles = await nameMap(rolesRes);
-    const groups = await nameMap(groupsRes);
+    const roles = nameMap(rolesRes);
+    const groups = nameMap(groupsRes);
     const out: Record<number, string> = {};
     await Promise.all(
       rows.map(async (row) => {
-        const res = await apiClient(`/api/v1/document-route-templates/${row.id}`).catch(() => null);
-        if (!res?.ok) return;
-        const body = (await res.json().catch(() => null)) as { data?: RouteTemplateGraphWire } | null;
+        const res = await api
+          .GET('/api/v1/document-route-templates/{id}', { params: { path: { id: row.id } } })
+          .catch(() => null);
+        if (!res?.response.ok) return;
+        const body = (res.data ?? null) as unknown as { data?: RouteTemplateGraphWire } | null;
         if (body?.data === undefined) return;
         out[row.id] = routeSentence(
           body.data.steps.map((st) => ({
@@ -119,59 +120,58 @@ export default function RouteTemplatesPage() {
       })
     );
     return out;
-  }, [apiClient, data]);
+  }, [data]);
 
   const duplicate = useCallback(
     async (row: RouteTemplateSummary) => {
       const failed = t('routeTemplates.error.duplicate', 'The route could not be duplicated');
-      const source = await apiClient(`/api/v1/document-route-templates/${row.id}`);
+      const { data: sourceBody, response: source } = await api.GET('/api/v1/document-route-templates/{id}', {
+        params: { path: { id: row.id } },
+      });
       if (!source.ok) return addToast(failed, 'error');
-      const graph = ((await source.json()) as { data: RouteTemplateGraphWire }).data;
-      const made = await apiClient('/api/v1/document-route-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const graph = (sourceBody as unknown as { data: RouteTemplateGraphWire }).data;
+      const { data: madeBody, response: made } = await api.POST('/api/v1/document-route-templates', {
+        body: {
           name: t('routeTemplates.duplicate.name', '{name} (copy)', { name: row.name }),
           description: row.description,
-        }),
+        },
       });
       if (!made.ok) return addToast(failed, 'error');
-      const id = ((await made.json()) as { data: { id: number } }).data.id;
-      const put = await apiClient(`/api/v1/document-route-templates/${id}/graph`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ steps: graph.steps, edges: graph.edges }),
+      const id = (madeBody as unknown as { data: { id: number } }).data.id;
+      const { response: put } = await api.PUT('/api/v1/document-route-templates/{id}/graph', {
+        params: { path: { id } },
+        body: { steps: graph.steps, edges: graph.edges } as never,
       });
       if (!put.ok) return addToast(failed, 'error');
       router.push(`/admin/document-route-templates/${id}`);
     },
-    [addToast, apiClient, router, t]
+    [addToast, router, t]
   );
 
   const remove = useCallback(async () => {
     if (deleting === null) return;
-    const response = await apiClient(`/api/v1/document-route-templates/${deleting.id}`, { method: 'DELETE' });
+    const { response } = await api.DELETE('/api/v1/document-route-templates/{id}', {
+      params: { path: { id: deleting.id } },
+    });
     if (!response.ok) {
       addToast(t('routeTemplates.error.delete', 'The route could not be deleted'), 'error');
       return;
     }
     setDeleting(null);
     refetch();
-  }, [addToast, apiClient, deleting, refetch, t]);
+  }, [addToast, deleting, refetch, t]);
 
   const create = useCallback(async () => {
     setSaving(true);
     try {
-      const response = await apiClient('/api/v1/document-route-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+      const { data, error: failure, response } = await api.POST('/api/v1/document-route-templates', {
+        body: { name },
       });
 
       if (!response.ok) {
         // The server's message names the conflict or the field, so it is shown
         // verbatim rather than replaced with a generic failure.
-        const body = await response.json().catch(() => null);
+        const body = (failure ?? null) as { error?: unknown } | null;
         const message =
           typeof body?.error === 'string'
             ? body.error
@@ -180,7 +180,7 @@ export default function RouteTemplatesPage() {
         return;
       }
 
-      const body = await response.json();
+      const body = data as unknown as { data: { id: number } };
       setCreating(false);
       setName('');
       // Straight into the editor: a template is created EMPTY and the only
@@ -189,7 +189,7 @@ export default function RouteTemplatesPage() {
     } finally {
       setSaving(false);
     }
-  }, [addToast, apiClient, name, router, t]);
+  }, [addToast, name, router, t]);
 
   const columns: DataTableColumn<RouteTemplateSummary>[] = [
     {

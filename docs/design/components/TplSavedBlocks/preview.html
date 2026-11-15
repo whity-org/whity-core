@@ -1,0 +1,61 @@
+<!-- @dsCard group="Templates · 3.4" height=2438 width=1344 subtitle="E.21–E.24: the list, where a block is used, Edit original, rename and delete" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Saved blocks library</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4]]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  function brow(n, kind, scope, uses, upd, sel) { return h('div', { className: 'x4-blk', style: sel ? { background: 'var(--primary-tint)' } : null }, h('div', { style: { minWidth: 0 } }, h('b', null, n[0]), h('small', null, n[1])),
+    h('div', null, h(W.Badge, { variant: kind === 'Synced' ? 'info' : 'secondary', icon: kind === 'Synced' ? 'sync' : 'copy' }, kind)), h('div', null, scope), h('div', null, uses), h('div', { className: 'x4-small' }, upd), h(W.Menu, { label: 'Actions for ' + n[0], items: [{ label: 'Edit original', icon: 'edit' }, { label: 'Rename', icon: 'text' }, { label: 'Where it’s used', icon: 'link' }, { label: 'Delete', icon: 'delete', danger: true }] })); }
+  var list = h('div', { className: 'x4-list' }, h('div', { className: 'x4-blk is-h' }, h('span', null, 'Block'), h('span', null, 'Kind'), h('span', null, 'Who can use it'), h('span', null, 'Used in'), h('span', null, 'Changed'), h('span')),
+    brow(['Bank details', 'IBAN, bank and branch for invoices'], 'Synced', 'Everyone in the workspace', '14 documents', '2 days ago', true), brow(['Signature and stamp, Amro', 'Signer’s name filled per document'], 'Synced', 'Everyone in the workspace', '6 templates', '9 Nov'),
+    brow(['Delivery terms', 'Three paragraphs for quotes'], 'Copy', 'Everyone in the workspace', 'Inserted 22 times', '1 Nov'), brow(['My sign-off', 'Kind regards, Awss'], 'Copy', 'Only me', 'Inserted 8 times', '28 Oct'));
+  var page = shell('Saved blocks', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: 'Documents' }, { label: 'Saved blocks' }], title: 'Saved blocks', description: 'Blocks people saved to reuse. Editing a synced block changes every document that uses it; published templates pick it up at their next publish.' }),
+    h('div', { className: 'x4-filters' }, filter('Kind', 'Any'), filter('Who can use it', 'Any'), h('span', { className: 'x4-sp' }), h(W.Input, { 'aria-label': 'Search saved blocks', placeholder: 'Search saved blocks' })), list));
+  var used = h(W.Drawer, { inline: true, width: 460, eyebrow: 'Synced block', title: 'Bank details', subtitle: 'Used in 14 documents', onClose: function () {} },
+    h('div', { style: { display: 'grid', gap: 14 } }, h('div', { className: 'x4-blkprev' }, 'Bank: Example Bank, Abdali branch', h('br'), 'IBAN: JO71 EXBK 0000 0000 0000 1234 5678', h('br'), 'Pay to: ', h('i', null, 'Workspace name')),
+      h('div', { className: 'x4-uses' }, h('div', null, I('template'), h('span', null, 'Invoice template'), h(W.Badge, { variant: 'outline' }, 'Published v4'), h('span', { className: 'x4-small' }, 'Changes at next publish')), h('div', null, I('template'), h('span', null, 'Quote template'), h(W.Badge, { variant: 'outline' }, 'Draft')), h('div', null, I('page'), h('span', null, 'Wiki: How we get paid'), h(W.Badge, { variant: 'outline' }, 'Page')), h('div', null, I('document'), h('span', null, '11 issued documents'), h('span', { className: 'x4-small' }, 'Never change'))),
+      h('div', { className: 'x4-row' }, h(W.Button, { icon: 'edit' }, 'Edit original'), h(W.Button, { variant: 'outline' }, 'Rename'))));
+  var del = h(W.ConfirmDialog, { inline: true, title: 'Delete “Bank details”?', description: 'It’s in 3 templates and a wiki page. They keep a copy of the text, no longer synced. Issued documents never change.', confirmLabel: 'Delete and keep copies', icon: 'delete' });
+  var ren = h(W.Dialog, { inline: true, title: 'Rename saved block', onClose: function () {}, footer: h(F, null, h(W.Button, { variant: 'ghost' }, 'Cancel'), h(W.Button, null, 'Rename')) }, h(W.Input, { label: 'Name', defaultValue: 'Bank details, Example Bank' }));
+  ReactDOM.createRoot(document.getElementById('root')).render(board(frame('Library', page, 640),
+    states([st('Where it’s used', used), h('div', { style: { display: 'grid', gap: 20 } }, st('Delete, when it’s in use', del), st('Rename', ren), st('None yet', h(W.EmptyState, { icon: 'field', title: 'No saved blocks yet', description: 'In a document, select blocks and choose Save as block.' })))], 2),
+    frame('Arabic', h('div', { dir: 'rtl', style: { padding: 20 } }, h('div', { className: 'x4-list' }, h('div', { className: 'x4-blk is-h' }, h('span', null, 'الكتلة'), h('span', null, 'النوع'), h('span', null, 'من يستخدمها'), h('span', null, 'مستخدمة في'), h('span', null, 'آخر تغيير'), h('span')),
+      h('div', { className: 'x4-blk' }, h('div', null, h('b', null, 'التفاصيل البنكية'), h('small', null, 'رقم الآيبان والبنك والفرع للفواتير')), h('div', null, h(W.Badge, { variant: 'info', icon: 'sync' }, 'متزامنة')), h('div', null, 'كل من في مساحة العمل'), h('div', null, '14 مستنداً'), h('div', { className: 'x4-small' }, 'قبل يومين'), h(W.IconButton, { icon: 'more', label: 'إجراءات' })),
+      h('div', { className: 'x4-blk' }, h('div', null, h('b', null, 'شروط التوصيل'), h('small', null, 'ثلاث فقرات لعروض الأسعار')), h('div', null, h(W.Badge, { variant: 'secondary', icon: 'copy' }, 'نسخة')), h('div', null, 'كل من في مساحة العمل'), h('div', null, 'أُدرجت 22 مرة'), h('div', { className: 'x4-small' }, '1 تشرين الثاني'), h(W.IconButton, { icon: 'more', label: 'إجراءات' })))), 240),
+    note('Saved blocks library (E.21–E.24, E.38)', ['One list under Documents › Saved blocks: name and what it holds, Synced or Copy, who can use it, where it’s used, when it changed.', 'Only me blocks show to their owner; owners and admins manage the workspace’s.', 'Where it’s used opens a side panel: templates (with “changes at next publish”), drafts, wiki pages, and issued documents that never change.', 'Edit original opens the block in the editor on its own; saving updates every synced use, published templates at their next publish.', 'Delete never breaks a document: uses keep a copy of the text, no longer synced, and the dialog says so.', 'Per-document parts (E.23) are marked in the preview, each with a stable key, never by position (E.23a).'])));
+</script>
+</body>
+</html>

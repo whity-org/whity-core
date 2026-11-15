@@ -48,9 +48,10 @@ import { IconRoute } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
 import { labelRequestKey, resolveLabels } from '@/lib/api/resolve-labels';
 import { DOCUMENTS_ROUTE } from '@/lib/capabilities';
 import type { AudienceGroupOption } from '@whity/ui/audience-group-picker';
@@ -102,7 +103,7 @@ export interface DocumentRoutingPanelProps {
 export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = false, onChanged }: DocumentRoutingPanelProps) {
   const t = useTranslation('documents');
   const dates = useDateDisplay();
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const { has, loading: capsLoading } = useCapabilities();
 
   const [composing, setComposing] = useState(false);
@@ -112,33 +113,37 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
   const viewerProfileId = user?.id ?? null;
 
   const routes = useFetch<RoutesResponse>(async () => {
-    const response = await apiClient(`/api/v1/documents/${documentId}/routes`);
+    const { data, error, response } = await api.GET('/api/v1/documents/{id}/routes', {
+      params: { path: { id: documentId } },
+    });
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (error ?? null) as { error?: string } | null;
       throw new Error(body?.error ?? t('routing.error.routes', 'This document’s routes could not be loaded.'));
     }
-    return (await response.json()) as RoutesResponse;
-  }, [apiClient, documentId, version]);
+    return data as unknown as RoutesResponse;
+  }, [documentId, version]);
 
   const recipients = useFetch<RecipientsResponse>(async () => {
-    const response = await apiClient(`/api/v1/documents/${documentId}/recipients`);
+    const { data, error, response } = await api.GET('/api/v1/documents/{id}/recipients', {
+      params: { path: { id: documentId } },
+    });
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (error ?? null) as { error?: string } | null;
       throw new Error(
         body?.error ?? t('routing.error.recipients', 'The recipients of this document could not be loaded.')
       );
     }
-    return (await response.json()) as RecipientsResponse;
-  }, [apiClient, documentId, version]);
+    return data as unknown as RecipientsResponse;
+  }, [documentId, version]);
 
   const rules = useFetch<RoutingRulesResponse>(async () => {
-    const response = await apiClient('/api/v1/routing-rules');
+    const { data, error, response } = await api.GET('/api/v1/routing-rules');
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (error ?? null) as { error?: string } | null;
       throw new Error(body?.error ?? t('routing.error.rules', 'The routing rules could not be loaded.'));
     }
-    return (await response.json()) as RoutingRulesResponse;
-  }, [apiClient]);
+    return data as unknown as RoutingRulesResponse;
+  }, []);
 
   /**
    * Roles, for the core rules' `role_id`.
@@ -150,11 +155,9 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
    * picker.
    */
   const rolesResult = useFetch<PickerCatalogue<RoleOption>>(async () => {
-    const probe = await apiClient('/api/v1/roles?page=1');
+    const { error: probeError, response: probe } = await api.GET('/api/v1/roles', { params: { query: { page: 1 } } });
     if (!probe.ok) {
-      const body = (await probe.json().catch(() => null)) as
-        | { error?: string; required?: string }
-        | null;
+      const body = (probeError ?? null) as { error?: string; required?: string } | null;
       const required = body?.required;
       return {
         items: [],
@@ -179,7 +182,7 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
       };
     }
 
-    const all = await fetchAllPages<RoleOption>(apiClient, '/api/v1/roles');
+    const all = await fetchAllPagesTyped<RoleOption>((query) => api.GET('/api/v1/roles', { params: { query } }) as never);
     return {
       items: all.items.map((role) => ({ id: role.id, name: role.name })),
       unavailable: null,
@@ -192,7 +195,7 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
             'Only some roles could be loaded, so this list may be incomplete.'
           ),
     };
-  }, [apiClient]);
+  }, []);
 
   /**
    * User groups, for the `group` kind's `group_id` (#1015).
@@ -206,11 +209,9 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
    * reason to render, not an exception to throw.
    */
   const groupsResult = useFetch<PickerCatalogue<AudienceGroupOption>>(async () => {
-    const probe = await apiClient('/api/v1/user-groups?page=1');
+    const { error: probeError, response: probe } = await api.GET('/api/v1/user-groups', { params: { query: { page: 1 } } });
     if (!probe.ok) {
-      const body = (await probe.json().catch(() => null)) as
-        | { error?: string; required?: string }
-        | null;
+      const body = (probeError ?? null) as { error?: string; required?: string } | null;
       const required = body?.required;
       return {
         items: [],
@@ -232,9 +233,8 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
       };
     }
 
-    const all = await fetchAllPages<{ id: number; name: string; description: string | null }>(
-      apiClient,
-      '/api/v1/user-groups'
+    const all = await fetchAllPagesTyped<{ id: number; name: string; description: string | null }>(
+      (query) => api.GET('/api/v1/user-groups', { params: { query } }) as never
     );
     return {
       items: all.items.map((group) => ({
@@ -250,7 +250,7 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
             'Only some user groups could be loaded, so this list may be incomplete.'
           ),
     };
-  }, [apiClient]);
+  }, []);
 
   /**
    * Route templates, for #1031's "start from a template".
@@ -264,11 +264,11 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
    * over because one of three ways to name recipients is closed.
    */
   const templatesResult = useFetch<PickerCatalogue<RouteTemplateSummary>>(async () => {
-    const probe = await apiClient('/api/v1/document-route-templates?page=1');
+    const { error: probeError, response: probe } = await api.GET('/api/v1/document-route-templates', {
+      params: { query: { page: 1 } },
+    });
     if (!probe.ok) {
-      const body = (await probe.json().catch(() => null)) as
-        | { error?: string; required?: string }
-        | null;
+      const body = (probeError ?? null) as { error?: string; required?: string } | null;
       const required = body?.required;
       return {
         items: [],
@@ -290,9 +290,8 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
       };
     }
 
-    const all = await fetchAllPages<RouteTemplateSummary>(
-      apiClient,
-      '/api/v1/document-route-templates'
+    const all = await fetchAllPagesTyped<RouteTemplateSummary>(
+      (query) => api.GET('/api/v1/document-route-templates', { params: { query } }) as never
     );
     return {
       items: all.items.map((template) => ({
@@ -309,7 +308,7 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
             'Only some route templates could be loaded, so this list may be incomplete.'
           ),
     };
-  }, [apiClient]);
+  }, []);
 
   /**
    * People — two jobs, ONE request.
@@ -322,11 +321,9 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
   const peopleResult = useFetch<
     PickerCatalogue<AudiencePersonOption> & { names: Map<number, string> }
   >(async () => {
-    const probe = await apiClient('/api/v1/users?page=1');
+    const { error: probeError, response: probe } = await api.GET('/api/v1/users', { params: { query: { page: 1 } } });
     if (!probe.ok) {
-      const body = (await probe.json().catch(() => null)) as
-        | { error?: string; required?: string }
-        | null;
+      const body = (probeError ?? null) as { error?: string; required?: string } | null;
       const required = body?.required;
       return {
         items: [],
@@ -348,9 +345,8 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
       };
     }
 
-    const all = await fetchAllPages<{ id: number; name: string; email?: string | null }>(
-      apiClient,
-      '/api/v1/users'
+    const all = await fetchAllPagesTyped<{ id: number; name: string; email?: string | null }>(
+      (query) => api.GET('/api/v1/users', { params: { query } }) as never
     );
     const names = new Map<number, string>();
     for (const person of all.items) {
@@ -371,16 +367,18 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
             'Only some people could be loaded, so this list may be incomplete.'
           ),
     };
-  }, [apiClient]);
+  }, []);
 
   const recordPeople = useFetch<Map<number, string>>(async () => {
-    const response = await apiClient(`/api/v1/documents/${documentId}/people`);
+    const { data, response } = await api.GET('/api/v1/documents/{id}/people', {
+      params: { path: { id: documentId } },
+    });
     if (!response.ok) throw new Error('names');
-    const body = (await response.json()) as { data?: Record<string, string> };
+    const body = (data ?? {}) as { data?: Record<string, string> };
     return new Map(Object.entries(body.data ?? {}).map(([id, name]) => [Number(id), name]));
     // Re-read after anything changes who is on the route, or a person just sent
     // the document to shows as a former member until the page is reloaded.
-  }, [apiClient, documentId, version]);
+  }, [documentId, version]);
 
   const recipientRows = useMemo<RouteRecipient[]>(
     () => recipients.data?.data ?? [],
@@ -408,8 +406,8 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
   const labelSurface = has(DOCUMENTS_ROUTE) ? 'documents.route' : 'documents';
   const stepRoleKey = labelRequestKey({ roles: stepRoleIds });
   const stepRoleLabels = useFetch(
-    () => resolveLabels(apiClient, labelSurface, { roles: stepRoleIds }),
-    [apiClient, labelSurface, stepRoleKey]
+    () => resolveLabels(apiFetch, labelSurface, { roles: stepRoleIds }),
+    [labelSurface, stepRoleKey]
   );
 
   const roleNames = useMemo(() => {

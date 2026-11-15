@@ -159,7 +159,9 @@ export class AppShell {
     // the hidden link, so absence keeps meaning what those specs read it to
     // mean. VISIBILITY is a separate question and still needs the group open —
     // call revealNavLink() before asserting it.
-    const nav = this.sidebar.getByRole('navigation');
+    // Settings is pinned at the foot, outside the scrolling list (PwShortSidebar),
+    // so the pinned area counts as part of the nav here.
+    const nav = this.sidebar.locator('[data-slot="app-sidebar-nav"], [data-slot="app-sidebar-pinned"]');
     const section = SIDEBAR_SECTIONS.find((s) => s.label === label);
     if (section) {
       return nav.locator(`a[href="${section.href}"]`);
@@ -220,12 +222,12 @@ export class AppShell {
    * the user menu).
    */
   get accountLink(): Locator {
-    return this.page.getByRole('menuitem', { name: 'Account settings' });
+    return this.page.getByRole('menuitem', { name: 'My settings' });
   }
 
-  /** "Logout", inside the account menu (open it first). */
+  /** "Sign out", inside the account menu (open it first). */
   get logoutButton(): Locator {
-    return this.page.getByRole('menuitem', { name: 'Logout' });
+    return this.page.getByRole('menuitem', { name: 'Sign out' });
   }
 
   /** Opens the account menu from the person's row, if it isn't open already. */
@@ -244,6 +246,8 @@ export class AppShell {
   /** Chooses an interface language in the account menu, by its own name ("English", "العربية"). */
   async chooseLanguage(name: string): Promise<void> {
     await this.openAccountMenu();
+    // Language is a row that opens the languages beside it (PwShortSidebar).
+    await this.page.getByTestId('language-switcher').click();
     await this.page.getByRole('menuitemradio', { name }).click();
   }
 
@@ -312,9 +316,9 @@ export class SettingsPage {
   }
 
   async goto(): Promise<void> {
-    // Two-step sign-in is on the account page's Sign-in and security tab.
+    // Two-step sign-in is on the account page's Password and two-step tab.
     await this.page.goto('/settings?tab=security');
-    await expect(this.page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await expect(this.page.getByRole('heading', { name: 'My settings' })).toBeVisible();
   }
 
   /** The 2FA status chip — "Enabled" (green) or "Not Enabled". */

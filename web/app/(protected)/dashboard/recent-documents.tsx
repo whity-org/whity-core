@@ -11,7 +11,7 @@ import { Badge } from '@whity/ui/badge';
 import { Card } from '@whity/ui/card';
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useCapabilitiesContext } from '@/lib/capabilities-context';
 import { useFetch } from '@/hooks/useFetch';
 
@@ -27,15 +27,14 @@ interface RecentDocument {
 export function RecentDocuments() {
   const t = useTranslation('common');
   const dates = useDateDisplay();
-  const { apiClient } = useAuth();
   const capabilities = useCapabilitiesContext();
   const router = useRouter();
 
   const recent = useFetch<RecentDocument[]>(async () => {
-    const response = await apiClient('/api/v1/me/recent-documents');
+    const { data: body, response } = await api.GET('/api/v1/me/recent-documents');
     if (!response.ok) return [];
-    return ((await response.json()) as { data?: RecentDocument[] }).data ?? [];
-  }, [apiClient]);
+    return ((body as { data?: RecentDocument[] } | undefined)?.data) ?? [];
+  }, []);
 
   const rows = recent.data ?? [];
   if (rows.length === 0) return null;

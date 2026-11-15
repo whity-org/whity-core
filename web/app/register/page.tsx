@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useBranding } from '@/lib/branding-context';
 import { Button } from '@whity/ui/button';
@@ -118,7 +119,8 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     setRegisterError(null);
     try {
-      const response = await fetch('/api/v1/register', {
+      // Not in the OpenAPI spec, so it goes through apiFetch (same session rules).
+      const response = await apiFetch('/api/v1/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -179,14 +181,8 @@ export default function RegisterPage() {
         // Account + workspace created. Sign in with the same credentials — a
         // fresh owner has exactly one active membership, so login mints the
         // session directly.
-        const loginRes = await fetch('/api/v1/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-          body: JSON.stringify({ email, password }),
-          credentials: 'include',
+        const { response: loginRes } = await api.POST('/api/v1/login', {
+          body: { email, password } as never,
         });
 
         if (loginRes.ok) {

@@ -15,6 +15,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 // optimistically-removed local state. Pass the jest.fn() itself, not a new
 // arrow function wrapping it.
 const mockApiClient = jest.fn();
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockApiClient }),
 }));

@@ -25,7 +25,8 @@ import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { DOCUMENTS_ISSUE, DOCUMENTS_PUBLISH, DOCUMENTS_WRITE } from '@/lib/capabilities';
 import { issueHref } from '@/lib/documents/issue';
-import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
+import { api } from '@/lib/api/client';
 import { createDocumentSource } from '@/lib/documents/sources';
 import { NumberingDialog } from './numbering-dialog';
 import { PublicNameDialog } from './public-name-dialog';
@@ -61,7 +62,7 @@ import type { OuOption, PermissionOption, PermissionSource, TemplateRow } from '
 type ShowFilter = 'all' | 'published' | 'drafts';
 
 export default function DocumentTemplatesPage() {
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const { addToast } = useToast();
   const router = useRouter();
   const { hasPermission, permissions } = useCapabilities();
@@ -76,8 +77,8 @@ export default function DocumentTemplatesPage() {
   // ── data ────────────────────────────────────────────────────────────────────
 
   const templates = useFetch<TemplateRow[]>(
-    () => listTemplates(apiClient, t('documentTemplates.error.templates', 'Failed to load templates')),
-    [apiClient]
+    () => listTemplates(t('documentTemplates.error.templates', 'Failed to load templates')),
+    []
   );
 
   /**
@@ -85,13 +86,13 @@ export default function DocumentTemplatesPage() {
    * catalogue cannot be read the key is shown as it is.
    */
   const recordTypes = useFetch<Record<string, string>>(async () => {
-    const response = await apiClient('/api/v1/document-embeds');
+    const { data, response } = await api.GET('/api/v1/document-embeds');
     if (!response.ok) return {};
-    const body = (await response.json().catch(() => null)) as {
+    const body = (data ?? null) as unknown as {
       data?: { record_types?: { key: string; label: string }[] };
     } | null;
     return Object.fromEntries((body?.data?.record_types ?? []).map((r) => [r.key, r.label]));
-  }, [apiClient]);
+  }, []);
 
   /**
    * Unit names, for the audience sentence and the placement picker. Listing
@@ -99,12 +100,14 @@ export default function DocumentTemplatesPage() {
    * here is an ordinary state: units show by id and placement is locked.
    */
   const ous = useFetch<OuOption[]>(async () => {
-    const result = await fetchAllPages<OuOption>(apiClient, '/api/v1/ous');
+    const result = await fetchAllPagesTyped<OuOption>((query) =>
+      api.GET('/api/v1/ous', { params: { query } })
+    );
     if (!result.complete) {
       throw new Error(t('documentTemplates.error.ous', 'Failed to load the full unit list'));
     }
     return result.items;
-  }, [apiClient]);
+  }, []);
   const units = useLocalizedUnits(ous.data);
 
   /**
@@ -116,9 +119,11 @@ export default function DocumentTemplatesPage() {
     // A page holds at most 100 and the catalogue is longer, so read every page.
     const catalogue: PermissionOption[] = [];
     for (let page = 1; page <= 20; page += 1) {
-      const response = await apiClient(`/api/v1/permissions?per_page=100&page=${page}`);
+      const { data, response } = await api.GET('/api/v1/permissions', {
+        params: { query: { per_page: 100, page } },
+      });
       if (!response.ok) break;
-      const body = (await response.json()) as {
+      const body = data as unknown as {
         data?: PermissionOption[];
         pagination?: { totalPages?: number };
       };
@@ -130,7 +135,7 @@ export default function DocumentTemplatesPage() {
     const names = catalogue.map((p) => p.name).filter((n): n is string => typeof n === 'string' && n !== '');
     if (names.length > 0) return { source: 'catalogue' as const, names: names.sort() };
     return { source: 'own' as const, names: [...permissions].sort() };
-  }, [apiClient, permissions]);
+  }, [permissions]);
 
   // ── dialog state ────────────────────────────────────────────────────────────
 
@@ -437,7 +442,6 @@ export default function DocumentTemplatesPage() {
         <CopyDialog
           row={copying}
           name={nameOf(copying)}
-          apiClient={apiClient}
           onClose={() => setCopying(null)}
           onCopied={(id) => {
             setCopying(null);
@@ -455,7 +459,6 @@ export default function DocumentTemplatesPage() {
           permissionNames={permissionOptions.data?.names ?? []}
           permissionSource={permissionOptions.data?.source ?? 'own'}
           viewerProfileId={viewerProfileId}
-          apiClient={apiClient}
           addToast={addToast}
           onClose={() => setScoping(null)}
           onSaved={() => {
@@ -469,7 +472,6 @@ export default function DocumentTemplatesPage() {
         <NumberingDialog
           row={numbering}
           name={nameOf(numbering)}
-          apiClient={apiClient}
           addToast={addToast}
           onClose={() => setNumbering(null)}
           onSaved={() => {
@@ -483,7 +485,6 @@ export default function DocumentTemplatesPage() {
         <PublicNameDialog
           row={naming}
           name={nameOf(naming)}
-          apiClient={apiClient}
           addToast={addToast}
           onClose={() => setNaming(null)}
           onSaved={() => {
@@ -498,7 +499,6 @@ export default function DocumentTemplatesPage() {
           row={deleting}
           name={nameOf(deleting)}
           ouName={ouName(deleting.owner_ou_id)}
-          apiClient={apiClient}
           addToast={addToast}
           onClose={() => setDeleting(null)}
           onDeleted={() => {

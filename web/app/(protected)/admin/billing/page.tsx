@@ -4,7 +4,7 @@ import { Affiliates } from './affiliates';
 import { TierFeatures } from './tier-features';
 import { TierLifecycle } from './tier-lifecycle';
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -93,21 +93,20 @@ const PERIODS = ['month', 'year', 'once'] as const;
 const FORBIDDEN = 'forbidden';
 
 export default function BillingPage() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
   const canManage = hasPermission(PLANS_MANAGE);
 
   const { data, loading, error, refetch } = useFetch(async () => {
-    const plansRes = await apiClient('/api/v1/plans');
+    const { data: plansBody, response: plansRes } = await api.GET('/api/v1/plans');
     if (plansRes.status === 403) {
       throw new Error(FORBIDDEN);
     }
     if (!plansRes.ok) {
       throw new Error(t('billing.error.load', 'Failed to load the plan catalogue'));
     }
-    const plans = ((await plansRes.json()).data ?? []) as Plan[];
+    const plans = ((plansBody as unknown as { data?: Plan[] } | undefined)?.data ?? []) as Plan[];
 
     // Prices per plan, in parallel. Each is allowed to fail on its own — one
     // unreadable plan must not blank the whole screen, and the row says so
@@ -115,9 +114,11 @@ export default function BillingPage() {
     const priced = await Promise.all(
       plans.map(async (plan) => {
         try {
-          const res = await apiClient(`/api/v1/plans/${plan.id}/prices`);
+          const { data: pricesBody, response: res } = await api.GET('/api/v1/plans/{id}/prices', {
+            params: { path: { id: plan.id } },
+          });
           if (!res.ok) return { plan, prices: null };
-          return { plan, prices: ((await res.json()).data ?? []) as PlanPrice[] };
+          return { plan, prices: ((pricesBody as unknown as { data?: PlanPrice[] } | undefined)?.data ?? []) as PlanPrice[] };
         } catch {
           return { plan, prices: null };
         }
@@ -125,7 +126,7 @@ export default function BillingPage() {
     );
 
     return priced;
-  }, [apiClient]);
+  }, []);
 
   const [pricing, setPricing] = useState<Plan | null>(null);
   const [creatingPlan, setCreatingPlan] = useState(false);
@@ -133,7 +134,7 @@ export default function BillingPage() {
   return (
     <div className="space-y-4">
       <AdminHeader
-        title={t('billing.title', 'Plans & pricing')}
+        title={t('billing.title', 'Plans and pricing')}
         description={t(
           'billing.description',
           'The tiers this instance sells and what each one costs. Managed by the system tenant.'
@@ -264,12 +265,12 @@ export default function BillingPage() {
                         size="sm"
                         data-testid={`retire-price-${price.id}`}
                         onClick={async () => {
-                          const res = await apiClient(
-                            `/api/v1/plans/${plan.id}/prices/${price.id}`,
-                            { method: 'DELETE' }
+                          const { error: failure, response: res } = await api.DELETE(
+                            '/api/v1/plans/{id}/prices/{priceId}',
+                            { params: { path: { id: plan.id, priceId: price.id } } }
                           );
                           if (!res.ok) {
-                            const body = (await res.json().catch(() => null)) as { error?: string } | null;
+                            const body = (failure ?? null) as { error?: string } | null;
                             addToast(
                               body?.error ?? t('billing.price.retireFailed', 'Could not retire this price.'),
                               'error'
@@ -286,14 +287,14 @@ export default function BillingPage() {
                             {
                               label: t('billing.price.retired.undo', 'Undo'),
                               onClick: async () => {
-                                const back = await apiClient(`/api/v1/plans/${plan.id}/prices`, {
-                                  method: 'POST',
-                                  body: JSON.stringify({
+                                const { response: back } = await api.POST('/api/v1/plans/{id}/prices', {
+                                  params: { path: { id: plan.id } },
+                                  body: {
                                     currency: price.currency,
                                     unit_amount: price.unit_amount,
-                                    billing_period: price.billing_period,
+                                    billing_period: price.billing_period as 'once' | 'month' | 'year',
                                     is_per_seat: price.is_per_seat,
-                                  }),
+                                  },
                                 });
                                 if (!back.ok) {
                                   addToast(t('billing.price.undoFailed', 'Could not bring this price back.'), 'error');
@@ -372,7 +373,6 @@ function AddPriceDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
 
@@ -476,19 +476,19 @@ function AddPriceDialog({
             data-testid="price-save"
             onClick={async () => {
               setSaving(true);
-              const res = await apiClient(`/api/v1/plans/${plan.id}/prices`, {
-                method: 'POST',
-                body: JSON.stringify({
+              const { error: failure, response: res } = await api.POST('/api/v1/plans/{id}/prices', {
+                params: { path: { id: plan.id } },
+                body: {
                   currency,
                   unit_amount: parsed,
-                  billing_period: period,
+                  billing_period: period as 'once' | 'month' | 'year',
                   is_per_seat: perSeat,
-                }),
+                },
               });
               setSaving(false);
 
               if (!res.ok) {
-                const body = (await res.json().catch(() => null)) as { error?: string } | null;
+                const body = (failure ?? null) as { error?: string } | null;
                 // The server's own words. A 409 explains that a live price
                 // already exists on these terms and what to do about it, and no
                 // rewording here would be more accurate than that.
@@ -510,7 +510,6 @@ function AddPriceDialog({
 
 /** Plans have been creatable through the API since the catalogue shipped; this is the screen for it. */
 function CreatePlanDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const [name, setName] = useState('');
@@ -527,16 +526,15 @@ function CreatePlanDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
     setSaving(true);
     setProblem(null);
     try {
-      const res = await apiClient('/api/v1/plans', {
-        method: 'POST',
-        body: JSON.stringify({
+      const { error: failure, response: res } = await api.POST('/api/v1/plans', {
+        body: {
           plan_key: planKey,
           name: name.trim(),
           description: description.trim() === '' ? null : description.trim(),
-        }),
+        },
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string; details?: Record<string, string> } | null;
+        const body = (failure ?? null) as { error?: string; details?: Record<string, string> } | null;
         const detail = body?.details ? Object.values(body.details)[0] : undefined;
         setProblem(detail ?? body?.error ?? t('billing.plan.saveFailed', 'Could not create this plan.'));
         return;

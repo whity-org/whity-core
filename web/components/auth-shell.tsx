@@ -36,11 +36,14 @@ export function isWhiteLabel(branding: Branding): boolean {
 export function AuthShell({
   title,
   subtitle,
+  icon,
   aside,
   children,
 }: {
   title: string;
   subtitle?: string;
+  /** A round state icon above the title (an outcome, TplWelcomeWorkspace); centred layout only. */
+  icon?: React.ReactNode;
   /** The brand panel. Turns the page into the two-column sign-in layout. */
   aside?: React.ReactNode;
   children: React.ReactNode;
@@ -113,6 +116,7 @@ export function AuthShell({
               {branding.siteName}
             </span>
           )}
+          {icon}
           <div className="space-y-1">
             <h1 className="text-xl font-semibold text-foreground">{title}</h1>
             {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}

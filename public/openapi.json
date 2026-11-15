@@ -11335,6 +11335,108 @@
                 }
             }
         },
+        "/api/v1/chat/chats/{id}/focus": {
+            "post": {
+                "operationId": "post_api_v1_chat_chats_id_focus",
+                "summary": "Say the caller is looking at this chat in a focused window (every 20 seconds), or stopped",
+                "tags": [
+                    "chat"
+                ],
+                "description": "While a person looks at a chat, its new lines are not pushed to their devices (WHIT-1077).",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChatFocusRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatDoneResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Chat not found, or you are not in it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/chat/chats/{id}/members": {
             "post": {
                 "operationId": "post_api_v1_chat_chats_id_members",
@@ -23273,6 +23375,134 @@
                 ]
             }
         },
+        "/api/v1/document-themes/form-printout-preview": {
+            "post": {
+                "operationId": "post_api_v1_document_themes_form_printout_preview",
+                "summary": "Preview form printouts with unsaved theme options",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Design 3.4 (`TplFormPrintStyle`): the workspace\u2019s latest form response (or `submissionId`) printed with the `form`, `letterhead` and `accent` options in the body over the workspace theme. A free workspace previews the standard layout, as it would print. One render against the limits.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FormPrintoutPreviewRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The PDF",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No form response to preview yet",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Some options are not valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "The document render limit has been reached",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "PDFs are turned off, or the render service is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/document-themes/resolve": {
             "post": {
                 "operationId": "post_api_v1_document_themes_resolve",
@@ -24241,6 +24471,15 @@
                                                         "revision",
                                                         "issued_on"
                                                     ]
+                                                },
+                                                "brand": {
+                                                    "nullable": true,
+                                                    "allOf": [
+                                                        {
+                                                            "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                                                        }
+                                                    ],
+                                                    "description": "Only beside a code that verified and names its issuer: the issuer logo and colour (WHIT-1044)."
                                                 }
                                             },
                                             "required": [
@@ -28936,6 +29175,137 @@
                     },
                     "503": {
                         "description": "The file could not be read from storage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/form-submissions/{id}/printout": {
+            "get": {
+                "operationId": "get_api_v1_form_submissions_id_printout",
+                "summary": "Print a response in the automatic layout",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Design 3.4 (P1): the response laid out from its form\u2019s sections and questions in the workspace theme\u2019s form printout options, as it would print now. Not stored: the record is the PDF its route\u2019s final step makes. `lang` is `en` or `ar`; left out, the language of the person who sent it. One render against the workspace\u2019s limits.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "lang",
+                        "in": "query",
+                        "required": false,
+                        "description": "The printout language, `en` or `ar`. Left out, the language of the person who sent the response.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "en",
+                                "ar"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The PDF",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Submission not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The render service refused the printout",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "The document render limit has been reached",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "PDFs are turned off, or the render service is unavailable",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -35556,6 +35926,10 @@
                                         "type": "object",
                                         "additionalProperties": true,
                                         "description": "Edited arguments to run with instead of the agent's (optional)."
+                                    },
+                                    "acknowledgedDestructive": {
+                                        "type": "boolean",
+                                        "description": "Needed for a Whity Builder publish or roll back that stops showing data people entered: the person ticked that they understand what is lost."
                                     }
                                 }
                             }
@@ -35633,6 +36007,16 @@
                             }
                         }
                     },
+                    "422": {
+                        "description": "An impact plan whose tests failed (code tests_failed), or a destructive one without acknowledgedDestructive (code acknowledge_destructive)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "content": {
@@ -35653,7 +36037,7 @@
                 "tags": [
                     "me"
                 ],
-                "description": "Nothing runs. The agent can ask again.",
+                "description": "Nothing runs. The agent can ask again, and reads the reason when you give one.",
                 "parameters": [
                     {
                         "name": "id",
@@ -35673,6 +36057,23 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "maxLength": 1000,
+                                        "description": "Why, for the agent to read back (optional), such as which tests to fix."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "The proposal after the decision",
@@ -35680,6 +36081,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/AgentProposalResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
                         }
@@ -40306,6 +40717,257 @@
                     },
                     "422": {
                         "description": "Missing 'checks' list, or more than 200 checks",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/push-subscriptions": {
+            "get": {
+                "operationId": "get_api_v1_me_push_subscriptions",
+                "summary": "The web push public key of the instance and the devices of the caller with push on, in the active workspace",
+                "tags": [
+                    "notifications"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The public key and the devices of the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PushSubscriptionsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "operationId": "post_api_v1_me_push_subscriptions",
+                "summary": "Turn web push on for this browser (its PushSubscription JSON), for the caller in the active workspace",
+                "tags": [
+                    "notifications"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PushSubscriptionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Stored; the new id with the devices of the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PushSubscriptionsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a push subscription from a known push service, or no active workspace",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/push-subscriptions/{id}": {
+            "delete": {
+                "operationId": "delete_api_v1_me_push_subscriptions_id",
+                "summary": "Turn web push off for one device of the caller",
+                "tags": [
+                    "notifications"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The remaining devices of the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PushSubscriptionsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not a device of the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -54897,11 +55559,11 @@
         "/api/v1/resource-role-grants": {
             "get": {
                 "operationId": "get_api_v1_resource_role_grants",
-                "summary": "List the role grants addressed at one resource",
+                "summary": "List the role grants at one resource, or made to one profile",
                 "tags": [
                     "rbac"
                 ],
-                "description": "Returns both grant shapes: a null `profile_id` is the \"everyone at this resource\" grant, a set `profile_id` grants to that one profile. Always scoped to the caller's tenant, so a resource belonging to another tenant yields an empty list rather than an error.",
+                "description": "With `resource_id`: the grants at that record, in both shapes: a null `profile_id` is the \"everyone at this resource\" grant, a set `profile_id` grants to that one profile. With `profile_id` instead: the grants of this type made to that profile by name, which are the records they stand at. Everyone-grants are left out there, because on their own they give nobody access. Pass one of the two, not both. Anyone may list their own grants (`profile_id` = their own profile); listing another person's, or the grants at a resource, needs `roles:read`. Always scoped to the caller's tenant, so another tenant's resource or profile yields an empty list rather than an error.",
                 "parameters": [
                     {
                         "name": "resource_type",
@@ -54915,8 +55577,17 @@
                     {
                         "name": "resource_id",
                         "in": "query",
-                        "required": true,
-                        "description": "The record the grants are addressed at",
+                        "required": false,
+                        "description": "The record the grants are addressed at. Required unless profile_id is given",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "List the grants made to this profile by name instead",
                         "schema": {
                             "type": "integer"
                         }
@@ -54924,7 +55595,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "The grants at this resource",
+                        "description": "The grants",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -54944,7 +55615,7 @@
                         }
                     },
                     "403": {
-                        "description": "Insufficient permissions",
+                        "description": "Listing another person's grants, or the grants at a resource, without roles:read",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -54974,7 +55645,7 @@
                         }
                     },
                     "422": {
-                        "description": "resource_type is unregistered, or resource_id is missing/invalid",
+                        "description": "resource_type is unregistered, neither or both of resource_id and profile_id were given, or one is invalid",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -54993,12 +55664,7 @@
                             }
                         }
                     }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
+                }
             },
             "post": {
                 "operationId": "post_api_v1_resource_role_grants",
@@ -71530,6 +72196,10 @@
                     "createdAt": {
                         "type": "string"
                     },
+                    "declineReason": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "action": {
                         "allOf": [
                             {
@@ -73872,6 +74542,15 @@
                 "required": [
                     "data"
                 ]
+            },
+            "ChatFocusRequest": {
+                "type": "object",
+                "properties": {
+                    "focused": {
+                        "type": "boolean",
+                        "description": "True while the chat is open in a focused window; false when it stops."
+                    }
+                }
             },
             "ChatLink": {
                 "type": "object",
@@ -78471,6 +79150,12 @@
                             "any",
                             "majority"
                         ]
+                    },
+                    "values": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RouteStepValue"
+                        }
                     }
                 },
                 "required": [
@@ -78525,6 +79210,13 @@
                     "to_author": {
                         "type": "boolean",
                         "description": "With `noted`: the note is meant for the author. Notes are internal by default."
+                    },
+                    "values": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The values the step asks for, by key. Only with an approval, `acknowledged` or `forwarded`; required ones must be filled in."
                     }
                 },
                 "required": [
@@ -78612,6 +79304,21 @@
                                 },
                                 "allow_send_back": {
                                     "type": "boolean"
+                                },
+                                "inputs": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/RouteStepInput"
+                                    },
+                                    "maxItems": 5
+                                },
+                                "exclude_named_in": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "maxItems": 10,
+                                    "description": "The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this step leaves out: not asked, not counted in the quorum, not printed among the approvals."
                                 },
                                 "kind": {
                                     "type": "string",
@@ -78870,6 +79577,18 @@
                     "final_template_id": {
                         "type": "integer",
                         "nullable": true
+                    },
+                    "inputs": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RouteStepInput"
+                        }
+                    },
+                    "exclude_named_in": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     },
                     "rejection_count": {
                         "type": "integer"
@@ -79321,6 +80040,15 @@
                                                     ]
                                                 },
                                                 "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                                            },
+                                            "layout": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "start",
+                                                    "centred",
+                                                    "bilingual"
+                                                ],
+                                                "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                                             }
                                         }
                                     }
@@ -80323,6 +81051,15 @@
                                             ]
                                         },
                                         "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                                    },
+                                    "layout": {
+                                        "type": "string",
+                                        "enum": [
+                                            "start",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                                     }
                                 }
                             },
@@ -80337,6 +81074,154 @@
                             "largePrint": {
                                 "type": "boolean",
                                 "description": "Large print: an 11pt body in print, with headings scaled by the same steps."
+                            },
+                            "form": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout.",
+                                "properties": {
+                                    "header": {
+                                        "type": "string",
+                                        "enum": [
+                                            "letterhead",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Standard: `letterhead`."
+                                    },
+                                    "officeDetails": {
+                                        "type": "string",
+                                        "enum": [
+                                            "decisionLine",
+                                            "strip"
+                                        ],
+                                        "description": "Standard: `decisionLine`."
+                                    },
+                                    "decision": {
+                                        "type": "string",
+                                        "enum": [
+                                            "topAndEnd",
+                                            "top",
+                                            "end"
+                                        ],
+                                        "description": "Standard: `topAndEnd`."
+                                    },
+                                    "sectionStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                            "mark",
+                                            "number",
+                                            "eyebrow",
+                                            "rail",
+                                            "tab",
+                                            "plane"
+                                        ],
+                                        "description": "Standard: `mark`."
+                                    },
+                                    "questions": {
+                                        "type": "string",
+                                        "enum": [
+                                            "stacked",
+                                            "twoColumns"
+                                        ],
+                                        "description": "Standard: `stacked`."
+                                    },
+                                    "longAnswers": {
+                                        "type": "string",
+                                        "enum": [
+                                            "countAndContinued",
+                                            "plain"
+                                        ],
+                                        "description": "Standard: `countAndContinued`."
+                                    },
+                                    "choices": {
+                                        "type": "string",
+                                        "enum": [
+                                            "allOptions",
+                                            "chosenOnly"
+                                        ],
+                                        "description": "Standard: `allOptions`."
+                                    },
+                                    "yesNo": {
+                                        "type": "string",
+                                        "enum": [
+                                            "word",
+                                            "threeColumns"
+                                        ],
+                                        "description": "Standard: `word`."
+                                    },
+                                    "empty": {
+                                        "type": "string",
+                                        "enum": [
+                                            "collapseAndMark",
+                                            "hide",
+                                            "printAll"
+                                        ],
+                                        "description": "Standard: `collapseAndMark`."
+                                    },
+                                    "signatures": {
+                                        "type": "string",
+                                        "enum": [
+                                            "confirmedAndDrawn",
+                                            "confirmedOnly",
+                                            "withPaperLines"
+                                        ],
+                                        "description": "Standard: `confirmedAndDrawn`."
+                                    },
+                                    "approvals": {
+                                        "type": "string",
+                                        "enum": [
+                                            "list",
+                                            "cards"
+                                        ],
+                                        "description": "Standard: `list`."
+                                    },
+                                    "footer": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "description": "What the footer prints beside \"Page x of y\", which always prints.",
+                                        "properties": {
+                                            "reference": {
+                                                "type": "boolean"
+                                            },
+                                            "pageCount": {
+                                                "type": "boolean",
+                                                "enum": [
+                                                    true
+                                                ]
+                                            },
+                                            "marks": {
+                                                "type": "boolean"
+                                            },
+                                            "qrEveryPage": {
+                                                "type": "boolean"
+                                            }
+                                        }
+                                    },
+                                    "marks": {
+                                        "type": "array",
+                                        "maxItems": 3,
+                                        "description": "Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan.",
+                                        "items": {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "required": [
+                                                "src"
+                                            ],
+                                            "properties": {
+                                                "src": {
+                                                    "type": "string",
+                                                    "pattern": "^data:image/(png|jpeg|webp);base64,",
+                                                    "description": "The image embedded as a data: URI, at most 300 KB."
+                                                },
+                                                "alt": {
+                                                    "type": "string",
+                                                    "maxLength": 80
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         },
                         "description": "The values it sets over the theme it extends. Leave a token out to keep the base's."
@@ -80411,6 +81296,15 @@
                                     ]
                                 },
                                 "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                            },
+                            "layout": {
+                                "type": "string",
+                                "enum": [
+                                    "start",
+                                    "centred",
+                                    "bilingual"
+                                ],
+                                "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                             }
                         }
                     }
@@ -80486,6 +81380,15 @@
                                             ]
                                         },
                                         "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                                    },
+                                    "layout": {
+                                        "type": "string",
+                                        "enum": [
+                                            "start",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                                     }
                                 }
                             },
@@ -80500,6 +81403,154 @@
                             "largePrint": {
                                 "type": "boolean",
                                 "description": "Large print: an 11pt body in print, with headings scaled by the same steps."
+                            },
+                            "form": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout.",
+                                "properties": {
+                                    "header": {
+                                        "type": "string",
+                                        "enum": [
+                                            "letterhead",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Standard: `letterhead`."
+                                    },
+                                    "officeDetails": {
+                                        "type": "string",
+                                        "enum": [
+                                            "decisionLine",
+                                            "strip"
+                                        ],
+                                        "description": "Standard: `decisionLine`."
+                                    },
+                                    "decision": {
+                                        "type": "string",
+                                        "enum": [
+                                            "topAndEnd",
+                                            "top",
+                                            "end"
+                                        ],
+                                        "description": "Standard: `topAndEnd`."
+                                    },
+                                    "sectionStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                            "mark",
+                                            "number",
+                                            "eyebrow",
+                                            "rail",
+                                            "tab",
+                                            "plane"
+                                        ],
+                                        "description": "Standard: `mark`."
+                                    },
+                                    "questions": {
+                                        "type": "string",
+                                        "enum": [
+                                            "stacked",
+                                            "twoColumns"
+                                        ],
+                                        "description": "Standard: `stacked`."
+                                    },
+                                    "longAnswers": {
+                                        "type": "string",
+                                        "enum": [
+                                            "countAndContinued",
+                                            "plain"
+                                        ],
+                                        "description": "Standard: `countAndContinued`."
+                                    },
+                                    "choices": {
+                                        "type": "string",
+                                        "enum": [
+                                            "allOptions",
+                                            "chosenOnly"
+                                        ],
+                                        "description": "Standard: `allOptions`."
+                                    },
+                                    "yesNo": {
+                                        "type": "string",
+                                        "enum": [
+                                            "word",
+                                            "threeColumns"
+                                        ],
+                                        "description": "Standard: `word`."
+                                    },
+                                    "empty": {
+                                        "type": "string",
+                                        "enum": [
+                                            "collapseAndMark",
+                                            "hide",
+                                            "printAll"
+                                        ],
+                                        "description": "Standard: `collapseAndMark`."
+                                    },
+                                    "signatures": {
+                                        "type": "string",
+                                        "enum": [
+                                            "confirmedAndDrawn",
+                                            "confirmedOnly",
+                                            "withPaperLines"
+                                        ],
+                                        "description": "Standard: `confirmedAndDrawn`."
+                                    },
+                                    "approvals": {
+                                        "type": "string",
+                                        "enum": [
+                                            "list",
+                                            "cards"
+                                        ],
+                                        "description": "Standard: `list`."
+                                    },
+                                    "footer": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "description": "What the footer prints beside \"Page x of y\", which always prints.",
+                                        "properties": {
+                                            "reference": {
+                                                "type": "boolean"
+                                            },
+                                            "pageCount": {
+                                                "type": "boolean",
+                                                "enum": [
+                                                    true
+                                                ]
+                                            },
+                                            "marks": {
+                                                "type": "boolean"
+                                            },
+                                            "qrEveryPage": {
+                                                "type": "boolean"
+                                            }
+                                        }
+                                    },
+                                    "marks": {
+                                        "type": "array",
+                                        "maxItems": 3,
+                                        "description": "Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan.",
+                                        "items": {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "required": [
+                                                "src"
+                                            ],
+                                            "properties": {
+                                                "src": {
+                                                    "type": "string",
+                                                    "pattern": "^data:image/(png|jpeg|webp);base64,",
+                                                    "description": "The image embedded as a data: URI, at most 300 KB."
+                                                },
+                                                "alt": {
+                                                    "type": "string",
+                                                    "maxLength": 80
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         },
                         "description": "The values it sets, replacing the whole token set. Leave a token out to use the base's."
@@ -80565,6 +81616,15 @@
                                             ]
                                         },
                                         "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                                    },
+                                    "layout": {
+                                        "type": "string",
+                                        "enum": [
+                                            "start",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                                     }
                                 }
                             }
@@ -80668,6 +81728,10 @@
                                 "labelAr"
                             ]
                         }
+                    },
+                    "form": {
+                        "type": "object",
+                        "description": "The Form printouts tab (design 3.4): the entitlement that unlocks it, whether this workspace holds it (allowed), each option with its standard value and English and Arabic labels, the footer parts and the marks limit."
                     }
                 },
                 "required": [
@@ -80735,6 +81799,15 @@
                                     ]
                                 },
                                 "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                            },
+                            "layout": {
+                                "type": "string",
+                                "enum": [
+                                    "start",
+                                    "centred",
+                                    "bilingual"
+                                ],
+                                "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                             }
                         }
                     },
@@ -80749,6 +81822,154 @@
                     "largePrint": {
                         "type": "boolean",
                         "description": "Large print: an 11pt body in print, with headings scaled by the same steps."
+                    },
+                    "form": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "description": "How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout.",
+                        "properties": {
+                            "header": {
+                                "type": "string",
+                                "enum": [
+                                    "letterhead",
+                                    "centred",
+                                    "bilingual"
+                                ],
+                                "description": "Standard: `letterhead`."
+                            },
+                            "officeDetails": {
+                                "type": "string",
+                                "enum": [
+                                    "decisionLine",
+                                    "strip"
+                                ],
+                                "description": "Standard: `decisionLine`."
+                            },
+                            "decision": {
+                                "type": "string",
+                                "enum": [
+                                    "topAndEnd",
+                                    "top",
+                                    "end"
+                                ],
+                                "description": "Standard: `topAndEnd`."
+                            },
+                            "sectionStyle": {
+                                "type": "string",
+                                "enum": [
+                                    "mark",
+                                    "number",
+                                    "eyebrow",
+                                    "rail",
+                                    "tab",
+                                    "plane"
+                                ],
+                                "description": "Standard: `mark`."
+                            },
+                            "questions": {
+                                "type": "string",
+                                "enum": [
+                                    "stacked",
+                                    "twoColumns"
+                                ],
+                                "description": "Standard: `stacked`."
+                            },
+                            "longAnswers": {
+                                "type": "string",
+                                "enum": [
+                                    "countAndContinued",
+                                    "plain"
+                                ],
+                                "description": "Standard: `countAndContinued`."
+                            },
+                            "choices": {
+                                "type": "string",
+                                "enum": [
+                                    "allOptions",
+                                    "chosenOnly"
+                                ],
+                                "description": "Standard: `allOptions`."
+                            },
+                            "yesNo": {
+                                "type": "string",
+                                "enum": [
+                                    "word",
+                                    "threeColumns"
+                                ],
+                                "description": "Standard: `word`."
+                            },
+                            "empty": {
+                                "type": "string",
+                                "enum": [
+                                    "collapseAndMark",
+                                    "hide",
+                                    "printAll"
+                                ],
+                                "description": "Standard: `collapseAndMark`."
+                            },
+                            "signatures": {
+                                "type": "string",
+                                "enum": [
+                                    "confirmedAndDrawn",
+                                    "confirmedOnly",
+                                    "withPaperLines"
+                                ],
+                                "description": "Standard: `confirmedAndDrawn`."
+                            },
+                            "approvals": {
+                                "type": "string",
+                                "enum": [
+                                    "list",
+                                    "cards"
+                                ],
+                                "description": "Standard: `list`."
+                            },
+                            "footer": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "What the footer prints beside \"Page x of y\", which always prints.",
+                                "properties": {
+                                    "reference": {
+                                        "type": "boolean"
+                                    },
+                                    "pageCount": {
+                                        "type": "boolean",
+                                        "enum": [
+                                            true
+                                        ]
+                                    },
+                                    "marks": {
+                                        "type": "boolean"
+                                    },
+                                    "qrEveryPage": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            },
+                            "marks": {
+                                "type": "array",
+                                "maxItems": 3,
+                                "description": "Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan.",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                        "src"
+                                    ],
+                                    "properties": {
+                                        "src": {
+                                            "type": "string",
+                                            "pattern": "^data:image/(png|jpeg|webp);base64,",
+                                            "description": "The image embedded as a data: URI, at most 300 KB."
+                                        },
+                                        "alt": {
+                                            "type": "string",
+                                            "maxLength": 80
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -81449,6 +82670,14 @@
                     "reference_format": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "reference_assign": {
+                        "type": "string",
+                        "enum": [
+                            "submit",
+                            "approval"
+                        ],
+                        "description": "`submit`: when the form is sent. `approval`: when its route finishes approved."
                     },
                     "submission_count": {
                         "type": "integer"
@@ -82344,6 +83573,36 @@
                     "data"
                 ]
             },
+            "FormPrintoutPreviewRequest": {
+                "type": "object",
+                "properties": {
+                    "form": {
+                        "type": "object",
+                        "description": "Unsaved `form` options (FormPrintoutStyle) to preview."
+                    },
+                    "letterhead": {
+                        "type": "object",
+                        "description": "Unsaved letterhead options, `layout` among them."
+                    },
+                    "accent": {
+                        "type": "string",
+                        "pattern": "^#[0-9A-Fa-f]{6}$",
+                        "description": "An unsaved print colour."
+                    },
+                    "submissionId": {
+                        "type": "integer",
+                        "description": "The response to print. Left out, the workspace\u2019s latest."
+                    },
+                    "lang": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "ar"
+                        ],
+                        "description": "The printout\u2019s language. Left out, the language of the person who sent it."
+                    }
+                }
+            },
             "FormPublicLinkClosedResponse": {
                 "type": "object",
                 "properties": {
@@ -83227,9 +84486,17 @@
                     },
                     "reference_format": {
                         "type": "string",
-                        "maxLength": 64,
+                        "maxLength": 160,
                         "nullable": true,
-                        "description": "The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none."
+                        "description": "The reference each submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}` or `{ANSWER:subject|human=IRB-AAU|animal=AUB-AAU} {SEQ}/{STEP:meeting_no}/{AY:9}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}; {AY:m}, the academic year starting in month m, as 2026-2027; {ANSWER:question}, an answer, optionally looked up in a list (`|answer=text`, `|*=text` for any other); {STEP:key}, a value entered during review (only with `reference_assign` `approval`). {SEQ} is required, and each different prefix, year or answer counts on its own. Dates are UTC. Null gives none."
+                    },
+                    "reference_assign": {
+                        "type": "string",
+                        "enum": [
+                            "submit",
+                            "approval"
+                        ],
+                        "description": "When the reference is given: `submit` (default) when the form is sent, or `approval` when its route finishes approved, before the final document is made."
                     },
                     "public_requires_sign_in": {
                         "type": "boolean",
@@ -84962,6 +86229,19 @@
                                 },
                                 "role": {
                                     "type": "string"
+                                },
+                                "roles": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "member",
+                                        "customer"
+                                    ]
                                 }
                             },
                             "required": [
@@ -85357,6 +86637,19 @@
                                 },
                                 "role": {
                                     "type": "string"
+                                },
+                                "roles": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "member",
+                                        "customer"
+                                    ]
                                 }
                             },
                             "required": [
@@ -88526,6 +89819,19 @@
                                         },
                                         "role": {
                                             "type": "string"
+                                        },
+                                        "roles": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "kind": {
+                                            "type": "string",
+                                            "enum": [
+                                                "member",
+                                                "customer"
+                                            ]
                                         }
                                     },
                                     "required": [
@@ -90229,6 +91535,15 @@
                             "name"
                         ]
                     },
+                    "brand": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                            }
+                        ],
+                        "description": "Only on the manage link: the brand of the workspace (WHIT-1014)."
+                    },
                     "time_zone": {
                         "type": "string"
                     }
@@ -90379,6 +91694,15 @@
                                 "type": "string"
                             }
                         }
+                    },
+                    "brand": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                            }
+                        ],
+                        "description": "The brand of the workspace, for the page (WHIT-1014)."
                     }
                 },
                 "required": [
@@ -90472,6 +91796,15 @@
                                         "type": "string"
                                     }
                                 }
+                            },
+                            "brand": {
+                                "nullable": true,
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                                    }
+                                ],
+                                "description": "The brand of the workspace, for the chat box (WHIT-1014)."
                             }
                         },
                         "required": [
@@ -91370,6 +92703,15 @@
                                 "items": {
                                     "$ref": "#/components/schemas/SignupJoinProvider"
                                 }
+                            },
+                            "brand": {
+                                "nullable": true,
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                                    }
+                                ],
+                                "description": "The workspace logo and colour for the page (WHIT-1044)."
                             }
                         },
                         "required": [
@@ -91402,6 +92744,15 @@
                             },
                             "requires_password": {
                                 "type": "boolean"
+                            },
+                            "brand": {
+                                "nullable": true,
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                                    }
+                                ],
+                                "description": "The workspace logo and colour for the page (WHIT-1044)."
                             }
                         },
                         "required": [
@@ -91431,6 +92782,58 @@
                 "required": [
                     "email",
                     "display_name"
+                ]
+            },
+            "PublicWorkspaceBrand": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The site name the workspace set, else its name."
+                    },
+                    "logo_wide_url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "logo_square_url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "main_color": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The workspace main colour as #rrggbb, or null for Whity Blue."
+                    },
+                    "theme": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Token values derived from the main colour (decision 2.8), keyed by token name without the leading dashes; null when no main colour is set.",
+                        "properties": {
+                            "light": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            },
+                            "dark": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "required": [
+                            "light",
+                            "dark"
+                        ]
+                    }
+                },
+                "required": [
+                    "name",
+                    "logo_wide_url",
+                    "logo_square_url",
+                    "main_color",
+                    "theme"
                 ]
             },
             "PublishWorkspacePluginRequest": {
@@ -91554,6 +92957,86 @@
                     }
                 },
                 "required": [
+                    "data"
+                ]
+            },
+            "PushDevice": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "endpoint_hash": {
+                        "type": "string"
+                    },
+                    "user_agent": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "last_success_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "failing": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "id",
+                    "endpoint_hash",
+                    "user_agent",
+                    "created_at",
+                    "last_success_at",
+                    "failing"
+                ]
+            },
+            "PushSubscriptionRequest": {
+                "type": "object",
+                "properties": {
+                    "endpoint": {
+                        "type": "string"
+                    },
+                    "keys": {
+                        "type": "object",
+                        "properties": {
+                            "p256dh": {
+                                "type": "string"
+                            },
+                            "auth": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "p256dh",
+                            "auth"
+                        ]
+                    }
+                },
+                "required": [
+                    "endpoint",
+                    "keys"
+                ]
+            },
+            "PushSubscriptionsResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "public_key": {
+                        "type": "string"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PushDevice"
+                        }
+                    }
+                },
+                "required": [
+                    "public_key",
                     "data"
                 ]
             },
@@ -91947,6 +93430,15 @@
                                             ]
                                         },
                                         "description": "The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`."
+                                    },
+                                    "layout": {
+                                        "type": "string",
+                                        "enum": [
+                                            "start",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo)."
                                     }
                                 },
                                 "required": [
@@ -91965,6 +93457,154 @@
                             "largePrint": {
                                 "type": "boolean",
                                 "description": "Large print: an 11pt body in print, with headings scaled by the same steps."
+                            },
+                            "form": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "description": "How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout.",
+                                "properties": {
+                                    "header": {
+                                        "type": "string",
+                                        "enum": [
+                                            "letterhead",
+                                            "centred",
+                                            "bilingual"
+                                        ],
+                                        "description": "Standard: `letterhead`."
+                                    },
+                                    "officeDetails": {
+                                        "type": "string",
+                                        "enum": [
+                                            "decisionLine",
+                                            "strip"
+                                        ],
+                                        "description": "Standard: `decisionLine`."
+                                    },
+                                    "decision": {
+                                        "type": "string",
+                                        "enum": [
+                                            "topAndEnd",
+                                            "top",
+                                            "end"
+                                        ],
+                                        "description": "Standard: `topAndEnd`."
+                                    },
+                                    "sectionStyle": {
+                                        "type": "string",
+                                        "enum": [
+                                            "mark",
+                                            "number",
+                                            "eyebrow",
+                                            "rail",
+                                            "tab",
+                                            "plane"
+                                        ],
+                                        "description": "Standard: `mark`."
+                                    },
+                                    "questions": {
+                                        "type": "string",
+                                        "enum": [
+                                            "stacked",
+                                            "twoColumns"
+                                        ],
+                                        "description": "Standard: `stacked`."
+                                    },
+                                    "longAnswers": {
+                                        "type": "string",
+                                        "enum": [
+                                            "countAndContinued",
+                                            "plain"
+                                        ],
+                                        "description": "Standard: `countAndContinued`."
+                                    },
+                                    "choices": {
+                                        "type": "string",
+                                        "enum": [
+                                            "allOptions",
+                                            "chosenOnly"
+                                        ],
+                                        "description": "Standard: `allOptions`."
+                                    },
+                                    "yesNo": {
+                                        "type": "string",
+                                        "enum": [
+                                            "word",
+                                            "threeColumns"
+                                        ],
+                                        "description": "Standard: `word`."
+                                    },
+                                    "empty": {
+                                        "type": "string",
+                                        "enum": [
+                                            "collapseAndMark",
+                                            "hide",
+                                            "printAll"
+                                        ],
+                                        "description": "Standard: `collapseAndMark`."
+                                    },
+                                    "signatures": {
+                                        "type": "string",
+                                        "enum": [
+                                            "confirmedAndDrawn",
+                                            "confirmedOnly",
+                                            "withPaperLines"
+                                        ],
+                                        "description": "Standard: `confirmedAndDrawn`."
+                                    },
+                                    "approvals": {
+                                        "type": "string",
+                                        "enum": [
+                                            "list",
+                                            "cards"
+                                        ],
+                                        "description": "Standard: `list`."
+                                    },
+                                    "footer": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "description": "What the footer prints beside \"Page x of y\", which always prints.",
+                                        "properties": {
+                                            "reference": {
+                                                "type": "boolean"
+                                            },
+                                            "pageCount": {
+                                                "type": "boolean",
+                                                "enum": [
+                                                    true
+                                                ]
+                                            },
+                                            "marks": {
+                                                "type": "boolean"
+                                            },
+                                            "qrEveryPage": {
+                                                "type": "boolean"
+                                            }
+                                        }
+                                    },
+                                    "marks": {
+                                        "type": "array",
+                                        "maxItems": 3,
+                                        "description": "Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan.",
+                                        "items": {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "required": [
+                                                "src"
+                                            ],
+                                            "properties": {
+                                                "src": {
+                                                    "type": "string",
+                                                    "pattern": "^data:image/(png|jpeg|webp);base64,",
+                                                    "description": "The image embedded as a data: URI, at most 300 KB."
+                                                },
+                                                "alt": {
+                                                    "type": "string",
+                                                    "maxLength": 80
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         },
                         "required": [
@@ -92018,6 +93658,9 @@
                     "id": {
                         "type": "integer"
                     },
+                    "resource_id": {
+                        "type": "integer"
+                    },
                     "role_id": {
                         "type": "integer"
                     },
@@ -92028,6 +93671,7 @@
                 },
                 "required": [
                     "id",
+                    "resource_id",
                     "role_id",
                     "profile_id"
                 ]
@@ -92631,6 +94275,69 @@
                     "data"
                 ]
             },
+            "RouteStepInput": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "Small letters, digits and _, up to 40 characters. Templates print it as `route.value.<key>`."
+                    },
+                    "label": {
+                        "type": "string",
+                        "description": "What the person filling it in reads. At most 80 characters."
+                    },
+                    "label_ar": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The label in Arabic, when it differs."
+                    },
+                    "required": {
+                        "type": "boolean",
+                        "description": "Whether approving needs it. True when absent."
+                    },
+                    "max_length": {
+                        "type": "integer",
+                        "description": "Longest value, 1 to 200. 100 when absent."
+                    }
+                },
+                "required": [
+                    "key",
+                    "label"
+                ]
+            },
+            "RouteStepValue": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "value": {
+                        "type": "string"
+                    },
+                    "step_id": {
+                        "type": "integer"
+                    },
+                    "event_id": {
+                        "type": "integer",
+                        "description": "The trail entry it was entered with."
+                    },
+                    "entered_by": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "entered_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "key",
+                    "value",
+                    "step_id",
+                    "event_id",
+                    "entered_by",
+                    "entered_at"
+                ]
+            },
             "RouteTemplate": {
                 "type": "object",
                 "properties": {
@@ -92903,6 +94610,21 @@
                         "type": "integer",
                         "nullable": true
                     },
+                    "inputs": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RouteStepInput"
+                        },
+                        "maxItems": 5
+                    },
+                    "exclude_named_in": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 10,
+                        "description": "The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this stage leaves out: not asked, not counted in the quorum, not printed among the approvals."
+                    },
                     "canvas_x": {
                         "type": "integer"
                     },
@@ -93042,6 +94764,12 @@
                                                 "can_send_back": {
                                                     "type": "boolean"
                                                 },
+                                                "values": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/RouteStepValue"
+                                                    }
+                                                },
                                                 "finalisation": {
                                                     "$ref": "#/components/schemas/RouteFinalisation",
                                                     "nullable": true
@@ -93155,12 +94883,20 @@
                         },
                         "description": "The contract Block[] at the current version"
                     },
+                    "perDocumentParts": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SavedBlockPart"
+                        },
+                        "description": "E.23a: the parts each document fills itself, in reading order, by stable key"
+                    },
                     "perDocumentKeys": {
                         "type": "array",
                         "items": {
                             "type": "string"
                         },
-                        "description": "Keys of the parts each document fills itself (E.23)"
+                        "deprecated": true,
+                        "description": "Deprecated in 3.4, kept one release: the keys of perDocumentParts"
                     },
                     "version": {
                         "type": "integer",
@@ -93192,6 +94928,7 @@
                     "sharing",
                     "owner",
                     "blocks",
+                    "perDocumentParts",
                     "perDocumentKeys",
                     "version",
                     "usedIn",
@@ -93264,12 +95001,20 @@
                         },
                         "description": "The contract Block[]: 1 to 200 objects, each with a string id and type, at most 256 KiB"
                     },
+                    "per_document_parts": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SavedBlockPart"
+                        },
+                        "description": "E.23a: labels, required and placeholders by key; which parts exist comes from the blocks. At most 200"
+                    },
                     "per_document_keys": {
                         "type": "array",
                         "items": {
                             "type": "string"
                         },
-                        "description": "Keys used by perDocument marks in the blocks; at most 200"
+                        "deprecated": true,
+                        "description": "Deprecated in 3.4: accepted and ignored"
                     }
                 },
                 "required": [
@@ -93290,6 +95035,53 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "SavedBlockPart": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "Stable key (pd_ + 8 characters), minted once when the part is marked"
+                    },
+                    "label": {
+                        "type": "object",
+                        "properties": {
+                            "en": {
+                                "type": "string"
+                            },
+                            "ar": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "en"
+                        ]
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "text",
+                            "field"
+                        ]
+                    },
+                    "required": {
+                        "type": "boolean",
+                        "description": "Blocks issuing until a document fills it"
+                    },
+                    "placeholder": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "Inline[] shown, dashed, until a document fills it"
+                    }
+                },
+                "required": [
+                    "key",
+                    "label",
+                    "kind"
                 ]
             },
             "SavedBlockResponse": {
@@ -93331,12 +95123,20 @@
                         },
                         "description": "The new contract Block[]; a change bumps the version"
                     },
+                    "per_document_parts": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SavedBlockPart"
+                        },
+                        "description": "E.23a: labels, required and placeholders by key; left out, they are kept"
+                    },
                     "per_document_keys": {
                         "type": "array",
                         "items": {
                             "type": "string"
                         },
-                        "description": "Keys used by perDocument marks in the blocks"
+                        "deprecated": true,
+                        "description": "Deprecated in 3.4: accepted and ignored"
                     },
                     "version": {
                         "type": "integer",
@@ -94466,6 +96266,10 @@
                     "customer_invites": {
                         "type": "boolean"
                     },
+                    "invites_per_customer": {
+                        "type": "integer",
+                        "description": "How many people one customer may invite; 0 is no limit (WHIT-1043)."
+                    },
                     "eligible_roles": {
                         "type": "array",
                         "items": {
@@ -94503,6 +96307,7 @@
                     "role_customer_safe",
                     "allowed_domains",
                     "customer_invites",
+                    "invites_per_customer",
                     "eligible_roles",
                     "pending_count",
                     "workspace_slug",
@@ -94550,6 +96355,10 @@
                     "customer_invites": {
                         "type": "boolean",
                         "description": "Whether customers may invite colleagues into their own role, as customers (POST /api/v1/team-invitations). Off by default."
+                    },
+                    "invites_per_customer": {
+                        "type": "integer",
+                        "description": "How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043)."
                     }
                 }
             },
@@ -96398,6 +98207,14 @@
                             "enabled": {
                                 "type": "boolean"
                             },
+                            "limit": {
+                                "type": "integer",
+                                "description": "How many people you may invite; 0 is no limit (WHIT-1043)."
+                            },
+                            "used": {
+                                "type": "integer",
+                                "description": "How many places your invitations take: open, accepted and not sent."
+                            },
                             "items": {
                                 "type": "array",
                                 "items": {
@@ -96407,6 +98224,8 @@
                         },
                         "required": [
                             "enabled",
+                            "limit",
+                            "used",
                             "items"
                         ]
                     }

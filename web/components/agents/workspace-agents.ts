@@ -125,6 +125,12 @@ export function templateGroups(grant: Record<string, ScopeGrantMode>, writeHint:
 /** The server's reasons for refusing an agent, one per line when it lists them. */
 export async function refusal(response: Response, fallback: string): Promise<string> {
   const body = (await response.json().catch(() => null)) as { error?: string; errors?: string[] } | null;
+  return refusalText(body, fallback);
+}
+
+/** {@link refusal} for a body the typed client already parsed (its `error`). */
+export function refusalText(parsed: unknown, fallback: string): string {
+  const body = (parsed ?? null) as { error?: string; errors?: string[] } | null;
   if (body?.errors && body.errors.length > 0) return body.errors.join('\n');
   return body?.error ?? fallback;
 }

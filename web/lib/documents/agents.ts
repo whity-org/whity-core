@@ -1,7 +1,7 @@
 import type { EditorAgentChoice, EditorAgentRequest, NewAgentRequest } from '@whity/ui/editor/agents';
 import type { DocumentEditorAdapter } from '@whity/features/document-editor';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 /**
  * Ask an agent from the editor (editor M6): the web half of

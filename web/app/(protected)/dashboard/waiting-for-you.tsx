@@ -18,7 +18,7 @@ import { Icon } from '@whity/ui/icon';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { parseWireDate, useDateDisplay, type RelativeAgeLabels } from '@whity/features/datetime';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
@@ -51,17 +51,16 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
   const t = useTranslation('common');
   const locale = useFormattingLocale();
   const dates = useDateDisplay();
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const router = useRouter();
 
   const failed = t('dashboard.waiting.error', 'What is waiting for you could not be loaded.');
 
   const waiting = useFetch<WaitingResponse>(async () => {
-    const response = await apiClient(`/api/v1/me/waiting?limit=${MAX_ROWS}`);
+    const { data: body, response } = await api.GET('/api/v1/me/waiting', { params: { query: { limit: MAX_ROWS } } });
     if (!response.ok) throw new Error(failed);
-    return (await response.json()) as WaitingResponse;
-  }, [apiClient]);
+    return body as unknown as WaitingResponse;
+  }, []);
 
   const unknownAgent = t('dashboard.agent.unknown', 'An agent');
   const ageLabels: RelativeAgeLabels = {
@@ -107,10 +106,9 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
   }, [waiting.data, locale, unknownAgent, dates.hidden]);
 
   const undo = async (action: AgentAction) => {
-    const response = await apiClient(`/api/v1/me/agent-actions/${action.id}/undo`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}',
+    const { response } = await api.POST('/api/v1/me/agent-actions/{id}/undo', {
+      params: { path: { id: action.id } },
+      body: {} as never,
     });
     addToast(
       response.ok
@@ -126,12 +124,11 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
   const decide = async (proposal: AgentProposal, verdict: 'approve' | 'decline') => {
     const decideFailed = t('dashboard.waiting.decideFailed', 'That decision could not be saved. Try again.');
     try {
-      const response = await apiClient(`/api/v1/me/agent-proposals/${proposal.id}/${verdict}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-      const body = (await response.json().catch(() => null)) as
+      const { data: okBody, error: errBody, response } = await api.POST(
+        verdict === 'approve' ? '/api/v1/me/agent-proposals/{id}/approve' : '/api/v1/me/agent-proposals/{id}/decline',
+        { params: { path: { id: proposal.id } }, body: {} as never }
+      );
+      const body = ((okBody ?? errBody ?? null) as unknown) as
         | { data?: (AgentProposal & { action?: AgentAction | null }) | null; error?: string }
         | null;
       if (!response.ok) {

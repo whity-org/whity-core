@@ -15,7 +15,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { SIGNUP_MANAGE } from '@/lib/capabilities';
@@ -31,6 +31,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { CopyBlock } from '@whity/ui/copy-block';
 import { RadioGroup, RadioGroupItem } from '@whity/ui/radio-group';
 import { SaveBar, ChangedField } from '@whity/ui/save-bar';
+import { Input } from '@whity/ui/input';
 import { Switch } from '@whity/ui/switch';
 import { Textarea } from '@whity/ui/textarea';
 import { IconUserCheck } from '@tabler/icons-react';
@@ -55,6 +56,8 @@ interface SignupSettings {
   allowed_domains: string[];
   /** Whether customers may invite colleagues into their own role (#1872). */
   customer_invites?: boolean;
+  /** How many people one customer may invite; 0 is no limit (WHIT-1043). */
+  invites_per_customer?: number;
   eligible_roles: EligibleRole[];
   pending_count: number;
   workspace_slug: string | null;
@@ -82,6 +85,8 @@ interface Draft {
   roleId: string;
   domains: string;
   customerInvites: boolean;
+  /** Text as typed; empty is no limit. */
+  perCustomer: string;
 }
 
 function draftOf(settings: SignupSettings): Draft {
@@ -90,6 +95,7 @@ function draftOf(settings: SignupSettings): Draft {
     roleId: settings.role_id === null ? '' : String(settings.role_id),
     domains: settings.allowed_domains.join('\n'),
     customerInvites: settings.customer_invites === true,
+    perCustomer: settings.invites_per_customer ? String(settings.invites_per_customer) : '',
   };
 }
 
@@ -117,6 +123,8 @@ function codeText(t: TranslateFn, details: Record<string, unknown>): string | nu
       );
     case 'domains_too_many':
       return t('settings.customerSignup.error.domainsTooMany', 'List at most {max} domains.', { max });
+    case 'invites_per_customer_invalid':
+      return t('settings.customerSignup.error.perCustomerInvalid', 'Enter a whole number from 1 to 1000, or leave it empty for no limit.');
     case 'customer_invites_invalid':
       return t('settings.customerSignup.error.invitesInvalid', 'Turn customer invitations on or off.');
     case 'mode_invalid':
@@ -145,9 +153,9 @@ function codeText(t: TranslateFn, details: Record<string, unknown>): string | nu
   }
 }
 
-async function readError(res: Response, fallback: string, t: TranslateFn): Promise<string> {
+function readError(parsed: unknown, fallback: string, t: TranslateFn): string {
   try {
-    const body = (await res.json()) as { error?: unknown; details?: Record<string, unknown> };
+    const body = (parsed ?? {}) as { error?: unknown; details?: Record<string, unknown> };
     if (body.details) {
       const translated = codeText(t, body.details);
       if (translated !== null) return translated;
@@ -174,11 +182,11 @@ export default function CustomerSignupSettingsPage() {
     error: loadError,
     refetch,
   } = useFetch<SignupSettings>(async () => {
-    const res = await apiClient('/api/v1/signup/settings');
+    const { data, response: res, error } = await api.GET('/api/v1/signup/settings');
     if (!res.ok) {
-      throw new Error(await readError(res, t('settings.customerSignup.loadFailed', 'Sign-up settings could not be loaded'), t));
+      throw new Error(readError(error, t('settings.customerSignup.loadFailed', 'Sign-up settings could not be loaded'), t));
     }
-    return ((await res.json()) as { data: SignupSettings }).data;
+    return (data as unknown as { data: SignupSettings }).data;
   }, []);
 
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -193,6 +201,7 @@ export default function CustomerSignupSettingsPage() {
     (current.mode !== saved.mode ||
       current.roleId !== saved.roleId ||
       current.customerInvites !== saved.customerInvites ||
+      current.perCustomer.trim() !== saved.perCustomer ||
       splitDomains(current.domains).join(',') !== splitDomains(saved.domains).join(','));
 
   if (!capabilitiesLoading && !canManage) {
@@ -215,19 +224,19 @@ export default function CustomerSignupSettingsPage() {
     if (current === null) return;
     setSaving(true);
     setSaveError(null);
-    const res = await apiClient('/api/v1/signup/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const { response: res, error } = await api.PUT('/api/v1/signup/settings', {
+      body: {
         mode: current.mode,
         role_id: current.roleId === '' ? null : Number(current.roleId),
         allowed_domains: splitDomains(current.domains),
         customer_invites: current.customerInvites,
-      }),
+        // Empty is no limit (0); anything else the server checks is a whole number.
+        invites_per_customer: current.perCustomer.trim() === '' ? 0 : Number(current.perCustomer.trim()),
+      },
     });
     setSaving(false);
     if (!res.ok) {
-      setSaveError(await readError(res, t('settings.customerSignup.saveFailed', 'The settings could not be saved'), t));
+      setSaveError(readError(error, t('settings.customerSignup.saveFailed', 'The settings could not be saved'), t));
       return;
     }
     setDraft(null);
@@ -254,6 +263,8 @@ export default function CustomerSignupSettingsPage() {
       changed.push(t('settings.customerSignup.domains', 'Allowed email domains'));
     if (current.customerInvites !== saved.customerInvites)
       changed.push(t('settings.customerSignup.invites', 'Customers can invite their team'));
+    if (current.perCustomer.trim() !== saved.perCustomer)
+      changed.push(t('settings.customerSignup.perCustomer', 'People per customer'));
   }
 
   return (
@@ -432,6 +443,30 @@ export default function CustomerSignupSettingsPage() {
                 </div>
               </ChangedField>
 
+              {current.customerInvites && (
+                <ChangedField changed={current.perCustomer.trim() !== saved?.perCustomer}>
+                  <div className="grid max-w-xs gap-1.5">
+                    <label htmlFor="signup-per-customer" className="text-sm font-medium text-foreground">
+                      {t('settings.customerSignup.perCustomer', 'People per customer')}
+                    </label>
+                    <Input
+                      id="signup-per-customer"
+                      inputMode="numeric"
+                      dir="ltr"
+                      value={current.perCustomer}
+                      placeholder={t('settings.customerSignup.perCustomer.none', 'No limit')}
+                      onChange={(event) => update({ perCustomer: event.target.value })}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        'settings.customerSignup.perCustomer.hint',
+                        'Each customer can invite up to this many. Leave it empty for no limit. Withdrawn invitations free a place.'
+                      )}
+                    </p>
+                  </div>
+                </ChangedField>
+              )}
+
               {saveError && (
                 <Alert variant="destructive">
                   <AlertDescription>{saveError}</AlertDescription>
@@ -492,23 +527,26 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
   const [rejecting, setRejecting] = useState<SignupRequest | null>(null);
 
   const { data, error, refetch } = useFetch<SignupRequest[]>(async () => {
-    const res = await apiClient(`/api/v1/signup/requests?status=${status}&per_page=100`);
+    const { data, response: res, error } = await api.GET('/api/v1/signup/requests', {
+      params: { query: { status, per_page: 100 } },
+    });
     if (!res.ok) {
-      throw new Error(await readError(res, t('settings.customerSignup.queue.loadFailed', 'The requests could not be loaded'), t));
+      throw new Error(readError(error, t('settings.customerSignup.queue.loadFailed', 'The requests could not be loaded'), t));
     }
-    return ((await res.json()) as { data: SignupRequest[] }).data;
+    return (data as unknown as { data: SignupRequest[] }).data;
   }, [pendingCount, status]);
 
   const rows = useMemo(() => data ?? [], [data]);
 
   const decide = async (request: SignupRequest, approve: boolean) => {
     setBusy(request.id);
-    const res = await apiClient(`/api/v1/signup/requests/${request.id}/${approve ? 'approve' : 'reject'}`, {
-      method: 'POST',
-    });
+    const options = { params: { path: { id: request.id } } };
+    const { response: res, error } = approve
+      ? await api.POST('/api/v1/signup/requests/{id}/approve', options)
+      : await api.POST('/api/v1/signup/requests/{id}/reject', options);
     setBusy(null);
     if (!res.ok) {
-      addToast(await readError(res, t('settings.customerSignup.queue.failed', 'The request could not be updated'), t), 'error');
+      addToast(readError(error, t('settings.customerSignup.queue.failed', 'The request could not be updated'), t), 'error');
       return;
     }
     addToast(

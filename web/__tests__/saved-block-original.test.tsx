@@ -33,6 +33,7 @@ const BANK = {
   sharing: 'workspace',
   owner: { kind: 'person', id: 12, name: 'Amro Saleh' },
   blocks: [{ id: 's1', type: 'paragraph', content: [{ type: 'text', text: 'IBAN JO00' }] }],
+  perDocumentParts: [],
   perDocumentKeys: [],
   version: 3,
   usedIn: 12,

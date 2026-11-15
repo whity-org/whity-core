@@ -8,6 +8,7 @@
  */
 
 import React from 'react';
+import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, within } from '@testing-library/react';
 
 let mockPathname = '/admin/settings';
@@ -131,5 +132,64 @@ describe('SettingsArea devices', () => {
     render(<SettingsArea>page</SettingsArea>);
     await screen.findByTestId('settings-area-link-general');
     expect(screen.queryByTestId('settings-area-link-devices')).toBeNull();
+  });
+});
+
+describe('SettingsArea on a phone (PwSettings)', () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it('draws the menu as its own page, marks the last opened page and filters by search', async () => {
+    window.localStorage.setItem('whity.settings.lastOpened', 'branding');
+    mockPathname = '/admin/settings/menu';
+    mockGet.mockResolvedValue(tabs(['general', 'branding', 'security']));
+    render(<SettingsArea>page</SettingsArea>);
+
+    const row = await screen.findByTestId('settings-menu-row-branding');
+    expect(row).toHaveAttribute('href', '/admin/settings/branding');
+    await waitFor(() => expect(within(row).getByText('Last opened')).toBeInTheDocument());
+    expect(within(screen.getByTestId('settings-menu-row-general')).queryByText('Last opened')).toBeNull();
+
+    const search = screen.getByTestId('settings-menu-search');
+    await userEvent.type(search, 'sec');
+    expect(screen.queryByTestId('settings-menu-row-branding')).toBeNull();
+    expect(screen.getByTestId('settings-menu-row-security')).toBeInTheDocument();
+  });
+
+  it('remembers the page you opened, and shows a back control with the path on a page', async () => {
+    mockPathname = '/admin/settings/branding';
+    mockGet.mockResolvedValue(tabs(['general', 'branding']));
+    render(<SettingsArea>page</SettingsArea>);
+
+    const crumb = await screen.findByTestId('settings-crumb');
+    expect(crumb).toHaveTextContent('SettingsWorkspace');
+    expect(within(screen.getByTestId('settings-back')).getByRole('link', { name: 'Settings' })).toHaveAttribute(
+      'href',
+      '/admin/settings/menu',
+    );
+    expect(window.localStorage.getItem('whity.settings.lastOpened')).toBe('branding');
+  });
+
+  it('a deeper page goes back to its list page and adds it to the path', async () => {
+    mockPathname = '/admin/settings/email-domains/7';
+    mockGet.mockResolvedValue(tabs(['general', 'email-domains']));
+    render(<SettingsArea>page</SettingsArea>);
+
+    const crumb = await screen.findByTestId('settings-crumb');
+    expect(crumb).toHaveTextContent('SettingsEmailEmail-domains');
+    expect(within(screen.getByTestId('settings-back')).getByRole('link')).toHaveAttribute(
+      'href',
+      '/admin/settings/email-domains',
+    );
+  });
+
+  it('still works when storage is blocked', async () => {
+    const spy = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    mockPathname = '/admin/settings/branding';
+    mockGet.mockResolvedValue(tabs(['general', 'branding']));
+    render(<SettingsArea>page</SettingsArea>);
+    expect(await screen.findByTestId('settings-crumb')).toBeInTheDocument();
+    spy.mockRestore();
   });
 });
