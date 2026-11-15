@@ -85,7 +85,18 @@ final class BrandingService
                 $_ENV['PWA_ENABLED'] ?? getenv('PWA_ENABLED'),
             ),
             builtOnWhity: $this->showsBuiltOnWhity($tenantId),
+            currency: self::currencyFrom($values[SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? ''),
         );
+    }
+
+    /** The workspace currency as an upper-case ISO code, or the registry default for anything else. */
+    private static function currencyFrom(string $value): string
+    {
+        $code = strtoupper(trim($value));
+
+        return preg_match('/^[A-Z]{3}$/', $code) === 1
+            ? $code
+            : (string) SettingsRegistry::defaultFor(SettingsRegistry::BILLING_DEFAULT_CURRENCY);
     }
 
     /**

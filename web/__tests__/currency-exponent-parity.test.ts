@@ -3,8 +3,10 @@ import path from 'node:path';
 
 import {
   currencyExponent,
+  currencySymbol,
   formatMoney,
   minorUnitsPerMajor,
+  moneyText,
   parseMoney,
   toDecimalString,
 } from '@whity/ui/money/currency';
@@ -207,24 +209,22 @@ describe('the client half behaves like the server half', () => {
     }
   });
 
-  it('formats for a locale at ISO precision, not CLDR’s', () => {
-    // The figure, not the symbol: which glyph and where it sits varies by ICU
-    // version, so asserting on it would test the engine's build rather than
-    // our arithmetic.
-    expect(formatMoney(5000, 'JOD', 'en')).toContain('5.000');
-    expect(formatMoney(5000, 'USD', 'en')).toContain('50.00');
-    expect(formatMoney(5000, 'JPY', 'en')).toContain('5,000');
+  it('writes money as the register does, the same in every language (CU.2)', () => {
+    expect(moneyText(31200, 'USD')).toBe('$312.00');
+    expect(moneyText(1865235, 'USD')).toBe('$18,652.35');
+    expect(moneyText(-3500, 'usd')).toBe('−$35.00');
+    expect(moneyText(31200, 'EUR')).toBe('€312.00');
+    expect(moneyText(312000, 'JOD')).toBe('JOD 312.000');
+    expect(moneyText(1234567891, 'JOD')).toBe('JOD 1,234,567.891');
+    expect(moneyText(31200, 'SAR')).toBe('SAR 312.00');
+    expect(moneyText(5000, 'JPY')).toBe('JPY 5,000');
     // The divergent case: ICU would render this with no decimals at all, and
     // an invoice that drops them is an invoice for a thousand times the amount.
-    expect(formatMoney(5000, 'IQD', 'en')).toContain('5.000');
-  });
-
-  it('formats Arabic without this module knowing anything about Arabic', () => {
-    const arabic = formatMoney(5000, 'JOD', 'ar-JO');
-    expect(arabic).not.toBe('');
-    // Arabic-Indic digits or Latin ones depending on ICU, but never the raw
-    // minor-unit integer, which is the bug this module exists to prevent.
-    expect(arabic).not.toContain('5000');
+    expect(moneyText(5000, 'IQD')).toBe('IQD 5.000');
+    // No locale changes it: Western digits in Arabic too (CU.1).
+    expect(formatMoney(5000, 'JOD', 'ar-JO')).toBe('JOD 5.000');
+    expect(currencySymbol('USD')).toBe('$');
+    expect(currencySymbol('JOD')).toBeNull();
   });
 });
 

@@ -21,7 +21,8 @@ import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
 import { EmptyState } from '@whity/ui/empty-state';
 import { useTranslation } from '@whity/features/i18n';
 import { agentName, type AgentProposal, type ProposalWords } from '@/components/agents/proposals';
-import { proposalAmount, waitedWords, type WaitedWords } from './list-helpers';
+import { proposalAmount, proposalMoney, waitedWords, type WaitedWords } from './list-helpers';
+import { moneyText } from '@whity/ui/money/currency';
 
 export interface ApprovalsListProps {
   proposals: AgentProposal[];
@@ -124,11 +125,10 @@ export function ApprovalsList({ proposals, words, onOpen, onApproveTogether, onD
 
   const total = chosen.reduce<{ currency: string | null; minor: number; mixed: boolean }>(
     (sum, proposal) => {
-      const amount = proposalAmount(proposal, true);
-      if (amount === null) return sum;
-      const [currency, value] = amount.split(' ');
-      if (sum.currency !== null && sum.currency !== currency) return { ...sum, mixed: true };
-      return { currency, minor: sum.minor + Number(value) * 1000, mixed: sum.mixed };
+      const money = proposalMoney(proposal);
+      if (money === null) return sum;
+      if (sum.currency !== null && sum.currency !== money.currency) return { ...sum, mixed: true };
+      return { currency: money.currency, minor: sum.minor + money.minor, mixed: sum.mixed };
     },
     { currency: null, minor: 0, mixed: false },
   );
@@ -156,8 +156,8 @@ export function ApprovalsList({ proposals, words, onOpen, onApproveTogether, onD
           canSelect: (proposal) => proposal.tier === 1,
           summary: () =>
             total.currency !== null && !total.mixed ? (
-              <span dir="ltr" className="font-mono">
-                · {total.currency} {(total.minor / 1000).toFixed(3)}
+              <span className="font-mono">
+                · <bdi dir="ltr">{moneyText(total.minor, total.currency)}</bdi>
               </span>
             ) : null,
           labels: {

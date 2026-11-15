@@ -11,7 +11,7 @@
  * than shown empty (noted in the brand ask, WHIT-946).
  *
  * Money is typed and shown in normal units with the currency's decimals
- * (JOD 12.500) and sent as minor units (12500), through the shared money input.
+ * ($12.50, JOD 12.500) and sent as minor units, through the shared money input.
  * Nothing is ever deleted: a service that is no longer offered is turned off.
  */
 
@@ -27,6 +27,7 @@ import { useCalendarAccess } from '@/components/calendar/use-calendar-basics';
 import { useCalendarWords } from '@/components/calendar/use-calendar-words';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
+import { useWorkspaceCurrency } from '@/lib/branding-context';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { BilingualInput, type BilingualValue } from '@whity/ui/bilingual-input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
@@ -92,6 +93,7 @@ export default function CalendarServicePage() {
   const words = useCalendarWords();
   const access = useCalendarAccess();
   const { addToast } = useToast();
+  const workspaceCurrency = useWorkspaceCurrency();
 
   const { data, error, forbidden, refetch } = useFetch(async () => {
     const [service, staff, rooms] = await Promise.all([calendarApi.service(id), calendarApi.staff(), calendarApi.rooms()]);
@@ -153,7 +155,7 @@ export default function CalendarServicePage() {
     }
     const currency = current.currency.trim().toUpperCase();
     if (!/^[A-Z]{3}$/.test(currency)) {
-      setProblem(t('services.error.currency', 'Enter a three-letter currency code, such as JOD.'));
+      setProblem(t('services.error.currency', 'Enter a three-letter currency code, such as USD.'));
       return;
     }
     let priceMinor: number | null = null;
@@ -161,7 +163,7 @@ export default function CalendarServicePage() {
       try {
         priceMinor = parseMoney(current.price, currency);
       } catch {
-        setProblem(t('services.error.price', 'Enter the price as a number, such as 12.500.'));
+        setProblem(t('services.error.price', 'Enter the price as a number, such as 12.50.'));
         return;
       }
     }
@@ -319,10 +321,10 @@ export default function CalendarServicePage() {
                   </label>
                   <MoneyInput
                     id="service-price"
-                    currency={/^[A-Z]{3}$/.test(current.currency) ? current.currency : 'JOD'}
+                    currency={/^[A-Z]{3}$/.test(current.currency) ? current.currency : workspaceCurrency}
                     value={current.price}
                     onValueChange={(price) => update({ price })}
-                    placeholder="12.500"
+                    placeholder={toDecimalString(0, /^[A-Z]{3}$/.test(current.currency) ? current.currency : workspaceCurrency)}
                   />
                 </ChangedField>
                 <ChangedField changed={current.currency !== saved.currency}>

@@ -1,12 +1,13 @@
 import * as React from "react"
 
 import { cn } from "../utils"
-import { currencyExponent } from "./currency"
+import { currencyExponent, currencySubUnit, currencySymbol } from "./currency"
 
 /**
  * A money field (docs/design/components/MoneyInput): the currency as a fixed
  * prefix, figures end-aligned and left to right, formatted to the currency's
- * decimals on blur (JOD 1,234.500). Arabic-Indic digits and the Arabic decimal
+ * decimals on blur ($1,234.50, JOD 1,234.500; CU.2: the symbol for dollars and
+ * euros, otherwise the code). Arabic-Indic digits and the Arabic decimal
  * mark are accepted as typed and become Western digits (3.7b).
  *
  * The value is a decimal STRING in normal units ("1234.5"), never minor units.
@@ -16,7 +17,7 @@ export interface MoneyInputProps extends Omit<React.ComponentProps<"input">, "va
   currency: string
   value: string
   onValueChange: (value: string) => void
-  /** "No more than {n} decimals for {currency}." Shown when there are too many. */
+  /** "USD has 2 decimals (cents). Use up to 2." Shown when there are too many (CU.4). */
   tooManyDecimalsLabel?: (decimals: number, currency: string) => string
 }
 
@@ -61,6 +62,12 @@ function formatForBlur(text: string, decimals: number): string {
   return `${negative ? "-" : ""}${grouped}${padded}`
 }
 
+/** The design's MoneyInput message (CU.4): it names the currency's own count. */
+function defaultDecimalsMessage(decimals: number, currency: string): string {
+  const unit = currencySubUnit(currency)
+  return `${currency} has ${decimals} decimals${unit ? ` (${unit})` : ""}. Use up to ${decimals}.`
+}
+
 function MoneyInput({
   currency,
   value,
@@ -86,8 +93,11 @@ function MoneyInput({
           className
         )}
       >
-        <span className="grid place-items-center border-e border-border bg-muted px-2.5 font-mono text-xs font-medium text-muted-foreground">
-          {currency}
+        <span
+          title={currency}
+          className="grid place-items-center border-e border-border bg-muted px-2.5 font-mono text-xs font-medium text-muted-foreground"
+        >
+          {currencySymbol(currency) ?? currency}
         </span>
         <input
           {...props}
@@ -111,7 +121,7 @@ function MoneyInput({
       </div>
       {tooMany && (
         <p className="text-xs text-destructive">
-          {tooManyDecimalsLabel?.(exponent, currency) ?? `No more than ${exponent} decimals for ${currency}.`}
+          {tooManyDecimalsLabel?.(exponent, currency) ?? defaultDecimalsMessage(exponent, currency)}
         </p>
       )}
     </div>

@@ -52,6 +52,7 @@ export function parseBrandingResponse(body: unknown): { branding: Branding; them
       faviconUrl: url(r.faviconUrl),
       // Shown unless the server says the plan removes it (WHIT-932).
       builtOnWhity: r.builtOnWhity !== false,
+      currency: typeof r.currency === 'string' && /^[A-Z]{3}$/.test(r.currency) ? r.currency : undefined,
     },
     themeCss: brandThemeCss(r.theme),
   };
@@ -157,6 +158,18 @@ export function BrandingSync() {
 
 export function useBranding(): Branding {
   return useContext(BrandingContext);
+}
+
+/** The default currency since design 3.5.1 (CU.1). */
+export const DEFAULT_CURRENCY = 'USD';
+
+/**
+ * The workspace's currency (CU.4): what a new price, service or promotion
+ * starts in. An amount that has a currency of its own (a row from the API)
+ * always shows in that one, never in this.
+ */
+export function useWorkspaceCurrency(): string {
+  return useBranding().currency ?? DEFAULT_CURRENCY;
 }
 
 /** Re-reads branding and the main colour's theme; a no-op outside BrandingProvider. */

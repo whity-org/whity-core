@@ -93,7 +93,7 @@ describe('MoneyInput', () => {
     expect(input.value).toBe('1,234.500');
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: '1.2345' } });
-    expect(screen.getByText('No more than 3 decimals for JOD.')).toBeInTheDocument();
+    expect(screen.getByText('JOD has 3 decimals (fils). Use up to 3.')).toBeInTheDocument();
   });
 });
 

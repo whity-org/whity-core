@@ -11,6 +11,11 @@ export type Branding = {
   faviconUrl: string | null;
   /** Whether public pages show "Built on Whity"; false when the plan removes it (WHIT-932). */
   builtOnWhity: boolean;
+  /**
+   * The workspace's currency (CU.4), an ISO code: what Money shows and new
+   * amounts start in when a screen has no row of its own. Absent means USD.
+   */
+  currency?: string;
 };
 
 const FALLBACK: Branding = {
@@ -63,6 +68,7 @@ export const getBranding = cache(async (): Promise<Branding> => {
     logoSquareUrl: typeof d.logoSquareUrl === 'string' ? d.logoSquareUrl : null,
     faviconUrl: typeof d.faviconUrl === 'string' ? d.faviconUrl : null,
     builtOnWhity: d.builtOnWhity !== false,
+    currency: typeof d.currency === 'string' && /^[A-Z]{3}$/.test(d.currency) ? d.currency : undefined,
   };
 });
 
