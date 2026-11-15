@@ -186,7 +186,7 @@ test('without a certificate yet it says what to check, finishes, and never claim
   const dir = tempDir(t);
   const deps = fakeDeps({ running: '0.2.22' });
   const fetch = deps.fetch;
-  deps.fetch = async (url, options) => (String(url).startsWith('https://office.example.jo')
+  deps.fetch = async (url, options) => (new URL(String(url)).hostname === 'office.example.jo'
     ? Promise.reject(new Error('certificate')) : fetch(url, options));
   await install({ dir, version: 'v0.2.22', domain: 'office.example.jo', adminEmail: 'owner@example.jo' }, deps);
   const lines = deps.logs.join('\n');
