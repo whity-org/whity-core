@@ -70,11 +70,11 @@ const GROUP_OF: Readonly<Record<string, GroupId>> = {
   'email-domains': 'email',
   'notification-log': 'email',
   storage: 'data',
-  fields: 'data',
   tags: 'data',
   'tag-groups': 'data',
   languages: 'data',
   translations: 'data',
+  fields: 'data',
   'public-forms': 'data',
   bookings: 'data',
   'feature-flags': 'advanced',
@@ -420,16 +420,36 @@ export function SettingsArea({ children }: { children: ReactNode }) {
     : t('settingsArea.workspaceSectionNoName', 'Workspace settings');
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[200px_minmax(0,1fr)] md:gap-8">
+    <div className="grid gap-4">
+      {/* The cards' frame (TplSettings*): "Settings › Page" above both columns,
+          then the sub-nav beside the page. Each page keeps its own title. */}
+      {current && (
+        <nav
+          aria-label={t('settingsArea.breadcrumb', 'You are here')}
+          data-testid="settings-breadcrumb"
+          className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground max-sm:hidden"
+        >
+          <Link
+            href={SETTINGS_HOME_HREF}
+            className="rounded-sm outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {t('settingsArea.title', 'Settings')}
+          </Link>
+          <Icon name="chevron-right" size={14} className="rtl:-scale-x-100" />
+          <span aria-current="page" className="text-foreground">
+            {current.label}
+          </span>
+        </nav>
+      )}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[220px_minmax(0,1fr)] md:gap-8">
       {/* One shrinkable column on phones: without it the grid track sizes to the
           sideways-scrolling nav row's full width and the whole page scrolls sideways. */}
       {/* From 640px up: today's sub-nav. Under it the menu is its own page. */}
       <nav
         aria-label={t('settingsArea.navLabel', 'Settings')}
         data-testid="settings-area-nav"
-        className="max-sm:hidden md:sticky md:top-0 md:self-start"
+        className="max-sm:hidden md:sticky md:top-4 md:self-start"
       >
-        <p className="mb-2 px-2 text-lg font-semibold">{t('settingsArea.title', 'Settings')}</p>
         {/* Under 768px the groups sit in a row that scrolls sideways, so the page stays first. */}
         <div className="flex gap-4 overflow-x-auto pb-2 md:grid md:gap-3 md:overflow-visible md:pb-0">
           {groups.map((group) => (
@@ -439,7 +459,11 @@ export function SettingsArea({ children }: { children: ReactNode }) {
                   {workspaceSectionLabel}
                 </p>
               )}
-              <p data-settings-group className="px-2 py-1 text-xs font-medium text-muted-foreground">
+              {/* The cards' group label: small, semibold, uppercase in Latin scripts. */}
+              <p
+                data-settings-group
+                className="px-2.5 pt-3 pb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase first:pt-0"
+              >
                 {group.label}
               </p>
               {group.links.map((link) => {
@@ -451,9 +475,9 @@ export function SettingsArea({ children }: { children: ReactNode }) {
                     data-testid={`settings-area-link-${link.id}`}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'flex items-center rounded-md px-2 py-[7px] text-sm font-medium whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:min-h-11',
+                      'flex items-center rounded-control px-2.5 py-2 text-sm whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:min-h-11',
                       active
-                        ? 'bg-primary-tint text-primary-tint-foreground'
+                        ? 'bg-primary-tint font-medium text-primary-tint-foreground'
                         : 'text-foreground hover:bg-muted',
                     )}
                   >
@@ -577,6 +601,7 @@ export function SettingsArea({ children }: { children: ReactNode }) {
           </p>
         )}
         {children}
+      </div>
       </div>
     </div>
   );

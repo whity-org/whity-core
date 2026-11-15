@@ -3458,6 +3458,7 @@
         "settings.workspaceRecord.title": "Workspace record",
         "settingsArea.billing": "Plan and billing",
         "settingsArea.bookings": "Bookings",
+        "settingsArea.breadcrumb": "You are here",
         "settingsArea.devices": "Licensed devices",
         "settingsArea.documentThemes": "Document themes",
         "settingsArea.fields": "Fields",
