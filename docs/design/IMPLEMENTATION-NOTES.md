@@ -104,7 +104,7 @@ The A17 session's plan is WHIT-1093 to WHIT-1099 on migrations 278–282.
 | A11 Receiving, waste, bank | Done in the plugin | whity-plugins #24, #26, #36 | Front Office unreleased; R29 follow-ups (English API errors, an id shown, two filled buttons) |
 | A12 Reports, agent notifications | Done | whity-plugins #28; #1859 | WhatsApp is the paid plugin's (unverified) |
 | A13 Lottie and Animations | Done | #1836, #1869 | Business moments ship with plugins |
-| A14 Web app on a phone | Done, with diffs | `86549ca0`, `9024020c`, #1962–#1970, #1997; web push #1976–#1980 | Create opens the page; no Find or Version history; "Choose all" covers the screen only; 360px and live push unverified; `PwMessages` and `PwCalendar` replaced (above) |
+| A14 Web app on a phone | Done, with diffs | `86549ca0`, `9024020c`, #1962–#1970, #1997; web push #1976–#1980 (the owner approved the web push plan on 15 Nov, so #1978 and #1979 merged with approval) | Create opens the page; no Find or Version history; "Choose all" covers the screen only; 360px and live push unverified; `PwMessages` and `PwCalendar` replaced (above) |
 | A15 Screens with no card | Done, with diffs | #1958, #1961, #1964, #1966, #1984, #1986, #1973, #1971, #1947; passes #1985–#1995 | #2007; API-limited diffs (WHIT-1044 notes); `MsgCustomerMessages`, `TplWhityAgent`, `TplWhityIdMore` in their repositories, unverified; E.23a leftovers (M7) |
 | P1 Form printouts | Partial | #1916, #1917, #1922, #1923, #1925, #1957 | Customise in the editor and `DocFormBlocks`; "Conditionally approved"; AAU page-for-page check waits on AAU's tenant |
 | A16 Calendar | Open | Above | CV.1–CV.11 (its own session; `feat/WHIT-1098-calendar-server` not merged) |
@@ -114,7 +114,7 @@ The A17 session's plan is WHIT-1093 to WHIT-1099 on migrations 278–282.
 | W3 id.whity.dev | Partial | whity-id #40, #41, #43 | The phone-approval page; no release tag |
 | W4 brand, W5 docs | Done in code | whity-web `1880670` | Docs search and kit links unverified |
 | W6 Company pages and footer | Done in code | whity-web pages; `PublicContactApiHandler` | The lawyer's privacy text |
-| W7 Installer | Partial | `install.sh` #1848, #1987 | The server install the owner chose on 16 Nov: #2008, #2009, whity-web #14; `PLAN.md` still describes the local install (Q35.3) |
+| W7 Installer | Partial | `install.sh` #1848, #1987 | The server install the owner chose (Q35.3, answered): #2008, #2009, whity-web #14. `PLAN.md`'s W7 text still describes the local install and is superseded; it is the design team's file, so it is asked of them below |
 | W8 Launch check | Partial | whity-web `scripts/claims-0.2.29.py`, `security.txt`, `llms.txt` | Claims checked on 12 Nov are stale (Q35.5); broken links unverified |
 | E1 The fifteen emails | Done in code | #1837, #1859, #1868; whity-plugins #31, #33 | Gmail, Outlook and Apple Mail, light and dark, unverified |
 | E2 The ten 3.4 emails | Done in code | #1946–#1959, #1975 | No refund line, no "Moved by"; mail clients and reply threading unverified |
@@ -128,8 +128,8 @@ The 3.4 status table below is out of date: A14's `Pw*` work, web push, P1 and E2
 | # | Question | Default if no answer |
 | --- | --- | --- |
 | Q35.1 | The app map still lists the replaced cards: row "Messages inbox `/admin/messages`" (`TplMessagesInbox`, `PwMessages`), the phone paragraph's `PwCalendar`, and SU's "calendar on a phone → `PwCalendar`", while rows A03a and A04 say they're replaced. Row A04 also still says "day, week, month". | Build to A03a and A04 and the CV/UC decisions; ask the brand team to tidy the app map |
-| Q35.2 | One chat across channels: the done-when has a WhatsApp reply and an email reply landing in the same conversation, but today a conversation is one channel, and UC.1 shows one channel badge per chat. One conversation with a channel picker, or separate rows in one list? | One conversation per customer, a channel per message, the reply going back by the channel it came in on |
-| Q35.3 | `PLAN.md` W7 describes the local install; on 16 Nov you chose a server install (`npm i -g whity`). Should the plan text follow? | Treat W7 as the server install |
+| Q35.2 | **Answered (owner): yes, one chat across channels.** "Merge messages and chat, and all similar systems"; the unify session designs it. The question was: one chat across channels: the done-when has a WhatsApp reply and an email reply landing in the same conversation, but today a conversation is one channel, and UC.1 shows one channel badge per chat. One conversation with a channel picker, or separate rows in one list? | One conversation per customer, a channel per message, the reply going back by the channel it came in on |
+| Q35.3 | **Answered (owner): the server install.** The question was: `PLAN.md` W7 describes the local install; on 16 Nov you chose a server install (`npm i -g whity`). Should the plan text follow? | Treat W7 as the server install |
 | Q35.4 | A9's done-when needs a flow condition, and flows aren't built; custom fields exist on contacts only. Close A9 for contacts and move the rest to flows? | Yes |
 | Q35.5 | whity.dev and the docs say Money and Stock are "coming soon", but Front Office (A11, A12) is built and not released. Which should the sites say? | "Coming soon" until Front Office is in the store |
 | Q35.6 | Names: UC.4 and UC.12 say Settings › Chat, but the app map and `TplSettingsMessages` say Settings › Messages at `/admin/settings/messages`; UC.7 says Account › Preferences › Chat, but personal settings are now My settings (WHIT-1081). | Settings › Chat at `/admin/settings/chat`, the old path redirecting; the chat preference under My settings |
@@ -137,13 +137,17 @@ The 3.4 status table below is out of date: A14's `Pw*` work, web push, P1 and E2
 | Q35.8 | Unticking "Email the new time" (CV.9) leaves the customer's calendar file out of date, against SU.8. Keep the tick? | Keep it, ticked by default, with a line saying their calendar won't update |
 | Q35.9 | The grid runs opening to closing (CV.6), but staff can book outside hours. Where do those show? | The grid stretches to include them that day |
 | Q35.10 | Colour by person (CV.4): more people than colours in the series. Repeat, and keep each person's colour fixed? | Repeat in order, each person's colour fixed by their position in the workspace |
-| Q35.11 | Who sees customer chats in the one list: everyone with `messages.read`, as today, or only those assigned? | `messages.read`, with an Assigned to me tab |
-| Q35.12 | Things core can't do alone: voice "with its text" (no speech-to-text in core), order-status and stock bots (Front Office), payment links (Whity Pay), Turn into a task (Taskaat). | Browser speech recognition; bots from plugins; Payment link only with Whity Pay; Task when Taskaat is connected |
+| Q35.11 | **Answered (owner): keep the default.** The question was: who sees customer chats in the one list: everyone with `messages.read`, as today, or only those assigned? | `messages.read`, with an Assigned to me tab |
+| Q35.12 | **Answered (owner): keep the defaults.** The question was: things core can't do alone: voice "with its text" (no speech-to-text in core), order-status and stock bots (Front Office), payment links (Whity Pay), Turn into a task (Taskaat). | Browser speech recognition; bots from plugins; Payment link only with Whity Pay; Task when Taskaat is connected |
 | Q35.13 | WhatsApp and SMS are paid plugins: is A17's done-when checked with them installed? WhatsApp can't delete a sent message, but UC.12 only exempts email and SMS. | Check with the plugins; exempt WhatsApp too |
 | Q35.14 | M6 routines (E.32) and M7 plugin document themes were never built and have no tickets. Deferred on purpose? | Deferred; ticket them after A16 and A17 |
 | Q35.15 | `TplCalendarPhone`'s 3-day grid replaces `PwCalendar`'s week as day cards, finished days ago. Confirm the change? | Build `TplCalendarPhone` |
 
-For the team (no owner decision): several WHIT ids were used for two different pieces of work (WHIT-1003, -1027, -1030, -1034), so a status check by ticket id is unreliable; and whity-web's brand and docs sites ship weight-700 font files against the no-700 rule.
+**Also decided (owner, 16 Nov):** the calendar, meetings and the other time systems merge into one solution, like chat and messages ("calendar, meetings, etc need to merge under one solution"). The unify session (local_db3206f4) designs both merges; A16 and A17 build on what it decides.
+
+For the design team: `PLAN.md` W7 should describe the server install the owner chose.
+
+For the team (no owner decision): several WHIT ids were used for two different pieces of work (WHIT-1003, -1027, -1030, -1034). They stay as they are, but from now on a WHIT id names one piece of work only; a status check by ticket id is unreliable for those four. whity-web's brand and docs sites ship weight-700 font files against the no-700 rule; swapped in whity-web (WHIT-1092).
 
 # Design 3.5.1: US dollars (15 Nov 2026)
 
