@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
+
 /**
  * Checks a submitted answer set against the form's fields, and returns the
  * NORMALIZED values that will be stored.
@@ -748,7 +750,7 @@ final class SubmissionValidator
     {
         /** @var array<string, string> $label */
         $label = is_array($field['label'] ?? null) ? $field['label'] : [];
-        $preferred = LocalizedLabel::preferred($label);
+        $preferred = LocalizedText::resolve($label);
 
         return $preferred !== '' ? $preferred : (string) ($field['field_key'] ?? 'A field');
     }

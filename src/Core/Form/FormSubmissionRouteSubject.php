@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 use Whity\Core\Document\Routing\RouteSubjectFinaliseInterface;
 use Whity\Core\Document\Routing\RouteSubjectApprovedInterface;
@@ -117,7 +118,7 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface,
             return null;
         }
 
-        $name = LocalizedLabel::preferred(LocalizedLabel::decode(isset($row['name']) ? (string) $row['name'] : null));
+        $name = LocalizedText::resolve(LocalizedText::decode(isset($row['name']) ? (string) $row['name'] : null, languages: LocalizedText::BILINGUAL));
 
         return $name !== '' ? $name : (string) $row['form_key'];
     }

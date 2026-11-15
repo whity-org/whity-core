@@ -13,7 +13,8 @@ use Whity\Core\Form\FormRenderer;
 use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormStatus;
 use Whity\Core\Form\FormSubmissionRepository;
-use Whity\Core\Form\LocalizedLabel;
+use Whity\Core\i18n\LocalizedText;
+use Whity\Core\i18n\LocalizedTextRejected;
 use Whity\Core\Form\PublicFormLink;
 use Whity\Core\Form\PublicFormView;
 use Whity\Core\Request;
@@ -213,9 +214,9 @@ final class FormsApiHandler
                 );
             }
 
-            $name = LocalizedLabel::fromInput($body['name'] ?? null, 'name');
+            $name = LocalizedText::label($body['name'] ?? null, 'name');
 
-            $description = LocalizedLabel::optionalForStorage(
+            $description = LocalizedText::optionalLabel(
                 $body['description'] ?? null,
                 'description',
                 InputLimits::TEXT_MAX,
@@ -236,7 +237,7 @@ final class FormsApiHandler
             );
 
             return Response::json(['data' => $this->presentFresh($tenantId, $id)], 201);
-        } catch (FormRejectedException $e) {
+        } catch (FormRejectedException | LocalizedTextRejected $e) {
             // ->clientMessage, never ->getMessage(): only text somebody wrote FOR
             // a caller reaches a caller, and giving it its own field is what makes
             // that structural rather than a habit. See the exception's docblock,
@@ -291,12 +292,12 @@ final class FormsApiHandler
 
             $changes = [];
             if (array_key_exists('name', $body)) {
-                $changes['name'] = LocalizedLabel::fromInput($body['name'], 'name');
+                $changes['name'] = LocalizedText::label($body['name'], 'name');
             }
             if (array_key_exists('description', $body)) {
                 /** @var array<string, string> $existingDescription */
                 $existingDescription = is_array($form['description_i18n'] ?? null) ? $form['description_i18n'] : [];
-                $changes['description'] = LocalizedLabel::optionalForStorage(
+                $changes['description'] = LocalizedText::optionalLabel(
                     $body['description'],
                     'description',
                     InputLimits::TEXT_MAX,
@@ -304,7 +305,7 @@ final class FormsApiHandler
                 );
             }
             if (array_key_exists('title', $body)) {
-                $changes['title'] = LocalizedLabel::optionalForStorage($body['title'], 'title', self::TITLE_MAX);
+                $changes['title'] = LocalizedText::optionalLabel($body['title'], 'title', self::TITLE_MAX);
             }
             $replacedBanner = null;
             if (array_key_exists('banner', $body)) {
@@ -315,7 +316,7 @@ final class FormsApiHandler
                 }
             }
             if (array_key_exists('submit_label', $body)) {
-                $changes['submit_label'] = LocalizedLabel::optionalForStorage(
+                $changes['submit_label'] = LocalizedText::optionalLabel(
                     $body['submit_label'],
                     'submit_label',
                     self::SUBMIT_LABEL_MAX,
@@ -395,7 +396,7 @@ final class FormsApiHandler
             FormBannerApiHandler::forget($this->storage, $tenantId, $replacedBanner);
 
             return Response::json(['data' => $this->presentFresh($tenantId, $id)]);
-        } catch (FormRejectedException $e) {
+        } catch (FormRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[FormsApiHandler] update failed: ' . $e->getMessage());
@@ -1016,16 +1017,16 @@ final class FormsApiHandler
             }
             $seen[$key] = true;
 
-            $title = LocalizedLabel::optionalForStorage($entry['title'] ?? null, "sections[{$index}].title", self::SUBMIT_LABEL_MAX);
-            $description = LocalizedLabel::optionalForStorage(
+            $title = LocalizedText::optionalLabel($entry['title'] ?? null, "sections[{$index}].title", self::SUBMIT_LABEL_MAX);
+            $description = LocalizedText::optionalLabel(
                 $entry['description'] ?? null,
                 "sections[{$index}].description",
                 InputLimits::TEXT_MAX,
             );
             $sections[] = [
                 'key' => $key,
-                'title' => LocalizedLabel::decode($title),
-                'description' => LocalizedLabel::decode($description),
+                'title' => LocalizedText::decode($title, languages: LocalizedText::BILINGUAL),
+                'description' => LocalizedText::decode($description, languages: LocalizedText::BILINGUAL),
             ];
         }
 

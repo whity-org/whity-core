@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Search;
 
 use PDO;
-use Whity\Core\Form\LocalizedLabel;
+use Whity\Core\i18n\LocalizedText;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Text\SearchText;
 
@@ -34,7 +34,7 @@ final class FormsSearchSource implements SearchSource
     public function search(SearchContext $context, string $pattern, int $limit): array
     {
         // `name` holds the label as JSON with both languages written out
-        // unescaped (LocalizedLabel::encode), so a match inside it is a match
+        // unescaped (LocalizedText::encode), so a match inside it is a match
         // on either language.
         $sql = 'SELECT id, name, form_key FROM forms
                  WHERE tenant_id = :tenant_id
@@ -46,7 +46,7 @@ final class FormsSearchSource implements SearchSource
             static fn (array $row): SearchHit => new SearchHit(
                 'form',
                 (string) $row['id'],
-                LocalizedLabel::preferred(LocalizedLabel::decode(isset($row['name']) ? (string) $row['name'] : null)),
+                LocalizedText::resolve(LocalizedText::decode(isset($row['name']) ? (string) $row['name'] : null, languages: LocalizedText::BILINGUAL)),
                 (string) $row['form_key'],
                 '/forms/' . (int) $row['id'],
             ),

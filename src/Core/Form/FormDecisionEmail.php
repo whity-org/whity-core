@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 use Whity\Core\Calendar\EmailBookingMessenger;
 use Whity\Core\Document\DocumentArtifactRepository;
@@ -143,8 +144,8 @@ final class FormDecisionEmail
         $lang = $this->sender->language($tenantId);
         $ar = $lang === 'ar';
         $workspace = $this->sender->branding($tenantId)->siteName;
-        $label = LocalizedLabel::decode((string) $row['form_name']);
-        $form = ($label[$lang] ?? '') !== '' ? $label[$lang] : LocalizedLabel::preferred($label);
+        $label = LocalizedText::decode((string) $row['form_name'], languages: LocalizedText::BILINGUAL);
+        $form = ($label[$lang] ?? '') !== '' ? $label[$lang] : LocalizedText::resolve($label);
         $form = $form !== '' ? $form : ($ar ? 'طلبك' : 'form');
         $name = trim((string) ($row['display_name'] ?? ''));
         $reference = trim((string) ($row['reference'] ?? ''));

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
 use Whity\Core\Hooks\HookManager;
 use Whity\Sdk\Hooks\Events;
 use PDO;
@@ -331,7 +332,7 @@ final class SubmissionIssuer
                 if ($upload === null) {
                     /** @var array<string, string> $label */
                     $label = is_array($field['label'] ?? null) ? $field['label'] : [];
-                    $name = LocalizedLabel::preferred($label);
+                    $name = LocalizedText::resolve($label);
                     throw new FormRejectedException(
                         'We could not find the file attached to '
                             . ($name !== '' ? $name : $key)
@@ -436,7 +437,7 @@ final class SubmissionIssuer
     {
         /** @var array<string, string> $name */
         $name = is_array($form['name'] ?? null) ? $form['name'] : [];
-        $title = LocalizedLabel::preferred($name);
+        $title = LocalizedText::resolve($name);
 
         if ($title === '') {
             $title = (string) ($form['form_key'] ?? 'Form submission');
@@ -481,7 +482,7 @@ final class SubmissionIssuer
             if (!$exists) {
                 /** @var array<string, string> $label */
                 $label = is_array($field['label'] ?? null) ? $field['label'] : [];
-                $name = LocalizedLabel::preferred($label);
+                $name = LocalizedText::resolve($label);
                 throw new FormRejectedException(
                     ($name !== '' ? $name : $key) . ' must name a record in this tenant',
                     '',

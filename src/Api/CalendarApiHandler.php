@@ -15,7 +15,8 @@ use Whity\Core\Calendar\Interval;
 use Whity\Core\Calendar\RoomRepository;
 use Whity\Core\Calendar\ServiceRepository;
 use Whity\Core\Form\FormRejectedException;
-use Whity\Core\Form\LocalizedLabel;
+use Whity\Core\i18n\LocalizedText;
+use Whity\Core\i18n\LocalizedTextRejected;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -553,7 +554,7 @@ final class CalendarApiHandler
             return $work($tenantId, $actor);
         } catch (CalendarRejectedException $e) {
             return Response::error($e->clientMessage, $e->status, $e->extra);
-        } catch (FormRejectedException $e) {
+        } catch (FormRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Throwable $e) {
             error_log('[CalendarApiHandler] ' . $area . ' failed: ' . $e->getMessage());
@@ -620,7 +621,7 @@ final class CalendarApiHandler
         }
 
         return [
-            'name' => LocalizedLabel::fromInput($pick('name', $existing['name'] ?? null), 'name'),
+            'name' => LocalizedText::label($pick('name', $existing['name'] ?? null), 'name'),
             'unit_id' => array_key_exists('unit_id', $body) ? $this->unitOrNull($tenantId, $body['unit_id']) : ($existing['unit_id'] ?? null),
             'active' => $pick('active', $existing['active'] ?? true) === true,
             'sort_order' => $sort,
@@ -752,14 +753,14 @@ final class CalendarApiHandler
     private function serviceValues(int $tenantId, array $body, ?array $existing): array
     {
         $pick = static fn (string $k, mixed $default): mixed => array_key_exists($k, $body) ? $body[$k] : $default;
-        $name = LocalizedLabel::fromInput($pick('name', $existing['name'] ?? null), 'name');
+        $name = LocalizedText::label($pick('name', $existing['name'] ?? null), 'name');
         $descriptionRaw = $pick('description', $existing['description'] ?? []);
         // A stored empty description reads back as `{}` (an empty object), so a
         // PATCH that leaves `description` out must treat that as empty too.
         if ($descriptionRaw instanceof \stdClass && get_object_vars($descriptionRaw) === []) {
             $descriptionRaw = [];
         }
-        $description = $descriptionRaw === [] || $descriptionRaw === '' || $descriptionRaw === null ? [] : LocalizedLabel::fromInput($descriptionRaw, 'description');
+        $description = $descriptionRaw === [] || $descriptionRaw === '' || $descriptionRaw === null ? [] : LocalizedText::label($descriptionRaw, 'description');
         $int = static function (string $k, mixed $v, int $min, int $max): int {
             if (!is_int($v) || $v < $min || $v > $max) {
                 throw new CalendarRejectedException("{$k} must be a whole number from {$min} to {$max}", 422);
