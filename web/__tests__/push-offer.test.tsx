@@ -155,6 +155,16 @@ describe('the notifications ask (PW.11)', () => {
 });
 
 describe('Preferences › Notifications', () => {
+  it('scrolls into view when reached by its link (WHIT-1078)', async () => {
+    const scroll = jest.fn();
+    Element.prototype.scrollIntoView = scroll;
+    window.history.replaceState(null, '', '/settings?tab=preferences#notifications');
+    render(<PushSettings />);
+    expect(document.getElementById('notifications')).not.toBeNull();
+    await waitFor(() => expect(scroll).toHaveBeenCalledWith({ block: 'start' }));
+    window.history.replaceState(null, '', '/');
+  });
+
   it('says to install first on an iPhone in Safari', async () => {
     setUserAgent(IPHONE, false);
     render(<PushSettings />);
