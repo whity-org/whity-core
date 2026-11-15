@@ -826,6 +826,7 @@ describe('AdminSettingsPage - the company details', () => {
     { key: 'company.tax_id', type: 'string', default: '' },
     { key: 'company.phone', type: 'string', default: '' },
     { key: 'company.email', type: 'string', default: '' },
+    { key: 'billing.default_currency', type: 'string', default: 'USD' },
   ];
 
   it('lists them on the tenant card, in their own group', async () => {
@@ -851,6 +852,17 @@ describe('AdminSettingsPage - the company details', () => {
     expect(within(group).getByLabelText(/^Tax number/)).toHaveAttribute('dir', 'ltr');
     expect(within(group).getByLabelText(/^Email/)).toHaveAttribute('type', 'email');
     expect(within(group).getByLabelText(/^Company name/)).toHaveAttribute('dir', 'auto');
+  });
+
+  // CU.4: the workspace currency sits with the company details, a code left to right.
+  it('offers the workspace currency', async () => {
+    grant('settings:read');
+    setTenant(5);
+    routeGet(['site_name'], true, COMPANY_REGISTRY);
+    render(<AdminSettingsPage />);
+
+    const group = await screen.findByTestId('tenant-company-settings');
+    expect(within(group).getByLabelText(/^Currency/)).toHaveAttribute('dir', 'ltr');
   });
 
   it('writes only the field the person changed', async () => {

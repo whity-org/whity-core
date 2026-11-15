@@ -3121,6 +3121,8 @@
         "settings.meta.company.name_ar.help": "Printed beside the English name when a letterhead is in English and Arabic.",
         "settings.meta.company.address_ar.label": "Address in Arabic",
         "settings.meta.company.address_ar.help": "Printed under the Arabic name on a letterhead in English and Arabic.",
+        "settings.meta.billing.default_currency.label": "Currency",
+        "settings.meta.billing.default_currency.help": "New prices, services and documents start in this currency, as a three-letter code such as USD or JOD. Amounts already saved keep their own currency.",
         "settings.meta.company.email.label": "Email",
         "settings.meta.company.name.help": "Printed on letterheads and invoices. Leave blank to use the site name.",
         "settings.meta.company.name.label": "Company name",

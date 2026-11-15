@@ -3119,6 +3119,8 @@
         "settings.meta.company.address.label": "العنوان",
         "settings.meta.company.address_ar.help": "يُطبع تحت الاسم العربي في الترويسة بالعربية والإنجليزية.",
         "settings.meta.company.address_ar.label": "العنوان بالعربية",
+        "settings.meta.billing.default_currency.help": "تبدأ الأسعار والخدمات والمستندات الجديدة بهذه العملة، برمز من ثلاثة أحرف مثل USD أو JOD. المبالغ المحفوظة تبقى بعملتها.",
+        "settings.meta.billing.default_currency.label": "العملة",
         "settings.meta.company.email.help": "يُطبع على الترويسة عندما يتضمنه نسق المستند.",
         "settings.meta.company.email.label": "البريد الإلكتروني",
         "settings.meta.company.name.help": "يُطبع على الترويسات والفواتير. اتركه فارغًا لاستخدام اسم الموقع.",
