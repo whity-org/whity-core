@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use PDO;
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Messaging\MessagesPresenter;
@@ -64,6 +65,7 @@ final class PublicChatApiHandler
         private readonly BotCheck $bot,
         private readonly SharedStoreInterface $store,
         private readonly string $ipPepper,
+        private readonly ?BrandingService $branding = null,
     ) {
     }
 
@@ -82,7 +84,27 @@ final class PublicChatApiHandler
             'bot_check' => $this->bot->isReady()
                 ? ['provider' => $this->bot->provider(), 'site_key' => $this->bot->siteKey()]
                 : null,
+            'brand' => $this->brandFor($workspace['id'], $workspace['name']),
         ]]);
+    }
+
+    /**
+     * The workspace's public brand (WHIT-1014, card TplChatBox): its logo and
+     * colour on the chat box. Null without a branding service or when it cannot
+     * be read; the page then keeps the host's.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function brandFor(int $tenantId, string $workspaceName): ?array
+    {
+        if ($this->branding === null) {
+            return null;
+        }
+        try {
+            return $this->branding->forPublicPage($tenantId, $workspaceName);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /** @param array<string, string> $params */

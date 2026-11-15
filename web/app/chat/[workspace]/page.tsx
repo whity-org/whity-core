@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * A workspace's public chat (ADR 0016 §5): `/chat/{workspace}`.
+ * A workspace's public chat (ADR 0016 §5, card `TplChatBox`): `/chat/{workspace}`.
  *
  * Outside `(protected)`: the visitor has no session. The workspace comes from
  * the slug; the server answers the same 404 for an unknown workspace and one
@@ -13,12 +13,15 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription } from '@whity/ui/alert';
+import { Button } from '@whity/ui/button';
+import { EmptyFirstTime } from '@whity/ui/page-states';
+import { TenantLogo } from '@whity/ui/tenant-logo';
 import { Input } from '@/components/ui/input';
 import { useCurrentLanguage, useTranslation } from '@whity/features/i18n';
 import { useThemeMode } from '@/lib/theme-mode-context';
 import { PublicShell } from '@/components/auth/public-shell';
 import { TurnstileWidget } from '@/components/auth/turnstile-widget';
-import { ChatThread, type ChatTransport } from '@/components/messages/chat-thread';
+import { ChatHeader, ChatThread, TooManyMessages, type ChatTransport } from '@/components/messages/chat-thread';
 import type { CustomerMessage, PublicChatInfo } from '@/lib/messages-wire';
 import { api } from '@/lib/api/client';
 
@@ -59,6 +62,9 @@ export default function PublicChatPage({ params }: { params: Promise<{ workspace
   const [website, setWebsite] = useState('');
   const [botToken, setBotToken] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
+  // The workspace closed the chat (401 on the token): say so, and offer a new one.
+  const [ended, setEnded] = useState(false);
+  const [threadKey, setThreadKey] = useState(0);
 
   useEffect(() => {
     api.GET('/api/v1/public/chat/{workspace}', { params: { path: { workspace } }, credentials: 'omit' })
@@ -76,10 +82,13 @@ export default function PublicChatPage({ params }: { params: Promise<{ workspace
 
   const failure = useCallback(
     (response: Response, errorBody: unknown): Error => {
-      if (response.status === 429) return new Error(t('chat.error.tooMany', 'Too many messages. Please wait a moment and try again.'));
+      if (response.status === 429) {
+        return new TooManyMessages(t('chat.error.tooMany', 'You sent a lot of messages quickly. Try again in a minute; nothing you wrote is lost.'));
+      }
       if (response.status === 401) {
         writeToken(workspace, null);
         setToken(null);
+        setEnded(true);
         return new Error(t('chat.error.ended', 'This chat has ended. Send your message again to start a new one.'));
       }
       const body = (errorBody ?? null) as { error?: string } | null;
@@ -131,14 +140,19 @@ export default function PublicChatPage({ params }: { params: Promise<{ workspace
 
   const firstMessage = token === null;
   const needsBotCheck = firstMessage && info?.bot_check != null;
+  const brand = info?.brand ?? null;
+  const shownName = brand?.name || info?.workspace_name || '';
 
   return (
-    <PublicShell>
+    <PublicShell brand={brand}>
       {phase === 'loading' && <div aria-busy="true" className="h-64 animate-pulse rounded-card bg-muted/40" />}
       {phase === 'closed' && (
-        <Alert>
-          <AlertDescription>{t('chat.closed', 'Chat is not available here.')}</AlertDescription>
-        </Alert>
+        <EmptyFirstTime
+          className="bg-card"
+          icon="comment"
+          title={t('chat.closed', 'Chat is closed right now')}
+          description={t('chat.closedNext', 'Come back later, or reach the team another way.')}
+        />
       )}
       {phase === 'error' && (
         <Alert variant="destructive">
@@ -146,36 +160,59 @@ export default function PublicChatPage({ params }: { params: Promise<{ workspace
         </Alert>
       )}
       {phase === 'ready' && info && (
-        <section className="overflow-hidden rounded-card border border-border bg-card" aria-label={t('chat.title', 'Chat with {name}', { name: info.workspace_name })}>
-          <h1 className="border-b border-border px-4 py-3 text-base font-semibold text-foreground">
-            {t('chat.title', 'Chat with {name}', { name: info.workspace_name })}
-          </h1>
+        <section className="overflow-hidden rounded-card border border-border bg-card shadow-sm" aria-label={t('chat.title', 'Chat with {name}', { name: shownName })}>
+          {ended ? (
+            <div className="space-y-3 p-4">
+              <p className="text-foreground">{t('chat.endedBy', '{name} closed this chat. Your messages are kept.', { name: shownName })}</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setEnded(false);
+                  setThreadKey((k) => k + 1);
+                }}
+              >
+                {t('chat.startNew', 'Start a new chat')}
+              </Button>
+            </div>
+          ) : (
           <ChatThread
-            className="h-[28rem]"
+            key={threadKey}
+            className="h-[36rem] max-h-[80dvh]"
             transport={transport}
-            workspaceName={info.workspace_name}
+            workspaceName={shownName}
             greeting={info.greeting}
             maxLength={info.max_length}
             canSend={!needsBotCheck || botToken !== null}
+            firstMessage={firstMessage}
+            header={
+              <ChatHeader
+                name={shownName}
+                logo={<TenantLogo name={shownName} src={brand?.logo_square_url ?? null} size={40} showName={false} />}
+              />
+            }
+            footer={t('chat.keptBy', 'Your messages are kept by {name}.', { name: shownName })}
             beforeComposer={
               firstMessage ? (
-                <div className="space-y-2">
-                  <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label htmlFor="chat-name" className="text-sm font-medium text-foreground">{t('chat.name', 'Your name (optional)')}</label>
+                    <Input id="chat-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={120} autoComplete="name" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="chat-email" className="text-sm font-medium text-foreground">{t('chat.email', 'Email (optional)')}</label>
                     <Input
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                      maxLength={120}
-                      aria-label={t('chat.name', 'Your name (optional)')}
-                      placeholder={t('chat.name', 'Your name (optional)')}
-                    />
-                    <Input
+                      id="chat-email"
                       type="email"
                       dir="ltr"
                       value={email}
                       onChange={(event) => setEmail(event.target.value)}
-                      aria-label={t('chat.email', 'Your email (optional)')}
-                      placeholder={t('chat.email', 'Your email (optional)')}
+                      placeholder="name@example.com"
+                      autoComplete="email"
+                      aria-describedby="chat-email-why"
                     />
+                    <p id="chat-email-why" className="text-xs text-muted-foreground">{t('chat.emailWhy', 'So we can answer by email if you leave.')}</p>
                   </div>
                   {/* Clipped rather than moved off-screen, so it never widens the page in either direction. */}
                   <div aria-hidden="true" className="sr-only">
@@ -202,6 +239,7 @@ export default function PublicChatPage({ params }: { params: Promise<{ workspace
               ) : null
             }
           />
+          )}
         </section>
       )}
     </PublicShell>

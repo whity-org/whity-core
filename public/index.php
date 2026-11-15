@@ -5756,6 +5756,7 @@ $publicChatHandler = new \Whity\Api\PublicChatApiHandler(
     $publicFormBotCheck,
     new DatabaseSharedStore($db->getPdo()),
     hash('sha256', 'whity.webchat.ip|' . $jwtSecret),
+    $brandingService,
 );
 $router->register('GET',  '/api/public/chat/{workspace}',               [$publicChatHandler, 'info'],  null);
 $router->register('POST', '/api/public/chat/{workspace}/conversations', [$publicChatHandler, 'start'], null);

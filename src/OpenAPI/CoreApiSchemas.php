@@ -7162,6 +7162,7 @@ final class CoreApiSchemas
                     'provider' => self::str(),
                     'site_key' => self::str(),
                 ]],
+                'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'The brand of the workspace, for the chat box (WHIT-1014).'],
             ], ['workspace_name', 'max_length'])),
             'PublicPlansResponse' => self::object([
                 'version' => self::int(),
