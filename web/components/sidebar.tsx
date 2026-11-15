@@ -28,7 +28,6 @@ import { TenantSwitcher as WorkspaceSwitcher } from '@whity/ui/tenant-switcher';
 import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
 import { useCurrentLanguage, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import { roleLabel } from '@whity/features/roles/role-label';
-import { localizedName } from '@/lib/localized-name';
 import { rolesLabel } from '@/lib/workspace-memberships';
 import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
 import {
@@ -42,6 +41,7 @@ import {
 } from '@tabler/icons-react';
 import { useState, useCallback, useMemo } from 'react';
 import { useShellNav } from '@/components/shell/use-shell-nav';
+import { localizedText } from '@whity/ui/localized-text';
 
 /** Settings stays at the foot with the account row on short windows (PW.10). */
 const PINNED_GROUP_IDS = ['settings'];
@@ -78,7 +78,7 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
       memberships.map((m) => ({
         id: String(m.tenant_id),
         // #821: the reader's language, else the original name.
-        name: localizedName(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
+        name: localizedText(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
         role: capitalise(rolesLabel(m)) || undefined,
       })),
     [memberships, currentLanguage],

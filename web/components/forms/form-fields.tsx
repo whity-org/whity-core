@@ -22,6 +22,7 @@ import { Textarea } from '@whity/ui/textarea';
 import { Checkbox } from '@whity/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { useTranslation } from '@whity/features/i18n';
+import { localizedText } from '@whity/ui/localized-text';
 import type { SignatureAppearance } from '@/components/documents/signature-drawing';
 import {
   RepeatingField,
@@ -95,25 +96,6 @@ export interface FormFieldSpec {
 /** A signature's answer: the typed name and, when drawn, the strokes (design 3.4, FP.7). */
 export type Answer = string | string[] | boolean | TableRow[] | { name: string; drawing?: SignatureAppearance };
 
-/** Prefer the reading direction's language, then anything that is actually set. */
-export function localized(
-  value: LocalizedText | string | null | undefined,
-  preferArabic: boolean
-): string {
-  if (typeof value === 'string') return value;
-  if (value === null || value === undefined) return '';
-
-  for (const key of preferArabic ? ['ar', 'en'] : ['en', 'ar']) {
-    const candidate = value[key];
-    if (typeof candidate === 'string' && candidate !== '') return candidate;
-  }
-  for (const candidate of Object.values(value)) {
-    if (typeof candidate === 'string' && candidate !== '') return candidate;
-  }
-
-  return '';
-}
-
 function optionValue(option: FormFieldSpec['options'][number]): string {
   return typeof option === 'string' ? option : String(option.value ?? '');
 }
@@ -127,7 +109,7 @@ function optionValue(option: FormFieldSpec['options'][number]): string {
 function optionLabel(option: FormFieldSpec['options'][number], preferArabic: boolean): string {
   if (typeof option === 'string') return option;
 
-  return localized(option.label, preferArabic) || String(option.value ?? '');
+  return localizedText(option.label, preferArabic ? 'ar' : 'en') || String(option.value ?? '');
 }
 
 export interface ReferenceOption {
@@ -325,10 +307,10 @@ export function FormField({
   upload?: FileUploader;
 }) {
   const t = useTranslation('forms');
-  const label = localized(field.label, preferArabic) || field.field_key;
+  const label = localizedText(field.label, preferArabic ? 'ar' : 'en') || field.field_key;
   // Empty translations come back from the server as `{}`, or `[]` from an older one.
   const translatedHelp = Array.isArray(field.help_text_i18n) ? null : field.help_text_i18n;
-  const help = localized(translatedHelp, preferArabic) || field.help_text;
+  const help = localizedText(translatedHelp, preferArabic ? 'ar' : 'en') || field.help_text;
   const id = `field-${field.field_key}`;
   const multiple = field.field_type === 'multiselect' || field.multi_valued;
 

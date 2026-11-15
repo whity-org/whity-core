@@ -1,19 +1,5 @@
 import type { FormStatus, LocalizedMap } from "./types"
 
-/** The text for a language, then English, then whatever the author wrote. */
-export function pickText(value: LocalizedMap | [] | string | null | undefined, language: string | null): string {
-  if (typeof value === "string") return value
-  if (value === null || value === undefined || Array.isArray(value)) return ""
-  for (const key of [language ?? "en", "en", "ar"]) {
-    const candidate = value[key]
-    if (typeof candidate === "string" && candidate !== "") return candidate
-  }
-  for (const candidate of Object.values(value)) {
-    if (typeof candidate === "string" && candidate !== "") return candidate
-  }
-  return ""
-}
-
 export function asMap(value: LocalizedMap | [] | null | undefined): LocalizedMap {
   return value === null || value === undefined || Array.isArray(value) ? {} : value
 }

@@ -30,17 +30,12 @@ import {
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
 import {
-  FormField,
-  localized,
-  type Answer,
-  type FileUploader,
-  type FormFieldSpec,
-  type LocalizedText,
-  type ReferenceOption,
+  FormField, type Answer, type FileUploader, type FormFieldSpec, type LocalizedText, type ReferenceOption
 } from '@/components/forms/form-fields';
 import { fieldVisibility, type FieldConditionRule } from '@/components/forms/form-conditions';
 import type { TableRow } from '@/components/forms/form-field-kinds';
 import { useRefusalMessage, type RefusalBody } from '@/components/forms/form-refusals';
+import { localizedText } from '@whity/ui/localized-text';
 
 export interface FormSectionSpec {
   key: string | null;
@@ -152,11 +147,11 @@ export function FormFill({
   function labelOf(fieldKey: string): string {
     const field = ordered.find((candidate) => candidate.field_key === fieldKey);
 
-    return (field !== undefined ? localized(field.label, preferArabic) : '') || fieldKey;
+    return (field !== undefined ? localizedText(field.label, preferArabic ? 'ar' : 'en') : '') || fieldKey;
   }
 
   function stepTitle(section: FormSectionSpec, index: number): string {
-    return localized(section.title, preferArabic) || t('step.untitled', 'Part {number}', { number: index + 1 });
+    return localizedText(section.title, preferArabic ? 'ar' : 'en') || t('step.untitled', 'Part {number}', { number: index + 1 });
   }
 
   function goTo(index: number) {
@@ -247,7 +242,7 @@ export function FormFill({
 
   const visibleFields = stepped ? (steps[current]?.fields ?? []) : asked;
   const section = stepped ? steps[current]?.section : undefined;
-  const sectionDescription = localized(section?.description, preferArabic);
+  const sectionDescription = localizedText(section?.description, preferArabic ? 'ar' : 'en');
 
   return (
     <form
@@ -484,7 +479,7 @@ function ReviewAnswer({
               .filter((column) => hasText(row[column.key]))
               .map((column) => {
                 const cell = row[column.key];
-                const label = localized(column.label, preferArabic) || column.key;
+                const label = localizedText(column.label, preferArabic ? 'ar' : 'en') || column.key;
 
                 const shown = column.type === 'date' && typeof cell === 'string' ? (date(cell) ?? '—') : String(cell);
 
@@ -502,7 +497,7 @@ function ReviewAnswer({
       if (typeof option === 'string') {
         if (option === one) return option;
       } else if (option.value === one) {
-        return localized(option.label, preferArabic) || one;
+        return localizedText(option.label, preferArabic ? 'ar' : 'en') || one;
       }
     }
 

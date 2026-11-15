@@ -11,16 +11,16 @@ import { useId } from 'react';
 import { useTranslation } from '@whity/features/i18n';
 import { BilingualInput, type BilingualValue } from '@whity/ui/bilingual-input';
 import { RadioGroup, RadioGroupItem } from '@whity/ui/radio-group';
-import type { NameLanguage } from '@/lib/localized-name';
+import { type BilingualLanguage } from '@whity/ui/localized-text';
 
 export interface LocalizedNameFieldProps {
   /** Base id for the inputs; the Arabic box is `${id}-ar`, the English `${id}-en`. */
   id: string;
   label: string;
   names: BilingualValue;
-  originalLanguage: NameLanguage;
+  originalLanguage: BilingualLanguage;
   onNamesChange: (names: BilingualValue) => void;
-  onOriginalLanguageChange: (language: NameLanguage) => void;
+  onOriginalLanguageChange: (language: BilingualLanguage) => void;
   disabled?: boolean;
   /** Shown under the boxes when the original is empty. */
   error?: string | null;
@@ -38,8 +38,8 @@ export function LocalizedNameField({
 }: LocalizedNameFieldProps) {
   const t = useTranslation('common');
   const originalId = useId();
-  const languageWord = (code: NameLanguage) =>
-    code === 'ar' ? t('localizedName.arabic', 'Arabic') : t('localizedName.english', 'English');
+  const languageWord = (code: BilingualLanguage) =>
+    code === 'ar' ? t('localizedText.arabic', 'Arabic') : t('localizedText.english', 'English');
 
   return (
     <div className="space-y-3" data-testid={`${id}-field`}>
@@ -51,13 +51,13 @@ export function LocalizedNameField({
         disabled={disabled}
         primaryLang={{ code: 'ar', label: languageWord('ar') }}
         secondaryLang={{ code: 'en', label: languageWord('en') }}
-        presentLabel={t('localizedName.set', 'Set')}
-        emptyLabel={t('localizedName.empty', 'Empty')}
+        presentLabel={t('localizedText.set', 'Set')}
+        emptyLabel={t('localizedText.empty', 'Empty')}
       />
 
       <div className="space-y-1.5">
         <p id={originalId} className="text-sm font-medium text-foreground">
-          {t('localizedName.original', 'The original name is in')}
+          {t('localizedText.original', 'The original name is in')}
         </p>
         <RadioGroup
           aria-labelledby={originalId}
@@ -76,7 +76,7 @@ export function LocalizedNameField({
         </RadioGroup>
         <p className="text-xs text-muted-foreground">
           {t(
-            'localizedName.hint',
+            'localizedText.hint',
             'The original is the official name. People who read the other language see it when that language is empty.'
           )}
         </p>

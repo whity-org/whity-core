@@ -16,9 +16,9 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
 import { TwoFactorSetupWizard } from '@/components/TwoFactorSettings';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
-import { localizedName } from '@/lib/localized-name';
 import { oneEntryPerWorkspace, rolesLabel } from '@/lib/workspace-memberships';
 import { SSO_ERROR_KEYS } from './sso-error-keys';
+import { localizedText } from '@whity/ui/localized-text';
 
 /**
  * THIS SCREEN IS THE TRANSLATION TEMPLATE — the first one converted from
@@ -584,7 +584,7 @@ export default function LoginPage() {
                 onClick={() => handleSelectTenant(m.tenant_id)}
               >
                 <span>
-                  {localizedName(m.tenant_names, readerLanguage, m.tenant_name_language, m.tenant_name)}
+                  {localizedText(m.tenant_names, readerLanguage, m.tenant_name_language, m.tenant_name)}
                 </span>
                 <span className="text-xs capitalize text-muted-foreground">{rolesLabel(m)}</span>
               </Button>

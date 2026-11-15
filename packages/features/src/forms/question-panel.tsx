@@ -15,8 +15,9 @@ import { useCurrentLanguage } from "./language"
 import { ChoiceSelect } from "./choice-select"
 import { blankOption, canControl, CHOICE_KINDS, controllersFor, optionValueFrom } from "./builder-model"
 import { useKindLabel } from "./kind-labels"
-import { asMap, pickText } from "./text"
+import { asMap } from "./text"
 import type { FieldColumn, FieldDraft, FieldKind, FieldValidation, FormSectionDef } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 const NO_SECTION = "__none__"
 const ALWAYS = "__always__"
@@ -125,7 +126,7 @@ export function QuestionPanel({
             { value: "true", label: t("builder.panel.yes", "Yes") },
             { value: "false", label: t("builder.panel.no", "No") },
           ]
-        : controller.options.map((o) => ({ value: o.value, label: pickText(o.label, currentLanguage) || o.value }))
+        : controller.options.map((o) => ({ value: o.value, label: localizedText(o.label, currentLanguage) || o.value }))
 
   return (
     <div className="space-y-5" aria-label={t("builder.panel.title", "Question settings")} role="group">
@@ -423,7 +424,7 @@ export function QuestionPanel({
             ...controllers.map((c) => ({
               value: c.field_key,
               label: t("builder.panel.show.onlyIf", "Only if: {question}", {
-                question: pickText(c.label, currentLanguage) || c.field_key,
+                question: localizedText(c.label, currentLanguage) || c.field_key,
               }),
             })),
           ]}
@@ -451,7 +452,7 @@ export function QuestionPanel({
       {field.visible_when !== null && controller !== null && (
         <p className="rounded-control bg-muted p-3 text-xs text-muted-foreground">
           {t("builder.panel.show.sentence", "This question is shown only when “{question}” is answered {answer}.", {
-            question: pickText(controller.label, currentLanguage) || controller.field_key,
+            question: localizedText(controller.label, currentLanguage) || controller.field_key,
             answer: answerChoices.find((c) => c.value === answerValue)?.label ?? answerValue,
           })}
         </p>
@@ -470,7 +471,7 @@ export function QuestionPanel({
               { value: NO_SECTION, label: t("builder.panel.section.none", "No section") },
               ...sections.map((s, i) => ({
                 value: s.key,
-                label: pickText(s.title, currentLanguage) || t("builder.section.untitled", "Section {number}", { number: i + 1 }),
+                label: localizedText(s.title, currentLanguage) || t("builder.section.untitled", "Section {number}", { number: i + 1 }),
               })),
             ]}
             onChange={(next) => onChange({ ...field, section_key: next === NO_SECTION ? null : next })}

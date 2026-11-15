@@ -35,14 +35,12 @@ import { useDirection } from '@/lib/direction-context';
 import { useDateDisplay } from '@whity/features/datetime';
 import { LanguageSwitcher, useTranslation } from '@whity/features/i18n';
 import {
-  localized,
-  type Answer,
-  type LocalizedText,
-  type UploadedFileRef,
+  type Answer, type LocalizedText, type UploadedFileRef
 } from '@/components/forms/form-fields';
 import { FormFill, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
 import { useRefusalMessage, type RefusalBody } from '@/components/forms/form-refusals';
 import { api } from '@/lib/api/client';
+import { localizedText } from '@whity/ui/localized-text';
 
 interface PublicForm {
   slug: string;
@@ -116,7 +114,7 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   function labelOf(fieldKey: string): string {
     const field = form?.fields.find((candidate) => candidate.field_key === fieldKey);
 
-    return (field !== undefined ? localized(field.label, preferArabic) : '') || fieldKey;
+    return (field !== undefined ? localizedText(field.label, preferArabic ? 'ar' : 'en') : '') || fieldKey;
   }
 
   /**
@@ -228,11 +226,11 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   }
 
   const title =
-    localized(form.title ?? null, preferArabic) || localized(form.name, preferArabic) || t('fill.untitled', 'Form');
+    localizedText(form.title ?? null, preferArabic ? 'ar' : 'en') || localizedText(form.name, preferArabic ? 'ar' : 'en') || t('fill.untitled', 'Form');
   const closedOn = dateTime(form.closes_at);
   const translatedDescription = Array.isArray(form.description_i18n) ? null : form.description_i18n;
-  const description = localized(translatedDescription, preferArabic) || form.description;
-  const submitLabel = localized(form.submit_label, preferArabic) || t('fill.send', 'Send');
+  const description = localizedText(translatedDescription, preferArabic ? 'ar' : 'en') || form.description;
+  const submitLabel = localizedText(form.submit_label, preferArabic ? 'ar' : 'en') || t('fill.send', 'Send');
 
   if (submitted) {
     return shell(

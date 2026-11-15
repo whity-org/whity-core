@@ -54,15 +54,9 @@ import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
 import { LocalizedNameField } from '@/components/localized-name-field';
-import {
-  cleanNames,
-  localizedName,
-  sameNames,
-  type LocalizedNames,
-  type NameLanguage,
-} from '@/lib/localized-name';
 import { IconBuildingCommunity } from '@tabler/icons-react';
 import { AddonPacksPanel } from './addon-packs-panel';
+import { type BilingualLanguage, cleanLocalizedText, localizedText, type LocalizedText, sameLocalizedText } from '@whity/ui/localized-text';
 
 export type Tenant = components['schemas']['Tenant'];
 type Subscription = components['schemas']['Subscription'];
@@ -72,14 +66,14 @@ type Entitlements = components['schemas']['TenantEntitlementsResponse']['data'];
 interface TenantForm {
   id: number;
   /** The name in Arabic and English (#821). */
-  names: LocalizedNames;
+  names: LocalizedText;
   /** Which of them is the original, legal name. */
-  nameLanguage: NameLanguage;
+  nameLanguage: BilingualLanguage;
   slug: string;
 }
 
 /** The record's original language, as one the form offers. */
-function formLanguage(code: string | undefined): NameLanguage {
+function formLanguage(code: string | undefined): BilingualLanguage {
   return code === 'ar' ? 'ar' : 'en';
 }
 
@@ -318,7 +312,7 @@ export function TenantRecordScreen({
   const isDirty =
     form !== null &&
     pristine !== null &&
-    (!sameNames(form.names, pristine.names) ||
+    (!sameLocalizedText(form.names, pristine.names) ||
       form.nameLanguage !== pristine.nameLanguage ||
       form.slug !== pristine.slug);
 
@@ -328,7 +322,7 @@ export function TenantRecordScreen({
     event.preventDefault();
     if (!current || !form || !access.editable) return;
 
-    const names = cleanNames(form.names);
+    const names = cleanLocalizedText(form.names);
     const nameLanguage = form.nameLanguage;
     const name = names[nameLanguage] ?? '';
     const slug = form.slug.trim();
@@ -437,7 +431,7 @@ export function TenantRecordScreen({
   }
 
   const fields: TenantRecordFields = {
-    name: localizedName(current.names, currentLanguage, current.nameLanguage, current.name),
+    name: localizedText(current.names, currentLanguage, current.nameLanguage, current.name),
     slug: current.slug,
     userCount: current.userCount,
     createdAt: current.createdAt,

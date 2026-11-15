@@ -22,9 +22,9 @@ import { Textarea } from '@whity/ui/textarea';
 import { useTranslation } from '@whity/features/i18n';
 import type { OU } from './types';
 import { LocalizedNameField } from '@/components/localized-name-field';
-import { cleanNames, type NameLanguage } from '@/lib/localized-name';
 import type { BilingualValue } from '@whity/ui/bilingual-input';
 import { buildOuTree, getDescendantIds } from './ou-tree-util';
+import { type BilingualLanguage, cleanLocalizedText } from '@whity/ui/localized-text';
 
 interface EditOuModalProps {
   isOpen: boolean;
@@ -43,17 +43,17 @@ export function EditOuModal({ isOpen, onClose, onSuccess, ou, ous }: EditOuModal
   // on the new record instead of synchronising state inside an effect (which the
   // React lint rules disallow).
   // #821: the name in Arabic and English, and which one is the original.
-  const originalLanguage: NameLanguage = ou.name_language === 'ar' ? 'ar' : 'en';
+  const originalLanguage: BilingualLanguage = ou.name_language === 'ar' ? 'ar' : 'en';
   const [names, setNames] = useState<BilingualValue>(() =>
     ou.names && Object.keys(ou.names).length > 0 ? { ...ou.names } : { [originalLanguage]: ou.name }
   );
-  const [nameLanguage, setNameLanguage] = useState<NameLanguage>(originalLanguage);
+  const [nameLanguage, setNameLanguage] = useState<BilingualLanguage>(originalLanguage);
   const [nameError, setNameError] = useState<string | null>(null);
   const [description, setDescription] = useState(ou.description || '');
   const [parentId, setParentId] = useState<string>(ou.parent_id ? ou.parent_id.toString() : 'null');
 
   const handleUpdate = async () => {
-    const cleaned = cleanNames(names);
+    const cleaned = cleanLocalizedText(names);
     const original = cleaned[nameLanguage] ?? '';
     if (original === '') {
       setNameError(t('ous.edit.validation.originalRequired', 'Fill in the name in the original language.'));

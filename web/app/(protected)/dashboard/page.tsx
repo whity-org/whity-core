@@ -11,7 +11,6 @@
 import { useState } from 'react';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
-import { localizedName } from '@/lib/localized-name';
 import { useAuth } from '@/lib/auth-context';
 import { useCapabilitiesContext } from '@/lib/capabilities-context';
 import { AgentsToday } from './agents-today';
@@ -21,6 +20,7 @@ import { PlatformCards } from './platform-cards';
 import { RecentDocuments } from './recent-documents';
 import { partOfDay } from './relative-time';
 import { WaitingForYou } from './waiting-for-you';
+import { localizedText } from '@whity/ui/localized-text';
 
 /** The system tenant's id: its people are the platform's operators. */
 const SYSTEM_TENANT_ID = 0;
@@ -50,7 +50,7 @@ export default function DashboardPage() {
   const currentLanguage = useLanguageCode();
   const membership = memberships.find((m) => m.tenant_id === user?.tenant_id);
   const workspace = membership
-    ? localizedName(membership.tenant_names, currentLanguage, membership.tenant_name_language, membership.tenant_name)
+    ? localizedText(membership.tenant_names, currentLanguage, membership.tenant_name_language, membership.tenant_name)
     : undefined;
   // Through the shared date display, so a workspace that hides dates shows none.
   const date = dates.date(new Date().toISOString());

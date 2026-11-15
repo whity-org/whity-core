@@ -11,9 +11,9 @@ import { useDateDisplay } from "../datetime"
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
 import { createFormsApi } from "./api"
-import { pickText } from "./text"
 import { ResponsesSummaryCards } from "./responses-summary"
 import type { FieldDraft, FormsScreenEnv, ResponsesSummary, SubmissionDetail, SubmissionFile, SubmissionProgress, SubmissionRow } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 /** Where a response is in its routing, in plain words. */
 export function useRoutingLabel() {
@@ -44,7 +44,7 @@ export function answerText(field: Pick<FieldDraft, "field_type" | "options" | "v
   if (field.field_type === "date" && typeof value === "string") return date(value)
   const optionLabel = (raw: unknown): string => {
     const match = field.options.find((o) => o.value === String(raw))
-    return match ? pickText(match.label, language) || String(raw) : String(raw)
+    return match ? localizedText(match.label, language) || String(raw) : String(raw)
   }
   if (Array.isArray(value)) {
     return value
@@ -190,7 +190,7 @@ export function ResponseDialog({ env, submissionId, mine = false, onClose }: { e
           <dl className="space-y-4">
             {asked.map((field) => (
               <div key={field.field_key} className="space-y-0.5">
-                <dt className="text-sm font-medium">{pickText(field.label, currentLanguage) || field.field_key}</dt>
+                <dt className="text-sm font-medium">{localizedText(field.label, currentLanguage) || field.field_key}</dt>
                 <dd className="text-sm text-muted-foreground">
                   {field.field_type === "file" && answers[field.field_key] ? (
                     <AttachedFiles base={filesBase} files={(detail.files ?? []).filter((file) => file.field_key === field.field_key)} />

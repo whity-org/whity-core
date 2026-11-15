@@ -12,7 +12,6 @@ import { Button } from '@whity/ui/button';
 import { Skeleton } from '@whity/ui/skeleton';
 import { IconBinaryTree2, IconList, IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
-import { localizedName } from '@/lib/localized-name';
 import { CreateOuModal } from './create-modal';
 import { EditOuModal } from './edit-modal';
 import { DeleteOuModal } from './delete-modal';
@@ -21,6 +20,7 @@ import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
 import { buildOuTree, findNode } from './ou-tree-util';
 import type { OuAction } from './ou-view';
 import type { OU } from './types';
+import { localizedText } from '@whity/ui/localized-text';
 
 // react-flow is heavy and touches browser-only APIs, so the graph view is
 // loaded on demand and never server-rendered (ssr:false). Keeping it behind a
@@ -97,7 +97,7 @@ export default function OUsPage() {
     () =>
       (data ?? []).map((ou) => ({
         ...ou,
-        name: localizedName(ou.names, language, ou.name_language, ou.name),
+        name: localizedText(ou.names, language, ou.name_language, ou.name),
       })),
     [data, language]
   );

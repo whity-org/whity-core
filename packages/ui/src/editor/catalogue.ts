@@ -4,9 +4,10 @@ import { iconNames, type IconName } from "../icon"
 import { currentBlock } from "./behaviour"
 import type { SavedBlock } from "./contract"
 import { freshEditorBlocks } from "./convert"
-import { defaultData, localized } from "./plugin-blocks"
+import { defaultData } from "./plugin-blocks"
 import type { PluginBlocks } from "./services"
 import type { EditorLabels } from "./labels"
+import { localizedText } from "../localized-text"
 
 /**
  * The blocks the editor inserts in this version, grouped as the / menu shows
@@ -96,13 +97,13 @@ export function pluginBlockItems(blocks: PluginBlocks | undefined, kind: string,
         (b): CatalogueItem => ({
           id: `plugin:${b.name}`,
           group: "groupPlugin",
-          groupTitle: localized(source.label, lang),
+          groupTitle: localizedText(source.label, lang),
           label: "groupPlugin",
           hint: "groupPlugin",
-          title: localized(b.label, lang),
-          hintText: localized(b.description ?? null, lang) || localized(source.label, lang),
+          title: localizedText(b.label, lang),
+          hintText: localizedText(b.description ?? null, lang) || localizedText(source.label, lang),
           icon: (iconNames as readonly string[]).includes(b.icon) ? (b.icon as IconName) : "plugin",
-          keywords: [...b.keywords, localized(source.label, "en"), localized(b.label, "en")],
+          keywords: [...b.keywords, localizedText(source.label, "en"), localizedText(b.label, "en")],
           textBlock: false,
           node: { type: "plugin", attrs: { plugin: source.plugin, blockType: b.blockType, schemaVersion: 1, data: defaultData(b) } },
         })

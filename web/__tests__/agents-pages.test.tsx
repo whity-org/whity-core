@@ -11,7 +11,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { isReadPermission, localized, templateGroups, toolsetsFromSplits, type WorkspaceAgent } from '@/components/agents/workspace-agents';
+import { isReadPermission, templateGroups, toolsetsFromSplits, type WorkspaceAgent } from '@/components/agents/workspace-agents';
 
 const mockApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient: mockApiClient }) }));
@@ -34,6 +34,7 @@ import AgentsPage from '@/app/(protected)/admin/agents/page';
 import MyAgentsPage from '@/app/(protected)/admin/my-agents/page';
 import { PersonaEditor } from '@/components/agents/persona-editor';
 import { AgentRecord } from '@/components/agents/agent-record';
+import { localizedText } from '@whity/ui/localized-text';
 
 const json = (status: number, body: unknown) =>
   Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) });
@@ -92,9 +93,9 @@ beforeEach(() => {
 
 describe('workspace agent helpers', () => {
   it('falls back to English where there is no Arabic', () => {
-    expect(localized('Clerk', 'كاتب', true)).toBe('كاتب');
-    expect(localized('Clerk', '  ', true)).toBe('Clerk');
-    expect(localized('Clerk', 'كاتب', false)).toBe('Clerk');
+    expect(localizedText({ en: 'Clerk', ar: 'كاتب' }, 'ar')).toBe('كاتب');
+    expect(localizedText({ en: 'Clerk', ar: '  ' }, 'ar')).toBe('Clerk');
+    expect(localizedText({ en: 'Clerk', ar: 'كاتب' }, 'en')).toBe('Clerk');
   });
 
   it('tells reads from writes as the server does', () => {

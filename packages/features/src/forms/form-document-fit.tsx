@@ -10,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
-import { pickText } from "./text"
 import type { DocumentFit, DocumentFitNeed, FieldDraft } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 /** The check boxes of one list. Everything starts ticked, so only what was unticked is kept. */
 function useUnticked() {
@@ -98,7 +98,7 @@ export function FormDocumentFit({
   }, [fit.needs, fields])
   const addable = needs.filter((need) => need.field_key !== null)
   const blocked = needs.filter((need) => need.field_key === null)
-  const questionText = (label: DocumentFit["unused"][number]["label"], key: string) => pickText(label, currentLanguage) || key
+  const questionText = (label: DocumentFit["unused"][number]["label"], key: string) => localizedText(label, currentLanguage) || key
 
   const waiting = fit.unused.filter((q) => q.in_draft)
   const leftOut = fit.unused.filter((q) => q.left_out && !q.in_draft)

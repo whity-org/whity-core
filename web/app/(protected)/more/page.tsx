@@ -20,10 +20,10 @@ import { useThemeMode } from '@/lib/theme-mode-context';
 import { useShellNav } from '@/components/shell/use-shell-nav';
 import { TenantSwitcher } from '@/components/sidebar';
 import { InstallOffer } from '@/components/pwa/install-offer';
-import { localizedName } from '@/lib/localized-name';
 import { rolesLabel } from '@/lib/workspace-memberships';
 import { SETTINGS_MENU_HREF } from '@/components/settings/settings-area';
 import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
+import { localizedText } from '@whity/ui/localized-text';
 
 /** Nav items the tab bar already holds. */
 const TAB_ITEM_IDS = ['dashboard', 'inbox', 'chat'];
@@ -47,7 +47,7 @@ export default function MorePage() {
   const displayName = user?.display_name || user?.email || '';
   const membership = memberships.find((m) => m.tenant_id === user?.tenant_id);
   const workspace = membership
-    ? localizedName(membership.tenant_names, currentLanguage ?? 'en', membership.tenant_name_language, membership.tenant_name)
+    ? localizedText(membership.tenant_names, currentLanguage ?? 'en', membership.tenant_name_language, membership.tenant_name)
     : '';
   const role = (membership ? rolesLabel(membership) : '') || user?.role || '';
 

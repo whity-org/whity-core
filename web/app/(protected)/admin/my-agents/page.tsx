@@ -16,10 +16,11 @@ import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { AgentsTabs } from '@/components/agents/agents-tabs';
 import { OnItsOwn } from '@/components/agents/agent-status';
-import { localized, refusalText, type MyAgent } from '@/components/agents/workspace-agents';
+import { refusalText, type MyAgent } from '@/components/agents/workspace-agents';
 import { useFetch } from '@/hooks/useFetch';
 import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
+import { localizedText } from '@whity/ui/localized-text';
 
 /**
  * My agents (A20, TplAgents): the workspace's agents and which ones this
@@ -68,14 +69,14 @@ export default function MyAgentsPage() {
   const list = agents.data ?? [];
   const mine = list.filter((agent) => agent.assignment !== null);
   const rest = list.filter((agent) => agent.assignment === null);
-  const nameOf = (agent: MyAgent) => localized(agent.name, agent.nameAr, arabic);
+  const nameOf = (agent: MyAgent) => localizedText({ en: agent.name, ar: agent.nameAr }, arabic ? 'ar' : 'en');
 
   const row = (agent: MyAgent) => (
     <li key={agent.id} className="flex flex-wrap items-center gap-4 border-t border-divider px-4 py-3 first:border-t-0">
       <Avatar kind="agent" name={nameOf(agent)} size={40} />
       <div className="min-w-0 flex-1">
         <p className="font-medium">{nameOf(agent)}</p>
-        <p className="text-sm text-muted-foreground">{localized(agent.role, agent.roleAr, arabic)}</p>
+        <p className="text-sm text-muted-foreground">{localizedText({ en: agent.role, ar: agent.roleAr }, arabic ? 'ar' : 'en')}</p>
         {agent.assignment !== null && (
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
             <OnItsOwn counts={agent.onItsOwn} />
