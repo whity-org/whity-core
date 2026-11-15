@@ -16,6 +16,7 @@ use Whity\Core\RBAC\PermissionRegistry;
  *
  *   POST   /api/mcp/tokens          — issue a new MCP token
  *   GET    /api/mcp/tokens          — list active tokens for the current profile
+ *   GET    /api/mcp/tokens/starting-grant — what a new agent credential would start with (WHIT-1040)
  *   DELETE /api/mcp/tokens/{jti}    — revoke a token
  *   GET    /api/mcp/tokens/{jti}/grant — an agent credential's grant, explained (WHIT-832)
  *   PATCH  /api/mcp/tokens/{jti}/grant — change it: Off, Ask first or Allowed per permission
@@ -216,6 +217,42 @@ final class McpTokenHandler
         [$token, $profileId, $tenantId] = $found;
 
         return Response::json(['data' => $this->presentGrant($token, $profileId, $tenantId)], 200);
+    }
+
+    /**
+     * GET /api/mcp/tokens/starting-grant (WHIT-1040, TplAgentCredential)
+     *
+     * The grant screen's rows for an agent credential not issued yet, so the
+     * person sets its starting grant before the key exists: each permission
+     * they hold with the modes they may give (the default reads Allowed and
+     * asks first for everything else, and nothing without undo is Allowed),
+     * and the permissions an agent could use that they don't hold, which they
+     * can't give. POST /api/mcp/tokens checks the chosen modes the same way.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function startingGrant(Request $request, array $params = []): Response
+    {
+        $claims = $this->callerClaims($request);
+        if ($claims === null) {
+            return Response::error('Unauthenticated', 401);
+        }
+        $identity = $this->requireProfileIdentity($claims);
+        if ($identity === null) {
+            return Response::error('Unauthenticated', 401);
+        }
+        [$profileId, $tenantId] = $identity;
+
+        $operations = $this->operations();
+        $candidates = array_values(array_unique(array_column($operations, 'permission')));
+        sort($candidates);
+        $held = $this->held($candidates, $profileId, $tenantId);
+
+        return Response::json(['data' => [
+            'scope'       => McpScope::CAPABILITIES,
+            'permissions' => (new AgentGrantView($operations))->rows(McpScope::CAPABILITIES, $held),
+            'notHeld'     => array_values(array_diff($candidates, $held)),
+        ]], 200);
     }
 
     /**

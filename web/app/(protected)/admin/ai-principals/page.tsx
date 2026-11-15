@@ -208,10 +208,18 @@ export default function AiPrincipalsPage() {
   };
 
   const connect = (
-    <Button onClick={() => setIsWizardOpen(true)}>
-      <Icon name="link" size={16} />
-      {t('aiPrincipals.header.connect', 'Connect an AI app')}
-    </Button>
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="outline" asChild>
+        <Link href="/admin/ai-principals/new-agent-key">
+          <Icon name="robot" size={16} />
+          {t('aiPrincipals.header.agentKey', 'New key for an agent')}
+        </Link>
+      </Button>
+      <Button onClick={() => setIsWizardOpen(true)}>
+        <Icon name="link" size={16} />
+        {t('aiPrincipals.header.connect', 'Connect an AI app')}
+      </Button>
+    </div>
   );
 
   return (
