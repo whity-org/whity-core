@@ -30,9 +30,11 @@ import { useCurrentLanguage, useLanguageCode, useI18nEnabled, useTranslation } f
 import { roleLabel } from '@whity/features/roles/role-label';
 import { localizedName } from '@/lib/localized-name';
 import { rolesLabel } from '@/lib/workspace-memberships';
+import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
 import {
   IconLogout,
   IconUserCog,
+  IconBell,
   IconSelector,
   IconSun,
   IconMoon,
@@ -241,6 +243,13 @@ export function Sidebar() {
           <Link href="/settings" onClick={() => setIsMobileOpen(false)}>
             <IconUserCog />
             {t('sidebar.accountSettings', 'Account settings')}
+          </Link>
+        </DropdownMenuItem>
+        {/* WHIT-1078: notifications on this device, straight to the card. */}
+        <DropdownMenuItem asChild>
+          <Link href={NOTIFICATIONS_HREF} onClick={() => setIsMobileOpen(false)} data-testid="account-menu-notifications">
+            <IconBell />
+            {t('sidebar.notifications', 'Notifications')}
           </Link>
         </DropdownMenuItem>
         {isI18nEnabled && availableLanguages.length > 1 && (

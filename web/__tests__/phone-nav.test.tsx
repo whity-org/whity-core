@@ -134,6 +134,13 @@ describe('More', () => {
     expect(screen.getByRole('heading', { name: 'Work' })).toBeInTheDocument();
   });
 
+  it('has a labelled Notifications row that opens the notifications card (WHIT-1078)', () => {
+    render(<MorePage />);
+    const row = screen.getByTestId('more-notifications');
+    expect(row.textContent).toContain('Notifications');
+    expect(row.getAttribute('href')).toBe('/settings?tab=preferences#notifications');
+  });
+
   it('keeps appearance and signing out reachable on a phone (WHIT-827)', async () => {
     render(<MorePage />);
     await userEvent.click(screen.getByTestId('more-theme'));

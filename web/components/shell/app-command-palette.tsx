@@ -51,6 +51,8 @@ import { usePaletteData } from '@/lib/commands/use-palette-data';
 import { requestNew } from '@/lib/commands/new-intent';
 import { fold, parseCommand, rank } from '@/lib/commands/parse';
 import type { components } from '@whity/api-client';
+import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
+
 
 type SearchGroup = components['schemas']['SearchGroup'];
 
@@ -80,6 +82,7 @@ export function AppCommandPalette() {
   const { currentLanguage, availableLanguages, setLanguage } = useCurrentLanguage();
   const { items: navItems, refresh: refreshNav } = useNavigation();
   const navLabels = useNavItemLabels();
+  const notificationsLabel = t('palette.page.notifications', 'Notifications');
   const {
     resolved: theme,
     preference: themePreference,
@@ -192,9 +195,13 @@ export function AppCommandPalette() {
   const commands = useMemo<PaletteCommand[]>(() => {
     const ctx: CommandContext = {
       can: has,
-      pages: navItems
-        .filter((item) => item.href)
-        .map((item) => ({ id: item.id, href: item.href, label: navLabels[item.id] ?? item.label })),
+      pages: [
+        ...navItems
+          .filter((item) => item.href)
+          .map((item) => ({ id: item.id, href: item.href, label: navLabels[item.id] ?? item.label })),
+        // WHIT-1078: not a sidebar page, but people look for it by name.
+        { id: 'notifications', href: NOTIFICATIONS_HREF, label: notificationsLabel, icon: 'notification' as const },
+      ],
       workspaces: memberships.map((m) => ({
         id: m.tenant_id,
         name: localizedName(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
@@ -238,6 +245,7 @@ export function AppCommandPalette() {
     has,
     navItems,
     navLabels,
+    notificationsLabel,
     memberships,
     currentLanguage,
     user?.tenant_id,
@@ -340,6 +348,15 @@ export function AppCommandPalette() {
           onSelect: () => openPlace({ id: `page-${item.id}`, label: navLabels[item.id] ?? item.label, href: item.href }),
         };
       });
+    // WHIT-1078: notifications settings, found by name from anywhere.
+    pages.push({
+      id: 'page-notifications',
+      group: t('palette.group.pages', 'Go to'),
+      label: notificationsLabel,
+      keywords: 'notifications push alerts إشعارات تنبيهات',
+      icon: <TablerIcons.IconBell size={16} />,
+      onSelect: () => openPlace({ id: 'page-notifications', label: notificationsLabel, href: NOTIFICATIONS_HREF }),
+    });
 
     const actions: CommandPaletteItem[] = [
       {
@@ -434,7 +451,7 @@ export function AppCommandPalette() {
       : [];
 
     return [...recentRows, ...records, ...pages, ...actions, ...commandRows, ...agent];
-  }, [groups, navItems, navLabels, currentLanguage, theme, toggleTheme, router, t, query, commands, commandRow, recent, data.recentDocuments, data.agents, aiPage, openPlace]);
+  }, [groups, navItems, navLabels, notificationsLabel, currentLanguage, theme, toggleTheme, router, t, query, commands, commandRow, recent, data.recentDocuments, data.agents, aiPage, openPlace]);
 
   const commandMode = commandItems !== null;
 

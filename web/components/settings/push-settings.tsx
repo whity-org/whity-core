@@ -20,7 +20,7 @@ import { Switch } from '@whity/ui/switch';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { api } from '@/lib/api/client';
-import { deviceLabel, usePush } from '@/lib/pwa/push';
+import { deviceLabel, NOTIFICATIONS_ANCHOR, usePush } from '@/lib/pwa/push';
 
 const CHANNEL = 'push';
 
@@ -45,6 +45,16 @@ export function PushSettings() {
   const [prefs, setPrefs] = useState<Preference[]>([]);
   const [pluginKinds, setPluginKinds] = useState<Kind[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
+
+  // Reached from More, the account menu or Ctrl+K (WHIT-1078): the card is
+  // below Display, so bring it into view.
+  useEffect(() => {
+    if (window.location.hash !== `#${NOTIFICATIONS_ANCHOR}`) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(NOTIFICATIONS_ANCHOR)?.scrollIntoView({ block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -124,7 +134,7 @@ export function PushSettings() {
   }
 
   return (
-    <Card data-testid="push-settings">
+    <Card id={NOTIFICATIONS_ANCHOR} data-testid="push-settings" className="scroll-mt-4">
       <CardHeader>
         <CardTitle>{t('settings.push.title', 'Notifications')}</CardTitle>
         <CardDescription>

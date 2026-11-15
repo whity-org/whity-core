@@ -23,6 +23,7 @@ import { InstallOffer } from '@/components/pwa/install-offer';
 import { localizedName } from '@/lib/localized-name';
 import { rolesLabel } from '@/lib/workspace-memberships';
 import { SETTINGS_MENU_HREF } from '@/components/settings/settings-area';
+import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
 
 /** Nav items the tab bar already holds. */
 const TAB_ITEM_IDS = ['dashboard', 'inbox', 'chat'];
@@ -109,6 +110,14 @@ export default function MorePage() {
           {t('phoneNav.you', 'You')}
         </h2>
         <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+          {/* WHIT-1078: push on this phone and which kinds, one tap away. */}
+          <li>
+            <Link href={NOTIFICATIONS_HREF} className={ROW} data-testid="more-notifications">
+              <Icon name="notification" size={20} className="text-muted-foreground" />
+              <span className="flex-1">{t('phoneNav.notifications', 'Notifications')}</span>
+              <Icon name="chevron-right" size={18} className="text-muted-foreground" />
+            </Link>
+          </li>
           <li>
             <button type="button" onClick={toggle} className={ROW} data-testid="more-theme">
               <Icon name={resolved === 'dark' ? 'sun' : 'moon'} size={20} className="text-muted-foreground" />
