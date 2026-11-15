@@ -1230,9 +1230,15 @@ final class ChatService
             $this->messageInChat($tenantId, $viewer, (int) $row['message_id']);
         }
         $type = (string) $row['content_type'];
+        try {
+            $bytes = $this->files()->bytes((string) $row['storage_key']);
+        } catch (\Whity\Storage\StorageException) {
+            // The row outlived its bytes (storage moved or emptied): say so, not "something went wrong".
+            throw new ChatException('This file is no longer here.', 404);
+        }
 
         return [
-            'bytes' => $this->files()->bytes((string) $row['storage_key']),
+            'bytes' => $bytes,
             'content_type' => $type,
             'filename' => (string) ($row['filename'] ?? 'file'),
             'inline' => ChatAttachmentPolicy::showsInline($type),
