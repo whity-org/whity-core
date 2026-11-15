@@ -1,0 +1,29 @@
+{
+  "name": "whity",
+  "version": "0.2.0",
+  "description": "Install and update a self-hosted Whity on Docker: npm install -g whity, then whity install.",
+  "license": "MIT",
+  "homepage": "https://whity.dev/install",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whity-org/whity-core.git",
+    "directory": "packages/whity"
+  },
+  "type": "module",
+  "bin": {
+    "whity": "bin/whity.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@whity/cli": "0.2.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  }
+}

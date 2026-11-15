@@ -26,11 +26,11 @@ export function stack(dir, envText, deps) {
     docker,
     compose,
     /** Runs a command in a new container of the install's current image. */
-    cli: (args) => compose(['run', '--rm', '-T', 'frankenphp', 'php', 'bin/whity-cli', ...args]),
-    pullImages: async (version) => {
+    cli: (args, options = {}) => compose(['run', '--rm', '-T', 'frankenphp', 'php', 'bin/whity-cli', ...args], options),
+    pullImages: async (version, { announce = true, ...options } = {}) => {
       for (const image of IMAGES) {
-        deps.log(m.pullingImage(`${image}:${version}`));
-        const result = await docker(['pull', `${image}:${version}`]);
+        if (announce) deps.log(m.pullingImage(`${image}:${version}`));
+        const result = await docker(['pull', `${image}:${version}`], options);
         if (result.code !== 0) throw pullError(`${image}:${version}`, result);
       }
     },
@@ -54,6 +54,7 @@ export async function checkDocker(deps) {
   }
   const major = Number.parseInt(compose.stdout.trim().replace(/^v/, ''), 10);
   if (!(major >= 2)) throw new CliError(m.composeTooOld(compose.stdout.trim()));
+  return server.stdout.trim();
 }
 
 /** A command's own output for an error message: stdout, without the PHP tool's colour codes or Compose's progress lines. */

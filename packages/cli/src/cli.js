@@ -12,6 +12,10 @@ const PLANNED = new Set(['login', 'logout', 'documents', 'agents', 'approvals', 
 const OPTIONS = {
   dir: { type: 'string', default: 'whity' },
   url: { type: 'string' },
+  domain: { type: 'string' },
+  email: { type: 'string' },
+  port: { type: 'string' },
+  verbose: { type: 'boolean', default: false },
   'web-port': { type: 'string' },
   'api-port': { type: 'string' },
   bind: { type: 'string' },
@@ -76,7 +80,10 @@ async function run(argv, deps) {
       webPort: values['web-port'],
       apiPort: values['api-port'],
       bind: values.bind,
-      adminEmail: values['admin-email'],
+      adminEmail: values.email ?? values['admin-email'],
+      domain: values.domain,
+      port: values.port,
+      verbose: values.verbose,
     }, deps);
   } else {
     await update({ dir, version, force: values.force }, deps);
