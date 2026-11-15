@@ -13,6 +13,7 @@ use Whity\Auth\TokenValidator;
 use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Agent\AgentProposalRepository;
 use Whity\Core\Agent\AgentRepository;
+use Whity\Core\Plugin\Tenant\WorkspacePluginProposalDiffs;
 use Whity\Core\Request;
 use Whity\Core\Router;
 use Whity\Core\Tenant\TenantContext;
@@ -234,6 +235,50 @@ final class AgentProposalsRealEngineTest extends TestCase
         self::assertTrue($this->stored($id, self::TENANT)['result']['isError']);
     }
 
+    /**
+     * WHIT-1042 (TplImpactPlan): a Whity Builder publish whose tests failed
+     * can't be approved, alone or together; the person declines it with the
+     * failing tests named, and that reason is kept for the agent.
+     */
+    public function testAnImpactPlanWithFailedTestsCanNotBeApproved(): void
+    {
+        $id = $this->plan(['level' => 'safe', 'changes' => [], 'tests' => ['passed' => 23, 'failed' => 1]]);
+
+        $refused = $this->inbox->approve($this->as(self::RANA), ['id' => (string) $id]);
+        self::assertSame(422, $refused->getStatusCode());
+        self::assertStringContainsString('tests_failed', $refused->getBody());
+        $bulk = json_decode($this->inbox->bulkApprove($this->as(self::RANA, (string) json_encode(['ids' => [$id]])))->getBody(), true)['data'];
+        self::assertSame([['id' => $id, 'reason' => 'open_on_its_own']], $bulk['refused']);
+        self::assertSame('waiting', $this->stored($id, self::TENANT)['status']);
+
+        $declined = $this->inbox->decline($this->as(self::RANA, '{"reason":"Fix the failing test: Orders with no notes keep an empty pickup time."}'), ['id' => (string) $id]);
+        self::assertSame(200, $declined->getStatusCode());
+        self::assertSame('Fix the failing test: Orders with no notes keep an empty pickup time.', json_decode($declined->getBody(), true)['data']['declineReason']);
+        self::assertSame('declined', $this->stored($id, self::TENANT)['status']);
+    }
+
+    public function testADestructiveImpactPlanNeedsTheTick(): void
+    {
+        $id = $this->plan(['level' => 'destructive', 'changes' => [], 'tests' => ['passed' => 24, 'failed' => 0]]);
+
+        $refused = $this->inbox->approve($this->as(self::RANA), ['id' => (string) $id]);
+        self::assertSame(422, $refused->getStatusCode());
+        self::assertStringContainsString('acknowledge_destructive', $refused->getBody());
+        self::assertSame('waiting', $this->stored($id, self::TENANT)['status']);
+
+        self::assertSame(200, $this->inbox->approve($this->as(self::RANA, '{"acknowledgedDestructive":true}'), ['id' => (string) $id])->getStatusCode());
+        self::assertSame('approved', $this->stored($id, self::TENANT)['status']);
+    }
+
+    public function testADeclineWithoutAReasonKeepsNone(): void
+    {
+        $id = $this->ask(['name' => 'Leave request']);
+
+        $declined = $this->inbox->decline($this->as(self::RANA, '{"reason":"   "}'), ['id' => (string) $id]);
+
+        self::assertNull(json_decode($declined->getBody(), true)['data']['declineReason']);
+    }
+
     public function testAgentsCanNotReachTheApprovalRoutes(): void
     {
         ToolDeriver::clearCache();
@@ -259,6 +304,27 @@ final class AgentProposalsRealEngineTest extends TestCase
     {
         $result = ($this->toolsCall)(['name' => 'post_api_forms', 'arguments' => $arguments], 'bearer');
         return (int) json_decode($result['content'][0]['text'], true)['proposal']['id'];
+    }
+
+    /**
+     * A Whity Builder publish proposal with this impact plan, as the agent's
+     * call would file it.
+     *
+     * @param array<string, mixed> $diff
+     */
+    private function plan(array $diff): int
+    {
+        return $this->proposals->create(
+            self::TENANT,
+            'jti-whity-builder',
+            self::RANA,
+            WorkspacePluginProposalDiffs::PUBLISH,
+            ['manifest' => ['plugin' => ['name' => 'CakeOrders']]],
+            ['tools:call'],
+            ['plugins:publish'],
+            'Publish a workspace plugin',
+            diff: $diff,
+        );
     }
 
     private function as(int $profileId, string $body = ''): Request

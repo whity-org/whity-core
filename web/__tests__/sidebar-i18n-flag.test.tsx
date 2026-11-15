@@ -117,7 +117,9 @@ describe('sidebar language affordance follows the i18n feature flag', () => {
     // The language choice is in the account menu at the foot (3.3 cards).
     await openAccountMenu();
     await waitFor(() => expect(screen.getByTestId('language-switcher')).toBeInTheDocument());
-    expect(screen.getAllByRole('menuitemradio').length).toBeGreaterThan(1);
+    // The row opens the languages beside it (PwShortSidebar: "Language  English").
+    await userEvent.click(screen.getByTestId('language-switcher'));
+    await waitFor(() => expect(screen.getAllByRole('menuitemradio').length).toBeGreaterThan(1));
   });
 
   it('shows no language row at all when the flag is off', async () => {

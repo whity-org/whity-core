@@ -14,7 +14,7 @@ use DateTimeImmutable;
 final class Ics
 {
     /**
-     * @param list<array{uid: string, start: DateTimeImmutable, end: DateTimeImmutable, summary: string, description?: string, status?: string, sequence?: int, url?: string}> $events
+     * @param list<array{uid: string, start: DateTimeImmutable, end: DateTimeImmutable, summary: string, description?: string, status?: string, sequence?: int, url?: string, organizer?: array{name: string, email: string}, attendee?: array{name: string, email: string}}> $events
      */
     public static function calendar(array $events, string $name = '', string $method = 'PUBLISH'): string
     {
@@ -43,6 +43,16 @@ final class Ics
             $url = $event['url'] ?? '';
             if ($url !== '') {
                 $lines[] = 'URL:' . $url;
+            }
+            // RFC 5546: a REQUEST or CANCEL names who organises it and who it is for.
+            foreach (['organizer' => 'ORGANIZER', 'attendee' => 'ATTENDEE'] as $key => $property) {
+                $who = $event[$key] ?? null;
+                if (is_array($who) && filter_var($who['email'], FILTER_VALIDATE_EMAIL) !== false) {
+                    $cn = trim(str_replace(['"', "\r", "\n"], '', $who['name']));
+                    $lines[] = $property . ($cn !== '' ? ';CN="' . $cn . '"' : '')
+                        . ($key === 'attendee' ? ';ROLE=REQ-PARTICIPANT;RSVP=FALSE' : '')
+                        . ':mailto:' . $who['email'];
+                }
             }
             $lines[] = 'STATUS:' . ($event['status'] ?? 'CONFIRMED');
             $lines[] = 'SEQUENCE:' . ($event['sequence'] ?? 0);

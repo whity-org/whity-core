@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import type { PluginFeature } from '@/lib/plugin-features';
 import { useToast } from '@/lib/toast-context';
 import { AdminHeader } from '@/components/admin/admin-header';
@@ -73,20 +73,14 @@ function toGreetings(body: unknown): Greeting[] {
  * Extract the backend's `{ error: string }` message from a failed response,
  * falling back when the body is absent or not JSON.
  */
-async function readErrorMessage(
-  response: Response,
-  fallback: string
-): Promise<string> {
-  try {
-    const body: unknown = await response.json();
+function readErrorMessage(body: unknown, fallback: string): string {
+  {
     if (typeof body === 'object' && body !== null && 'error' in body) {
       const message = (body as { error: unknown }).error;
       if (typeof message === 'string' && message.length > 0) {
         return message;
       }
     }
-  } catch {
-    // No JSON body — use the fallback.
   }
   return fallback;
 }
@@ -144,7 +138,7 @@ export function HelloGreetingsScreen({ feature }: { feature: PluginFeature }) {
     const load = async (): Promise<void> => {
       setIsLoading(true);
       try {
-        const response = await apiClient('/api/v1/hello/greetings');
+        const { data, error, response } = await api.GET('/api/v1/hello/greetings');
 
         if (response.status === 403) {
           setIsForbidden(true);
@@ -154,10 +148,10 @@ export function HelloGreetingsScreen({ feature }: { feature: PluginFeature }) {
         setIsForbidden(false);
 
         if (!response.ok) {
-          throw new Error(await readErrorMessage(response, loadErrorMessage));
+          throw new Error(readErrorMessage(error, loadErrorMessage));
         }
 
-        const body: unknown = await response.json();
+        const body: unknown = data;
         setGreetings(toGreetings(body));
       } catch (error) {
         addToast(error instanceof Error ? error.message : loadErrorMessage, 'error');
@@ -179,15 +173,13 @@ export function HelloGreetingsScreen({ feature }: { feature: PluginFeature }) {
 
     try {
       setIsSubmitting(true);
-      const response = await apiClient('/api/v1/hello/greetings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed }),
+      const { error, response } = await api.POST('/api/v1/hello/greetings', {
+        body: { message: trimmed },
       });
       if (!response.ok) {
         addToast(
-          await readErrorMessage(
-            response,
+          readErrorMessage(
+            error,
             t('hello.create.error', 'Failed to create greeting')
           ),
           'error'

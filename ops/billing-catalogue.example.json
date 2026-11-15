@@ -17,6 +17,7 @@
       "limits": {
         "members.max": 3,
         "documents.render.per_month": 20,
+        "documents.form_printouts": false,
         "sso.tenant_idp": false,
         "customers.per_month": 100,
         "agents.runs.per_month": 200,
@@ -48,6 +49,7 @@
       "limits": {
         "members.max": 40,
         "documents.render.per_month": 500,
+        "documents.form_printouts": true,
         "storage.quota_bytes": 21474836480,
         "sso.tenant_idp": true,
         "customers.per_month": 2000,
@@ -67,6 +69,7 @@
       "limits": {
         "members.max": -1,
         "documents.render.per_month": -1,
+        "documents.form_printouts": true,
         "storage.quota_bytes": -1,
         "sso.tenant_idp": true,
         "customers.per_month": -1,

@@ -54,7 +54,7 @@ test.describe('Sidebar navigation (admin)', () => {
 
   test("Tenants is not in a workspace admin's sidebar, and the URL says they have no access", async ({ adminPage, page }) => {
     await page.goto('/admin/tenants');
-    await expect(adminPage.shell.navLink('Tenants')).toHaveCount(0);
+    await expect(adminPage.shell.navLink('Workspaces')).toHaveCount(0);
     await expect(page.getByText('You don’t have access to workspaces')).toBeVisible();
     await expect(page.getByRole('table')).toHaveCount(0);
   });
@@ -86,11 +86,11 @@ test.describe('Sidebar navigation (admin)', () => {
   test('the user row opens the account page', async ({ adminPage, page }) => {
     await adminPage.shell.openAccountSettings();
     await page.waitForURL('**/settings');
-    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
     // The Account Information card became the editable Profile card (WC-64).
-    // The account page is in tabs (Profile, Sign-in and security, Sessions and devices, Preferences).
+    // The account page is in tabs (Profile, Password and two-step, Where you’re signed in, Language and display).
     await expect(page.getByRole('tab', { name: 'Profile' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Sign-in and security' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Password and two-step' })).toBeVisible();
   });
 
   test('Dashboard section loads the home page', async ({

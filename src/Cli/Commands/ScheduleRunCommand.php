@@ -12,6 +12,8 @@ use Whity\Core\Queue\JobRepository;
 use Whity\Core\Queue\QueueService;
 use Whity\Core\Scheduler\CronExpression;
 use Whity\Core\Scheduler\ScheduledJobRepository;
+use Whity\Core\Scheduler\SchedulerHeartbeat;
+use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Store\DatabaseSharedStore;
 use Whity\Core\Store\SharedStoreInterface;
 use Whity\Database\Database;
@@ -31,6 +33,8 @@ use Whity\Database\Database;
  *     ONCE, never replays.
  *  3. Run built-in retention GC: prune completed jobs older than the retention
  *     window (wires JobRepository::pruneCompleted into the scheduler).
+ *  4. Record the tick's heartbeat ({@see SchedulerHeartbeat}), whether or not
+ *     anything was due, so the health probe sees the tick alive (WHIT-1013).
  *
  * `--once` runs a single tick and exits (cron-style / tests); otherwise it loops
  * (sleep between ticks), recycling on `--max-runtime` so a supervisor respawns a
@@ -51,10 +55,12 @@ final class ScheduleRunCommand implements CliCommand
     /** @var (\Closure(): void)|null */
     private ?\Closure $syncPluginSchedules;
     private bool $pluginSchedulesSynced = false;
+    private ?SchedulerHeartbeat $heartbeat;
 
     /**
      * @param \Closure(int): void|null $sleeper Idle sleeper (seconds); default sleep(), a no-op in tests.
      * @param (\Closure(): void)|null $syncPluginSchedules Reconciles plugins' declared schedules (WHIT-1031).
+     * @param SchedulerHeartbeat|null $heartbeat Where each completed tick is recorded (WHIT-1013).
      */
     public function __construct(
         ?ScheduledJobRepository $schedules = null,
@@ -64,7 +70,8 @@ final class ScheduleRunCommand implements CliCommand
         ?LoggerInterface $logger = null,
         ?\Closure $sleeper = null,
         private ?\Whity\Core\Plugin\PluginRecords $pluginRecords = null,
-        ?\Closure $syncPluginSchedules = null
+        ?\Closure $syncPluginSchedules = null,
+        ?SchedulerHeartbeat $heartbeat = null
     ) {
         $this->logger = $logger ?? new NullLogger();
         if ($schedules === null || $queue === null || $store === null || $jobs === null) {
@@ -75,7 +82,9 @@ final class ScheduleRunCommand implements CliCommand
             $queue ??= new QueueService(new JobRepository($pdo));
             $store ??= new DatabaseSharedStore($pdo);
             $jobs ??= new JobRepository($pdo);
+            $heartbeat ??= new SchedulerHeartbeat(new GlobalSettingsRepository($pdo));
         }
+        $this->heartbeat = $heartbeat;
         $this->syncPluginSchedules = $syncPluginSchedules;
         $this->schedules = $schedules;
         $this->queue = $queue;
@@ -200,6 +209,13 @@ final class ScheduleRunCommand implements CliCommand
                 'tenant_id' => 0,
                 'idempotency_key' => 'agents-daily-summary-' . $bucket,
             ]);
+        }
+
+        // WHIT-1013: proof of life, due or not. A failed write must not fail the tick.
+        try {
+            $this->heartbeat?->beat($now->getTimestamp());
+        } catch (\Throwable $e) {
+            $this->logger->error('[schedule:run] heartbeat write failed', ['error' => $e->getMessage()]);
         }
 
         $this->logger->info('[schedule:run] tick complete', [

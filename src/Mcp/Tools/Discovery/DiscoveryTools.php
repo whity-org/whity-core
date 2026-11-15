@@ -228,7 +228,7 @@ final class DiscoveryTools
         return [
             'name'        => self::GET_PROPOSAL,
             'description' => 'Check on something you asked to do that needs approval: pass the proposal id a call returned. '
-                . 'Says whether it is still waiting, was approved (with the result), declined or expired. Read-only.',
+                . 'Says whether it is still waiting, was approved (with the result), declined (with the reason, when the person gave one) or expired. Read-only.',
             'inputSchema' => [
                 'type'       => 'object',
                 'properties' => [
@@ -491,6 +491,8 @@ final class DiscoveryTools
             'decidedAt'   => $proposal['decided_at'],
             'expiresAt'   => $proposal['expires_at'],
             'createdAt'   => $proposal['created_at'],
+            // WHIT-1042: why the person declined, when they said ("fix these tests").
+            'declineReason' => $proposal['decline_reason'] ?? null,
         ]]);
     }
 

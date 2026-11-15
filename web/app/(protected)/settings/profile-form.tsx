@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,7 +84,7 @@ interface ProfilePayload {
 }
 
 export function ProfileForm() {
-  const { user, apiClient, refreshAuth } = useAuth();
+  const { user, refreshAuth } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('auth');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -140,14 +141,12 @@ export function ProfileForm() {
         payload.password = data.newPassword;
       }
 
-      const response = await apiClient('/api/v1/me', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      const { data: updated, error: updateError, response } = await api.PATCH('/api/v1/me', {
+        body: payload as never,
       });
 
       if (!response.ok) {
-        const errorData = (await response.json().catch(() => ({}))) as {
+        const errorData = ((updateError ?? {}) as unknown) as {
           error?: string;
           message?: string;
         };
@@ -159,7 +158,7 @@ export function ProfileForm() {
       // Confirm the change actually persisted before claiming success: the
       // backend returns the updated user, so assert the email it reports back
       // matches what we asked for rather than trusting a bare 200.
-      const result = (await response.json().catch(() => null)) as
+      const result = ((updated ?? null) as unknown) as
         | { user?: { email?: string } }
         | null;
       const persistedEmail = result?.user?.email;

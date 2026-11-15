@@ -5,7 +5,7 @@ import { Button } from '@whity/ui/button';
 import { Icon } from '@whity/ui/icon';
 import { SystemState } from '@whity/ui/system-state';
 import { useTranslation } from '@whity/features/i18n';
-import { latestErrorReference } from '@/lib/api-client';
+import { latestErrorReference } from '@/lib/api/client';
 
 /**
  * The 500 page: nothing the person did caused it, nothing was lost, one thing

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   Sheet,
@@ -80,7 +80,6 @@ export function OuDetailDrawer({
   canWrite,
   canDelete,
 }: OuDetailDrawerProps) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
 
@@ -101,26 +100,26 @@ export function OuDetailDrawer({
     setPendingRoleId('');
     try {
       const [rolesRes, membersRes, allRolesRes] = await Promise.all([
-        apiClient(`/api/v1/ous/${ouId}/roles`),
-        apiClient(`/api/v1/ous/${ouId}/members`),
-        apiClient('/api/v1/roles'),
+        api.GET('/api/v1/ous/{id}/roles', { params: { path: { id: ouId } } }),
+        api.GET('/api/v1/ous/{id}/members', { params: { path: { id: ouId } } }),
+        api.GET('/api/v1/roles'),
       ]);
 
-      if (rolesRes.ok) {
-        setRoles(((await rolesRes.json()).data ?? []) as OuRole[]);
+      if (rolesRes.response.ok) {
+        setRoles(((rolesRes.data as { data?: unknown[] } | undefined)?.data ?? []) as OuRole[]);
       }
-      if (membersRes.ok) {
-        setMembers(((await membersRes.json()).data ?? []) as OuMember[]);
+      if (membersRes.response.ok) {
+        setMembers(((membersRes.data as { data?: unknown[] } | undefined)?.data ?? []) as OuMember[]);
       }
-      if (allRolesRes.ok) {
-        setAllRoles(((await allRolesRes.json()).data ?? []) as OuRole[]);
+      if (allRolesRes.response.ok) {
+        setAllRoles(((allRolesRes.data as { data?: unknown[] } | undefined)?.data ?? []) as OuRole[]);
       }
     } catch {
       addToast(t('ous.detail.loadError', 'Failed to load OU details'), 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [apiClient, ouId, addToast, t]);
+  }, [ouId, addToast, t]);
 
   useEffect(() => {
     if (ouId !== null) {
@@ -139,13 +138,12 @@ export function OuDetailDrawer({
     }
     setIsMutating(true);
     try {
-      const res = await apiClient(`/api/v1/ous/${ouId}/roles`, {
-        method: 'POST',
-        body: JSON.stringify({ role_id: parseInt(pendingRoleId, 10) }),
+      const { response: res, error: body } = await api.POST('/api/v1/ous/{id}/roles', {
+        params: { path: { id: ouId } },
+        body: { role_id: parseInt(pendingRoleId, 10) },
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || t('ous.detail.roles.assignError', 'Failed to assign role'));
+        throw new Error((body as { error?: string } | undefined)?.error || t('ous.detail.roles.assignError', 'Failed to assign role'));
       }
       addToast(t('ous.detail.roles.assignSuccess', 'Role assigned'), 'success');
       setPendingRoleId('');
@@ -169,10 +167,11 @@ export function OuDetailDrawer({
     }
     setIsMutating(true);
     try {
-      const res = await apiClient(`/api/v1/ous/${ouId}/roles/${roleId}`, { method: 'DELETE' });
+      const { response: res, error: body } = await api.DELETE('/api/v1/ous/{ouId}/roles/{roleId}', {
+        params: { path: { ouId, roleId } },
+      });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || t('ous.detail.roles.removeError', 'Failed to remove role'));
+        throw new Error((body as { error?: string } | undefined)?.error || t('ous.detail.roles.removeError', 'Failed to remove role'));
       }
       addToast(t('ous.detail.roles.removeSuccess', 'Role removed'), 'success');
       await loadDetail();

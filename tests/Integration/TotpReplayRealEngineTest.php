@@ -160,4 +160,28 @@ final class TotpReplayRealEngineTest extends TestCase
         $good = $this->handler->handle2fa($this->mintTempTokenAndRequest($validCode));
         self::assertSame(200, $good->getStatusCode(), 'a genuinely valid code must still work after an invalid attempt');
     }
+
+    /**
+     * A secret stored before two-step sign-in moved onto the key ring (a bare
+     * ciphertext) still signs in, and that sign-in moves the row onto the
+     * current key so no re-enrolment or sweep is needed.
+     */
+    public function testSecretStoredBeforeTheKeyRingSignsInAndIsMovedToTheCurrentKey(): void
+    {
+        $plain = 'JBSWY3DPEHPK3PXP';
+        $bare = \Defuse\Crypto\Crypto::encryptWithPassword($plain, 'totp-replay-test-encryption-key-32-chars');
+        $this->pdo->prepare('UPDATE profiles SET two_factor_secret = ? WHERE id = ?')
+            ->execute([$bare, self::PROFILE_ID]);
+
+        $code = TOTP::create($plain)->now();
+        $response = $this->handler->handle2fa($this->mintTempTokenAndRequest($code));
+        self::assertSame(200, $response->getStatusCode());
+
+        $stmt = $this->pdo->prepare('SELECT two_factor_secret FROM profiles WHERE id = ?');
+        $stmt->execute([self::PROFILE_ID]);
+        $stored = (string) $stmt->fetchColumn();
+        self::assertStringStartsWith('v1:', $stored);
+        $totp = new TotpService('totp-replay-test-encryption-key-32-chars');
+        self::assertSame($plain, $totp->decryptSecret($stored));
+    }
 }

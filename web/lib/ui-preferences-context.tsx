@@ -35,6 +35,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { DateDisplayProvider } from '@whity/features/datetime';
 
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import type { UiPreferences } from '@/lib/ui-preferences';
 
 export function UiPreferencesProvider({
@@ -44,7 +45,7 @@ export function UiPreferencesProvider({
   initial: UiPreferences;
   children: ReactNode;
 }) {
-  const { user, apiClient } = useAuth();
+  const { user } = useAuth();
   const [preferences, setPreferences] = useState<UiPreferences>(initial);
 
   // The stable identity driving refetches: a login, a logout, a profile switch
@@ -77,10 +78,9 @@ export function UiPreferencesProvider({
 
     const load = async (): Promise<void> => {
       try {
-        const response = await apiClient('/api/v1/ui/preferences');
+        const { data: body, response } = await api.GET('/api/v1/ui/preferences');
         if (!response.ok) return;
 
-        const body: unknown = await response.json();
         const hideDates =
           typeof body === 'object' &&
           body !== null &&
@@ -102,7 +102,7 @@ export function UiPreferencesProvider({
     return () => {
       cancelled = true;
     };
-  }, [userId, tenantId, apiClient]);
+  }, [userId, tenantId]);
 
   return <DateDisplayProvider hidden={preferences.hideDates}>{children}</DateDisplayProvider>;
 }

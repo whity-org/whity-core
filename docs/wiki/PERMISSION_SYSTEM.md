@@ -247,6 +247,12 @@ Because a role is now askable at a record, "this profile holds role X at record 
 
 The route-level `requiredRole` / `requiredPermission` gate stays **flat and tenant-wide**: it runs before the handler, with no record in hand. A record-scoped grant therefore does not open a whole route — that is the point of resolving *inside* the handler.
 
+### Narrowing to some records (`ResourceScope`, SDK 1.74)
+
+Because the scoped answer is a superset, `hasPermission($p, $t, $perm, $type, $id)` is true for every id once the person holds `$perm` tenant-wide. It cannot filter a list: "these records and not those" is a restriction, and an additive check can only express exceptions (#1074).
+
+For that, a plugin asks `\Whitypp(\Whity\Sdk\Rbac\ResourceScope::class)->reach($profileId, $tenantId, $perm, $type, $everyRecordPerm)` and ANDs the result with its permission check. The reach holds the records where a role was granted to the person by name (everyone-grants do not count, any role does) and where `hasPermission()` allows `$perm`. It is never more than the permission check allows. It covers every record only when the person holds both `$perm` and the plugin-named `$everyRecordPerm` tenant-wide. `GET /api/resource-role-grants?resource_type=T&profile_id=P` lists the same grants over HTTP.
+
 ### Writing a grant (`/api/resource-role-grants`)
 
 Resolution shipped before any way to *create* what it resolves, so a consumer could ask the platform "does this profile hold this role at this record?" while still storing that authority in its own table — two sources of truth for one question, which is strictly worse than keeping one private table. Three routes close that (`ResourceRoleGrantsApiHandler`):
@@ -255,6 +261,7 @@ Resolution shipped before any way to *create* what it resolves, so a consumer co
 | --- | --- | --- |
 | `POST /api/resource-role-grants` | `roles:manage` | `{resource_type, resource_id, role_id, profile_id?}` |
 | `GET /api/resource-role-grants?resource_type=T&resource_id=N` | `roles:read` | both shapes in one list |
+| `GET /api/resource-role-grants?resource_type=T&profile_id=P` | your own `profile_id`: none; anyone else's: `roles:read` | the records one person stands at: grants made to them by name, no everyone-grants (#1074) |
 | `DELETE /api/resource-role-grants/{id}` | `roles:manage` | id comes from the list route |
 | `DELETE /api/resource-role-grants/all?resource_type=T&resource_id=N` | `roles:manage` | the record-delete cleanup |
 

@@ -49,3 +49,76 @@ export function proposalAmount(proposal: AgentProposal, raw = false): string | n
   const decimals = ['JOD', 'KWD', 'BHD', 'OMR', 'TND', 'IQD', 'LYD'].includes(currency) ? 3 : 2;
   return `${currency} ${value.toFixed(decimals)}`;
 }
+
+/* ── Decided (TplApprovalsDecided) ─────────────────────────────────────────── */
+
+export type DecidedOutcome = 'approved' | 'declined' | 'expired' | 'undone';
+
+/** When a decided proposal was settled: decided, undone, or let expire. */
+export function settledAt(proposal: AgentProposal): string {
+  if (proposal.status === 'undone' && proposal.action?.undoneAt) return proposal.action.undoneAt;
+  if (proposal.status === 'expired') return proposal.expiresAt;
+  return proposal.decidedAt ?? proposal.createdAt;
+}
+
+function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+export interface DecidedFilters {
+  outcome: DecidedOutcome[];
+  /** Agent names, as shown. */
+  agent: string[];
+  /** Only what was settled in the last this-many days; null for any time. */
+  days: number | null;
+}
+
+/** The proposals that match the filters, newest first. */
+export function filterDecided(
+  proposals: AgentProposal[],
+  filters: DecidedFilters,
+  agentOf: (proposal: AgentProposal) => string,
+  now: number,
+): AgentProposal[] {
+  const at = (p: AgentProposal) => parseWireDate(settledAt(p))?.getTime() ?? 0;
+  return proposals
+    .filter((p) => p.status !== 'waiting')
+    .filter((p) => filters.outcome.length === 0 || filters.outcome.includes(p.status as DecidedOutcome))
+    .filter((p) => filters.agent.length === 0 || filters.agent.includes(agentOf(p)))
+    .filter((p) => filters.days === null || now - at(p) <= filters.days * 86_400_000)
+    .sort((a, b) => at(b) - at(a));
+}
+
+export interface DayGroup {
+  /** `today`, `yesterday`, or the local calendar day `YYYY-MM-DD`. */
+  key: string;
+  /** A wire time on that day, for formatting its heading. */
+  sample: string;
+  items: AgentProposal[];
+}
+
+/** Grouped by the viewer's calendar day, in the order given (newest first). */
+export function groupByDay(proposals: AgentProposal[], now: Date = new Date()): DayGroup[] {
+  const today = dayKey(now);
+  const yesterday = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+  const groups: DayGroup[] = [];
+  for (const proposal of proposals) {
+    const when = settledAt(proposal);
+    const date = parseWireDate(when);
+    const day = date === null ? 'unknown' : dayKey(date);
+    const key = day === today ? 'today' : day === yesterday ? 'yesterday' : day;
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.items.push(proposal);
+    else groups.push({ key, sample: when, items: [proposal] });
+  }
+  return groups;
+}
+
+function csvCell(value: string): string {
+  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+/** A CSV for the audit (note 3): one row per proposal, a header row first. */
+export function decidedCsv(header: string[], rows: string[][]): string {
+  return [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
+}

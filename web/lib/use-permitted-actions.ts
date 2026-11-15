@@ -22,7 +22,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 
 /** The endpoint whose answer is authoritative. Versioned, like every block source. */
 export const PERMITTED_ACTIONS_ENDPOINT = '/api/v1/me/permitted-actions';
@@ -148,10 +148,8 @@ export function usePermittedActions(
 
     const run = async (): Promise<void> => {
       try {
-        const response = await apiClient(PERMITTED_ACTIONS_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ checks: batch }),
+        const { data, response } = await api.POST(PERMITTED_ACTIONS_ENDPOINT, {
+          body: { checks: batch } as never,
           signal: controller.signal,
         });
 
@@ -160,15 +158,7 @@ export function usePermittedActions(
           return;
         }
 
-        let body: unknown;
-        try {
-          body = await response.json();
-        } catch {
-          settle('error', new Set<string>());
-          return;
-        }
-
-        settle('ready', parseAllowed(body));
+        settle('ready', parseAllowed(data));
       } catch {
         // AbortError from unmount/re-fetch, or a network failure.
         settle('error', new Set<string>());

@@ -15,6 +15,38 @@ jest.mock('next/navigation', () => ({
 
 const apiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient }) }));
+// The typed client is adapted onto the URL router below: the template and its
+// path params become the concrete URL, and a body travels as init.body.
+async function viaRouter(
+  method: string,
+  template: string,
+  options?: { params?: { path?: Record<string, unknown> }; body?: unknown }
+) {
+  const url = template.replace(/\{(\w+)\}/g, (_m, k: string) => String(options?.params?.path?.[k]));
+  const res = (await (method === 'GET' ? apiClient(url) : apiClient(url, { method, body: JSON.stringify(options?.body) }))) as {
+    ok: boolean;
+    status: number;
+    json: () => Promise<unknown>;
+  };
+  const body = await res.json();
+  return {
+    data: res.ok ? body : undefined,
+    error: res.ok ? undefined : body,
+    response: new Response(null, { status: res.status }),
+  };
+}
+jest.mock('@/lib/api/client', () => ({
+  api: {
+    GET: (...a: [string, never]) => viaRouter('GET', ...a),
+    POST: (...a: [string, never]) => viaRouter('POST', ...a),
+  },
+  apiFetch: (url: string, ...rest: unknown[]) =>
+    // The maintenance notice reads /api/v1/status, which the spec does not name,
+    // and these tests stub it on global.fetch.
+    url.startsWith('/api/v1/status')
+      ? (global.fetch as unknown as (u: string, ...r: unknown[]) => Promise<Response>)(url, ...rest)
+      : apiClient(url, ...rest),
+}));
 
 const hasPermission = jest.fn<boolean, [string]>();
 jest.mock('@/hooks/useCapabilities', () => ({

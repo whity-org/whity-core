@@ -337,7 +337,7 @@ final class SubscriptionBillingRun
      */
     private function activePriceFor(int $tenantId, int $planId): ?array
     {
-        $currency = strtoupper($this->setting($tenantId, SettingsRegistry::BILLING_DEFAULT_CURRENCY, 'JOD'));
+        $currency = strtoupper($this->setting($tenantId, SettingsRegistry::BILLING_DEFAULT_CURRENCY, 'USD'));
 
         $statement = $this->pdo->prepare(
             'SELECT * FROM plan_prices

@@ -12,6 +12,7 @@ jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }))
 
 const apiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient }) }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => apiClient));
 
 const hasPermission = jest.fn<boolean, [string]>();
 jest.mock('@/hooks/useCapabilities', () => ({

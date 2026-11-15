@@ -18,6 +18,22 @@ import * as authContext from '@/lib/auth-context';
 
 const mockApiClient = jest.fn<Promise<Response>, [string, (RequestInit | undefined)?]>();
 
+// The typed client, over a fetch-shaped fake: the tests queue `{ ok, json }`
+// answers on `mockApiClient`, and this maps each to `{ data, error, response }`.
+jest.mock('@/lib/api/client', () => ({
+  api: {
+    GET: async (path: string, init?: RequestInit) => {
+      const res = await mockApiClient(path, init);
+      const body: unknown = await res.json();
+      return {
+        data: res.ok ? body : undefined,
+        error: res.ok ? undefined : body,
+        response: { ok: res.ok, status: res.status },
+      };
+    },
+  },
+}));
+
 jest.mock('@/lib/auth-context', () => ({
   useAuth: jest.fn(),
 }));
@@ -38,7 +54,6 @@ interface MockUser {
 
 function mockAuth(user: MockUser | null, isLoading = false): void {
   (authContext.useAuth as jest.Mock).mockReturnValue({
-    apiClient: mockApiClient,
     user,
     isLoading,
   });

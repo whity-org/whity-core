@@ -8,7 +8,7 @@
  * is given.
  */
 
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 
 /**
  * The SP1 server-driven plugin-UI block set (WC-225/226/227), mirrored from the
@@ -1206,13 +1206,12 @@ export async function fetchPluginFeatures(): Promise<PluginFeatureList> {
   const controller = new AbortController();
   const hangGuard = setTimeout(() => controller.abort(), 15_000);
   try {
-    const response = await apiClient('/api/v1/frontend/features', {
+    const { data: body, response } = await api.GET('/api/v1/frontend/features', {
       signal: controller.signal,
     });
     if (!response.ok) {
       return EMPTY_FEATURE_LIST;
     }
-    const body: unknown = await response.json();
     if (!isFeatureListResponse(body)) {
       return EMPTY_FEATURE_LIST;
     }

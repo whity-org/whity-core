@@ -29,7 +29,7 @@ const BANK: SavedBlock = {
     { id: 's1', type: 'heading', level: 2, content: [t('Bank details')] },
     { id: 's2', type: 'paragraph', content: [t('Example Bakery, IBAN JO00 0000')] },
   ],
-  perDocumentKeys: [],
+  perDocumentParts: [],
   version: 3,
   usedIn: 12,
 };
@@ -175,7 +175,7 @@ it('saves the selected blocks as a synced block and puts the reference in their 
     mode: 'synced',
     sharing: 'me',
     blocks: blocks.slice(0, 2),
-    perDocumentKeys: [],
+    perDocumentParts: [],
   });
   await waitFor(() => {
     const saved = onChange.mock.calls.at(-1)?.[0] as WhityDocument;

@@ -20,8 +20,8 @@ Everything Whity Render prints: invoices, letters, payslips, reports. Documents 
 | --- | --- |
 | Type | Body Noto Sans 9.5 pt, labels 8.5 pt, the title Readex Pro 600 at 22 pt, codes in Geist Mono |
 | Line items | A strong rule under the header, hairlines between rows; no zebra stripes, no grid |
-| Numbers | Tabular figures, end-aligned, JOD to 3 decimals |
-| Totals | An end-aligned block 46% wide; only the grand total is bold, with a 1.5 pt rule above. The amount is written in words under it, in both languages (dinars and fils) |
+| Numbers | Tabular figures, end-aligned, to the currency's decimals (US dollars: 2) |
+| Totals | An end-aligned block 46% wide; only the grand total is bold, with a 1.5 pt rule above. The amount is written in words under it, in both languages, in the document's currency (dollars and cents in designs) |
 | Footer | The JoFotara stamp, reference and "Page x of y" at the start side; the QR code at the end side |
 | Continuation | A small running header (logo, number, "continued"), the table header repeated, "Brought forward" and "Carried forward", totals on the last page only |
 | Charts | Grey bars with the one that matters in ink, values on the bars, no legend |
@@ -38,11 +38,11 @@ Everything Whity Render prints: invoices, letters, payslips, reports. Documents 
 
 **The free set and Front Office.** Whity's free set has an **Invoice** (فاتورة) and a **Credit note** (إشعار دائن), with no JoFotara stamp or fiscal QR. The **Tax invoice** (فاتورة ضريبية) and the **fiscal credit note**, issued through JoFotara with their stamp, reference and QR, are what Front Office adds. The `TplDocInvoice` and `TplDocCreditNote` cards show those, and the JoFotara parts of the footer rule above apply to them (owner, 2 Nov 2026).
 
-The examples tell one story for Example Bakery: quote QUO-0318 → invoice INV-1042 (JOD 301.600) → credit note CN-0012 (JOD 98.600) → receipt RCT-0207 (JOD 203.000) → the clinic's October statement.
+The examples tell one story for Example Bakery: quote QUO-0318 → invoice INV-1042 ($301.60) → credit note CN-0012 ($98.60) → receipt RCT-0207 ($203.00) → the clinic's October statement.
 
 ## Building one
 
-`Doc` lays out pages with a line table, totals and words; `DocPages` gives letters and reports the same letterhead and foot; `DocTable`, `DocKpis`, `DocBars`, `DocNote`, `DocSign` and `DocAmount` are the parts; `Whity.amountInWords(amount, 'en' | 'ar')` writes JOD in words; `DocPreview` shows a document in the app. Every standard label is in `Whity.docLabels` in both languages.
+`Doc` lays out pages with a line table, totals and words; `DocPages` gives letters and reports the same letterhead and foot; `DocTable`, `DocKpis`, `DocBars`, `DocNote`, `DocSign` and `DocAmount` are the parts; `Whity.amountInWords(amount, 'en' | 'ar', currency)` writes the amount in words (US dollars by default; `Whity.currencies` holds each currency's symbol, decimals and words) and `Whity.moneyText(amount, currency)` writes $312.00 or JOD 312.000; `DocPreview` shows a document in the app. Every standard label is in `Whity.docLabels` in both languages.
 
 ## Before shipping
 

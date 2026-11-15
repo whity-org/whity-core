@@ -11,12 +11,12 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import type { Block } from '@/lib/plugin-features';
-import { apiClient } from '@/lib/api-client';
+import { apiFetch as apiClient } from '@/lib/api/client';
 import * as actionPermissionModule from '@/hooks/useActionPermission';
 import type { ActionPermission } from '@/hooks/useActionPermission';
 import { ToastProvider } from '@/lib/toast-context';
 
-jest.mock('@/lib/api-client', () => ({ apiClient: jest.fn() }));
+jest.mock('@/lib/api/client', () => ({ apiFetch: jest.fn() }));
 jest.mock('@/hooks/useActionPermission', () => ({ useActionPermission: jest.fn() }));
 
 const mockApiClient = apiClient as jest.MockedFunction<typeof apiClient>;

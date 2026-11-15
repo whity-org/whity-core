@@ -24,6 +24,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { Branding } from '@/lib/branding';
 import { brandThemeCss } from '@/lib/brand-theme-css';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 
 const FALLBACK: Branding = {
   siteName: 'Whity',
@@ -75,9 +76,9 @@ export function BrandingProvider({
   const refreshBranding = useCallback(async () => {
     const ticket = ++latest.current;
     try {
-      const res = await fetch('/api/v1/branding', { credentials: 'include', cache: 'no-store' });
+      const { data, response: res } = await api.GET('/api/v1/branding', { cache: 'no-store' });
       if (!res.ok) return;
-      const parsed = parseBrandingResponse(await res.json());
+      const parsed = parseBrandingResponse(data);
       if (parsed === null || ticket !== latest.current) return;
       setBranding(parsed.branding);
       setThemeCss(parsed.themeCss);
@@ -94,6 +95,45 @@ export function BrandingProvider({
         {children}
       </RefreshBrandingContext.Provider>
     </BrandingContext.Provider>
+  );
+}
+
+/**
+ * A workspace's public brand as a public page's API sends it (WHIT-1014): the
+ * booking page and the manage link carry the brand of the workspace they are
+ * for, because on a shared host the layout's branding is the instance's.
+ */
+export interface WorkspaceBrand {
+  name: string;
+  logo_wide_url: string | null;
+  logo_square_url: string | null;
+  /** The token sets derived from the main colour (TenantTheme), or null for the default. */
+  theme?: unknown;
+}
+
+/**
+ * Shows `children` in a workspace's own brand (WHIT-1014): the same branding
+ * context and theme `<style>` as the app-wide BrandingProvider, nested, so
+ * TenantLogo and every `primary` token below read the workspace's. Its style
+ * comes after the app's in the document, so it wins in both modes; the label
+ * colours on the brand colour are the server's (TenantTheme, 4.5:1). Without
+ * a brand, the app's branding stays as it is.
+ */
+export function WorkspaceBrandProvider({ brand, children }: { brand: WorkspaceBrand | null | undefined; children: React.ReactNode }) {
+  const outer = useBranding();
+  if (!brand) return <>{children}</>;
+  const branding: Branding = {
+    ...outer,
+    siteName: brand.name || outer.siteName,
+    logoWideUrl: brand.logo_wide_url,
+    logoSquareUrl: brand.logo_square_url,
+  };
+  const themeCss = brandThemeCss(brand.theme);
+  // Keyed: BrandingProvider takes `initial` once, so a different brand starts afresh.
+  return (
+    <BrandingProvider key={`${branding.siteName}|${branding.logoWideUrl}|${branding.logoSquareUrl}|${themeCss}`} initial={branding} initialThemeCss={themeCss}>
+      {children}
+    </BrandingProvider>
   );
 }
 

@@ -16,7 +16,7 @@
 import * as React from 'react';
 import type { Block, FormBlock, LocalizedTextValue, OuScopeValue } from '@/lib/plugin-features';
 import { isOuScopeValue } from '@/lib/plugin-features';
-import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api/client';
 import { resolveContextPath } from '@/components/plugin/blocks/context-path';
 import { submitPluginAction, type ActionIssue } from '@/lib/plugin-action-submit';
 import { useToast } from '@/lib/toast-context';
@@ -518,7 +518,7 @@ export function FormProvider({
 
   React.useEffect(() => {
     if (!dataSourcePath || !dataSourceMethod) return;
-    apiClient(dataSourcePath, { method: dataSourceMethod })
+    apiFetch(dataSourcePath, { method: dataSourceMethod })
       .then((response) => response.json())
       .then((body: unknown) => {
         // THE `{ data: … }` ENVELOPE, which this used to spread whole (#981).

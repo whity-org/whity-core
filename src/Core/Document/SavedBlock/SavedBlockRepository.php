@@ -28,7 +28,7 @@ final class SavedBlockRepository
     public const SHARINGS = [self::SHARING_ME, self::SHARING_WORKSPACE];
 
     private const COLUMNS = 'b.id, b.tenant_id, b.name, b.description, b.mode, b.sharing, b.owner_profile_id,
-        b.blocks, b.per_document_keys, b.version, b.archived_at, b.created_at, b.updated_at,
+        b.blocks, b.per_document_keys, b.per_document_parts, b.version, b.archived_at, b.created_at, b.updated_at,
         p.display_name AS owner_name,
         (SELECT COUNT(*) FROM saved_block_uses u WHERE u.tenant_id = b.tenant_id AND u.saved_block_id = b.id) AS used_in';
 
@@ -40,16 +40,20 @@ final class SavedBlockRepository
      * Creates a saved block at version 1 with its first version row.
      *
      * @param array{name: string, description: ?string, mode: string, sharing: string,
-     *              owner_profile_id: int, blocks: list<array<string, mixed>>, per_document_keys: list<string>} $rec
+     *              owner_profile_id: int, blocks: list<array<string, mixed>>,
+     *              per_document_parts?: list<array<string, mixed>>, per_document_keys?: list<string>} $rec
+     *        `per_document_parts` (E.23a) default to the parts found in the blocks;
+     *        `per_document_keys` is ignored (kept for one release, it's the parts' keys).
      */
     public function create(int $tenantId, array $rec): int
     {
+        $parts = $rec['per_document_parts'] ?? PerDocumentParts::fromBlocks($rec['blocks']);
         $own = $this->begin();
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO saved_blocks
-                    (tenant_id, name, description, mode, sharing, owner_profile_id, blocks, per_document_keys, version, created_at, updated_at)
-                 VALUES (:tenant_id, :name, :description, :mode, :sharing, :owner, :blocks, :keys, 1, NOW(), NOW())'
+                    (tenant_id, name, description, mode, sharing, owner_profile_id, blocks, per_document_keys, per_document_parts, version, created_at, updated_at)
+                 VALUES (:tenant_id, :name, :description, :mode, :sharing, :owner, :blocks, :keys, :parts, 1, NOW(), NOW())'
             );
             $stmt->execute([
                 ':tenant_id'   => $tenantId,
@@ -59,7 +63,8 @@ final class SavedBlockRepository
                 ':sharing'     => $rec['sharing'],
                 ':owner'       => $rec['owner_profile_id'],
                 ':blocks'      => self::encode($rec['blocks']),
-                ':keys'        => self::encode($rec['per_document_keys']),
+                ':keys'        => self::encode(self::keysOf($parts)),
+                ':parts'       => self::encode($parts),
             ]);
             $id = (int) $this->db->lastInsertId();
             $this->insertVersion($tenantId, $id, 1, $rec['blocks']);
@@ -139,20 +144,21 @@ final class SavedBlockRepository
      * Null when it changed in between (or was archived); else the new version.
      *
      * @param list<array<string, mixed>> $blocks
-     * @param list<string>               $perDocumentKeys
+     * @param list<array<string, mixed>> $parts  E.23a: the parts each document fills
      */
-    public function replaceBlocks(int $id, int $tenantId, int $expectedVersion, array $blocks, array $perDocumentKeys): ?int
+    public function replaceBlocks(int $id, int $tenantId, int $expectedVersion, array $blocks, array $parts): ?int
     {
         $own = $this->begin();
         try {
             $stmt = $this->db->prepare(
                 'UPDATE saved_blocks
-                    SET blocks = :blocks, per_document_keys = :keys, version = version + 1, updated_at = NOW()
+                    SET blocks = :blocks, per_document_keys = :keys, per_document_parts = :parts, version = version + 1, updated_at = NOW()
                   WHERE id = :id AND tenant_id = :tenant_id AND version = :expected AND archived_at IS NULL'
             );
             $stmt->execute([
                 ':blocks'    => self::encode($blocks),
-                ':keys'      => self::encode($perDocumentKeys),
+                ':keys'      => self::encode(self::keysOf($parts)),
+                ':parts'     => self::encode($parts),
                 ':id'        => $id,
                 ':tenant_id' => $tenantId,
                 ':expected'  => $expectedVersion,
@@ -174,17 +180,18 @@ final class SavedBlockRepository
     }
 
     /**
-     * Changes only the per-document keys (no new version: the blocks are the same).
+     * Changes only the per-document parts' labels, required and placeholders
+     * (no new version: the blocks are the same).
      *
-     * @param list<string> $perDocumentKeys
+     * @param list<array<string, mixed>> $parts
      */
-    public function updatePerDocumentKeys(int $id, int $tenantId, array $perDocumentKeys): bool
+    public function updatePerDocumentParts(int $id, int $tenantId, array $parts): bool
     {
         $stmt = $this->db->prepare(
-            'UPDATE saved_blocks SET per_document_keys = :keys, updated_at = NOW()
+            'UPDATE saved_blocks SET per_document_keys = :keys, per_document_parts = :parts, updated_at = NOW()
               WHERE id = :id AND tenant_id = :tenant_id AND archived_at IS NULL'
         );
-        $stmt->execute([':keys' => self::encode($perDocumentKeys), ':id' => $id, ':tenant_id' => $tenantId]);
+        $stmt->execute([':keys' => self::encode(self::keysOf($parts)), ':parts' => self::encode($parts), ':id' => $id, ':tenant_id' => $tenantId]);
 
         return $stmt->rowCount() === 1;
     }
@@ -449,12 +456,22 @@ final class SavedBlockRepository
             'owner_name'        => $row['owner_name'] !== null ? (string) $row['owner_name'] : null,
             'blocks'            => self::decodeList($row['blocks']),
             'per_document_keys' => $keys,
+            'per_document_parts' => array_values(array_filter(self::decodeList($row['per_document_parts'] ?? null), 'is_array')),
             'version'           => (int) $row['version'],
             'used_in'           => (int) $row['used_in'],
             'archived_at'       => $row['archived_at'] !== null ? (string) $row['archived_at'] : null,
             'created_at'        => (string) $row['created_at'],
             'updated_at'        => (string) $row['updated_at'],
         ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $parts
+     * @return list<string>
+     */
+    private static function keysOf(array $parts): array
+    {
+        return array_values(array_filter(array_map(static fn (array $p): mixed => $p['key'] ?? null, $parts), 'is_string'));
     }
 
     /** @return list<mixed> */

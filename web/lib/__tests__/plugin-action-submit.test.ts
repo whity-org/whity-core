@@ -1,7 +1,7 @@
 /**
  * WC-235: unit tests for `submitPluginAction`.
  *
- * Mocks `apiClient` directly. Asserts:
+ * Mocks `apiFetch` directly. Asserts:
  *   - 2xx response → { ok: true }
  *   - 422 with `{ issues }` → { ok: false, issues }
  *   - other 4xx with `{ error }` → { ok: false, error }
@@ -10,13 +10,12 @@
  */
 
 import { submitPluginAction } from '@/lib/plugin-action-submit';
-import { apiClient } from '@/lib/api-client';
 
-jest.mock('@/lib/api-client', () => ({
-  apiClient: jest.fn(),
+// The endpoint is a run-time path, so the action goes through `apiFetch`.
+const mockApiClient = jest.fn<Promise<Response>, [string, RequestInit?]>();
+jest.mock('@/lib/api/client', () => ({
+  apiFetch: (...a: [string, RequestInit?]) => mockApiClient(...a),
 }));
-
-const mockApiClient = apiClient as jest.MockedFunction<typeof apiClient>;
 
 function stubResponse(ok: boolean, status: number, body: unknown): Response {
   return {
@@ -77,7 +76,7 @@ describe('submitPluginAction', () => {
     expect((result as { ok: false; error?: string }).error).toContain('400');
   });
 
-  it('returns { ok: false, error } when apiClient throws', async () => {
+  it('returns { ok: false, error } when apiFetch throws', async () => {
     mockApiClient.mockRejectedValue(new Error('Network failure'));
 
     const result = await submitPluginAction('/api/v1/x/save', 'POST', {});

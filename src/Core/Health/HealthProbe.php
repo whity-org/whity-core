@@ -6,6 +6,8 @@ namespace Whity\Core\Health;
 
 use PDO;
 use Throwable;
+use Whity\Core\Scheduler\SchedulerHeartbeat;
+use Whity\Core\Settings\GlobalSettingsRepository;
 
 /**
  * Samples the health of each component this deployment depends on.
@@ -206,32 +208,27 @@ final class HealthProbe
     }
 
     /**
-     * The scheduler advances `next_run_at` on every tick, so the newest
-     * `last_run_at` across enabled schedules is a proxy for "the tick is alive".
-     * With no schedules registered there is nothing to infer, so stay quiet
-     * rather than invent an outage.
+     * `schedule:run` records its own heartbeat on every tick it completes,
+     * whether or not any schedule was due ({@see SchedulerHeartbeat}), so the
+     * tick's liveness no longer depends on an install having schedules at all
+     * (WHIT-1013). Unknown only when it has never ticked.
      *
      * @return array{0: HealthStatus, 1: ?int, 2: ?string}
      */
     private function probeScheduler(): array
     {
-        if (!$this->tableExists('scheduled_jobs')) {
-            return [HealthStatus::Unknown, null, 'the scheduled_jobs table does not exist — migrations may not have run'];
+        if (!$this->tableExists('app_settings')) {
+            return [HealthStatus::Unknown, null, 'the app_settings table does not exist — migrations may not have run'];
         }
 
-        // @tenant-guard-ignore: the cron tick is deployment-wide infrastructure that runs ACROSS tenants, so its liveness is measured the same way — the newest last_run_at of any enabled schedule. Returns one timestamp, no tenant data.
-        $stmt = $this->pdo->query(
-            'SELECT MAX(last_run_at) AS last FROM scheduled_jobs WHERE enabled = TRUE'
-        );
-        $last = $stmt ? ($stmt->fetch(PDO::FETCH_ASSOC)['last'] ?? null) : null;
+        $last = (new SchedulerHeartbeat(new GlobalSettingsRepository($this->pdo)))->lastTick();
         if ($last === null) {
-            // No enabled schedule has EVER run. Reporting that as operational
-            // is what let this component show 100% uptime while nothing was
-            // scheduling anything at all.
-            return [HealthStatus::Unknown, null, 'no enabled schedule has ever run'];
+            // The tick has never run. Reporting that as operational is what let
+            // this component show 100% uptime while nothing was scheduling.
+            return [HealthStatus::Unknown, null, 'the scheduler has never ticked'];
         }
 
-        $ageSeconds = max(0, time() - (int) strtotime((string) $last));
+        $ageSeconds = max(0, time() - $last);
         $status = match (true) {
             $ageSeconds >= self::SCHEDULER_DOWN_SECONDS => HealthStatus::Down,
             $ageSeconds >= self::SCHEDULER_DEGRADED_SECONDS => HealthStatus::Degraded,
@@ -241,7 +238,7 @@ final class HealthProbe
         return [
             $status,
             null,
-            $status === HealthStatus::Operational ? null : "last scheduler run was {$ageSeconds}s ago",
+            $status === HealthStatus::Operational ? null : "last scheduler tick was {$ageSeconds}s ago",
         ];
     }
 

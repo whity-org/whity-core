@@ -12,6 +12,7 @@ import McpToolsPage from '@/app/(protected)/admin/mcp-tools/page';
 import type { McpTool, McpToolListResponse } from '@/app/(protected)/admin/mcp-tools/types';
 
 const mockApiClient = jest.fn();
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockApiClient }),
 }));

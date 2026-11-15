@@ -21,7 +21,7 @@ import { AgentsTabs } from '@/components/agents/agents-tabs';
 import { localized, refusal, type WorkspaceAgent } from '@/components/agents/workspace-agents';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useFetch } from '@/hooks/useFetch';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 
 type Filter = 'all' | 'working' | 'paused' | 'archived';
@@ -38,7 +38,6 @@ export default function AgentsPage() {
   const t = useTranslation('admin');
   const arabic = useFormattingLocale() === 'ar';
   const router = useRouter();
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const [choosing, setChoosing] = useState(false);
   const [query, setQuery] = useState('');
@@ -47,15 +46,18 @@ export default function AgentsPage() {
   const dates = useDateDisplay();
 
   const agents = useFetch<WorkspaceAgent[]>(async () => {
-    const response = await apiClient('/api/v1/agents?archived=1');
+    const { data, response } = await api.GET('/api/v1/agents', { params: { query: { archived: '1' } } });
     throwUnlessOk(response, t('agents.error.load', 'The agents could not be loaded.'));
-    return ((await response.json()) as { data: WorkspaceAgent[] }).data;
-  }, [apiClient]);
+    return (data as unknown as { data: WorkspaceAgent[] }).data;
+  }, []);
 
   const setArchived = async (agent: WorkspaceAgent, archived: boolean) => {
-    const response = await apiClient(`/api/v1/agents/${agent.id}/${archived ? 'archive' : 'restore'}`, { method: 'POST' });
+    const params = { params: { path: { id: agent.id } } };
+    const { response, error } = archived
+      ? await api.POST('/api/v1/agents/{id}/archive', params)
+      : await api.POST('/api/v1/agents/{id}/restore', params);
     if (!response.ok) {
-      addToast(await refusal(response, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
+      addToast(await refusal(new Response(JSON.stringify(error ?? null)), t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
       return;
     }
     const name = localized(agent.name, agent.nameAr, arabic);
@@ -71,9 +73,12 @@ export default function AgentsPage() {
   };
 
   const setPaused = async (agent: WorkspaceAgent, paused: boolean) => {
-    const response = await apiClient(`/api/v1/agents/${agent.id}/${paused ? 'pause' : 'resume'}`, { method: 'POST' });
+    const params = { params: { path: { id: agent.id } } };
+    const { response, error } = paused
+      ? await api.POST('/api/v1/agents/{id}/pause', params)
+      : await api.POST('/api/v1/agents/{id}/resume', params);
     if (!response.ok) {
-      addToast(await refusal(response, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
+      addToast(await refusal(new Response(JSON.stringify(error ?? null)), t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
       return;
     }
     const name = localized(agent.name, agent.nameAr, arabic);

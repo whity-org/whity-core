@@ -17,7 +17,7 @@ import {
   type ProposalWords,
 } from '@/components/agents/proposals';
 import { useFetch } from '@/hooks/useFetch';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 
 /**
@@ -32,7 +32,6 @@ export function AgentActivityPanel() {
   const t = useTranslation('admin');
   const language = useFormattingLocale();
   const dates = useDateDisplay();
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const [undoingId, setUndoingId] = useState<number | null>(null);
 
@@ -44,16 +43,16 @@ export function AgentActivityPanel() {
   }, []);
 
   const proposals = useFetch<AgentProposal[]>(async () => {
-    const response = await apiClient('/api/v1/me/agent-proposals');
+    const { data, response } = await api.GET('/api/v1/me/agent-proposals');
     if (!response.ok) throw new Error(t('agentActivity.error', 'Your agents’ activity could not be loaded.'));
-    return ((await response.json()) as { data?: AgentProposal[] }).data ?? [];
-  }, [apiClient]);
+    return ((data ?? {}) as { data?: AgentProposal[] }).data ?? [];
+  }, []);
 
   const actions = useFetch<AgentAction[]>(async () => {
-    const response = await apiClient('/api/v1/me/agent-actions');
+    const { data, response } = await api.GET('/api/v1/me/agent-actions');
     if (!response.ok) throw new Error(t('agentActivity.error', 'Your agents’ activity could not be loaded.'));
-    return ((await response.json()) as { data?: AgentAction[] }).data ?? [];
-  }, [apiClient]);
+    return ((data ?? {}) as { data?: AgentAction[] }).data ?? [];
+  }, []);
 
   const words: ProposalWords = {
     arabic: language === 'ar',
@@ -82,12 +81,11 @@ export function AgentActivityPanel() {
   const undo = async (action: AgentAction) => {
     setUndoingId(action.id);
     try {
-      const response = await apiClient(`/api/v1/me/agent-actions/${action.id}/undo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+      const { error, response } = await api.POST('/api/v1/me/agent-actions/{id}/undo', {
+        params: { path: { id: action.id } },
+        body: {} as never,
       });
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (error ?? null) as { error?: string } | null;
       if (!response.ok) {
         addToast(body?.error ?? t('agentActivity.error.undo', 'That could not be undone.'), 'error', 8000);
       } else {

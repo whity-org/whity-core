@@ -10,6 +10,7 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Api\PublicBookingApiHandler;
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Calendar\BookingReminderJob;
@@ -100,7 +101,9 @@ final class PublicBookingRealEngineTest extends TestCase
             }
         };
         $tenants = new TenantHostRepository($this->pdo);
-        $this->service->setMessenger(new EmailBookingMessenger($mailer, new EmailLayout(), $this->settings, $tenants, 'https://app.example.com/booking'));
+        $messenger = new EmailBookingMessenger(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $this->settings), $this->settings, $tenants, 'https://app.example.com/booking');
+        $messenger->setClock(static fn (): DateTimeImmutable => new DateTimeImmutable(self::NOW, new DateTimeZone('UTC')));
+        $this->service->setMessenger($messenger);
         $this->feed = new CalendarFeed($this->pdo, $calendar, $bookings);
 
         $this->cake = $services->insert(1, [
@@ -123,6 +126,7 @@ final class PublicBookingRealEngineTest extends TestCase
             new HostResolver($tenants, ''),
             new BotCheck($globals, new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'), new HttpFetcher()),
             new DatabaseSharedStore($this->pdo),
+            new BrandingService($this->settings),
         );
     }
 
@@ -185,6 +189,49 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertSame($off->getBody(), $unknown->getBody(), 'a page that is off and one that does not exist look the same');
     }
 
+    public function testThePageCarriesTheWorkspacesOwnBrandAndNothingElse(): void
+    {
+        // WHIT-1014: the instance has its own name and colour; the bakery sets its own colour and logo.
+        $this->settings->setGlobal('site_name', 'Platform');
+        $this->settings->setGlobal('branding_main_color', '#c53829');
+        $this->settings->setTenant(1, 'branding_main_color', '#b74c05');
+        $this->settings->setTenantAsset(1, 'branding_logo_square', 'tenants/1/branding/logo_square-abc.png');
+        $this->settings->setTenant(1, 'support_email', 'owner@example.com');
+
+        $brand = self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data']['brand'];
+        self::assertSame(['name', 'logo_wide_url', 'logo_square_url', 'main_color', 'theme'], array_keys($brand), 'only public brand fields');
+        self::assertSame('Example Bakery', $brand['name'], 'the workspace name, not the instance name');
+        self::assertSame('#b74c05', $brand['main_color']);
+        self::assertSame('/api/v1/branding/asset/1/logo_square-abc.png', $brand['logo_square_url']);
+        self::assertNull($brand['logo_wide_url']);
+        self::assertSame('#b74c05', $brand['theme']['light']['primary']);
+        self::assertArrayHasKey('primary-foreground', $brand['theme']['light'], 'the label colour derived for contrast comes too');
+        self::assertStringNotContainsString('owner@example.com', (string) json_encode($brand));
+
+        $this->settings->setTenant(1, 'site_name', 'Example Bakery & Cafe');
+        $named = self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data']['brand'];
+        self::assertSame('Example Bakery & Cafe', $named['name'], 'its own site name when it set one');
+    }
+
+    public function testWithoutItsOwnColourThePageKeepsTheDefault(): void
+    {
+        $brand = self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data']['brand'];
+        self::assertNull($brand['main_color']);
+        self::assertNull($brand['theme']);
+        self::assertSame('Example Bakery', $brand['name']);
+    }
+
+    public function testTheManageLinkCarriesTheWorkspacesBrand(): void
+    {
+        $this->settings->setTenant(1, 'branding_main_color', '#00792f');
+        $made = self::data($this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']))['data'];
+        self::assertArrayNotHasKey('brand', $made, 'booking answers only the manage link adds it to');
+
+        $shown = self::data($this->handler->showBooking(self::request('GET', '/x', [], '198.51.100.1'), ['token' => (string) $made['manage_token']]))['data'];
+        self::assertSame('#00792f', $shown['brand']['main_color']);
+        self::assertSame('Example Bakery', $shown['brand']['name']);
+    }
+
     public function testABookingIsMadeConfirmedAndEmailedWithItsLink(): void
     {
         $response = $this->handler->book(self::request('POST', '/api/v1/public/booking/example-bakery/bookings', $this->bookingBody()), ['workspace' => 'example-bakery']);
@@ -197,8 +244,9 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertCount(1, $this->sent);
         self::assertSame('lina@example.com', $this->sent[0]['to']);
         self::assertStringContainsString('Booked: Cake tasting', $this->sent[0]['subject']);
-        self::assertStringContainsString('Monday 16 November 2026, 10:00 (Asia/Amman)', $this->sent[0]['text']);
-        self::assertStringContainsString('JOD 12.500', $this->sent[0]['text']);
+        // 3.4 `booking-confirmed`: the short date in the workspace's zone (10:00 in Amman).
+        self::assertMatchesRegularExpression('/When: Mon 16 Nov( 2026)?, 10:00/', $this->sent[0]['text']);
+        self::assertStringContainsString('Hello Lina Haddad, see you soon.', $this->sent[0]['text']);
         self::assertStringContainsString('https://app.example.com/booking/' . $booking['manage_token'], $this->sent[0]['text']);
     }
 
@@ -287,7 +335,7 @@ final class PublicBookingRealEngineTest extends TestCase
                 ($this->record)($email);
             }
         };
-        $this->service->setMessenger(new EmailBookingMessenger($mailer, new EmailLayout(), $this->settings, new TenantHostRepository($this->pdo), 'https://app.example.com/booking'));
+        $this->service->setMessenger(new EmailBookingMessenger(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $this->settings), $this->settings, new TenantHostRepository($this->pdo), 'https://app.example.com/booking'));
 
         $made = self::data($this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']))['data'];
         self::assertCount(1, $captured);
@@ -297,9 +345,27 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertStringContainsString('DTSTART:20261116T070000Z', $ics->content);
         self::assertStringContainsString('UID:booking-' . $made['id'] . '-1@whity', $ics->content);
 
-        // A reminder carries no file.
+        self::assertStringContainsString('METHOD:REQUEST', $ics->content);
+        self::assertStringContainsString('method=REQUEST', $ics->contentType);
+        self::assertStringContainsString('SEQUENCE:0', $ics->content);
+        self::assertStringContainsString('ATTENDEE;CN="Lina Haddad"', $ics->content);
+
+        // A move updates the same entry: same UID, a higher SEQUENCE.
+        $this->service->move(1, (int) $made['id'], new DateTimeImmutable('2026-11-16 08:00:00', new DateTimeZone('UTC')), null, false);
+        $moved = $captured[1]->attachments[0];
+        self::assertStringContainsString('METHOD:REQUEST', $moved->content);
+        self::assertStringContainsString('UID:booking-' . $made['id'] . '-1@whity', $moved->content);
+        self::assertStringContainsString('SEQUENCE:1', $moved->content);
+        self::assertStringContainsString('DTSTART:20261116T080000Z', $moved->content);
+
+        // The cancel removes it: METHOD:CANCEL, same UID, higher again.
         $this->service->cancel(1, (int) $made['id'], 'staff', '');
-        self::assertSame([], $captured[1]->attachments);
+        $cancel = $captured[2]->attachments[0];
+        self::assertStringContainsString('METHOD:CANCEL', $cancel->content);
+        self::assertStringContainsString('method=CANCEL', $cancel->contentType);
+        self::assertStringContainsString('STATUS:CANCELLED', $cancel->content);
+        self::assertStringContainsString('UID:booking-' . $made['id'] . '-1@whity', $cancel->content);
+        self::assertStringContainsString('SEQUENCE:2', $cancel->content);
     }
 
     public function testTheReminderIsQueuedSentOnceAndSkippedAfterAMove(): void
@@ -317,7 +383,7 @@ final class PublicBookingRealEngineTest extends TestCase
         $this->pdo->exec("UPDATE calendar_bookings SET reminder_due_at = '2026-11-15 03:00:00' WHERE tenant_id = 1");
         $before = count($this->sent);
         self::assertSame(['result' => 'sent'], $reminders->handle($payload));
-        self::assertStringContainsString('Reminder: Cake tasting', $this->sent[$before]['subject']);
+        self::assertStringContainsString('Tomorrow: Cake tasting', $this->sent[$before]['subject']);
         self::assertSame(['result' => 'nothing due'], $reminders->handle($payload), 'a second run sends nothing');
         self::assertCount($before + 1, $this->sent);
 

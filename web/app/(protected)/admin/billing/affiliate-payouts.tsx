@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { toDecimalString } from '@whity/ui/money/currency';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useTranslation } from '@whity/features/i18n';
@@ -72,7 +72,6 @@ export function AffiliatePayouts({
   balances: Balance[];
   onChanged: () => void;
 }) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
 
@@ -81,12 +80,14 @@ export function AffiliatePayouts({
   const [reference, setReference] = useState('');
 
   const { data, refetch } = useFetch(async () => {
-    const res = await apiClient(`/api/v1/affiliates/${affiliateId}/payouts`);
+    const { data: body, response: res } = await api.GET('/api/v1/affiliates/{id}/payouts', {
+      params: { path: { id: affiliateId } },
+    });
     if (!res.ok) {
       throw new Error(t('payout.error.load', 'Failed to load payouts'));
     }
-    return ((await res.json()).data ?? []) as Payout[];
-  }, [apiClient, affiliateId]);
+    return ((body as unknown as { data?: Payout[] } | undefined)?.data ?? []) as Payout[];
+  }, [affiliateId]);
 
   const refresh = () => {
     refetch();
@@ -94,24 +95,21 @@ export function AffiliatePayouts({
   };
 
   /** The server's own words when it refuses — it names the reason, we do not. */
-  const reasonFrom = async (res: Response, fallback: string): Promise<string> => {
-    const body = (await res.json().catch(() => null)) as
-      | { error?: string; details?: Record<string, string> }
-      | null;
+  const reasonFrom = (error: unknown, fallback: string): string => {
+    const body = (error ?? null) as { error?: string; details?: Record<string, string> } | null;
     return Object.values(body?.details ?? {})[0] ?? body?.error ?? fallback;
   };
 
   const assemble = async (currency: string) => {
     setBusy(true);
     try {
-      const res = await apiClient(`/api/v1/affiliates/${affiliateId}/payouts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currency }),
+      const { error, response: res } = await api.POST('/api/v1/affiliates/{id}/payouts', {
+        params: { path: { id: affiliateId } },
+        body: { currency },
       });
       if (!res.ok) {
         addToast(
-          await reasonFrom(res, t('payout.assemble.failed', 'Could not assemble a payout.')),
+          reasonFrom(error, t('payout.assemble.failed', 'Could not assemble a payout.')),
           'error'
         );
         return;
@@ -132,13 +130,12 @@ export function AffiliatePayouts({
     }
     setBusy(true);
     try {
-      const res = await apiClient(`/api/v1/affiliate-payouts/${settling.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reference }),
+      const { error, response: res } = await api.PATCH('/api/v1/affiliate-payouts/{id}', {
+        params: { path: { id: settling.id } },
+        body: { reference },
       });
       if (!res.ok) {
-        addToast(await reasonFrom(res, t('payout.settle.failed', 'Could not record this payment.')), 'error');
+        addToast(reasonFrom(error, t('payout.settle.failed', 'Could not record this payment.')), 'error');
         return;
       }
       addToast(t('payout.settled', 'Payment recorded.'), 'success');
@@ -153,9 +150,11 @@ export function AffiliatePayouts({
   const discard = async (payout: Payout) => {
     setBusy(true);
     try {
-      const res = await apiClient(`/api/v1/affiliate-payouts/${payout.id}`, { method: 'DELETE' });
+      const { error, response: res } = await api.DELETE('/api/v1/affiliate-payouts/{id}', {
+        params: { path: { id: payout.id } },
+      });
       if (!res.ok) {
-        addToast(await reasonFrom(res, t('payout.discard.failed', 'Could not discard this draft.')), 'error');
+        addToast(reasonFrom(error, t('payout.discard.failed', 'Could not discard this draft.')), 'error');
         return;
       }
       addToast(

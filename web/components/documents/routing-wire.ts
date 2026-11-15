@@ -4,7 +4,7 @@
  * Mirrors `RoutingPresenter` (`src/Core/Document/Routing/RoutingPresenter.php`)
  * and `InboxItem` (`src/Core/Inbox/InboxItem.php`) field for field.
  *
- * Hand-written rather than taken from `@/lib/api/schema`, matching the
+ * Hand-written rather than taken from `@whity/api-client`, matching the
  * convention its nearest neighbour states — see
  * `web/app/(protected)/admin/document-library/types.ts`: the generated client is
  * built from the DYNAMIC `/api/openapi.json`, which describes whatever plugin
@@ -196,6 +196,33 @@ export interface RouteStep {
   /** On a `sign` step: the capacity the signer signs in, and whom they sign for. */
   sign_capacity?: string | null;
   sign_on_behalf_of?: string | null;
+  /**
+   * WHIT-1016: values the person letting it through here fills in (a committee
+   * meeting number, say). Sent with an approval, an acknowledgement or a
+   * forward as `values`. Absent on an older server, which meant none.
+   */
+  inputs?: RouteStepInput[];
+  /** WHIT-1018: the subject's people questions whose answers this step leaves out. */
+  exclude_named_in?: string[];
+}
+
+/** WHIT-1016: one value a step asks for. */
+export interface RouteStepInput {
+  key: string;
+  label: string;
+  label_ar: string | null;
+  required: boolean;
+  max_length: number;
+}
+
+/** WHIT-1016: a value entered on a route, each key's latest. */
+export interface RouteStepValue {
+  key: string;
+  value: string;
+  step_id: number;
+  event_id: number;
+  entered_by: number | null;
+  entered_at: string;
 }
 
 /**
@@ -251,6 +278,8 @@ export interface DocumentRoute {
    * approval rule is the strictest one, never the most permissive.
    */
   default_quorum: RouteQuorumName;
+  /** WHIT-1016: what people entered at the steps that ask for values. */
+  values?: RouteStepValue[];
 }
 
 export interface RoutesResponse {

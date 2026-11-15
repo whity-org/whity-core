@@ -110,7 +110,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'billing.payment_terms_days',
             'company.name',
             'company.address',
-            'company.tax_id', 'company.phone', 'company.email',
+            'company.tax_id', 'company.phone', 'company.email', 'company.name_ar', 'company.address_ar',
             'billing.invoice_number_format',
             'billing.invoice_number_scope',
             'billing.invoice_number_reset',
@@ -199,6 +199,13 @@ final class SettingsRegistryCorePinTest extends TestCase
             // WS.5, WS.19: the operator's website (global-only).
             'website.plans',
             'website.contact_workspace',
+            // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
+            'signup.mode',
+            'signup.role_id',
+            'signup.allowed_domains',
+            'signup.customer_invites',
+            // WHIT-1043: how many people one customer may invite.
+            'signup.invites_per_customer',
         ];
     }
 
@@ -303,7 +310,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             // an operator is not registered to collect is a worse failure than
             // not charging it, and a default correct for one jurisdiction and
             // wrong for every other gets shipped unnoticed.
-            'billing.default_currency' => 'JOD',
+            'billing.default_currency' => 'USD',
             'billing.default_plan' => '',
             'billing.tax_rate_bp' => '0',
             'billing.tax_label' => '',
@@ -311,7 +318,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'billing.payment_terms_days' => '14',
             'company.name' => '',
             'company.address' => '',
-            'company.tax_id' => '', 'company.phone' => '', 'company.email' => '',
+            'company.tax_id' => '', 'company.phone' => '', 'company.email' => '', 'company.name_ar' => '', 'company.address_ar' => '',
             'billing.invoice_number_format' => 'INV-{YYYY}-{SEQ:5}',
             'billing.invoice_number_scope' => 'shared',
             'billing.invoice_number_reset' => 'yearly',
@@ -421,6 +428,11 @@ final class SettingsRegistryCorePinTest extends TestCase
             'app.installable' => 'true',
             'website.plans' => '',
             'website.contact_workspace' => '',
+            'signup.mode' => 'off',
+            'signup.role_id' => '0',
+            'signup.allowed_domains' => '[]',
+            'signup.customer_invites' => 'false',
+            'signup.invites_per_customer' => '0',
         ];
     }
 

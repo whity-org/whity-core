@@ -43,7 +43,24 @@ export function useWhoCanFill() {
 }
 
 /** The form builder list: every form, its status, who can fill it, and when it last changed. */
-export function FormsListScreen({ env, canManage }: { env: FormsScreenEnv; canManage: boolean }) {
+/**
+ * `newRequest` opens New form from outside the screen (⌘K `/new form`,
+ * WHIT-1069): each new `id` opens it once, with `name` filled in.
+ */
+export interface FormsNewRequest {
+  id: number
+  name: string
+}
+
+export function FormsListScreen({
+  env,
+  canManage,
+  newRequest,
+}: {
+  env: FormsScreenEnv
+  canManage: boolean
+  newRequest?: FormsNewRequest | null
+}) {
   const t = useTranslation("forms")
   const { currentLanguage } = useCurrentLanguage()
   const { dateTime } = useDateDisplay()
@@ -55,6 +72,12 @@ export function FormsListScreen({ env, canManage }: { env: FormsScreenEnv; canMa
   const [failure, setFailure] = useState<{ denied: boolean; message: string } | null>(null)
   const [search, setSearch] = useState("")
   const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState("")
+  useEffect(() => {
+    if (!newRequest || !canManage) return
+    setNewName(newRequest.name)
+    setCreating(true)
+  }, [newRequest?.id, canManage]) // eslint-disable-line react-hooks/exhaustive-deps
   const [deleting, setDeleting] = useState<FormRow | null>(null)
 
   const load = useCallback(async () => {
@@ -143,6 +166,8 @@ export function FormsListScreen({ env, canManage }: { env: FormsScreenEnv; canMa
         submit_label: form.submit_label,
         sections: form.sections.map((s) => ({ key: s.key, title: asMap(s.title), description: asMap(s.description) })),
         reference_format: form.reference_format,
+        // WHIT-1017: copied with the format, which may need it.
+        reference_assign: form.reference_assign ?? "submit",
       },
       ""
     )
@@ -293,17 +318,36 @@ export function FormsListScreen({ env, canManage }: { env: FormsScreenEnv; canMa
         <NewFormDialog
           env={env}
           existingKeys={new Set((forms ?? []).map((row) => row.form_key))}
-          onClose={() => setCreating(false)}
+          initialName={newName}
+          onClose={() => {
+            setCreating(false)
+            setNewName("")
+          }}
         />
       )}
     </div>
   )
 }
 
-function NewFormDialog({ env, existingKeys, onClose }: { env: FormsScreenEnv; existingKeys: ReadonlySet<string>; onClose: () => void }) {
+const ARABIC_LETTER = new RegExp("[\\u0600-\\u06FF]")
+
+function NewFormDialog({
+  env,
+  existingKeys,
+  initialName = "",
+  onClose,
+}: {
+  env: FormsScreenEnv
+  existingKeys: ReadonlySet<string>
+  initialName?: string
+  onClose: () => void
+}) {
   const t = useTranslation("forms")
   const api = useMemo(() => createFormsApi(env.transport), [env.transport])
-  const [name, setName] = useState<BilingualValue>({})
+  // A name typed in Arabic letters is the Arabic name; anything else, English.
+  const [name, setName] = useState<BilingualValue>(() =>
+    initialName.trim() === "" ? {} : ARABIC_LETTER.test(initialName) ? { ar: initialName.trim() } : { en: initialName.trim() }
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const typed = Object.values(name).some((value) => (value ?? "").trim() !== "")

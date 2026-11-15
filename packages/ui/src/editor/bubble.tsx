@@ -8,6 +8,7 @@ import { BubbleMenu } from "@tiptap/react/menus"
 import type { IconName } from "../icon"
 import { IconButton } from "../icon-button"
 import type { EditorLabels } from "./labels"
+import { mintPartKey } from "./saved-parts"
 
 /**
  * The selection bubble (EditorInline): after a short pause above a text
@@ -60,6 +61,11 @@ function SelectionBubble({
     />
   )
   const mark = (name: string) => () => editor.chain().focus().toggleMark(name).run()
+  // E.23a: marking mints the part's key once; unmarking deletes it, and marking again mints a new one.
+  const togglePart = () =>
+    s.perDocument
+      ? editor.chain().focus().unsetMark("perDocument").run()
+      : editor.chain().focus().setMark("perDocument", { key: mintPartKey() }).run()
   return (
     <BubbleMenu
       editor={editor}
@@ -88,7 +94,7 @@ function SelectionBubble({
             {perDocument && (
               <>
                 <span aria-hidden="true" className="mx-[3px] h-[18px] w-px bg-border" />
-                {b("field", labels.perDocumentMark, s.perDocument, mark("perDocument"))}
+                {b("field", labels.perDocumentMark, s.perDocument, togglePart)}
               </>
             )}
           </>

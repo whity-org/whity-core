@@ -18,6 +18,7 @@ const mockApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockApiClient, user: { id: 7 } }),
 }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({
@@ -199,6 +200,49 @@ describe('Approvals page', () => {
     expect(screen.getByText(/20 minutes left to undo/)).toBeInTheDocument();
     expect(screen.getByText(/Can no longer be undone/)).toBeInTheDocument();
     expect(screen.getByText(/Undone by Rana Haddad/)).toBeInTheDocument();
+  });
+
+  it('lists what was decided by day, with the outcome, the agent and who decided (TplApprovalsDecided)', async () => {
+    const now = new Date();
+    const iso = (minutesAgo: number) => new Date(now.getTime() - minutesAgo * 60_000).toISOString();
+    const lastWeek = iso(60 * 24 * 6);
+    serve([
+      proposal(1, { status: 'approved', decidedAt: iso(5) }),
+      proposal(2, { status: 'declined', decidedAt: iso(10), agent: { name: 'Purchasing assistant' } }),
+      proposal(3, { status: 'expired', expiresAt: lastWeek }),
+      proposal(4, { status: 'approved', decidedAt: iso(60 * 24 * 60) }),
+    ]);
+    render(<ApprovalsPage />);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Decided' }));
+
+    const today = await screen.findByRole('region', { name: 'Today' });
+    expect(within(today).getByText('Create form 1')).toBeInTheDocument();
+    expect(within(today).getByText('Create form 2')).toBeInTheDocument();
+    expect(within(screen.getByTestId('decided-3')).getByText('Nobody')).toBeInTheDocument();
+    expect(within(screen.getByTestId('decided-3')).getByText(/nobody decided in time/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('decided-1')).getByText('You')).toBeInTheDocument();
+    // The last 30 days by default.
+    expect(screen.queryByText('Create form 4')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('decided-filter-agent'));
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Purchasing assistant' }));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByText('Create form 1')).not.toBeInTheDocument());
+    expect(screen.getByText('Create form 2')).toBeInTheDocument();
+  });
+
+  it('holds Approve with changes until what was typed is valid', async () => {
+    serve([proposal(1)]);
+    render(<ApprovalsPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Change what Billing assistant will send/)).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText('Days'), { target: { value: 'two' } });
+    expect(within(dialog).getByText('This needs to be a number.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Approve with changes' })).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('Days'), { target: { value: '2' } });
+    expect(within(dialog).getByRole('button', { name: 'Approve with changes' })).toBeEnabled();
   });
 
   it('says so when nothing waits', async () => {

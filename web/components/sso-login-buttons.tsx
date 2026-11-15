@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import { Button } from '@whity/ui/button';
 import { useTranslation } from '@whity/features/i18n';
 import { Mark } from '@whity/ui/mark';
@@ -47,9 +47,9 @@ export function SsoLoginButtons() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await apiClient('/api/v1/auth/sso/providers', { skipRefresh: true });
+        const { data: listing, response: res } = await api.GET('/api/v1/auth/sso/providers');
         if (!res.ok) return;
-        const body: unknown = await res.json();
+        const body: unknown = listing;
         const data =
           body && typeof body === 'object' && Array.isArray((body as { data?: unknown }).data)
             ? ((body as { data: unknown[] }).data as SsoProvider[])

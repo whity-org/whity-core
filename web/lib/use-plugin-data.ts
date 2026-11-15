@@ -3,9 +3,9 @@
 /**
  * WC-231: usePluginData — fetch hook for data-bound plugin UI blocks.
  *
- * Manages a loading → error / empty / ready state machine over apiClient.
+ * Manages a loading → error / empty / ready state machine over apiFetch.
  * The hook:
- *   - Fetches `source` verbatim via `apiClient` on mount and on refresh/retry.
+ *   - Fetches `source` verbatim via `apiFetch` on mount and on refresh/retry.
  *   - Uses an AbortController to cancel the in-flight request on unmount or
  *     re-fetch, guarding against setState-after-unmount.
  *   - Expects the response to be a `{ data: unknown }` envelope; anything else
@@ -30,7 +30,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api/client';
 import { fetchAllPages, isPaginationEnvelope } from '@/lib/api/fetch-all-pages';
 
 export type PluginDataState<T> =
@@ -72,7 +72,7 @@ function hasUnfetchedPages(body: {
 }
 
 /**
- * Fetch `source` via `apiClient` and map the result into a discriminated
+ * Fetch `source` via `apiFetch` and map the result into a discriminated
  * state. `parse` receives the unwrapped `body.data` value and must return `T`
  * (valid, non-empty) or `null` (treat as empty). The hook never throws.
  *
@@ -136,7 +136,7 @@ export function usePluginData<T>(
 
     const run = async (): Promise<void> => {
       try {
-        const response = await apiClient(source, { signal: controller.signal });
+        const response = await apiFetch(source, { signal: controller.signal });
 
         if (!mountedRef.current) return;
 
@@ -177,7 +177,7 @@ export function usePluginData<T>(
           // for any source big enough to reach here.
           const all = await fetchAllPages<unknown>((url) => {
             armHangGuard();
-            return apiClient(url, { signal: controller.signal });
+            return apiFetch(url, { signal: controller.signal });
           }, source);
 
           if (!mountedRef.current) return;

@@ -58,7 +58,14 @@ final class EmailVerificationHandlerRealEngineTest extends TestCase
         $provider = new TokenEmailVerificationProvider(
             $this->service,
             $this->emails,
-            $this->mailer,
+            new \Whity\Core\Mail\BrandedEmailSender(
+                $this->mailer,
+                new \Whity\Core\Mail\EmailLayout(),
+                new \Whity\Core\Settings\SettingsService(
+                    new \Whity\Core\Settings\GlobalSettingsRepository($this->pdo),
+                    new \Whity\Core\Settings\TenantSettingsRepository($this->pdo),
+                ),
+            ),
             'https://app.test/verify-email'
         );
 

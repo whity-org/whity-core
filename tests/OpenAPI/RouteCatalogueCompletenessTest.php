@@ -110,6 +110,9 @@ final class RouteCatalogueCompletenessTest extends TestCase
         // route becomes an MCP tool, and an agent must not reach its own grant.
         'GET /api/mcp/tokens/{jti}/grant',
         'PATCH /api/mcp/tokens/{jti}/grant',
+        // WHIT-1040: the starting grant of a credential not issued yet, for the
+        // same reason.
+        'GET /api/mcp/tokens/starting-grant',
         // WC-0208ce4d: MCP admin endpoints — OpenAPI schema to follow once
         // the generate:openapi snapshot is regenerated in a dedicated task.
         'DELETE /api/admin/mcp/tokens/{jti}',

@@ -5,7 +5,7 @@ import { api } from '@/lib/api/client';
 import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
 import { useToast } from '@/lib/toast-context';
 import { useLocalizedUnits } from '@/hooks/useLocalizedUnits';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 /**
  * A selectable OU option for the user edit dropdown.

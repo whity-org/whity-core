@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Whity\Core\Messaging\Email;
 
 use Closure;
+use Whity\Core\Mail\BrandedEmailSender;
+use Whity\Core\Mail\EmailContent;
+use Whity\Core\Mail\EmailOptions;
 use Whity\Core\Mail\OutgoingEmail;
 use Whity\Core\Mail\ThreadedMailer;
 use Whity\Core\Messaging\MessagingSettings;
@@ -33,12 +36,16 @@ final class EmailChannel implements MessageChannel
 
     /**
      * @param Closure(int): ?string $workspaceName tenant id => its display name
+     * @param (Closure(int, int): ?string)|null $authorName (tenant id, message id) => who wrote it
      */
     public function __construct(
         private readonly ThreadedMailer $mailer,
         private readonly MessagingSettings $settings,
         private readonly Closure $workspaceName,
         private readonly string $messageIdHost,
+        /** E2 `message-reply`: with the shared sender, the email is the workspace's HTML card. */
+        private readonly ?BrandedEmailSender $sender = null,
+        private readonly ?Closure $authorName = null,
     ) {
     }
 
@@ -80,6 +87,28 @@ final class EmailChannel implements MessageChannel
         $name = ($this->workspaceName)($message->tenantId);
         $name = $name !== null ? trim((string) preg_replace('/[\r\n]+/', ' ', $name)) : null;
         $replyTo = $this->settings->get($message->tenantId)['inbound_email_address'];
+        $replyTo = $replyTo !== null && filter_var($replyTo, FILTER_VALIDATE_EMAIL) !== false ? $replyTo : null;
+        $inReplyTo = self::validId($message->inReplyTo);
+        $references = array_values(array_filter(array_map([self::class, 'validId'], $message->references)));
+
+        if ($this->sender !== null) {
+            try {
+                $this->sender->deliver(
+                    $message->tenantId,
+                    $message->to,
+                    $subject,
+                    $this->replyContent($message, $replyTo !== null),
+                    // `message-reply` comes from the workspace itself, as Messages always has.
+                    new EmailOptions(replyTo: $replyTo, messageId: $messageId, inReplyTo: $inReplyTo, references: $references, fromName: $name !== null && $name !== '' ? $name : null),
+                );
+            } catch (\Throwable $e) {
+                error_log('[EmailChannel] send failed: ' . $e->getMessage());
+
+                return SendOutcome::failed('The mail server did not accept the message.', true);
+            }
+
+            return SendOutcome::sent($messageId);
+        }
 
         try {
             $this->mailer->sendThreaded(new OutgoingEmail(
@@ -91,7 +120,7 @@ final class EmailChannel implements MessageChannel
                 messageId: $messageId,
                 inReplyTo: self::validId($message->inReplyTo),
                 references: array_values(array_filter(array_map([self::class, 'validId'], $message->references))),
-                replyTo: $replyTo !== null && filter_var($replyTo, FILTER_VALIDATE_EMAIL) !== false ? $replyTo : null,
+                replyTo: $replyTo,
             ));
         } catch (\Throwable $e) {
             error_log('[EmailChannel] send failed: ' . $e->getMessage());
@@ -100,6 +129,40 @@ final class EmailChannel implements MessageChannel
         }
 
         return SendOutcome::sent($messageId);
+    }
+
+    /**
+     * The 3.4 `message-reply` card: "**Awss Haddad** from Example Bakery
+     * replied:", the message as a quote, and a line saying a reply comes back
+     * to the conversation (only when replies do: the workspace has an inbound
+     * address). The footer carries the workspace's address.
+     */
+    private function replyContent(OutboundMessage $message, bool $repliesReturn): EmailContent
+    {
+        assert($this->sender !== null);
+        $ar = $this->sender->language($message->tenantId) === 'ar';
+        $workspace = $this->sender->branding($message->tenantId)->siteName;
+        $author = $this->authorName !== null ? ($this->authorName)($message->tenantId, $message->messageId) : null;
+        $author = $author !== null && trim($author) !== '' ? trim($author) : $workspace;
+        $answer = $message->inReplyTo !== null;
+        $address = $this->sender->workspaceContact($message->tenantId, $ar ? 'ar' : 'en')['address'];
+        $preview = mb_substr(trim((string) preg_replace('/\s+/u', ' ', $message->body)), 0, 140);
+
+        return new EmailContent(
+            heading: '',
+            footnote: $repliesReturn ? ($ar
+                ? 'ردّ على هذه الرسالة للإجابة؛ تصل مباشرة إلى المحادثة نفسها.'
+                : 'Reply to this email to answer; it goes straight to the same conversation.') : null,
+            preheader: $preview !== '' ? $preview : null,
+            notice: implode(' · ', array_filter([$workspace, $address], static fn (?string $v): bool => $v !== null && $v !== '')),
+            language: $ar ? 'ar' : 'en',
+            leadLine: $author === $workspace
+                ? ['before' => '', 'strong' => $workspace, 'after' => $ar ? ($answer ? ' ردّت:' : ' كتبت:') : ($answer ? ' replied:' : ' wrote:')]
+                : ($ar
+                    ? ['before' => $answer ? 'ردّ ' : 'كتب ', 'strong' => $author, 'after' => ' من ' . $workspace . ':']
+                    : ['before' => '', 'strong' => $author, 'after' => ' from ' . $workspace . ($answer ? ' replied:' : ' wrote:')]),
+            quote: $message->body,
+        );
     }
 
     public function receive(int $tenantId, string $rawBody, array $headers): array

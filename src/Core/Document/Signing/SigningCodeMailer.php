@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Document\Signing;
 
-use Whity\Core\Mail\EmailBranding;
+use Whity\Core\Mail\BrandedEmailSender;
 use Whity\Core\Mail\EmailContent;
-use Whity\Core\Mail\EmailLayout;
-use Whity\Core\Mail\Mailer;
-use Whity\Core\Settings\SettingsService;
 
 /**
  * Sends the one-time code a signer confirms a signature with (WHIT-922).
@@ -19,17 +16,17 @@ use Whity\Core\Settings\SettingsService;
 final class SigningCodeMailer
 {
     public function __construct(
-        private readonly Mailer $mailer,
-        private readonly EmailLayout $layout,
-        private readonly SettingsService $settings,
+        private readonly BrandedEmailSender $sender,
     ) {
     }
 
     public function send(string $email, string $code, string $documentTitle): void
     {
-        $branding = EmailBranding::fromSettings($this->settings);
         $minutes = (int) (SigningChallengeRepository::EMAIL_CODE_TTL / 60);
-        $rendered = $this->layout->render(
+        $this->sender->deliver(
+            0,
+            $email,
+            'Your signing code: ' . $code,
             new EmailContent(
                 heading: 'Your signing code',
                 paragraphs: [
@@ -40,9 +37,6 @@ final class SigningCodeMailer
                 code: $code,
                 notice: 'Sent to ' . $email . '.',
             ),
-            $branding,
         );
-
-        $this->mailer->send($email, 'Your signing code: ' . $code, $rendered->text, $rendered->html);
     }
 }

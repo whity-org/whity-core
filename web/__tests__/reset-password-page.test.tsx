@@ -18,12 +18,16 @@ jest.mock('@/lib/branding-context', () => ({
   useBranding: () => ({ siteName: 'Whity', logoWideUrl: null, logoSquareUrl: null, faviconUrl: null }),
 }));
 
+const mockPost = jest.fn();
+jest.mock('@/lib/api/client', () => ({
+  api: { POST: (...a: unknown[]) => mockPost(...a) },
+}));
+
 import ResetPasswordPage from '@/app/reset-password/page';
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockToken = 'a-valid-token';
-  global.fetch = jest.fn();
 });
 
 function fillAndSubmit(password: string, confirm = password) {
@@ -44,28 +48,29 @@ test('shows the no-token error state (with a link to request a new one) when the
 });
 
 test('applies the new password immediately and shows the "applied" success state', async () => {
-  (global.fetch as jest.Mock).mockResolvedValueOnce({
-    status: 200,
-    json: async () => ({ data: { status: 'applied', message: 'ok' } }),
+  mockPost.mockResolvedValueOnce({
+    data: { data: { status: 'applied', message: 'ok' } },
+    error: undefined,
+    response: new Response(null, { status: 200 }),
   });
 
   render(<ResetPasswordPage />);
   fillAndSubmit('a-strong-new-password');
 
   await waitFor(() => expect(screen.getByTestId('reset-password-applied')).toBeInTheDocument());
-  expect(global.fetch).toHaveBeenCalledWith(
+  expect(mockPost).toHaveBeenCalledWith(
     '/api/v1/auth/password/reset',
     expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({ token: 'a-valid-token', password: 'a-strong-new-password' }),
+      body: { token: 'a-valid-token', password: 'a-strong-new-password' },
     })
   );
 });
 
 test('shows the awaiting-approval state when the backend stages the reset', async () => {
-  (global.fetch as jest.Mock).mockResolvedValueOnce({
-    status: 200,
-    json: async () => ({ data: { status: 'awaiting_approval', message: 'ok' } }),
+  mockPost.mockResolvedValueOnce({
+    data: { data: { status: 'awaiting_approval', message: 'ok' } },
+    error: undefined,
+    response: new Response(null, { status: 200 }),
   });
 
   render(<ResetPasswordPage />);
@@ -77,7 +82,7 @@ test('shows the awaiting-approval state when the backend stages the reset', asyn
 });
 
 test('shows a generic error for an invalid/expired token (400)', async () => {
-  (global.fetch as jest.Mock).mockResolvedValueOnce({ status: 400, json: async () => ({}) });
+  mockPost.mockResolvedValueOnce({ data: undefined, error: {}, response: new Response(null, { status: 400 }) });
 
   render(<ResetPasswordPage />);
   fillAndSubmit('a-strong-new-password');
@@ -90,7 +95,7 @@ test('rejects mismatched passwords client-side without calling the API', () => {
   fillAndSubmit('a-strong-new-password', 'a-different-password');
 
   expect(screen.getByText('Passwords do not match')).toBeInTheDocument();
-  expect(global.fetch).not.toHaveBeenCalled();
+  expect(mockPost).not.toHaveBeenCalled();
 });
 
 test('rejects a too-short password client-side without calling the API', () => {
@@ -98,5 +103,5 @@ test('rejects a too-short password client-side without calling the API', () => {
   fillAndSubmit('short');
 
   expect(screen.getByText('Password must be at least 8 characters')).toBeInTheDocument();
-  expect(global.fetch).not.toHaveBeenCalled();
+  expect(mockPost).not.toHaveBeenCalled();
 });

@@ -13,6 +13,7 @@ const mockApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockApiClient }),
 }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 const mockAddToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({
   useToast: () => ({ addToast: mockAddToast }),

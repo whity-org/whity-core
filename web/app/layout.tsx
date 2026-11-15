@@ -225,7 +225,11 @@ export default async function RootLayout({
                           <PluginFeaturesProvider>
                             {children}
                             <ToastContainerMount />
-                            <AppInstall state={appInstall.state} />
+                            <AppInstall
+                              state={appInstall.state}
+                              name={appInstall.siteName}
+                              iconUrl={appIconUrl("192", appInstall.version)}
+                            />
                           </PluginFeaturesProvider>
                         </NavigationProvider>
                       </ToastProvider>

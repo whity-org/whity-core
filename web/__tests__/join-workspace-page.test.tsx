@@ -12,7 +12,12 @@ jest.mock('next/navigation', () => ({
 }));
 
 jest.mock('@/components/auth/public-shell', () => ({
-  PublicShell: ({ children }: { children: React.ReactNode }) => <main>{children}</main>,
+  // The brand the page hands its frame (WHIT-1044), readable in the tests.
+  PublicShell: ({ children, brand }: { children: React.ReactNode; brand?: { name: string } | null }) => (
+    <main data-testid="public-shell" data-brand={brand?.name ?? ''}>
+      {children}
+    </main>
+  ),
 }));
 
 jest.mock('@/lib/theme-mode-context', () => ({
@@ -27,6 +32,8 @@ jest.mock('@whity/features/i18n', () => ({
 jest.mock('@/components/auth/turnstile-widget', () => ({
   TurnstileWidget: () => <div data-testid="signup-bot-check" />,
 }));
+
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 
 import JoinWorkspacePage from '@/app/join/[workspace]/page';
 import JoinConfirmPage from '@/app/join/confirm/page';
@@ -119,7 +126,7 @@ test('the confirm page asks a new address for a password, then says it waits for
   render(<JoinConfirmPage />);
 
   await screen.findByTestId('join-confirm-form');
-  fireEvent.change(screen.getByLabelText('Choose a password'), { target: { value: 'bakery-pass-1' } });
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'bakery-pass-1' } });
   fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'bakery-pass-1' } });
   fireEvent.click(screen.getByTestId('join-confirm-submit'));
 
@@ -137,7 +144,7 @@ test('an existing account is asked for nothing, and a refusal is shown as such',
   render(<JoinConfirmPage />);
 
   await screen.findByTestId('join-confirm-form');
-  expect(screen.queryByLabelText('Choose a password')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId('join-confirm-submit'));
 
   await waitFor(() => expect(screen.getByTestId('join-confirm-refused')).toBeInTheDocument());
@@ -212,4 +219,34 @@ test('a 409 from the email form means not taking sign-ups yet, not "try later"',
 test('a missing or bad link says so', async () => {
   render(<JoinConfirmPage />);
   expect(await screen.findByTestId('join-confirm-invalid')).toBeInTheDocument();
+});
+
+test('both pages wear the workspace brand the API sends, and an unknown workspace wears none (WHIT-1044)', async () => {
+  const brand = { name: 'Example Bakery', logo_wide_url: null, logo_square_url: null, main_color: '#b54708', theme: null };
+  (global.fetch as jest.Mock).mockResolvedValueOnce(json(200, { data: { ...OPEN_INFO.data, brand } }));
+  await renderJoin();
+  await screen.findByText('Join Example Bakery');
+  expect(screen.getByTestId('public-shell')).toHaveAttribute('data-brand', 'Example Bakery');
+  expect(screen.getByTestId('join-submit')).toHaveTextContent('Join');
+});
+
+test('the confirm page wears the brand too, and its outcome names the next step', async () => {
+  mockToken = 'c'.repeat(64);
+  const brand = { name: 'Example Bakery', logo_wide_url: null, logo_square_url: null, main_color: '#b54708', theme: null };
+  (global.fetch as jest.Mock)
+    .mockResolvedValueOnce(
+      json(200, { data: { workspace_name: 'Example Bakery', email: 'ibrahim@example.com', requires_password: false, brand } })
+    )
+    .mockResolvedValueOnce(json(200, { data: { status: 'joined', message: '' } }));
+
+  render(<JoinConfirmPage />);
+
+  await screen.findByTestId('join-confirm-form');
+  expect(screen.getByTestId('public-shell')).toHaveAttribute('data-brand', 'Example Bakery');
+  expect(screen.getByTestId('join-confirm-submit')).toHaveTextContent('Join Example Bakery');
+  fireEvent.click(screen.getByTestId('join-confirm-submit'));
+
+  const joined = await screen.findByTestId('join-confirm-joined');
+  expect(joined).toHaveTextContent('You’ve joined Example Bakery');
+  expect(screen.getByRole('link', { name: 'Open Example Bakery' })).toHaveAttribute('href', '/login');
 });

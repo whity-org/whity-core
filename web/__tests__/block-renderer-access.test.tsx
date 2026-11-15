@@ -24,11 +24,10 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import type { Block } from '@/lib/plugin-features';
-import { apiClient } from '@/lib/api-client';
 import { ToastProvider } from '@/lib/toast-context';
 
-jest.mock('@/lib/api-client', () => ({ apiClient: jest.fn() }));
-const mockApiClient = apiClient as jest.MockedFunction<typeof apiClient>;
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
+const mockApiClient: jest.Mock = jest.fn();
 
 function stubResponse(body: unknown, status = 200): Response {
   return {

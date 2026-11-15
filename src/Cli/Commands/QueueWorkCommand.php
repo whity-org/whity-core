@@ -150,19 +150,47 @@ final class QueueWorkCommand implements CliCommand
                 new \Whity\Core\Settings\TenantSettingsRepository($pdo)
             );
             $workerLogger = $this->logger;
+            $workerMailer = new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
+                $workerSettings,
+                new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                $workerSecrets,
+                $workerLogger
+            ));
+            // E2: the customer's email is the workspace's HTML card, in its brand.
+            $workerSender = new \Whity\Core\Mail\BrandedEmailSender($workerMailer, new \Whity\Core\Mail\EmailLayout(), $workerSettings, $workerLogger);
+            $workerSender->useGate(new \Whity\Core\Mail\EmailGate($workerSettings, $pdo));
+            $workerSender->useBranding(new \Whity\Core\Branding\BrandingService(
+                $workerSettings,
+                entitlements: new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo))
+            ));
+            // WHIT-1072: a final document this worker's retry makes (FinaliseRouteJob)
+            // announces document.finalised here, so the form-decision email goes from
+            // here too. The shared store keeps it to one email per route and decision,
+            // whichever process gets there first. Storage is built on first use.
+            (new \Whity\Core\Form\FormDecisionEmail(
+                $pdo,
+                new \Whity\Core\Identity\ProfileEmailRepository($pdo),
+                $workerSender,
+                $workerSettings,
+                \Whity\Core\Http\FrontendUrls::fromEnv()->base(),
+                static function (): ?\Whity\Core\Document\DocumentArtifactStore {
+                    $parts = \Whity\app(\Whity\Core\Document\Issuing\WorkerDocumentParts::class);
+
+                    return $parts instanceof \Whity\Core\Document\Issuing\WorkerDocumentParts
+                        ? new \Whity\Core\Document\DocumentArtifactStore($parts->storage())
+                        : null;
+                },
+                new \Whity\Core\Store\DatabaseSharedStore($pdo),
+            ))->subscribe($hookManager);
             $messaging = \Whity\Core\Messaging\CoreMessaging::build(
                 $pdo,
                 $messageChannels,
-                new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
-                    $workerSettings,
-                    new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
-                    $workerSecrets,
-                    $workerLogger
-                )),
+                $workerMailer,
                 $workerSecrets,
                 static fn (string $name, array $payload, array $opts): ?int => (new \Whity\Core\Queue\QueueService($repo))->dispatch($name, $payload, $opts),
                 null,
                 (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+                $workerSender,
             );
             \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messaging);
             \Whity\register_service(\Whity\Sdk\Messaging\CustomerMessages::class, new \Whity\Core\Messaging\HostCustomerMessages(static fn (): \Whity\Core\Messaging\MessagingService => $messaging));

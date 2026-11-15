@@ -439,11 +439,12 @@ commit them in the same PR as the change that affects them, or the build fails:
   After any route/schema change run `php public/index.php generate:openapi`; CI
   fails if the committed spec differs from a fresh generation (and the PHPUnit
   `OpenApiSpecDriftTest` asserts the same).
-- **Typed API client** — `web/lib/api/schema.d.ts` is generated from
+- **Typed API client** — `packages/api-client/src/schema.d.ts` (the
+  `@whity/api-client` package, which the web app imports) is generated from
   `public/openapi.json`. After the spec changes run
-  `cd web && npm run generate:api`; CI fails on drift. So a single API change
-  touches three files: the handler/route, `public/openapi.json`, and
-  `web/lib/api/schema.d.ts`.
+  `cd packages/api-client && npm run generate`; CI fails on drift. So a single
+  API change touches three files: the handler/route, `public/openapi.json`, and
+  `packages/api-client/src/schema.d.ts`.
 - **Design tokens** — styling variables come from `base.json` via the token
   pipeline; run `cd web && npm run tokens:check` (CI runs it). Never hand-edit a
   generated token output or use raw hex/RGB in components.
@@ -628,8 +629,8 @@ seeded accounts and shared-database discipline.
    - [ ] PHPStan (level 8, `composer phpstan`) clean; frontend `tsc` +
          `npm run lint` clean if `web/` changed.
    - [ ] Generated artifacts regenerated and committed if affected:
-         `public/openapi.json` (`generate:openapi`) and `web/lib/api/schema.d.ts`
-         (`npm run generate:api`) on API changes; design tokens
+         `public/openapi.json` (`generate:openapi`) and
+         `packages/api-client/src/schema.d.ts` (`npm run generate` there) on API changes; design tokens
          (`npm run tokens:check`) on styling changes.
    - [ ] Data-layer / migration / auth changes verified on real PostgreSQL; new
          tenant-owned tables added to `CrossTenantRejectionRealEngineTest`.

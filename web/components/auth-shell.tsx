@@ -6,7 +6,7 @@
  * title and one line under it. Used by sign-in, password reset and invitations.
  *
  * With an `aside` (sign-in, #1734) it becomes two columns on wide screens: the
- * form on the start side and the brand panel on the end side, mirrored by the
+ * brand panel on the start side and the form on the end side, mirrored by the
  * grid in RTL and stacked, form first, on phones. Whity's own console shows the
  * lockup; a white-labelled workspace (`isWhiteLabel`) shows its own logo, gets
  * `.wy-theme-partner` and the "Built on Whity" credit at the foot, and never
@@ -36,11 +36,14 @@ export function isWhiteLabel(branding: Branding): boolean {
 export function AuthShell({
   title,
   subtitle,
+  icon,
   aside,
   children,
 }: {
   title: string;
   subtitle?: string;
+  /** A round state icon above the title (an outcome, TplWelcomeWorkspace); centred layout only. */
+  icon?: React.ReactNode;
   /** The brand panel. Turns the page into the two-column sign-in layout. */
   aside?: React.ReactNode;
   children: React.ReactNode;
@@ -55,7 +58,9 @@ export function AuthShell({
         data-brand={partner ? 'partner' : 'whity'}
         className={partner ? 'wy-theme-partner grid min-h-screen bg-background lg:grid-cols-2' : 'grid min-h-screen bg-background lg:grid-cols-2'}
       >
-        <main className="flex flex-col bg-card px-4 pt-4 pb-8 sm:px-10 lg:min-h-screen">
+        {/* From 1024px the brand side sits at the start and the form at the end
+            (TplSignInTwoColumn, WHIT-1044); on phones the form comes first. */}
+        <main className="flex flex-col bg-card px-4 pt-4 pb-8 sm:px-10 lg:order-last lg:min-h-screen">
           <div className="flex justify-end">
             <LanguageSwitcher
               variant="dropdown"
@@ -113,6 +118,7 @@ export function AuthShell({
               {branding.siteName}
             </span>
           )}
+          {icon}
           <div className="space-y-1">
             <h1 className="text-xl font-semibold text-foreground">{title}</h1>
             {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}

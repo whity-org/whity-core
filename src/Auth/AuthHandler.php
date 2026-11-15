@@ -14,6 +14,7 @@ use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Http\JsonBody;
 use PDO;
+use Whity\Core\i18n\LocalizedText;
 use Whity\Core\i18n\LocalizedTexts;
 use Whity\Core\Db\DbBool;
 use PDOStatement;
@@ -1097,8 +1098,10 @@ class AuthHandler
     /**
      * List the profile's active memberships (ADR 0005 §6).
      *
-     * Returns one row per active membership, each as {tenant_id, tenant_name,
-     * role}, ordered by tenant_id ASC for a stable UI.
+     * Returns one entry per WORKSPACE with an active membership, each as
+     * {tenant_id, tenant_name, role, roles, kind}, ordered by tenant_id ASC for
+     * a stable UI. Several rows in one workspace (one per role) fold into one
+     * entry: `role` is the primary row's, `roles` lists them all.
      *
      * SYSTEM TENANT (id 0): tenant 0 is the LEGITIMATE home of the system admin
      * (system@whity.local, seeded by migration 036 with its ONLY membership in
@@ -1117,7 +1120,7 @@ class AuthHandler
      * Login flow — enumerates all tenant memberships for one profile (ADR 0005 §6)
      *
      * @param int $profileId The profile whose memberships to query.
-     * @return list<array{tenant_id:int, tenant_name:string, tenant_name_language:string, tenant_names:array<string, string>|\stdClass, role:string, kind:string}>
+     * @return list<array{tenant_id:int, tenant_name:string, tenant_name_language:string, tenant_names:array<string, string>|\stdClass, role:string, roles:list<string>, kind:string}>
      */
     private function listActiveMemberships(int $profileId): array
     {
@@ -1131,7 +1134,7 @@ class AuthHandler
                  JOIN tenants t ON t.id = m.tenant_id
                  LEFT JOIN roles r ON r.id = m.role_id
                  WHERE m.profile_id = ? AND m.status = 'active'
-                 ORDER BY m.tenant_id ASC"
+                 ORDER BY m.tenant_id ASC, m.is_primary DESC, m.id ASC"
             );
             $stmt->execute([$profileId]);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1148,24 +1151,47 @@ class AuthHandler
                 $others = [];
             }
 
+            // ONE entry per workspace. A person may hold several roles in one
+            // workspace (#712 §1: one membership row per role, the primary row
+            // first); listing each row would show the same workspace once per
+            // role in every picker. Permissions there are already the union of
+            // all the rows (RoleChecker), so the entry names every role.
             $out = [];
             foreach ($rows as $row) {
+                $tenantId = (int) $row['tenant_id'];
+                $role = (string) ($row['role'] ?? '');
+                // `customer` for a membership from the workspace's own
+                // sign-up: the app hides admin and create-workspace surfaces,
+                // and RBAC caps it server-side. Any staff row makes the person
+                // staff here, as RoleChecker::isCustomerOnly() decides.
+                $kind = (string) ($row['kind'] ?? 'member');
+
+                if (isset($out[$tenantId])) {
+                    if ($role !== '' && !in_array($role, $out[$tenantId]['roles'], true)) {
+                        $out[$tenantId]['roles'][] = $role;
+                    }
+                    if ($kind !== 'customer') {
+                        $out[$tenantId]['kind'] = $kind;
+                    }
+                    continue;
+                }
+
                 $tenantName = (string) ($row['tenant_name'] ?? '');
                 $nameLanguage = (string) ($row['tenant_name_language'] ?? '') !== '' ? (string) $row['tenant_name_language'] : 'en';
-                $names = LocalizedTexts::merge($tenantName, $nameLanguage, $others[(int) $row['tenant_id']] ?? []);
-                $out[] = [
-                    'tenant_id'   => (int) $row['tenant_id'],
+                $names = LocalizedText::merge($tenantName, $nameLanguage, $others[$tenantId] ?? []);
+                $out[$tenantId] = [
+                    'tenant_id'   => $tenantId,
                     'tenant_name' => $tenantName,
                     'tenant_name_language' => $nameLanguage,
                     'tenant_names' => $names === [] ? new \stdClass() : $names,
-                    'role'        => (string) ($row['role'] ?? ''),
-                    // `customer` for a membership from the workspace's own
-                    // sign-up: the app hides admin and create-workspace
-                    // surfaces, and RBAC caps it server-side.
-                    'kind'        => (string) ($row['kind'] ?? 'member'),
+                    // The primary row's role, kept for older clients.
+                    'role'        => $role,
+                    // Every role held here, the primary one first.
+                    'roles'       => $role === '' ? [] : [$role],
+                    'kind'        => $kind,
                 ];
             }
-            return $out;
+            return array_values($out);
         } catch (\Exception) {
             return [];
         }
@@ -2452,6 +2478,7 @@ class AuthHandler
                 // rejected exactly like a replayed backup code.
                 if ($matchedStep !== null && $this->consumeTotpStep($profileId, $matchedStep)) {
                     $isValid = true;
+                    $this->moveTotpSecretToCurrentKey($totpService, $profileId, (string) $twoFactorSecret);
                 }
             } catch (\Exception) {
                 // Continue to backup code validation
@@ -2558,6 +2585,31 @@ class AuthHandler
     }
 
     /**
+     * Move a profile's stored TOTP secret onto the current key of the key ring,
+     * after it has just verified a code. Rows still in the older format, or under
+     * a retired key, are rewritten here so a rotation finishes without a sweep.
+     *
+     * Compare-and-set on the old value so a concurrent re-enrolment is never
+     * overwritten. Best effort: a failure here never fails the sign-in.
+     */
+    private function moveTotpSecretToCurrentKey(TotpService $totpService, int $profileId, string $stored): void
+    {
+        try {
+            $rewrapped = $totpService->rewrapForCurrentKey($stored);
+            if ($rewrapped === null) {
+                return;
+            }
+            // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1); PK-targeted write of the caller's own profile
+            $stmt = $this->db->prepare(
+                'UPDATE profiles SET two_factor_secret = ? WHERE id = ? AND two_factor_secret = ?'
+            );
+            $stmt->execute([$rewrapped, $profileId, $stored]);
+        } catch (\Throwable) {
+            // Left as it is; it still decrypts, and the next sign-in tries again.
+        }
+    }
+
+    /**
      * Get the TotpService used for login-path 2FA validation.
      *
      * Prefers the instance injected via the constructor (the same one the setup/confirm path uses).
@@ -2570,7 +2622,7 @@ class AuthHandler
     private function getTotpService(): TotpService
     {
         if ($this->totpService === null) {
-            $this->totpService = new TotpService(TotpService::resolveEncryptionKey());
+            $this->totpService = TotpService::fromEnv();
         }
         return $this->totpService;
     }

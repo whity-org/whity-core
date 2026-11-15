@@ -436,7 +436,7 @@ final class ProfileLoginRealEngineTest extends TestCase
         self::assertArrayHasKey('role', $body['data']['memberships'][0]);
         // #821: the workspace's name in every language rides with it.
         self::assertSame(
-            ['tenant_id', 'tenant_name', 'tenant_name_language', 'tenant_names', 'role', 'kind'],
+            ['tenant_id', 'tenant_name', 'tenant_name_language', 'tenant_names', 'role', 'roles', 'kind'],
             array_keys($body['data']['memberships'][0])
         );
         self::assertNull($this->jwtParser->lastPayloadOfType('access'), 'Reading the choice must not mint a session.');

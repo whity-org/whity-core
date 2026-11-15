@@ -13,17 +13,21 @@
  * WEEKEND days are tinted with the muted token, from the workspace's own
  * `weekend_days` (Friday and Saturday by default).
  *
+ * WEEK (TplCalendarStaff, WHIT-1044): each day is headed with its short date
+ * and how many bookings it has, a block reads "time service" over "customer ·
+ * person", and a red line marks now on today's column.
+ *
  * STATES OF AN ITEM. A confirmed booking is the main tint with a solid edge; a
  * booking waiting for payment is dashed, because dashed means "not happened
- * yet" in this design system; a busy event is the info tint; an event that
- * does not block bookings is muted. Design 3.3 adds a customer's request,
+ * yet" in this design system; an event is grey, with a solid edge when it
+ * blocks bookings (TplCalendarStaff, WHIT-1044). Design 3.3 adds a customer's request,
  * dashed amber ("needs your OK"), and a checked-in booking, green.
  * The tints are tokens, never palette classes.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@whity/features/i18n';
-import { useDateDisplay } from '@whity/features/datetime';
+import { useDateDisplay, wallClockAt } from '@whity/features/datetime';
 import {
   assignLanes,
   dateKey,
@@ -57,6 +61,26 @@ export interface GridItem {
 
 const HOUR_PX = 48;
 
+/** The minute of the day it is now on the workspace's clock, kept fresh each minute. */
+function useNowMinute(timeZone: string): number | null {
+  // A tick each minute redraws the line; the minute itself is read on each draw.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  return minuteNow(timeZone);
+}
+
+function minuteNow(timeZone: string): number | null {
+  try {
+    const clock = wallClockAt(new Date(), timeZone);
+    return clock.hour * 60 + clock.minute;
+  } catch {
+    return null;
+  }
+}
+
 export interface GridProps {
   days: CalendarDate[];
   items: GridItem[];
@@ -80,7 +104,8 @@ function toneClass(tone: GridItem['tone']): string {
     case 'checkedIn':
       return 'border-s-4 border-success bg-success-tint text-success-text';
     case 'busy':
-      return 'border-s-4 border-info bg-info-tint text-info-text';
+      // Events are grey (TplCalendarStaff, note 3); bookings keep the main tint.
+      return 'border-s-4 border-muted-foreground bg-muted text-foreground';
     default:
       return 'border border-border bg-muted text-foreground';
   }
@@ -100,19 +125,35 @@ function DayHeading({
   weekendDays,
   today,
   onPickDay,
+  bookings,
 }: {
   date: CalendarDate;
   timeZone: string;
   weekendDays: string[];
   today: CalendarDate;
   onPickDay?: (date: CalendarDate) => void;
+  /** Week: the day's bookings, counted under its date. Left out, the round day number shows. */
+  bookings?: number;
 }) {
+  const t = useTranslation('calendar');
   const dates = useDateDisplay({ timeZone });
   const words = useCalendarWords();
   const isToday = sameDate(date, today);
   const weekday = words.weekdayShort(isoWeekday(date));
   const day = dates.calendarLabel(labelInstant(date, timeZone), 'dayNumber');
-  const content = (
+  const dayMonth = dates.calendarLabel(labelInstant(date, timeZone), 'dayMonth');
+  const content = bookings !== undefined ? (
+    <span className="flex min-w-0 flex-col items-start leading-tight">
+      <span className={cn('truncate text-sm font-medium whitespace-nowrap', isToday ? 'text-primary' : 'text-foreground')}>
+        {weekday} <bdi>{dayMonth ?? ''}</bdi>
+      </span>
+      <span className="truncate text-xs whitespace-nowrap text-muted-foreground" data-testid="calendar-day-count">
+        {bookings === 1
+          ? t('grid.bookingsOne', '1 booking')
+          : t('grid.bookingsMany', '{count} bookings', { count: String(bookings) })}
+      </span>
+    </span>
+  ) : (
     <span className="flex flex-col items-center leading-tight">
       <span className="text-xs text-muted-foreground">{weekday}</span>
       <span
@@ -128,7 +169,11 @@ function DayHeading({
   );
   return (
     <div
-      className={cn('flex min-h-14 items-center justify-center border-s border-divider py-1', isWeekend(date, weekendDays) && 'bg-muted')}
+      className={cn(
+        'flex min-h-14 items-center border-s border-divider py-1',
+        bookings !== undefined ? 'justify-start px-1' : 'justify-center',
+        isWeekend(date, weekendDays) && 'bg-muted'
+      )}
       data-weekend={isWeekend(date, weekendDays) ? '' : undefined}
       data-testid="calendar-day-heading"
       data-date={dateKey(date)}
@@ -137,7 +182,7 @@ function DayHeading({
         <button
           type="button"
           onClick={() => onPickDay(date)}
-          className="rounded-control px-2 outline-none hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+          className="min-w-0 max-w-full rounded-control px-2 py-0.5 text-start outline-none hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
           aria-current={isToday ? 'date' : undefined}
         >
           {content}
@@ -156,6 +201,8 @@ export function TimeGrid({ days, items, timeZone, weekendDays, today, showPerson
   const itemLabel = useItemLabel();
   const scroller = useRef<HTMLDivElement>(null);
   const columns = { gridTemplateColumns: `4rem repeat(${days.length}, minmax(0, 1fr))` };
+
+  const nowMinute = useNowMinute(timeZone);
 
   // Open at the start of the working day rather than at midnight.
   useEffect(() => {
@@ -177,6 +224,11 @@ export function TimeGrid({ days, items, timeZone, weekendDays, today, showPerson
             weekendDays={weekendDays}
             today={today}
             onPickDay={days.length > 1 ? onPickDay : undefined}
+            bookings={
+              days.length > 1
+                ? timed.filter((item) => item.booking !== undefined && overlapsDay(item, date, timeZone)).length
+                : undefined
+            }
           />
         ))}
       </div>
@@ -239,6 +291,14 @@ export function TimeGrid({ days, items, timeZone, weekendDays, today, showPerson
                 {Array.from({ length: 24 }, (_, hour) => (
                   <div key={hour} className="absolute inset-x-0 border-t border-divider" style={{ top: hour * HOUR_PX }} aria-hidden="true" />
                 ))}
+                {sameDate(date, today) && nowMinute !== null && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 z-10 border-t-2 border-destructive"
+                    style={{ top: (nowMinute / 60) * HOUR_PX }}
+                    data-testid="calendar-now"
+                    aria-hidden="true"
+                  />
+                )}
                 {placed.map(({ item, startMinute, endMinute, lane, lanes }) => {
                   const from = dates.time(item.starts_at);
                   const to = dates.time(item.ends_at);
@@ -261,12 +321,16 @@ export function TimeGrid({ days, items, timeZone, weekendDays, today, showPerson
                         width: `calc(${100 / lanes}% - 4px)`,
                       }}
                     >
-                      <span className="block truncate font-medium">{item.title}</span>
+                      {/* "10:00 Cake tasting" over "Ibrahim Mansour · Awss"; an event
+                          reads "12:00 Team lunch" over its kind. */}
+                      <span className="block truncate font-medium">
+                        {from !== null && <><bdi dir="ltr" className="tabular-nums">{from}</bdi>{' '}</>}
+                        {item.booking ? item.subtitle : item.title}
+                      </span>
                       {height >= 40 && (
                         <span className="block truncate opacity-90">
-                          {from !== null && <><bdi dir="ltr" className="tabular-nums">{from}</bdi>{' '}</>}
-                          {item.subtitle}
-                          {showPerson && ` · ${item.person}`}
+                          {item.booking ? item.title : item.subtitle}
+                          {showPerson && item.person !== '' && ` · ${item.person}`}
                         </span>
                       )}
                     </button>
@@ -289,7 +353,7 @@ export function AgendaList({ days, items, timeZone, weekendDays, today, showPers
   const itemLabel = useItemLabel();
 
   return (
-    <ol className="divide-y divide-divider rounded-card border border-border bg-card" data-testid="calendar-agenda">
+    <ol className="space-y-3" data-testid="calendar-agenda">
       {days.map((date) => {
         const onDay = items
           .filter((item) => overlapsDay(item, date, timeZone))
@@ -298,11 +362,15 @@ export function AgendaList({ days, items, timeZone, weekendDays, today, showPers
         return (
           <li
             key={dateKey(date)}
-            className={cn('px-4 py-3', isWeekend(date, weekendDays) && 'bg-muted')}
+            className={cn(
+              'rounded-card border border-border bg-card px-4 py-3',
+              isWeekend(date, weekendDays) && 'bg-muted',
+              onDay.length === 0 && 'py-2'
+            )}
             data-testid="calendar-agenda-day"
             data-date={dateKey(date)}
           >
-            <h3 className="mb-2 flex items-baseline gap-2 text-sm font-medium text-foreground">
+            <h3 className={cn('flex items-baseline gap-2 text-sm font-medium text-foreground', onDay.length > 0 && 'mb-2')}>
               <button
                 type="button"
                 className="rounded-control outline-none hover:underline focus-visible:outline-2 focus-visible:outline-ring"
@@ -313,10 +381,13 @@ export function AgendaList({ days, items, timeZone, weekendDays, today, showPers
                 <span>{dates.calendarLabel(labelInstant(date, timeZone), 'dayMonth') ?? ''}</span>
               </button>
               {isToday && <span className="text-xs text-primary">{t('grid.today', 'Today')}</span>}
+              <span className="ms-auto text-sm font-normal text-muted-foreground" data-testid="calendar-agenda-count">
+                {onDay.length === 0
+                  ? t('grid.nothingBooked', 'Nothing booked')
+                  : t('grid.bookingCount', '{count} bookings', { count: onDay.length })}
+              </span>
             </h3>
-            {onDay.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('grid.nothing', 'Nothing on')}</p>
-            ) : (
+            {onDay.length === 0 ? null : (
               <ul className="space-y-2">
                 {onDay.map((item) => {
                   const from = item.allDay ? null : dates.time(item.starts_at);
@@ -366,11 +437,27 @@ export function MonthGrid({
   today,
   onOpen,
   onPickDay,
-}: Omit<GridProps, 'days' | 'showPerson'> & { weeks: CalendarDate[][]; month: number }) {
+  selected,
+  onSelectDay,
+}: Omit<GridProps, 'days' | 'showPerson'> & {
+  weeks: CalendarDate[][];
+  month: number;
+  /** Phone: the day whose list sits under the grid, and how a tap chooses one. */
+  selected?: CalendarDate | null;
+  onSelectDay?: (date: CalendarDate) => void;
+}) {
   const t = useTranslation('calendar');
   const dates = useDateDisplay({ timeZone });
   const words = useCalendarWords();
   const itemLabel = useItemLabel();
+  // Under 768px a tap chooses the day and its list opens under the grid; wider,
+  // it opens the Day view as before.
+  const pick = (date: CalendarDate) => {
+    const narrow =
+      typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 767px)').matches;
+    if (onSelectDay && narrow) onSelectDay(date);
+    else onPickDay?.(date);
+  };
 
   return (
     <div className="overflow-hidden rounded-card border border-border bg-card" data-testid="calendar-month-grid">
@@ -394,19 +481,22 @@ export function MonthGrid({
             const outside = date.month !== month;
             const isToday = sameDate(date, today);
             const shown = onDay.slice(0, 3);
+            const isSelected = selected !== undefined && selected !== null && sameDate(date, selected);
             return (
               <div
                 key={dateKey(date)}
                 className={cn(
-                  'min-h-16 border-s border-divider p-1 first:border-s-0 md:min-h-28',
-                  isWeekend(date, weekendDays) && 'bg-muted'
+                  'min-h-14 border-s border-divider p-1 first:border-s-0 md:min-h-28',
+                  isWeekend(date, weekendDays) && 'bg-muted',
+                  isSelected && 'max-md:bg-primary-tint'
                 )}
                 data-testid="calendar-month-day"
+                data-selected={isSelected ? '' : undefined}
                 data-date={dateKey(date)}
               >
                 <button
                   type="button"
-                  onClick={() => onPickDay?.(date)}
+                  onClick={() => pick(date)}
                   className={cn(
                     'grid size-8 place-items-center rounded-full text-sm tabular-nums outline-none hover:bg-card focus-visible:outline-2 focus-visible:outline-ring',
                     outside && 'text-muted-foreground',
@@ -424,7 +514,7 @@ export function MonthGrid({
                 {onDay.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => onPickDay?.(date)}
+                    onClick={() => pick(date)}
                     className="mt-1 block w-full rounded-md bg-primary-tint px-1 text-center text-xs font-medium text-primary-tint-foreground md:hidden"
                   >
                     {onDay.length}

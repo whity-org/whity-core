@@ -35,7 +35,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api/client';
 import {
   deriveCrudModel,
   effectiveCapabilities,
@@ -202,7 +202,7 @@ function useCrudRecord(
       };
 
       try {
-        const response = await apiClient(basePath);
+        const response = await apiFetch(basePath);
         if (response.status === 403) {
           settle({ status: 'forbidden' });
           return;
@@ -239,7 +239,7 @@ function useCrudRecord(
           return;
         }
 
-        const walk = await fetchAllPages<unknown>(apiClient, basePath);
+        const walk = await fetchAllPages<unknown>(apiFetch, basePath);
         const found = findRow(walk.items, recordId);
         if (found !== null) {
           settle({ status: 'ready', row: found });
@@ -361,7 +361,7 @@ function CrudRecordBody({
   ]);
 
   const save = async (payload: Record<string, unknown>): Promise<boolean> => {
-    const response = await apiClient(
+    const response = await apiFetch(
       `${feature.resource?.basePath ?? ''}/${encodeURIComponent(String(row.id))}`,
       {
         method: 'PATCH',

@@ -25,6 +25,7 @@ TipTap 2 (ProseMirror) inside `packages/ui`, styled with the tokens. ProseMirror
 | Page view (E.7, E.11) | A pagination decoration that measures blocks and adds page gaps, letterhead and footer; pages stay white in dark mode | Whity Render paginates the final PDF |
 | Plugin blocks (E.17–E.20) | `pluginBlock` node; node view mounts the plugin's native component (verified) or a sandboxed iframe that talks over `postMessage` | Validate `data` against the plugin's JSON Schema before saving |
 | Saved blocks (E.21–E.24) | `savedBlock` node; synced ones render the library version with `overrides` for per-document parts; Detach replaces the node with its blocks | Published templates pick up library changes at their next publish |
+| Per-document parts (E.23a, 3.4) | `perDocument` mark with `key`, `FieldRef.perDocument` = key; `SavedBlock.perDocumentParts` lists them; `overrides` keyed by part key, never by position | Keys are minted once (`pd_` + nanoid) and survive edits, moves and version bumps. Migrating old rows: position `i` maps to `perDocumentParts[i].key` once, when the row is first read. Values for removed parts stay in `overrides` and are reported as `orphanedParts` |
 | Collaboration (later, E.3) | Yjs + `@tiptap/extension-collaboration` | The model above already keys everything by stable ids |
 
 ## Rules the build must keep

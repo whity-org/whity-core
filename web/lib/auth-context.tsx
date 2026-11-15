@@ -1,9 +1,9 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { apiClient as apiClientModule } from './api-client';
-import { SESSION_EXPIRED_EVENT } from './api/client';
-import { refreshSession } from '@/lib/session-refresh';
+import { api, SESSION_EXPIRED_EVENT } from './api/client';
+import { forgetPushOnSignOut } from '@/lib/pwa/push';
+import { oneEntryPerWorkspace } from '@/lib/workspace-memberships';
 
 interface User {
   id: number;
@@ -26,6 +26,8 @@ export interface Membership {
   tenant_name_language?: string;
   tenant_names?: Record<string, string>;
   role: string;
+  /** Every role held in the workspace, the primary one first. */
+  roles?: string[];
   /**
    * `customer` when the person joined through the workspace's own sign-up
    * (WHIT-915). The server caps a customer's permissions, so admin screens
@@ -51,13 +53,15 @@ interface AuthContextType {
    * so user and memberships are updated without a full page reload.
    */
   switchTenant: (tenantId: number) => Promise<void>;
-  apiClient: (
-    url: string,
-    options?: RequestInit
-  ) => Promise<Response>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+/** What `GET /api/v1/me` carries that this provider mirrors into state. */
+interface MeBody {
+  user?: User;
+  memberships?: unknown;
+}
 
 interface JWTPayload {
   exp?: number;
@@ -101,26 +105,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        let response = await fetch('/api/v1/me', {
-          credentials: 'include',
-        });
-
-        // access_token has a 15-min TTL; silently refresh before giving up so
-        // that a stored browser session (e.g. Playwright storageState) survives
-        // longer test runs without requiring a fresh login.
-        if (response.status === 401) {
-          if ((await refreshSession()) === 'renewed') {
-            response = await fetch('/api/v1/me', { credentials: 'include' });
-          }
-        }
+        // access_token has a 15-min TTL; the client silently refreshes and
+        // replays on a 401, so a stored browser session (e.g. Playwright
+        // storageState) survives longer test runs without a fresh login.
+        const { data: body, response } = await api.GET('/api/v1/me');
 
         if (response.ok) {
-          const data = await response.json();
+          const data = (body ?? {}) as MeBody;
           if (data.user) {
             setUser(data.user);
           }
           if (Array.isArray(data.memberships)) {
-            setMemberships(data.memberships as Membership[]);
+            setMemberships(oneEntryPerWorkspace(data.memberships as Membership[]));
           }
         }
       } catch (error) {
@@ -165,23 +161,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
 
     try {
-      const response = await fetch('/api/v1/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // CSRF defense (WC-160): required on the auth POSTs.
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include',
+      const { data: body, error: errorBody, response } = await api.POST('/api/v1/login', {
+        body: { email, password },
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = (errorBody ?? {}) as { message?: string };
         throw new Error(errorData.message || 'Login failed');
       }
 
-      const data = await response.json();
+      const data = (body ?? {}) as { user?: User; token?: unknown };
 
       // Authentication state lives entirely in the server-set httpOnly cookies
       // (#51); the JWT is never persisted client-side. We only mirror the user
@@ -217,13 +206,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = async (): Promise<void> => {
+    // WHIT-1075: a signed-out browser gets nobody's notifications.
+    await forgetPushOnSignOut().catch(() => undefined);
     try {
-      await fetch('/api/v1/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-        // CSRF defense (WC-160): required on the auth POSTs.
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      });
+      await api.POST('/api/v1/auth/logout');
     } catch (error) {
       console.error('Logout request failed:', error);
     } finally {
@@ -235,17 +221,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const refreshAuth = async (): Promise<void> => {
     try {
-      const response = await fetch('/api/v1/me', {
-        credentials: 'include',
-      });
+      const { data: body, response } = await api.GET('/api/v1/me');
 
       if (response.ok) {
-        const data = await response.json();
+        const data = (body ?? {}) as MeBody;
         if (data.user) {
           setUser(data.user);
         }
         if (Array.isArray(data.memberships)) {
-          setMemberships(data.memberships as Membership[]);
+          setMemberships(oneEntryPerWorkspace(data.memberships as Membership[]));
         }
       } else {
         setUser(null);
@@ -266,19 +250,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * memberships) reflects the new session without a page reload.
    */
   const switchTenant = async (tenantId: number): Promise<void> => {
-    const switchResponse = await fetch('/api/v1/auth/switch-tenant', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        // CSRF defense (WC-160): required on state-changing auth POSTs.
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: JSON.stringify({ tenant_id: tenantId }),
-    });
+    const { error: switchError, response: switchResponse } = await api.POST(
+      '/api/v1/auth/switch-tenant',
+      { body: { tenant_id: tenantId } }
+    );
 
     if (!switchResponse.ok) {
-      const errData = await switchResponse.json().catch(() => ({})) as Record<string, unknown>;
+      const errData = (switchError ?? {}) as Record<string, unknown>;
       throw new Error((errData['error'] as string | undefined) ?? 'Tenant switch failed');
     }
 
@@ -291,13 +269,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return !!user;
   }, [user]);
 
-  const apiClient = useCallback(
-    (url: string, options?: RequestInit): Promise<Response> => {
-      return apiClientModule(url, options);
-    },
-    []
-  );
-
   const value: AuthContextType = {
     user,
     memberships,
@@ -308,7 +279,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated,
     refreshAuth,
     switchTenant,
-    apiClient,
   };
 
   return (

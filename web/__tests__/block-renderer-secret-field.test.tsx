@@ -8,10 +8,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import type { Block } from '@/lib/plugin-features';
-import { apiClient } from '@/lib/api-client';
+import { apiFetch as apiClient } from '@/lib/api/client';
 
-jest.mock('@/lib/api-client', () => ({
-  apiClient: jest.fn(),
+jest.mock('@/lib/api/client', () => ({
+  apiFetch: jest.fn(),
 }));
 
 jest.mock('@/lib/toast-context', () => ({

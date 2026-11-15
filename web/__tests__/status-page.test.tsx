@@ -1,5 +1,6 @@
 /** Smoke: the public status page renders component states from the API payload. */
 import { render, screen, waitFor } from '@testing-library/react';
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 import StatusPage from '@/app/status/page';
 
 const PAYLOAD = {

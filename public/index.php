@@ -451,7 +451,7 @@ $jwtParser = new JwtParser($jwtSecret);
 // Single source of truth shared by the setup/confirm path and the login-validation path so the
 // 2FA secret is always encrypted and decrypted with the SAME key. Fails fast in non-development
 // when ENCRYPTION_KEY is missing/empty, mirroring the JWT_SECRET guard above.
-$totpService = new TotpService(TotpService::resolveEncryptionKey());
+$totpService = TotpService::fromEnv();
 
 // 4. Initialize permission registry
 $permissionRegistry = new PermissionRegistry();
@@ -945,7 +945,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'tenants',
-        'label' => 'Tenants',
+        'label' => 'Workspaces',
         'href' => '/admin/tenants',
         'icon' => 'building',
         'group' => 'platform',
@@ -994,7 +994,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'billing',
-        'label' => 'Plans & pricing',
+        'label' => 'Plans and pricing',
         'href' => '/admin/billing',
         'icon' => 'receipt',
         'group' => 'platform',
@@ -1059,7 +1059,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'notifications',
-        'label' => 'Notification Delivery',
+        'label' => 'Notification log',
         'href' => '/admin/notifications',
         'icon' => 'bell-cog',
         'group' => 'platform',
@@ -1089,7 +1089,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'website-settings',
-        'label' => 'Website Settings',
+        'label' => 'Workspace settings',
         'href' => '/admin/settings',
         'icon' => 'settings',
         'group' => 'settings',
@@ -1270,7 +1270,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'approval-gating',
-        'label' => 'Approval Gating',
+        'label' => 'Sign-up approvals',
         'href' => '/admin/registrations',
         'icon' => 'user-check',
         'group' => 'people',
@@ -1764,32 +1764,28 @@ $profileEmailRepository = new ProfileEmailRepository($db->getPdo());
 // own frontend. See docs/wiki/Headless.md.
 $frontendUrls = \Whity\Core\Http\FrontendUrls::fromEnv();
 $verifyUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::EMAIL_VERIFICATION);
+// EM.1: one sender for every email core sends (E2): a workspace's in its brand
+// and language, the instance's own (tenant 0) in the instance's brand. The
+// workspace branding source is handed over once the entitlement service exists (below).
+$brandedEmailSender = new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService, $logger);
+// E2: the one gate every email asks (operator, workspace, agent and person switches).
+$brandedEmailSender->useGate(new \Whity\Core\Mail\EmailGate($settingsService, $db->getPdo()));
 $emailVerificationProvider = new TokenEmailVerificationProvider(
     $emailVerificationService,
     $profileEmailRepository,
-    $mailer,
+    $brandedEmailSender,
     $verifyUrlBase,
-    // WC-email: render the link as a branded HTML email (with a text fallback),
-    // driven by the instance branding/mail settings.
-    new \Whity\Core\Mail\EmailLayout(),
-    $settingsService
 );
 // WC-email: customer lifecycle emails. The subscriber listens on lifecycle hooks
 // (welcome on registration today; approval/invitation to follow) and sends via
 // the branded EmailLayout, gated per-event on the mail.events.* toggles. Sends
 // are best-effort — a failure can never break the originating request.
 $emailNotifications = new \Whity\Core\Mail\EmailNotifications(
-    $mailer,
-    new \Whity\Core\Mail\EmailLayout(),
+    $brandedEmailSender,
     $settingsService,
     $frontendUrls->base(),
-    $logger
 );
 $emailNotifications->subscribe($hookManager);
-// EM.1: one sender for every email a workspace sends (its brand, its language),
-// and the two security emails that can't be turned off. The workspace branding
-// source is handed over once the entitlement service exists (below).
-$brandedEmailSender = new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService, $logger);
 // SDK 1.99 (WHIT-978): plugins send as the workspace through the same sender.
 \Whity\register_service(\Whity\Sdk\Mail\WorkspaceEmails::class, new \Whity\Core\Mail\SdkWorkspaceEmails($brandedEmailSender)); // @phpstan-ignore-line
 // SDK 1.102 (WHIT-985): Whity's own billing emails to a workspace's payers, only from a plugin
@@ -1913,10 +1909,8 @@ $router->register('GET', '/api/auth/2fa/status', [$twoFactorHandler, 'status'], 
 $passwordResetService = new \Whity\Core\Identity\PasswordResetService($db->getPdo());
 $resetUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::PASSWORD_RESET);
 $passwordResetMailer = new \Whity\Core\Identity\PasswordResetMailer(
-    $mailer,
+    $brandedEmailSender,
     $resetUrlBase,
-    new \Whity\Core\Mail\EmailLayout(),
-    $settingsService
 );
 $passwordResetHandler = new \Whity\Api\PasswordResetHandler(
     $passwordResetService,
@@ -1964,10 +1958,8 @@ $twoFactorRecoveryService = new \Whity\Core\Identity\TwoFactorRecoveryService(
 );
 $twoFactorRecoveryConfirmUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::TWO_FACTOR_RECOVERY);
 $twoFactorRecoveryMailer = new \Whity\Core\Identity\TwoFactorRecoveryMailer(
-    $mailer,
+    $brandedEmailSender,
     $twoFactorRecoveryConfirmUrlBase,
-    new \Whity\Core\Mail\EmailLayout(),
-    $settingsService
 );
 $twoFactorRecoveryHandler = new \Whity\Api\TwoFactorRecoveryHandler(
     $twoFactorRecoveryService,
@@ -1990,7 +1982,7 @@ $twoFactorRecoveryApprovalsHandler = new \Whity\Api\TwoFactorRecoveryApprovalsAp
         $db->getPdo(),
         new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo()),
         $totpService,
-        new \Whity\Core\Security\IdentityCheckMailer($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService),
+        new \Whity\Core\Security\IdentityCheckMailer($brandedEmailSender),
     )
 );
 $router->register('GET',  '/api/2fa-recovery/pending',           [$twoFactorRecoveryApprovalsHandler, 'listPending'], null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
@@ -2017,10 +2009,8 @@ $invitationService = new \Whity\Core\Identity\InvitationService(
 );
 $invitationUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::INVITATION_ACCEPT);
 $invitationMailer = new \Whity\Core\Identity\InvitationMailer(
-    $mailer,
+    $brandedEmailSender,
     $invitationUrlBase,
-    new \Whity\Core\Mail\EmailLayout(),
-    $settingsService
 );
 $invitationsHandler = new \Whity\Api\InvitationsApiHandler(
     $db->getPdo(),
@@ -3449,7 +3439,7 @@ $router->register('DELETE', '/api/document-sources/{id:\d+}',       [$documentSo
 // Document themes (editor M4d, E.44, DOCUMENT-THEMES.md 5): reads with
 // documents:read, the workspace's own themes managed with documents:themes.
 // A theme is addressed by its ref: whity.standard or tenant.<key>.
-$documentThemesHandler = new \Whity\Api\DocumentThemesApiHandler($documentThemeRepository, $documentThemeResolver, $settingsService);
+$documentThemesHandler = new \Whity\Api\DocumentThemesApiHandler($documentThemeRepository, $documentThemeResolver, $settingsService, $entitlementService);
 // Each path is written out, not built from a variable: the OpenAPI catalogue
 // tests read these registrations as literals and match them against
 // CoreApiSchemas::documentThemeRoutes().
@@ -3682,6 +3672,10 @@ $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentFieldP
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\CompanyFieldProvider($settingsService, $documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\TodayFieldProvider($documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentNumberFieldProvider($documentFieldLabels));
+// WHIT-1016: values entered at route steps (`route.value.<key>`), filled by the final document stage.
+$documentFieldRegistry->add(new \Whity\Core\Document\Fields\RouteValueFieldProvider($db->getPdo(), $documentFieldLabels));
+// WHIT-1018: who approved (`route.approvals.*.name`), a table row each, filled by the final document stage.
+$documentFieldRegistry->add(new \Whity\Core\Document\Fields\RouteApprovalFieldProvider($db->getPdo(), $documentFieldLabels));
 // WHIT-954: contacts as a record type, with the workspace's own fields (`{{contact.<key>}}`).
 $documentFieldRegistry->add(new \Whity\Core\Contacts\ContactFieldProvider($db->getPdo(), $documentFieldLabels));
 // WHIT-742: each workspace plugin's record types, in the workspaces where
@@ -4047,6 +4041,14 @@ $documentQrHandler = new \Whity\Api\DocumentQrApiHandler(
     $roleChecker,
     $settingsService
 );
+// Built here rather than with the branding API below: the verification page
+// wears the issuer's brand (WHIT-1044). Its inputs are all built above.
+$brandingService = new \Whity\Core\Branding\BrandingService(
+    $settingsService,
+    $storageDriver,
+    new \Whity\Core\Branding\BrandingAssetValidator(new \Whity\Core\Branding\SvgSanitizer()),
+    $entitlementService
+);
 $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     $documentQrService,
     $documentRepository,
@@ -4055,6 +4057,7 @@ $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     new DatabaseSharedStore($db->getPdo()),
     $documentSourceRepository,
     $documentArtifactRepository,
+    $brandingService,
 );
 
 // `/api/documents/views` is registered BEFORE the `{id:\d+}` routes and cannot
@@ -4276,7 +4279,7 @@ $signingService = new \Whity\Core\Document\Signing\SigningService(
     ),
     $signingChallengeRepository,
     $instanceSealKeys,
-    new \Whity\Core\Document\Signing\SigningCodeMailer($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService),
+    new \Whity\Core\Document\Signing\SigningCodeMailer($brandedEmailSender),
 );
 $documentSigningHandler = new \Whity\Api\DocumentSigningApiHandler(
     $documentRepository,
@@ -4607,6 +4610,16 @@ $router->register('POST', '/api/forms/{id:\d+}/submissions', [$formSubmissionsHa
 $router->register('GET', '/api/form-submissions', [$formSubmissionsHandler, 'list'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/form-submissions/{id:\d+}/files/{fileId:\d+}', [$formSubmissionsHandler, 'fileContent'], null, null, CorePermissions::FORMS_READ);
+// Design 3.4 (P1): a response in the automatic printout layout, and the
+// Form printouts tab's live preview of unsaved theme options.
+$formPrintoutsHandler = new \Whity\Api\FormPrintoutsApiHandler(
+    $db->getPdo(),
+    new \Whity\Core\Form\Print\FormPrintoutService($db->getPdo(), $sourceDocumentPrinter, $entitlementService, $settingsService),
+    $flowDocumentRenderer,
+    $documentRenderMeters,
+);
+$router->register('GET', '/api/form-submissions/{id:\d+}/printout', [$formPrintoutsHandler, 'submission'], null, null, CorePermissions::FORMS_READ);
+$router->register('POST', '/api/document-themes/form-printout-preview', [$formPrintoutsHandler, 'themePreview'], null, null, CorePermissions::DOCUMENTS_THEMES);
 // The office's record on a submission (migration 194). Somebody who can read a
 // submission can read what became of it; recording takes `forms:review`.
 $router->register('GET', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
@@ -4897,7 +4910,10 @@ $resourceRoleGrantsHandler = new \Whity\Api\ResourceRoleGrantsApiHandler(
     $roleChecker,
     $hookManager
 );
-$router->register('GET',    '/api/resource-role-grants',          [$resourceRoleGrantsHandler, 'list'],   null, null, CorePermissions::ROLES_READ);
+// No route-level permission on the list: a caller may read their OWN grants
+// (?profile_id=<self>, #1074) without roles:read. The handler requires
+// roles:read for every other read, in the caller's tenant.
+$router->register('GET',    '/api/resource-role-grants',          [$resourceRoleGrantsHandler, 'list'],   null);
 $router->register('POST',   '/api/resource-role-grants',          [$resourceRoleGrantsHandler, 'create'], null, null, CorePermissions::ROLES_MANAGE);
 $router->register('DELETE', '/api/resource-role-grants/{id:\d+}', [$resourceRoleGrantsHandler, 'revoke'], null, null, CorePermissions::ROLES_MANAGE);
 // WC-712 §4: the record-delete cleanup an owner runs when it deletes the record
@@ -5003,7 +5019,11 @@ $router->register('POST',   '/api/data-types/{type}/bulk',           [$dataTypes
 // records a per-channel delivery, and enqueues the durable send job. Also
 // subscribed on the HookManager, so firing the `notification.dispatch` hook (from
 // core or a plugin) dispatches a notification (hook-subscriber mode).
-$transportRegistry = \Whity\Core\Notification\CoreTransports::make($logger);
+// E2: the `email` channel is delivered through core mail, not only logged.
+$transportRegistry = \Whity\Core\Notification\CoreTransports::make($logger, $brandedEmailSender, $profileEmailRepository);
+// WHIT-1074: web push. Registered here so the dispatcher adds `push` for a
+// person with a device on; the worker sends it.
+$transportRegistry->register(\Whity\Core\Notification\Push\PushTransport::fromEnv($db->getPdo(), $logger, $_ENV));
 $notificationRepository = new \Whity\Core\Notification\NotificationRepository($db->getPdo());
 // Per-user preference resolver — the dispatcher consults it to filter a
 // recipient's channels (transactional types always bypass; #c56a6455).
@@ -5018,7 +5038,8 @@ $notificationDispatcher = new \Whity\Core\Notification\NotificationDispatcher(
     ),
     $logger,
     $notificationPreferenceResolver,
-    $auditLogger
+    $auditLogger,
+    $brandedEmailSender->gate()
 );
 $notificationDispatcher->subscribe($hookManager);
 \Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger, $logger);
@@ -5114,9 +5135,18 @@ $router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/rep
 // reached is operator configuration.
 $routingNotifications = new \Whity\Core\Document\Routing\RoutingNotifications(
     $notificationDispatcher,
-    $settingsService
+    $settingsService,
+    // E2: people at a sign step get the sign-request email instead of an emailed notice.
+    $db->getPdo(),
 );
 $routingNotifications->subscribe($hookManager);
+// E2 `EmailForms`: "Please sign this" to people a route asks to sign, and
+// "We received it" to a signed-in person who sends a form.
+(new \Whity\Core\Document\Routing\SignRequestEmail($db->getPdo(), $profileEmailRepository, $brandedEmailSender, $frontendUrls->base()))->subscribe($hookManager);
+(new \Whity\Core\Form\FormReceivedEmail($db->getPdo(), $profileEmailRepository, $brandedEmailSender, $settingsService, $frontendUrls->base()))->subscribe($hookManager);
+// E2 `form-decision` (WHIT-1034): the decision, with the final document's PDF (P1) when there is one.
+// The worker subscribes it too, for a final document its retry makes; the shared store keeps it to one email.
+(new \Whity\Core\Form\FormDecisionEmail($db->getPdo(), $profileEmailRepository, $brandedEmailSender, $settingsService, $frontendUrls->base(), $documentArtifactStore, new DatabaseSharedStore($db->getPdo())))->subscribe($hookManager);
 
 // THE EFFECT ENGINE (#1032), beside the notifier and for the same reasons.
 //
@@ -5228,7 +5258,7 @@ $calendarBookingService = \Whity\Core\Calendar\CalendarServices::bookingService(
     $db->getPdo(),
     $settingsService,
     $hookManager,
-    $mailer,
+    $brandedEmailSender,
     $frontendUrls,
     $queueService,
     $logger,
@@ -5438,6 +5468,22 @@ $notificationPreferencesHandler = new \Whity\Api\NotificationPreferencesApiHandl
 $router->register('GET', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'list'],   null);
 $router->register('PUT', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'update'], null);
 
+// Web push: a person's devices and the instance's public key (WHIT-1073).
+// Self-scoped, session-gated, no RBAC permission. The key pair is made on
+// first use and kept encrypted with the shared key ring.
+$pushSubscriptionsHandler = new \Whity\Api\PushSubscriptionsApiHandler(
+    $tokenValidator,
+    new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
+    static fn (): \Whity\Core\Notification\Push\VapidKeys => new \Whity\Core\Notification\Push\VapidKeys(
+        $globalSettingsRepository,
+        \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+    ),
+    \Whity\Core\Notification\Push\PushEndpoint::extraHostsFrom($_ENV),
+);
+$router->register('GET',    '/api/me/push-subscriptions',             [$pushSubscriptionsHandler, 'list'],      null);
+$router->register('POST',   '/api/me/push-subscriptions',             [$pushSubscriptionsHandler, 'subscribe'], null);
+$router->register('DELETE', '/api/me/push-subscriptions/{id:\d+}',    [$pushSubscriptionsHandler, 'remove'],    null);
+
 // A person's text size and Show technical details (design decisions W.3, A.3).
 // Self-scoped, session-gated, no RBAC permission.
 $displayPreferencesHandler = new \Whity\Api\DisplayPreferencesApiHandler($tokenValidator, $db->getPdo());
@@ -5531,12 +5577,8 @@ $router->register('POST', '/api/settings/mail/test',         [$mailSettingsHandl
 // consumer until persisted documents became a second one, and those are wired
 // above this point. It is the same per-tenant routing driver described there —
 // shared, never rebuilt, so reads and writes can never split across backends.
-$brandingService = new \Whity\Core\Branding\BrandingService(
-    $settingsService,
-    $storageDriver,
-    new \Whity\Core\Branding\BrandingAssetValidator(new \Whity\Core\Branding\SvgSanitizer()),
-    $entitlementService
-);
+// $brandingService is built earlier, before the document verification handler
+// (WHIT-1044), which also sends the issuer's brand.
 $brandingHostRepo = new \Whity\Core\Branding\TenantHostRepository($db->getPdo());
 $hostResolver = new \Whity\Core\Branding\HostResolver(
     $brandingHostRepo,
@@ -5559,6 +5601,7 @@ $publicBookingHandler = new \Whity\Api\PublicBookingApiHandler(
     $hostResolver,
     $publicFormBotCheck,
     new DatabaseSharedStore($db->getPdo()),
+    $brandingService,
 );
 $router->register('GET',  '/api/public/booking/{workspace}',                       [$publicBookingHandler, 'page'],        null);
 $router->register('GET',  '/api/public/booking/{workspace}/slots',                 [$publicBookingHandler, 'slots'],       null);
@@ -5613,15 +5656,15 @@ $publicSignupHandler = new \Whity\Api\PublicSignupApiHandler(
     $hostResolver,
     $publicFormBotCheck,
     new \Whity\Core\Signup\CustomerSignupMailer(
-        $mailer,
+        $brandedEmailSender,
         $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::SIGNUP_CONFIRM),
-        new \Whity\Core\Mail\EmailLayout(),
-        $settingsService
     ),
     new DatabaseSharedStore($db->getPdo()),
     $auditLogger,
     // WHIT-917: the sign-in providers a visitor may join with, listed up front.
-    $joinProviders
+    $joinProviders,
+    // WHIT-1044: the workspace's logo and colour on the join pages.
+    $brandingService,
 );
 // The confirm pair first, so it can never be read as a workspace slug.
 $router->register('GET',  '/api/public/signup/confirm',               [$publicSignupHandler, 'preview'], null);
@@ -5646,6 +5689,7 @@ $messagingService = \Whity\Core\Messaging\CoreMessaging::build(
     static fn (string $name, array $payload, array $opts): ?int => $queueService->dispatch($name, $payload, $opts),
     $planLimitMeters,
     (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+    $brandedEmailSender,
 );
 \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messagingService);
 // WHIT-967 (SDK 1.99): a plugin messages a workspace's customer through Messages.
@@ -5679,7 +5723,15 @@ $router->register('POST',  '/api/messages/settings/inbound-secret',       [$mess
 // caller (or the calling agent) is not in answers 404. What an agent may do in
 // a chat is set per chat, by the person who added it.
 $chatRepository = new \Whity\Core\Chat\ChatRepository($db->getPdo());
-$chatHandler = new \Whity\Api\ChatApiHandler(new \Whity\Core\Chat\ChatService($chatRepository));
+// WHIT-1077: each chat line is pushed to the chat's other people who have a
+// device on and aren't looking at that chat.
+$chatHandler = new \Whity\Api\ChatApiHandler(new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core\Chat\ChatPushNotifier(
+    $notificationDispatcher,
+    $chatRepository,
+    new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
+    new \Whity\Core\Store\DatabaseSharedStore($db->getPdo()),
+    $logger,
+)));
 $router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null);
 $router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null);
@@ -5688,6 +5740,7 @@ $router->register('GET',    '/api/chat/chats/{id:\d+}/messages',                
 $router->register('POST',   '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'post'],          null);
 $router->register('POST',   '/api/chat/chats/{id:\d+}/proposals',               [$chatHandler, 'shareProposal'], null);
 $router->register('POST',   '/api/chat/chats/{id:\d+}/read',                    [$chatHandler, 'markRead'],      null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/focus',                   [$chatHandler, 'focus'],         null);
 $router->register('POST',   '/api/chat/chats/{id:\d+}/members',                 [$chatHandler, 'addMember'],     null);
 $router->register('DELETE', '/api/chat/chats/{id:\d+}/members/{member:\d+}',    [$chatHandler, 'removeMember'],  null);
 $router->register('POST',   '/api/chat/messages/{id:\d+}/approve',              [$chatHandler, 'approve'],       null);
@@ -5710,6 +5763,7 @@ $publicChatHandler = new \Whity\Api\PublicChatApiHandler(
     $publicFormBotCheck,
     new DatabaseSharedStore($db->getPdo()),
     hash('sha256', 'whity.webchat.ip|' . $jwtSecret),
+    $brandingService,
 );
 $router->register('GET',  '/api/public/chat/{workspace}',               [$publicChatHandler, 'info'],  null);
 $router->register('POST', '/api/public/chat/{workspace}/conversations', [$publicChatHandler, 'start'], null);
@@ -5745,7 +5799,8 @@ $workspaceSignupHandler =new \Whity\Api\WorkspaceSignupApiHandler(
     $customerSignupService,
     $auditLogger,
     $publicFormBotCheck,
-    $joinProviders
+    $joinProviders,
+    new \Whity\Core\Signup\JoinDecisionMailer($brandedEmailSender, $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::SSO_LOGIN)),
 );
 $router->register('GET',  '/api/signup/settings',                   [$workspaceSignupHandler, 'getSettings'],    null, null, CorePermissions::SIGNUP_MANAGE);
 $router->register('PUT',  '/api/signup/settings',                   [$workspaceSignupHandler, 'updateSettings'], null, null, CorePermissions::SIGNUP_MANAGE);
@@ -5974,6 +6029,7 @@ $mcpTokenHandler = new McpTokenHandler(
 );
 $router->register('POST',   '/api/mcp/tokens',       [$mcpTokenHandler, 'create']);
 $router->register('GET',    '/api/mcp/tokens',       [$mcpTokenHandler, 'list']);
+$router->register('GET',    '/api/mcp/tokens/starting-grant', [$mcpTokenHandler, 'startingGrant']);
 $router->register('DELETE', '/api/mcp/tokens/{jti}', [$mcpTokenHandler, 'revoke']);
 $router->register('GET',    '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'grant']);
 $router->register('PATCH',  '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'updateGrant']);
@@ -6147,7 +6203,6 @@ $agentProposals = new \Whity\Core\Agent\AgentProposalRepository(
 (new \Whity\Core\Notification\AgentEmailNotifier(
     $db->getPdo(),
     $agentProposals,
-    new \Whity\Core\Notification\NotificationPreferenceRepository($db->getPdo()),
     $profileEmailRepository,
     new DatabaseSharedStore($db->getPdo()),
     $brandedEmailSender,

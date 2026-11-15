@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/lib/auth-context';
+import { apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { useTranslation } from '@whity/features/i18n';
@@ -22,13 +22,12 @@ export function RevokeAiPrincipalModal({
   own = false,
   onSuccess,
 }: RevokeAiPrincipalModalProps) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
 
   const handleRevoke = async () => {
     try {
-      const response = await apiClient(
+      const response = await apiFetch(
         `/api/v1/${own ? '' : 'admin/'}mcp/tokens/${principal.jti}`,
         { method: 'DELETE' }
       );
