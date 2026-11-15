@@ -154,7 +154,7 @@ final class TenantOwnedTables
         'chats' => '253_create_team_chat.php',
         'chat_members' => '253_create_team_chat.php',
         // One chat (UC.1): each person's pins and read marks on any conversation.
-        'chat_person_state' => '278_create_chat_person_state.php',
+        'chat_person_state' => '281_create_chat_person_state.php',
 
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says

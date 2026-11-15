@@ -92,8 +92,8 @@ final class ChatInbox
         $max = (int) $stmt->fetchColumn();
         $mark = max(0, min($messageId, $max));
 
-        $current = $this->db->prepare('SELECT last_read_message_id FROM chat_person_state WHERE conversation_id = :cid AND profile_id = :pid');
-        $current->execute([':cid' => $conversationId, ':pid' => $viewer->profileId]);
+        $current = $this->db->prepare('SELECT last_read_message_id FROM chat_person_state WHERE tenant_id = :tid AND conversation_id = :cid AND profile_id = :pid');
+        $current->execute([':tid' => $tenantId, ':cid' => $conversationId, ':pid' => $viewer->profileId]);
         $was = $current->fetchColumn();
         if ($was !== false && (int) $was >= $mark) {
             return;

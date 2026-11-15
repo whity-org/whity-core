@@ -17,7 +17,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Rbac\PermissionResolver;
 
 /**
- * One chat on the real schema (design 3.5, UC.1, WHIT-1093; migration 278):
+ * One chat on the real schema (design 3.5, UC.1, WHIT-1093; migration 281):
  * team chats and customer conversations in one list, customer conversations
  * only for people who may read them, pins and read marks per person, and
  * nobody pinning or reading what they can't see.
