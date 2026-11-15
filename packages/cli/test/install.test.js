@@ -225,3 +225,12 @@ test('a missing owner account fails the install instead of printing how to sign 
   await assert.rejects(install({ dir, version: 'v0.2.22' }, deps), /Finding the owner account failed/);
   assert.equal(existsSync(join(dir, MARKER)), true, 'so the same command can continue');
 });
+
+test('it waits only for services with a healthcheck, which Compose 2.33 insists on', async (t) => {
+  const dir = tempDir(t);
+  const deps = fakeDeps({ running: '0.2.22' });
+  await install({ dir, version: 'v0.2.22' }, deps);
+  const wait = deps.calls[indexOfCall(deps.calls, 'up -d --wait --wait-timeout')];
+  assert.match(wait, /--wait-timeout 180 postgres web$/);
+  assert.ok(indexOfCall(deps.calls, 'compose up -d') < indexOfCall(deps.calls, 'up -d --wait --wait-timeout'));
+});

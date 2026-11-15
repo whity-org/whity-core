@@ -217,7 +217,7 @@ export async function install(options, deps) {
   await step(m.labelStartDatabase(), await run.compose(['up', '-d', '--wait', 'postgres'], loud));
   await step(m.labelMigrations(), await run.cli(['migrate', 'run'], loud));
   await step(m.labelSeed(), await run.cli(['seed'], loud));
-  await step(m.labelStartWhity(), await run.compose(['up', '-d', '--wait', '--wait-timeout', '180'], loud));
+  await step(m.labelStartWhity(), await run.startAndWait([], loud));
   try {
     await smoke({ run, env, version, deps });
   } catch (error) {

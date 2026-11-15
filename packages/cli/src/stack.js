@@ -22,9 +22,31 @@ export function stack(dir, envText, deps) {
   const docker = (args, options = {}) => deps.exec(args, { cwd: dir, env, ...options });
   const compose = (args, options = {}) => docker(['compose', ...args], options);
 
+  /**
+   * Starts everything, then waits for the services that have a healthcheck.
+   * Waiting on all of them fails on Compose 2.33 and newer: the workers turn their
+   * healthcheck off, and `up --wait` refuses a service with none ("has no
+   * healthcheck configured") although everything is running.
+   */
+  const startAndWait = async (extra = [], options = {}) => {
+    const started = await compose(['up', '-d', ...extra], options);
+    if (started.code !== 0) return started;
+    const config = await compose(['config', '--format', 'json']);
+    let services = [];
+    try {
+      services = Object.entries(JSON.parse(config.stdout).services ?? {})
+        .filter(([, service]) => !service.healthcheck?.disable)
+        .map(([name]) => name);
+    } catch {
+      // An older Compose without --format json: wait for everything, as before.
+    }
+    return compose(['up', '-d', '--wait', '--wait-timeout', '180', ...services], options);
+  };
+
   return {
     docker,
     compose,
+    startAndWait,
     /** Runs a command in a new container of the install's current image. */
     cli: (args, options = {}) => compose(['run', '--rm', '-T', 'frankenphp', 'php', 'bin/whity-cli', ...args], options),
     pullImages: async (version, { announce = true, ...options } = {}) => {

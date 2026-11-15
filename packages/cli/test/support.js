@@ -34,6 +34,9 @@ export function fakeDeps({ running = '0.2.21', target = '0.2.22', fail = {}, dum
     if (line.includes('compose version')) return ok('2.30.0');
     if (line.includes('version --format')) return ok('27.3.1\n');
     if (line.includes('profile_emails')) return ok('1\n');
+    if (line.includes('config --format json')) {
+      return ok(JSON.stringify({ services: { postgres: { healthcheck: { test: ['x'] } }, web: {}, 'queue-worker': { healthcheck: { disable: true } } } }));
+    }
     if (line.includes('config --services')) return ok('postgres\nfrankenphp\nweb\nqueue-worker\n');
     if (line.includes('pg_restore --list')) return ok('1; TABLE DATA public users\n');
     if (line.includes('count(*) FROM')) {
