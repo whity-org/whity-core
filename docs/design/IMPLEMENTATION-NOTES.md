@@ -1,5 +1,22 @@
 # Implementation notes
 
+# Design 3.5.1: US dollars (15 Nov 2026)
+
+3.5.1 makes US dollars the default currency (register CU.1–CU.5); the owner approved the plan on 15 Nov 2026. Core stays multi-currency: each workspace has a currency (`billing.default_currency`, USD for new workspaces) and every stored amount keeps its own row's currency. Workspaces that existed before 3.5.1 are pinned to the currency they had (JOD), and no stored amount is rewritten.
+
+| PR | Ticket | What |
+| --- | --- | --- |
+| 1 | WHIT-1085 | This unpack: 3.5.1 into `docs/design`, `START-HERE.md` moved here, the CLAUDE.md snippet |
+| 2 | WHIT-1086 | `Currency::display` (CU.2) and amount in words for USD, EUR, JOD, SAR, AED |
+| 3 | WHIT-1087 | Default USD; migration 277 pins existing workspaces to their currency |
+| 4 | WHIT-1088 | Web `moneyText`, `Money`, `MoneyInput`, the workspace currency in new-amount forms |
+| 5 | WHIT-1089 | Document fields, invoice words, starters in the workspace currency |
+| 6 | WHIT-1090 | Seeds, samples and text in US dollars |
+
+Not done here: JoFotara isn't built in core, and the 16% sales tax is the generic per-workspace `billing.tax_rate_bp`; both stay as they are for Jordanian workspaces. Whity Cloud's own prices in dollars are the owner's to set (whity-web). The 3.5 calendar (CV) and one chat (UC) organise step, with A16 and A17, is separate.
+
+For the design team: `CLAUDE-snippet.md` still gives "JOD 49.000" as the money example; CLAUDE.md adds the CU rule under Team additions.
+
 # Design 3.4 working plan (14 Nov 2026)
 
 The working plan for design system 3.4, checked against `develop` at `1b681fd7` on 14 Nov 2026 (WHIT-1019). This is step 1 of `START-HERE.md`: organise, no feature code. 3.4 adds four milestones to `PLAN.md`: A14 (the web app on a phone), A15 (screens and surfaces with no card before 3.4), P1 (form printouts) and E2 (the ten 3.4 emails). The 3.3 working plan of 12 Nov is kept unchanged [below](#design-33-working-plan-12-nov-2026), and so are the 2.9 plan and the M0 notes under it.

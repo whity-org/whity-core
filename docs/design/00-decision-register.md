@@ -191,7 +191,7 @@ Overall ratio: side 8, offset 3, radius 2, edge 1.
 
 Other rules:
 - Sentence case everywhere.
-- Western digits, JOD with 3 decimals, dates as 27 Oct 2026 (27/10/2026 where space is short), 24-hour times.
+- Western digits, money in the workspace's currency with its own decimals (designs use US dollars: $301.60, CU.1), dates as 27 Oct 2026 (27/10/2026 where space is short), 24-hour times.
 
 ## Stage 6 · Document components (locked 28 Oct 2026)
 These are the building blocks for everything Whity Render prints. They were shown on an A4 tax invoice for the demo tenant, Example Bakery (burnt orange).
@@ -209,8 +209,8 @@ These are the building blocks for everything Whity Render prints. They were show
 | --- | --- | --- |
 | 6.5 | Type | Body Noto Sans 9.5 pt, labels 8.5 pt, title Readex Pro 600 at 22 pt, codes in Geist Mono. |
 | 6.6 | Line-item table | A strong rule under the header and hairlines between rows. No zebra stripes, no grid. |
-| 6.6 | Totals | End-aligned block 46% wide. Only the grand total is bold, with a 1.5 pt rule above. The amount is written in words under it in both languages (dinars and fils). |
-| 6.6 | Numbers | Tabular figures, end-aligned, JOD to 3 decimals. |
+| 6.6 | Totals | End-aligned block 46% wide. Only the grand total is bold, with a 1.5 pt rule above. The amount is written in words under it in both languages, in the document's currency (dollars and cents in designs, CU.3). |
+| 6.6 | Numbers | Tabular figures, end-aligned, to the currency's decimals (US dollars: 2, CU.1). |
 | 6.7 | Footer | The JoFotara stamp, reference and "Page x of y" at the start side; the QR code ("Scan to verify") at the end side. |
 | 6.7 | Continuation pages | A small running header (logo, number, "continued"), the table header repeated, "Carried forward" at the foot, and totals on the last page only. |
 | — | Legal fields | Every legal field comes from tenant settings. Confirm the required invoice fields with an accountant and the JoFotara specification before shipping. |
@@ -249,8 +249,8 @@ These are the building blocks for everything Whity Render prints. They were show
 
 ### Built 28 Oct 2026
 - Design system v2.0 draft published: logo files, tokens and components rebuilt from stages 1–7.
-- `Doc` component (Whity Render): A4, A5 and US Letter pages to the stage 6 rules; either language leads; continuation pages (14 rows on page 1, 20 after, totals on the last page only, "Brought forward" and "Carried forward"); amount in words for JOD in English and Arabic; `--doc-accent`, the tenant's print colour, the same in light and dark mode.
-- Sales documents: quote, tax invoice (English leads, Arabic leads, and a two-page version), credit note and A5 receipt. They tell one story: QUO-0318 → INV-1042 (JOD 301.600) → CN-0012 (JOD 98.600) → RCT-0207 (JOD 203.000).
+- `Doc` component (Whity Render): A4, A5 and US Letter pages to the stage 6 rules; either language leads; continuation pages (14 rows on page 1, 20 after, totals on the last page only, "Brought forward" and "Carried forward"); amount in words for the document's currency in English and Arabic (CU.3); `--doc-accent`, the tenant's print colour, the same in light and dark mode.
+- Sales documents: quote, tax invoice (English leads, Arabic leads, and a two-page version), credit note and A5 receipt. They tell one story: QUO-0318 → INV-1042 ($301.60) → CN-0012 ($98.60) → RCT-0207 ($203.00).
 - Accounts documents: statement of account (running balance, ageing), payment reminder (short letter, overdue invoices only, sent by the Billing assistant with approval) and delivery note (no prices, signed on receipt).
 - People documents: payslip (earnings and deductions in separate columns, net pay in words, leave balance beside the totals), employment letter (Arabic leads, salary in figures and words, QR to verify) and leave approval (balance before and after, approval trail from the audit log).
 - General documents: a two-page sales report (summary, key numbers, chart, tables, notes), a business letter and a purchase order.
@@ -303,7 +303,7 @@ These are the building blocks for everything Whity Render prints. They were show
 - Agent activity: filter by agent.
 - Plan names and prices in cards replaced with placeholders, as stage 5 words require.
 - The agent icon is the robot face everywhere (old wording removed from the Icon card and README).
-- From the independent check against this register: the label on the main colour is pure white (#ffffff, 6.1:1, decision 2.1), not #fafafa; selected text on the dark tint is the main colour on dark (#59a0f9, 5.1:1; the partner's #e97c47, 4.9:1), decision 7.3; the 20px brand headline tracks −1%; the 700 font files and Geist Mono 600 are no longer declared; empty-state icons are 24px (5.2); menu items have 8px corners (¼ of 32); `Money` shows JOD with 3 decimals; the branding screen derives the whole tenant set from one colour (`Whity.tenantTheme`, decision 2.8); the stale v1 wording in the Button, Mark, Lockup, Icon, Actor chip, Badge, Tabs, Menu, Branding, Money and Page header READMEs was corrected.
+- From the independent check against this register: the label on the main colour is pure white (#ffffff, 6.1:1, decision 2.1), not #fafafa; selected text on the dark tint is the main colour on dark (#59a0f9, 5.1:1; the partner's #e97c47, 4.9:1), decision 7.3; the 20px brand headline tracks −1%; the 700 font files and Geist Mono 600 are no longer declared; empty-state icons are 24px (5.2); menu items have 8px corners (¼ of 32); `Money` shows the currency's symbol or code with its decimals ($312.00, CU.2); the branding screen derives the whole tenant set from one colour (`Whity.tenantTheme`, decision 2.8); the stale v1 wording in the Button, Mark, Lockup, Icon, Actor chip, Badge, Tabs, Menu, Branding, Money and Page header READMEs was corrected.
 
 ### Values set while building (follow the locked rules)
 - Large controls are 40px, for a single call to action; corners 10px (¼ rule).
@@ -530,7 +530,7 @@ Values set while drawing, open to change:
 - The settings sub-nav adds a Devices group (Licensed devices), which had no link in the built app.
 - Tags and tag groups share one page. Translations shows coverage tiles and "Only missing Arabic" by default.
 - Text size Larger is 17px, every size one step up.
-- Prices and discounts are typed with MoneyInput in normal units with the currency's decimals; Promotions default to JOD.
+- Prices and discounts are typed with MoneyInput in normal units with the currency's decimals; Promotions default to the workspace's currency (US dollars in designs).
 - System refreshes every minute and says so. Errors lead with plain words; technical details on request.
 - Platform settings: install-wide switches as sentences; Email, File storage, Languages and Error tracking as tabs.
 
@@ -699,17 +699,17 @@ The roadmap's near-term design items N1–N9 (R.1) are drawn. Values set while d
 - Custom fields: twelve kinds (short and long text, choose one or several, amount, date, time range, a person, a contact, yes or no, file, formula); usable at once in lists, filters, document merge fields and flow conditions.
 - Import: Excel or CSV; Whity suggests matches and fixes what it can (adds +962), says what will be created, updated and skipped before anything changes, and the whole import can be undone for 24 hours.
 - Receiving and bills: three-way match (ordered, received, billed) line by line; the Bookkeeping assistant reads the bill and proposes the fix for a mismatch.
-- Waste: reasons from a short list; approval above JOD 25 a line by the branch manager; end-of-day reminder at closing time.
+- Waste: reasons from a short list; approval above $25 a line by the branch manager; end-of-day reminder at closing time.
 - Bank reconciliation: statements uploaded or forwarded; exact matches confirmed together; the assistant's likely matches dashed; the month closes at a zero difference.
 - Reports: profit and loss against the previous period, who owes us and whom we owe by 0, 1–30, 31–60 and 60+ days, balance sheet, stock value, sales tax; PDF and a monthly email.
-- The 80 mm receipt: 72 mm printable, Geist Mono, sales tax 16%, JOD to 3 decimals, the JoFotara QR, Arabic mirrored with Western digits.
+- The 80 mm receipt: 72 mm printable, Geist Mono, sales tax 16%, the currency's decimals ($ with 2 in designs), the JoFotara QR, Arabic mirrored with Western digits.
 - Agent notifications by email and WhatsApp only open Whity, like push (M.44); at most one per agent per hour except sign-in approvals.
 
 ## Websites (8 November 2026)
 
 | # | Decision | Choice |
 | --- | --- | --- |
-| WS.1 | whity.dev | Two doors, companies first: the page speaks to small companies (what Whity does, agents, made for here, your brand, plans in JOD), with a second door to builders (open source, SDK, MCP) |
+| WS.1 | whity.dev | Two doors, companies first: the page speaks to small companies (what Whity does, agents, made for here, your brand, plans in US dollars), with a second door to builders (open source, SDK, MCP) |
 | WS.2 | Deliverable | Each site as design-system cards plus build-ready static pages: whity.dev, brand.whity.dev, health.whity.dev, id.whity.dev (sign in, approve on the phone, account), docs.whity.dev (home and an article). Section 29 |
 | WS.3 | Languages | English and Arabic, fully mirrored under `/ar/`; the name stays "Whity" in Latin letters |
 | WS.4 | People in the designs | The Whity team stands in for every person in cards, pages and docs: Amro Saleh, Awss Haddad, Ahmad Khalil, Ibrahim Mansour, Emad Nasser (Arabic: عمرو صالح، أوس حداد، أحمد خليل، إبراهيم منصور، عماد ناصر). Where a screen needs more than five people, a team first name takes another common surname. Companies stay fictional (Example Bakery and friends) |
@@ -717,7 +717,7 @@ The roadmap's near-term design items N1–N9 (R.1) are drawn. Values set while d
 | WS.6 | whity.dev hero | Headline kept ("Your company's work, in one place. Agents prepare it. You approve it."); the picture is the web Home with the phone in front, both showing what's waiting for approval; Book a demo opens Whity's own booking page |
 | WS.7 | What it does, and module pages | The home section leads with four large cards (invoices and money, stock and recipes, approvals, documents and signing), each with a small screen and a link to its page; the other four sit in a compact row. Each of the four gets its own page from one template (hero with a screen, what you can do, agents, works with, questions, final call), in English and Arabic |
 | WS.8 | whity.dev Agents | One proposal visitors try themselves: Approve sets it down on the plane, Undo plays it back, and the three steps light up as it goes; then an "Agents never" list (do more than you allow, have more rights than their person, hide what they did, pass for a person). "Your name on it" lets visitors try a colour on the brand animation; each module page has its own animation |
-| WS.9 | whity.dev Made for here | Five points (Arabic and English, JoFotara, CliQ, WhatsApp, dinars to three decimals), each with a small animation, beside a receipt visitors switch between English and Arabic: the layout mirrors, the numbers don't change |
+| WS.9 | whity.dev Made for here | Five points (Arabic and English, JoFotara, CliQ, WhatsApp, any currency with its own decimals, dinars to three included), each with a small animation, beside a receipt visitors switch between English and Arabic: the layout mirrors, the numbers don't change |
 | WS.10 | Small details on the sites | The hero sets down once on load (the web Home lands on its plane, then the phone slides in); approving on the hero's phone updates the web Home behind it, with Undo; sections ease in once (10 px, 400 ms); the main button lifts and its plane grows on hover; clickable cards lift onto the plane; the nav gets a line once the page scrolls. None of it runs when less motion is asked for, and every page works without it |
 | WS.11 | whity.dev For builders | A terminal types the real install commands from whity.dev/install once when seen, with Copy and Play again; three cards (open source, build apps, agents can run it) with small animations; one line for agencies ("sell Whity under your own brand") linking to a partners page to design later. The terminal stays left to right in Arabic |
 | WS.12 | whity.dev Questions, final call, footer | Eight straight answers, always open (free, growing past 5, agents, where data is kept, leaving, Arabic, developers, who approves), then "Book 30 minutes with the team"; the final call sits on its own sheet on the plane with four ticks (free for 5, no card, Arabic and English, leave with your data); the footer shows live status from health.whity.dev (a plain link if it doesn't answer), the four promises and Back to top |
@@ -753,7 +753,7 @@ Approved by the owner on 9 November 2026, for now; trusted reviewers have the on
 | BM.8 | Who hosts the services | Whity is the only host of Whity ID and Whity Render by default, for every installation, under the same limits. The exception is a paid on-premises licence (minimum contract, usage reported back) for regulated companies (banks, clinics, government) and large partners. Self-hosted installations keep working for a while if Whity ID can't be reached (open sessions continue; a local owner sign-in for emergencies). Core keeps supporting standard sign-in (OIDC), so Whity ID wins on convenience, not lock-in |
 | BM.9 | Data region | Hosted services run in a region Jordan's data protection law (No. 24 of 2023) accepts for transfers, to be confirmed by a Jordanian lawyer; a Jordan-only setup is offered at a higher price for regulated companies |
 | BM.10 | Partners | Agencies resell Whity to their clients under their own brand and choose how: a **partner price** (`[n]`% off; they invoice their clients; full white-label including domains) or a **revenue share** (clients pay Whity; the agency gets `[n]`% every month) |
-| BM.11 | Promises | Published on whity.dev and in the docs: **Open stays open** (Core stays open source for good; nothing free moves behind a paywall); **Your data is yours** (export everything any time in open formats; leaving costs nothing; Core works with any standard sign-in provider); **Free means free** (the full product, not a trial, no card; passing a limit warns first and never locks out or deletes); **Plain pricing** (published prices in JOD, monthly for small companies, no hidden fees; charges for hosting, services, white-label and support) |
+| BM.11 | Promises | Published on whity.dev and in the docs: **Open stays open** (Core stays open source for good; nothing free moves behind a paywall); **Your data is yours** (export everything any time in open formats; leaving costs nothing; Core works with any standard sign-in provider); **Free means free** (the full product, not a trial, no card; passing a limit warns first and never locks out or deletes); **Plain pricing** (published prices in US dollars, monthly for small companies, no hidden fees; charges for hosting, services, white-label and support) |
 
 Open: prices, the partner discount and share, pack sizes, the agent work included in each plan, the hosting sizes. Core is AGPL, so others may host Core commercially; the closed services, the partner programme and the trademark (section 11) are what only Whity sells.
 
@@ -861,6 +861,56 @@ A sweep of every route and everything Whity sends or shows outside the app (117 
 | SU.8 | Emails, the rest | Bookings (confirmed and moved carry an `.ics` with one UID for the booking’s life; cancelled sends METHOD:CANCEL), form received, form decision with the printout PDF, sign request, join approved and declined, message reply (threads back into Messages). Each in English and Arabic; 25 emails in all | `EmailBookings`, `EmailForms`, `EmailJoining` |
 | SU.9 | Cards in dark mode | Every card follows the Design System’s theme, Arabic cards included (they set `dir` and `lang` after load so the theme can apply). Email cards show the emails’ own dark-mode styles; printed pages stay white on a dark ground | all |
 | SU.10 | A customer’s own booking (`/booking/[token]`, WHIT-945) | The page every booking email and message links to: no sign-in, in the workspace’s brand, English or Arabic. The booking, then Add to my calendar (main), Move it, Cancel it, and the online deadline in a sentence. Moving: the next days and free times as 44px buttons, taken times crossed out, the button names the new time. Cancelling names what happens to the deposit first; the reason is optional and goes to Messages. Inside the cut-off (24 hours by default) the actions become Message and Call; a time just taken says nothing changed; an old link points to the latest email | `TplBookingManage` |
+
+## The calendar, like Google Calendar (version 3.5, 14 November 2026)
+
+Owner's answers: Day, 4 days, Week, Month and Year; a Google-style left panel; staff choose what colours mean; create, move and resize on the grid like Google; the sidebar collapsed on calendar screens; phones designed too. Cards: `TplCalendarWeek`, `TplCalendarViews`, `TplCalendarEditing`, `TplCalendarPhone`; `TplCalendarStaff` keeps the booking sheet, hours, services, rooms and settings.
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| CV.1 | The app's sidebar | On calendar screens the sidebar starts as the 56px rail; the menu button opens it, and a person who opens it keeps it open on their calendar |
+| CV.2 | The left panel | New booking (the one main button), a mini month with the shown range banded, search, People and Rooms and branches as coloured checkboxes, Also show (team events, time off, cancelled), the time zone. Choices are remembered for each person |
+| CV.3 | The bar | Today, ‹ ›, the range as a 22px title, Colour by, the view, and the gear for Services, Rooms and branches, Hours and time off and Settings (the old tabs) |
+| CV.4 | Colour by | **Owner:** staff choose Person, Service or Room or branch, for themselves only. Colours from the 2.7 series in order; the matching checkboxes take the colour; the name is always written on the booking, so colour is never the only signal |
+| CV.5 | A booking on the grid | A 20% tint with a 4px bar at the start; 13px text: start time and service, then customer and person from 54 minutes; waiting for payment dashed, team events grey, time off striped; overlapping bookings cascade (66% wide, offset) |
+| CV.6 | The grid and details | 48px an hour from the earliest opening to the latest closing hour; the week from the workspace's first day; the weekend shaded; All day row; now as a red line with a dot; today filled. Clicking a booking opens its details beside it (when, customer and phone, with, where, paid, how booked; Move, Message, Cancel, Open booking); Esc closes |
+| CV.7 | Views | **Owner:** Day, 4 days, Week, Month, Year (keys D, X, W, M, Y). Day adds the room; 4 days starts from the day in view; Month shows up to three bookings a day then “n more”, leave as bars; Year shades each day by bookings in steps of the main colour. View and range remembered per person; Week first |
+| CV.8 | Creating | **Owner:** like Google. Click an empty time (the default service's length) or drag; the slot stays dashed until Save; a quick booking beside it (Booking, Event, Time off; service, customer, with, where, “Email a confirmation”); More options opens the full sheet |
+| CV.9 | Moving and resizing | Drag in 15-minute steps, across days; pull the bottom edge to change the length; the time shows in a dark label. A customer's booking asks first with “Email the new time” ticked; then Undo for 10 seconds. A busy person warns with Book anyway; a taken room, closed branch or a 409 sends it back and says why |
+| CV.10 | Without dragging | Every change also works from Move in the details and with the keys (arrows move the selected booking, Enter saves, Esc cancels); on touch, press and hold half a second |
+| CV.11 | On a phone | Day, 3 days (the phone's Week) and Month with the chosen day's list; ☰ opens a drawer with views, Colour by, People, Rooms; bookings open a sheet with Call; + Booking floats on its plane; tap an empty time for New booking; press and hold to move, letting go asks first. 14px on the grid, 17px elsewhere, 56px an hour |
+
+## One chat (version 3.5, 14 November 2026)
+
+Owner's answers: team Chat and customer Messages become one, streamlined, with groups, blocks and bots; replies, threads, reactions; files, voice, photos; seen, typing, unread; mentions, pins, search; three panes; bubbles or compact rows as each person chooses. “Blocks” is taken both ways: rich blocks inside messages, and blocking unwanted senders. Cards: `TplChatHub`, `TplChatCompact`, `TplChatParts`, `TplChatPhone`.
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| UC.1 | One chat | **Owner:** Chat replaces Messages in the sidebar (and is the phone's Chat tab, CH.3). One list for people, groups, customers on any channel (WhatsApp, email, the website chat box, SMS), agents and bots, the channel as a badge on the picture. Tabs: All, Unread, Customers, Team, Groups, Agents and bots; pinned chats on top. Routes: `/admin/messages` redirects to `/chat` |
+| UC.2 | Layout | **Owner:** three panes: list 340px, the conversation, and a 360px right pane for details or a thread. Under 1280px the right pane opens over the conversation; on a phone each is its own screen |
+| UC.3 | Customer chats | Keep assign, close, Reply or Internal note (warm, dashed, “Only the team sees this”), the channel to send by, and the customer's open orders, bookings and files on the right. Each reply shows which teammate sent it; the customer sees the workspace |
+| UC.4 | Bots and agents | Bots follow rules set in Settings › Chat (away reply, welcome menu, order status, stock alerts, hand-over), grey with a Bot tag and the trigger icon, and never decide anything. Agents keep CH.1–CH.2: robot face, Agent tag; a suggested reply waits above the box until a person uses it; changes arrive as approval blocks |
+| UC.5 | Blocks in messages | A Whity record (order, invoice, booking), a payment link, booking times, a form to fill, a poll, an approval; live status and only the actions the reader may take |
+| UC.6 | Threads | “n replies” under a message opens it in the right pane; “Also send to the chat” posts a reply to both |
+| UC.7 | Bubbles or rows | **Owner:** each person chooses in Account › Preferences › Chat, with a live preview. Bubbles by default: theirs on the start side on the card, mine on the end side in the main colour's tint. Compact rows: picture, name and time on the start side |
+| UC.8 | Details and search | Group details: people, agents (who they work for, what they may do), bots, add, pinned, photos, files and links, Mute, Leave. Search in a chat filters by person, photos, files and links, highlights words and opens the message in place |
+| UC.9 | Actions | Hover (or press and hold) shows three quick reactions, more, Reply, Reply in thread and ⋯ (Pin, Copy, Forward, Turn into a task in Taskaat, Edit and Delete for own messages); swiping a message on a phone replies |
+| UC.10 | Mentions, files and voice | @ lists the chat's people, agents and bots and @everyone; a mention notifies through mute. + attaches photos and videos, files, records, polls, and in customer chats payment links, forms and booking times. Voice is tap to record, tap Send, and is transcribed; photos send as an album |
+| UC.11 | Delivery and reading | Progress on the message; “Not sent” with Try again and nothing lost; two ticks, in the main colour once seen; Seen by lists who; WhatsApp reports reading, email and SMS don't, and the app says so. Typing shows under the last message and in the list; an unread line and “n new” |
+| UC.12 | Edit, delete and blocking | “edited” shows; delete for everyone within 2 days leaves “This message was deleted”; email and SMS can't be taken back. Admins can block a customer's number or address (optional spam report) and unblock in Settings › Chat; team members can't be blocked, only muted. Team groups hold people, agents and bots; customers stay in their own chats |
+| UC.13 | On a phone | The Chat tab: the list, a conversation, details and a thread as screens; 17px text; press and hold for reactions and actions; Reply or Note and the channel above the box in customer chats |
+
+## US dollars (version 3.5 update, 15 November 2026)
+
+Owner's answer: use US dollars everywhere. Every card, sample, document, email, website page and doc now shows dollars; the components stay currency-aware so a workspace in dinars, riyals or dirhams still gets its own decimals and words. This replaces the earlier JOD-with-3-decimals rules (sections 6.6, 7, WS.1, WS.9, BM.11 and the Money and MoneyInput notes), which now point here.
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| CU.1 | The currency in designs | **Owner:** US dollars, 2 decimals, Western digits, in English and Arabic: $312.00, $18,652.35. Prices that are still open stay `[price]`; JoFotara and the 16% sales tax stay as features for Jordanian workspaces |
+| CU.2 | How money is written | A currency with a symbol puts it before the number with no space ($312.00, €312.00), at the amount's own size and colour; a minus goes before the symbol (−$35.00). A currency without one writes its code and a space (JOD 312.000, SAR 312.00). In Arabic text the amount keeps this left-to-right form, isolated so it never flips; prose can say “312.00 دولار” |
+| CU.3 | Amount in words | Follows the document's currency: “Three hundred and one US dollars and sixty cents”, “ثلاثمئة وواحد دولاراً أمريكياً وستون سنتاً”. Dinars keep 1,000 fils; dollars, euros, riyals and dirhams have 100 sub-units |
+| CU.4 | Components | `Money`, `MoneyInput`, `Doc`, `DocAmount` and the document tables read the workspace's currency (default USD) for the symbol, decimals and words; `Whity.currencies`, `Whity.moneyText` and `Whity.amountInWords(amount, lang, currency)` are exported. MoneyInput's decimals error names the currency's own count |
+| CU.5 | What changed | 130 cards, 20 component notes, the generators, `bundle.js` and `bundle.css`, and docs 04, 07, 12, 13, 16, 17, 23, 25 and 29. Three-decimal sample amounts were rounded to cents, so receipts and invoices still add up |
 
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.

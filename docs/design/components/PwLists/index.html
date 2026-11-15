@@ -78,7 +78,7 @@
   function code(t) { return h('code', null, t); }
   var RT = 'rtl';
 
-  var INV = [['INV-1048', 'info', 'Sent', 'Awss Haddad', 'JOD 120.000', '20 Nov 2026'], ['INV-1047', 'destructive', 'Overdue', 'Ibrahim Mansour', 'JOD 312.000', '1 Nov 2026'], ['INV-1046', 'success', 'Paid', 'Emad Nasser', 'JOD 46.168', '28 Oct 2026'], ['INV-1045', 'secondary', 'Draft', 'Amman Coffee Co.', 'JOD 980.500', 'Not set'], ['INV-1044', 'success', 'Paid', 'Ahmad Khalil', 'JOD 75.000', '20 Oct 2026']];
+  var INV = [['INV-1048', 'info', 'Sent', 'Awss Haddad', '$120.00', '20 Nov 2026'], ['INV-1047', 'destructive', 'Overdue', 'Ibrahim Mansour', '$312.00', '1 Nov 2026'], ['INV-1046', 'success', 'Paid', 'Emad Nasser', '$46.17', '28 Oct 2026'], ['INV-1045', 'secondary', 'Draft', 'Amman Coffee Co.', '$980.50', 'Not set'], ['INV-1044', 'success', 'Paid', 'Ahmad Khalil', '$75.00', '20 Oct 2026']];
   function rows(sel) { return INV.map(function (r, i) { return h(F, { key: i }, row({ t: r[0], badge: badge(r[1], r[2]), sel: sel === undefined ? undefined : sel > i, lines: [['Customer', r[3]], ['Amount', r[4]], ['Due', r[5]]] })); }); }
   function listTop() { return title('Invoices', '48 invoices · Newest first', h(F, null, h('button', { className: 'pw-ib is-box', 'aria-label': 'Sort' }, I('sort', 22)), h('button', { className: 'pw-tbtn' }, 'Select'))); }
   function listPage() { return h(F, null, listTop(), scroll(plist.apply(null, rows())), tb('more', { search: sbar('Search invoices', 'New invoice') })); }
@@ -92,7 +92,7 @@
   var p5 = phone('Filtered · nothing found', h(F, null, title('Invoices', 'No matches', h('button', { className: 'pw-tbtn' }, 'Select')), fchips(['Overdue', 'Emad Nasser']),
     h('div', { className: 'wm-empty' }, h('span', { className: 'pw-emptyic' }, I('search', 32)), h('h2', null, 'No invoices match'), h('p', null, 'Nothing is overdue for Emad Nasser. Try fewer filters.'), h('div', { style: { paddingTop: 6 } }, h(W.Button, { variant: 'outline' }, 'Clear filters'))),
     tb('more', { search: sbar('Search invoices', 'New invoice') })));
-  var AR = [['INV-1048', 'info', 'مرسلة', 'أوس حداد', '120.000 د.أ', '20 تشرين الثاني 2026'], ['INV-1047', 'destructive', 'متأخرة', 'إبراهيم منصور', '312.000 د.أ', '1 تشرين الثاني 2026'], ['INV-1046', 'success', 'مدفوعة', 'عماد ناصر', '46.168 د.أ', '28 تشرين الأول 2026'], ['INV-1045', 'secondary', 'مسودة', 'قهوة عمّان', '980.500 د.أ', 'غير محدد']];
+  var AR = [['INV-1048', 'info', 'مرسلة', 'أوس حداد', '$120.00', '20 تشرين الثاني 2026'], ['INV-1047', 'destructive', 'متأخرة', 'إبراهيم منصور', '$312.00', '1 تشرين الثاني 2026'], ['INV-1046', 'success', 'مدفوعة', 'عماد ناصر', '$46.17', '28 تشرين الأول 2026'], ['INV-1045', 'secondary', 'مسودة', 'قهوة عمّان', '$980.50', 'غير محدد']];
   var p6 = phone('Arabic · Many rows', h(F, null, title('الفواتير', '48 فاتورة · الأحدث أولاً', h(F, null, h('button', { className: 'pw-ib is-box', 'aria-label': 'الترتيب' }, I('sort', 22)), h('button', { className: 'pw-tbtn' }, 'تحديد'))),
     scroll(plist.apply(null, AR.map(function (r, i) { return h(F, { key: i }, row({ t: r[0], badge: badge(r[1], r[2]), moreLabel: 'المزيد لـ ', lines: [['العميل', r[3]], ['المبلغ', r[4]], ['الاستحقاق', r[5]]] })); }))),
     tb('more', { T: TA, search: h('div', { className: 'wm-searchrow' }, search('ابحث في الفواتير', 'تصفية'), h('button', { 'aria-label': 'فاتورة جديدة' }, I('plus', 24))) })), { dir: RT });

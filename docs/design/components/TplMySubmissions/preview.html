@@ -31,7 +31,7 @@
   function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
   var _shell = shell; shell = function (a, k) { return _shell(a, k, { user: 'Ahmad Khalil', role: 'Staff \u00b7 Sweifieh' }); };
 
-  var rows = [{ id: 1, f: 'Leave request', d: '3–5 November', w: '—', st: ['secondary', 'Draft · step 2 of 3'], ref: '' }, { id: 2, f: 'Expense claim', d: 'Fuel for deliveries · JOD 24.000', w: 'Today, 09:40', st: ['warning', 'With Awss Haddad'], ref: 'EXP-0219' }, { id: 3, f: 'Daily stock count', d: 'Sweifieh, 1 November', w: 'Sun 1 Nov', st: ['success', 'Received'], ref: 'CNT-1182' }, { id: 4, f: 'Equipment fault', d: 'Mixer 2 at Sweifieh', w: 'Thu 29 Oct', st: ['success', 'Resolved'], ref: 'FLT-0087' }];
+  var rows = [{ id: 1, f: 'Leave request', d: '3–5 November', w: '—', st: ['secondary', 'Draft · step 2 of 3'], ref: '' }, { id: 2, f: 'Expense claim', d: 'Fuel for deliveries · $24.00', w: 'Today, 09:40', st: ['warning', 'With Awss Haddad'], ref: 'EXP-0219' }, { id: 3, f: 'Daily stock count', d: 'Sweifieh, 1 November', w: 'Sun 1 Nov', st: ['success', 'Received'], ref: 'CNT-1182' }, { id: 4, f: 'Equipment fault', d: 'Mixer 2 at Sweifieh', w: 'Thu 29 Oct', st: ['success', 'Resolved'], ref: 'FLT-0087' }];
   ReactDOM.createRoot(document.getElementById('root')).render(shell('My submissions', h(F, null,
     h(W.PageHeader, { title: 'My submissions', description: 'What you sent through forms, and where each one is now.' }),
     h('div', { className: 'wy-listbar' }, h(W.SearchField, { placeholder: 'Search your submissions' })),

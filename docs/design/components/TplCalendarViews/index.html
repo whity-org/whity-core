@@ -1,0 +1,144 @@
+<!-- @dsCard group="Templates · 3.5" height=4458 width=1600 subtitle="CV.7: the other views, each with the same panel and colours" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1600px;min-height:4458px}</style><meta charset="utf-8"><title>Calendar: day, 4 days, month, year</title><style>html,body{height:100%;margin:0} #root{min-height:100%}</style></head>
+<body>
+<div id="root"></div>
+<script>
+
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var HUE = W.brandHue('#0961bb');
+  var AR = { 'Dashboard': 'الرئيسية', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'Messages': 'الرسائل', 'Calendar': 'التقويم', 'My submissions': 'طلباتي', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات', 'Delegations': 'التفويضات', 'AI': 'الذكاء الاصطناعي', 'Agents': 'المساعدون', 'Connected AI apps': 'تطبيقات الذكاء المتصلة', 'What AI can do': 'ما يمكن للذكاء فعله', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Saved blocks': 'الكتل المحفوظة', 'Route templates': 'قوالب المسارات', 'Form builder': 'منشئ النماذج', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['comment', 'Messages', 4], ['calendar', 'Calendar']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['field', 'Saved blocks'], ['routing', 'Route templates'], ['form', 'Form builder']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]]];
+  function appNav(active, ar) { function L(s) { return ar ? (AR[s] || s) : s; }
+    return GROUPS.map(function (g) { var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  function topBar() { return h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' })); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: o.ar ? 'عمرو صالح' : 'Amro Saleh', role: o.ar ? 'المالك' : 'Owner', nav: appNav(active, o.ar), topActions: topBar(), searchLabel: o.ar ? 'بحث' : undefined, dir: o.ar ? 'rtl' : undefined, labels: o.ar ? { menu: 'القائمة', close: 'إغلاق القائمة', main: 'التنقل' } : undefined }, kids); }
+  function frame(label, kid, ht, o) { o = o || {}; return h('section', null, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-frame', style: { height: ht }, dir: o.dir }, kid)); }
+  function states(list, n) { return h('div', { className: 'x4-states', style: { '--n': n || list.length } }, list); }
+  function st(label, kids, o) { o = o || {}; return h('div', { key: label }, h('p', { className: 'x4-lab' }, label), h('div', { className: 'x4-state', dir: o.dir }, kids)); }
+  function board() { return h('div', { className: 'x4-board' }, Array.prototype.slice.call(arguments)); }
+  function note(t, items) { return h('div', { className: 'x4-note' }, h('h3', null, t), h('ol', null, items.map(function (x, i) { return h('li', { key: i }, x); }))); }
+  function av(name, seed, s) { return h(W.Avatar, { name: name, pattern: seed || name, hue: HUE, size: s || 32 }); }
+  function agentAv(s) { return h('span', { style: { width: s || 32, height: s || 32, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--primary-tint)', color: 'var(--primary-tint-foreground)', border: '1.5px dashed var(--primary)', boxSizing: 'border-box', flex: 'none' } }, I('robot', 16)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'SSO', 'Sign-up', 'Public forms']], ['Email', ['Email', 'Email domains', 'Messages']], ['Data', ['Storage', 'Tags', 'Languages', 'Translations']], ['Advanced', ['Feature flags', 'Error tracking']]];
+  var SUBNAV_AR = { 'Workspace': 'مساحة العمل', 'General': 'عام', 'Branding': 'الهوية', 'Sign-in and security': 'الدخول والأمان', 'Security': 'الأمان', 'SSO': 'الدخول الموحّد', 'Sign-up': 'التسجيل', 'Public forms': 'النماذج العامة', 'Email': 'البريد', 'Email domains': 'نطاقات البريد', 'Messages': 'الرسائل', 'Calendar': 'التقويم', 'Data': 'البيانات', 'Storage': 'التخزين', 'Tags': 'الوسوم', 'Languages': 'اللغات', 'Translations': 'الترجمات', 'Advanced': 'متقدم', 'Feature flags': 'مفاتيح الميزات', 'Error tracking': 'تتبّع الأخطاء' };
+  function setPage(active, title, desc, kids, o) { o = o || {}; function L(s) { return o.ar ? (SUBNAV_AR[s] || s) : s; }
+    return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: L('Settings') === 'Settings' && o.ar ? 'الإعدادات' : (o.ar ? 'الإعدادات' : 'Settings') }, { label: L(active) }], title: title, description: desc, actions: o.actions }),
+      h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': o.ar ? 'الإعدادات' : 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, L(g[0])), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '', 'aria-current': x === active ? 'page' : undefined }, L(x)); })); })), h('div', { className: 'wy-set__main' }, kids))), o); }
+  function code(t) { return h('code', null, t); }
+
+  var HH = 48;
+  GROUPS[0][1][3] = ['comment', 'Chat', 6]; AR['Chat'] = 'المحادثات';
+  var P = { amro: ['Amro Saleh', 'عمرو صالح', 'var(--chart-1)'], awss: ['Awss Haddad', 'أوس حداد', 'var(--chart-2)'], ibrahim: ['Ibrahim Mansour', 'إبراهيم منصور', 'var(--chart-3)'], emad: ['Emad Nasser', 'عماد ناصر', 'var(--chart-4)'] };
+  var SV = { taste: ['Cake tasting', 'تذوّق الكعك', 'var(--chart-2)'], consult: ['Wedding cake consult', 'استشارة كعكة زفاف', 'var(--chart-4)'], pickup: ['Order pickup', 'استلام طلب', 'var(--chart-5)'], deliv: ['Delivery', 'توصيل', 'var(--chart-3)'], ev: ['Team lunch', 'غداء الفريق', 'var(--chart-6)'] };
+  var RM = { room: ['Abdali · Tasting room', 'العبدلي · غرفة التذوّق', 'var(--chart-1)'], front: ['Abdali · Front counter', 'العبدلي · الكاونتر', 'var(--chart-5)'], swe: ['Sweifieh', 'الصويفية', 'var(--chart-2)'] };
+  var CU = { 'Ahmad Khalil': 'أحمد خليل' };
+  var EV = [
+    { d: 0, s: 9, e: 9.5, v: 'pickup', p: 'emad', r: 'front', c: 'Example Café' }, { d: 0, s: 10, e: 11.25, v: 'taste', p: 'awss', r: 'room', c: 'Ahmad Khalil' }, { d: 0, s: 10.5, e: 11.5, v: 'consult', p: 'amro', r: 'swe', c: 'Example Clinic' }, { d: 0, s: 14.5, e: 15.5, v: 'consult', p: 'amro', r: 'swe', c: 'Amman Coffee Co.', k: 'wait' },
+    { d: 1, s: 9, e: 10.5, v: 'consult', p: 'amro', r: 'room', c: 'Example University' }, { d: 1, s: 12, e: 13, v: 'ev', p: 'amro', r: 'front', k: 'ev' }, { d: 1, s: 15, e: 16, v: 'taste', p: 'ibrahim', r: 'room', c: 'Amman Coffee Co.' },
+    { d: 2, s: 10, e: 11.25, v: 'taste', p: 'awss', r: 'room', c: 'Ahmad Khalil', id: 'sel' }, { d: 2, s: 10, e: 10.5, v: 'pickup', p: 'emad', r: 'front', c: 'Example Clinic' }, { d: 2, s: 13, e: 14, v: 'deliv', p: 'emad', r: 'swe', c: 'Example Café' }, { d: 2, s: 16, e: 17.5, v: 'consult', p: 'ibrahim', r: 'room', c: 'Example University' },
+    { d: 3, s: 9, e: 9.5, v: 'pickup', p: 'emad', r: 'front', c: 'Amman Coffee Co.' }, { d: 3, s: 11, e: 12.25, v: 'taste', p: 'awss', r: 'room', c: 'Example Clinic' }, { d: 3, s: 14, e: 15, v: 'deliv', p: 'emad', r: 'swe', c: 'Example Café' },
+    { d: 4, s: 9.5, e: 11, v: 'consult', p: 'amro', r: 'room', c: 'Ahmad Khalil' }, { d: 4, s: 9.5, e: 10, v: 'pickup', p: 'emad', r: 'front', c: 'Example Café' }, { d: 4, s: 12, e: 13.25, v: 'taste', p: 'awss', r: 'room', c: 'Example University' }, { d: 4, s: 15.5, e: 16.5, v: 'deliv', p: 'emad', r: 'swe', c: 'Example Clinic', k: 'wait' },
+    { d: 6, s: 10, e: 10.5, v: 'pickup', p: 'emad', r: 'front', c: 'Amman Coffee Co.' }];
+  var ALL = [{ d: 1, span: 1, t: 'Sweifieh delivery day', a: 'يوم توصيل الصويفية', v: 'deliv', p: 'emad', r: 'swe' }, { d: 3, span: 2, t: 'Ibrahim Mansour · leave', a: 'إبراهيم منصور · إجازة', k: 'off', p: 'ibrahim', v: 'ev', r: 'room' }];
+  var WEEK = [['Sun', 'الأحد', 15], ['Mon', 'الإثنين', 16], ['Tue', 'الثلاثاء', 17, 'today'], ['Wed', 'الأربعاء', 18], ['Thu', 'الخميس', 19], ['Fri', 'الجمعة', 20, 'off'], ['Sat', 'السبت', 21, 'off']];
+  function days(ar, from, to) { return WEEK.slice(from || 0, to || 7).map(function (w) { return { n: ar ? w[1] : w[0], d: w[2], today: w[3] === 'today', off: w[3] === 'off' }; }); }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function tm(x) { var hr = Math.floor(x), m = Math.round((x - hr) * 60); return pad(hr) + ':' + pad(m); }
+  function first(n) { return n.split(' ')[0]; }
+  function col(x, by) { return by === 'service' ? SV[x.v][2] : by === 'room' ? RM[x.r][2] : P[x.p][2]; }
+  function layout(list) { list.forEach(function (e) { var o = list.filter(function (x) { return x.d === e.d && x.s < e.e && e.s < x.e; }).sort(function (a, b) { return a.s - b.s || (b.e - b.s) - (a.e - a.s); }); e.n = o.length; e.col = o.indexOf(e); }); return list; }
+  function evNode(e, o, extra) { var ar = o.ar, long = e.e - e.s >= 0.9;
+    var title = SV[e.v][ar ? 1 : 0], who = e.k === 'ev' ? (ar ? 'الجميع · العبدلي' : 'Everyone · Abdali') : ((ar ? (CU[e.c] || e.c) : e.c) + ' · ' + first(P[e.p][ar ? 1 : 0]));
+    var n = e.n || 1, c = e.col || 0;
+    return h('div', { key: (e.id || '') + e.d + '-' + e.s + '-' + e.v + (e.k || ''), className: 'x6-ev' + (e.k ? ' is-' + e.k : '') + (e.id && e.id === o.sel ? ' is-sel' : '') + (e.cls ? ' ' + e.cls : ''), style: { '--c': col(e, o.by), top: (e.s - o.start) * (o.hh || HH) + 1, height: (e.e - e.s) * (o.hh || HH) - 3, insetInlineStart: 'calc(' + (n > 1 ? c * 34 / (n - 1) : 0) + '% + 2px)', width: n > 1 ? 'calc(66% - 4px)' : 'calc(100% - 6px)', zIndex: n > 1 ? c + 1 : undefined, boxShadow: n > 1 && c ? '0 0 0 1px var(--card)' : undefined } },
+      h('b', null, tm(e.s) + ' ' + title), long ? h('span', null, who) : null, long && o.wide ? h('span', null, RM[e.r][ar ? 1 : 0] + (e.k === 'wait' ? (ar ? ' · بانتظار الدفع' : ' · waiting for payment') : '')) : null, extra || null); }
+  function grid(o) { var nd = o.days.length, HX = o.hh || HH, cols = (o.gut || '64px') + ' repeat(' + nd + ', minmax(0, 1fr))', ev = layout((o.ev || []).map(function (e) { return Object.assign({}, e); }));
+    var hrs = []; for (var x = o.start + 1; x < o.end; x++) hrs.push(x);
+    return h('div', { className: 'x6-cal' + (o.phone ? ' is-phone' : '') },
+      h('div', { className: 'x6-head', style: { gridTemplateColumns: cols } }, h('div', { className: 'x6-tz' }, o.phone ? '' : 'GMT+3'), o.days.map(function (d, i) { return h('div', { key: i, className: 'x6-dh' + (d.today ? ' is-today' : '') + (d.off ? ' is-off' : '') }, h('span', { className: 'dn' }, d.n), h('b', { className: 'dd' }, d.d)); })),
+      o.all ? h('div', { className: 'x6-all', style: { gridTemplateColumns: cols } }, h('div', { className: 'x6-tz', style: { gridColumn: 1, gridRow: 1, alignSelf: 'center' } }, o.ar ? 'طوال اليوم' : 'All day'),
+        o.days.map(function (d, i) { return h('div', { key: 'c' + i, className: 'x6-allc' + (d.off ? ' is-off' : ''), style: { gridColumn: i + 2, gridRow: 1 } }); }),
+        o.all.filter(function (a) { return a.d - (o.from || 0) >= 0 && a.d - (o.from || 0) < nd; }).map(function (a, i) { var st = a.d - (o.from || 0); return h('div', { key: 'a' + i, className: 'x6-bar' + (a.k ? ' is-' + a.k : ''), style: { '--c': col(a, o.by), gridColumn: (st + 2) + ' / span ' + Math.min(a.span, nd - st), gridRow: 1 } }, o.ar ? a.a : a.t); })) : null,
+      h('div', { className: 'x6-body', style: { gridTemplateColumns: cols, height: (o.end - o.start) * HX } },
+        h('div', { className: 'x6-gut' }, hrs.map(function (x) { return h('span', { key: x, style: { top: (x - o.start) * HX } }, pad(x) + ':00'); })),
+        o.days.map(function (d, i) { var di = i + (o.from || 0); return h('div', { key: i, className: 'x6-col' + (d.off ? ' is-off' : '') },
+          ev.filter(function (e) { return e.d === di && e.s >= o.start && e.e <= o.end; }).map(function (e) { return evNode(e, o, o.evx && o.evx[e.id]); }),
+          o.now && o.now.d === di ? h('div', { className: 'x6-now', style: { top: (o.now.t - o.start) * HX } }) : null, (o.extra && o.extra[di]) || null); })));
+  }
+  function cb(label, c, on, right) { return h('label', { key: label, className: 'x6-cbrow' }, h('span', { className: 'x6-cb' + (on ? ' is-on' : ''), style: { '--c': c || 'var(--muted-foreground)' } }, on ? I('check', 14) : null), h('span', null, label), right ? h('small', null, right) : null); }
+  function mini(ar) { var names = ar ? ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'], cells = [];
+    for (var n = 1; n <= 35; n++) { var dd = n <= 30 ? n : n - 30, out = n > 30, wk = n >= 15 && n <= 21;
+      cells.push(h('span', { key: n, className: (out ? 'is-out' : '') + (wk ? ' is-wk' : '') + (n === 15 ? ' is-first' : '') + (n === 21 ? ' is-last' : '') + (n === 17 ? ' is-today' : '') }, n === 17 ? h('b', null, dd) : dd)); }
+    return h('div', { className: 'x6-mini' }, h('div', { className: 'x6-minih' }, h('b', null, ar ? 'تشرين الثاني 2026' : 'November 2026'), h('span', null, h(W.IconButton, { icon: 'chevron-left', label: ar ? 'الشهر السابق' : 'Previous month', size: 'sm' }), h(W.IconButton, { icon: 'chevron-right', label: ar ? 'الشهر التالي' : 'Next month', size: 'sm' }))),
+      h('div', { className: 'x6-minig' }, names.map(function (x, i) { return h('span', { key: 'n' + i, className: 'dn' }, x); }), cells)); }
+  function side(o) { var ar = o.ar, by = o.by || 'person', L = function (x) { return x[ar ? 1 : 0]; };
+    var people = h('div', { className: 'x6-grp' }, h('h4', null, ar ? 'الأشخاص' : 'People'), Object.keys(P).map(function (k) { return cb(L(P[k]), by === 'person' ? P[k][2] : null, (o.offP || []).indexOf(k) < 0); }));
+    var rooms = h('div', { className: 'x6-grp' }, h('h4', null, ar ? 'الغرف والفروع' : 'Rooms and branches'), Object.keys(RM).map(function (k) { return cb(L(RM[k]), by === 'room' ? RM[k][2] : null, true); }));
+    var svc = by === 'service' ? h('div', { className: 'x6-grp' }, h('h4', null, ar ? 'الخدمات' : 'Services'), Object.keys(SV).map(function (k) { return cb(k === 'ev' ? (ar ? 'أحداث الفريق' : 'Team events') : L(SV[k]), SV[k][2], true); })) : null;
+    return h('aside', { className: 'x6-side' }, h('div', { className: 'x6-new' }, h(W.Button, { icon: 'plus', size: 'lg' }, ar ? 'حجز جديد' : 'New booking')), mini(ar),
+      h('div', { className: 'x6-search' }, I('search'), h('span', null, ar ? 'ابحث في الحجوزات والأشخاص' : 'Search bookings and people')),
+      svc, people, rooms,
+      h('div', { className: 'x6-grp' }, h('h4', null, ar ? 'اعرض أيضاً' : 'Also show'), cb(ar ? 'أحداث الفريق' : 'Team events', null, true), cb(ar ? 'الإجازات' : 'Time off', null, true), cb(ar ? 'الحجوزات الملغاة' : 'Cancelled bookings', null, false)),
+      h('p', { className: 'x4-small', style: { margin: 0 } }, ar ? 'الأوقات بتوقيت عمّان (GMT+3)' : 'Times in Amman (GMT+3)')); }
+  var VIEWS = [['d', 'Day', 'يوم'], ['x', '4 days', '4 أيام'], ['w', 'Week', 'أسبوع'], ['m', 'Month', 'شهر'], ['y', 'Year', 'سنة']];
+  var BY = { person: ['Person', 'الشخص'], service: ['Service', 'الخدمة'], room: ['Room or branch', 'الغرفة أو الفرع'] };
+  function tool(o) { var ar = o.ar; return h('div', { className: 'x6-tool' }, h(W.Button, { variant: 'outline' }, ar ? 'اليوم' : 'Today'), h(W.IconButton, { icon: 'chevron-left', label: ar ? 'السابق' : 'Previous' }), h(W.IconButton, { icon: 'chevron-right', label: ar ? 'التالي' : 'Next' }), h('h2', null, o.title), h('span', { className: 'x4-sp' }),
+    filter(ar ? 'التلوين حسب' : 'Colour by', BY[o.by || 'person'][ar ? 1 : 0]), h(W.Segmented, { label: ar ? 'العرض' : 'View', defaultValue: o.view, options: VIEWS.map(function (v) { return { value: v[0], label: v[ar ? 2 : 1] }; }) }), h(W.IconButton, { icon: 'settings', label: ar ? 'الخدمات والساعات والإعدادات' : 'Services, hours and settings' })); }
+  function page(o, body) { var ar = o.ar; return h(W.AppShell, { collapsed: true, tenant: 'Example Bakery', user: ar ? 'عمرو صالح' : 'Amro Saleh', role: ar ? 'المالك' : 'Owner', nav: appNav('Calendar', ar), topActions: topBar(), searchLabel: ar ? 'بحث' : undefined, dir: ar ? 'rtl' : undefined }, h('div', { className: 'x6' }, side(o), h('div', { className: 'x6-main' }, tool(o), body))); }
+  function prow(ic, a, b) { return h('div', { className: 'x6-prow' }, I(ic), h('div', null, a, b ? h('small', null, b) : null)); }
+  function details(ar, style) { return h('div', { className: 'x6-pop', style: style, role: 'dialog', 'aria-label': ar ? 'الحجز' : 'Booking' },
+    h('div', { className: 'x6-poph' }, h('span', { className: 'x6-sq', style: { '--c': 'var(--chart-2)' } }), h('div', null, h('h3', null, ar ? 'تذوّق الكعك' : 'Cake tasting'), h('p', null, ar ? 'الثلاثاء 17 تشرين الثاني · 10:00 – 11:15' : 'Tuesday 17 November · 10:00 – 11:15')), h(W.IconButton, { icon: 'close', label: ar ? 'إغلاق' : 'Close', size: 'sm' })),
+    prow('customer', ar ? 'أحمد خليل' : 'Ahmad Khalil', h('span', { dir: 'ltr' }, '+962 79 555 0142')), prow('user', ar ? 'مع أوس حداد' : 'With Awss Haddad'), prow('store', ar ? 'العبدلي · غرفة التذوّق' : 'Abdali · Tasting room'), prow('money', ar ? 'دُفع عربون 10.00 دولار' : '$10.00 deposit paid'), prow('clock', ar ? 'حُجز عبر الإنترنت في 9 تشرين الثاني' : 'Booked online on 9 November'),
+    h('div', { className: 'x4-row' }, h(W.Button, { size: 'sm', variant: 'outline', icon: 'calendar' }, ar ? 'غيّر الموعد' : 'Move'), h(W.Button, { size: 'sm', variant: 'outline', icon: 'send' }, ar ? 'رسالة' : 'Message'), h(W.Button, { size: 'sm', variant: 'ghost' }, ar ? 'إلغاء' : 'Cancel'), h('span', { className: 'x4-sp' }), h(W.Button, { size: 'sm', variant: 'ghost', iconEnd: 'chevron-right' }, ar ? 'افتح الحجز' : 'Open booking'))); }
+  function quick(style) { return h('div', { className: 'x6-pop', style: style, role: 'dialog', 'aria-label': 'New booking' },
+    h(W.Segmented, { label: 'What', defaultValue: 'b', options: [{ value: 'b', label: 'Booking' }, { value: 'e', label: 'Event' }, { value: 't', label: 'Time off' }] }),
+    h(W.Select, { label: 'Service', defaultValue: 't', options: [{ value: 't', label: 'Cake tasting · 75 minutes' }] }),
+    h('p', { className: 'x6-when' }, I('clock'), 'Thursday 19 November · 13:30 – 14:45'),
+    h(W.Input, { label: 'Customer', placeholder: 'Search or add a customer', defaultValue: 'Example Clinic' }),
+    h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } }, h(W.Select, { label: 'With', defaultValue: 'a', options: [{ value: 'a', label: 'Awss Haddad' }] }), h(W.Select, { label: 'Where', defaultValue: 'r', options: [{ value: 'r', label: 'Tasting room' }] })),
+    h(W.Checkbox, { label: 'Email the customer a confirmation', defaultChecked: true }),
+    h('div', { className: 'x4-row' }, h(W.Button, { variant: 'ghost' }, 'More options'), h('span', { className: 'x4-sp' }), h(W.Button, null, 'Save'))); }
+  function ghost(s, e, t, sub) { return h('div', { key: 'g', className: 'x6-ghost', style: { top: (s - 8) * HH + 1, height: (e - s) * HH - 3 } }, h('b', null, t), sub ? h('span', null, sub) : null); }
+
+  var dayV = page({ title: 'Tuesday 17 November 2026', view: 'd' }, grid({ days: days(false, 2, 3), from: 2, ev: EV, all: ALL, by: 'person', start: 8, end: 19, now: { d: 2, t: 11.67 }, wide: true }));
+  var fourV = page({ title: '17 – 20 November 2026', view: 'x' }, grid({ days: days(false, 2, 6), from: 2, ev: EV, all: ALL, by: 'person', start: 8, end: 19, now: { d: 2, t: 11.67 }, wide: true }));
+  // month
+  var POOL = [[9, 'pickup', 'emad'], [10, 'taste', 'awss'], [11.5, 'consult', 'amro'], [13, 'deliv', 'emad'], [15, 'taste', 'ibrahim'], [16, 'consult', 'amro']];
+  function chips(n) { var dow = (n - 1) % 7; if (dow >= 5) return n === 21 ? [[10, 'pickup', 'emad']] : []; var k = [2, 3, 1, 5, 2, 4, 3][n % 7]; return POOL.slice(n % 2, n % 2 + k); }
+  var MBARS = { 1: [{ c: 2, span: 1, t: 'Sweifieh delivery day', p: 'emad' }], 2: [{ c: 3, span: 2, t: 'Ibrahim Mansour · leave', p: 'ibrahim', k: 'off' }], 3: [{ c: 3, span: 3, t: 'Awss Haddad · leave', p: 'awss', k: 'off' }] };
+  var weeks = []; for (var w = 0; w < 5; w++) { var cells = [], cl = [], bars = MBARS[w] || [];
+    for (var i = 0; i < 7; i++) { var n = w * 7 + i + 1, out = n > 30, dn = out ? n - 30 : n, list = out ? [] : chips(n), more = list.length > 3 ? list.length - 3 : 0;
+      cells.push(h('div', { key: 'c' + i, className: 'x6-mcell' + (i === 0 ? ' c0' : '') + (i >= 5 ? ' is-off' : ''), style: { gridColumn: i + 1 } }));
+      cells.push(h('span', { key: 'n' + i, className: 'x6-mnum' + (n === 17 ? ' is-today' : '') + (out ? ' is-out' : ''), style: { gridColumn: i + 1, width: out && dn === 1 ? 'auto' : undefined, whiteSpace: 'nowrap' } }, dn === 1 && out ? 'Dec 1' : dn));
+      cl.push(h('div', { key: 'h' + i, className: 'x6-mchips', style: { gridColumn: i + 1 } }, list.slice(0, more ? 2 : 3).map(function (x, j) { return h('span', { key: j, className: 'x6-chip' + (n === 15 && x[0] === 13 ? ' is-wait' : ''), style: { '--c': P[x[2]][2] } }, h('i'), h('b', null, tm(x[0])), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis' } }, SV[x[1]][0])); }), more ? h('span', { className: 'x6-more' }, (more + 1) + ' more') : null)); }
+    weeks.push(h('div', { key: w, className: 'x6-mweek' }, cells, bars.map(function (b, j) { return h('div', { key: 'b' + j, className: 'x6-bar' + (b.k ? ' is-' + b.k : ''), style: { '--c': P[b.p][2], gridColumn: (b.c + 1) + ' / span ' + b.span } }, b.t); }), cl)); }
+  var monthV = page({ title: 'November 2026', view: 'm' }, h('div', { className: 'x6-month' }, h('div', { className: 'x6-mhead' }, ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(function (x) { return h('span', { key: x }, x); })), weeks));
+  // year
+  var MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var months = MN.map(function (m, mi) { var st = new Date(2026, mi, 1).getDay(), len = new Date(2026, mi + 1, 0).getDate(), cs = [];
+    ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(function (x, i) { cs.push(h('span', { key: 'd' + i, className: 'dn' }, x)); });
+    for (var i = 0; i < st; i++) cs.push(h('span', { key: 'e' + i }));
+    for (var d = 1; d <= len; d++) { var dow = (st + d - 1) % 7, lv = dow >= 5 ? 0 : ((mi * 31 + d * 7) % 5) % 4; if (mi === 0 && d < 4) lv = 0;
+      cs.push(h('span', { key: d, className: (lv ? 'l' + lv : '') + (mi === 10 && d === 17 ? ' is-today' : ''), title: lv ? lv * 3 + ' bookings' : 'No bookings' }, d)); }
+    return h('div', { key: m, className: 'x6-ym' }, h('h4', null, m), h('div', { className: 'x6-ymg' }, cs)); });
+  var yearV = page({ title: '2026', view: 'y' }, h('div', { style: { display: 'grid', gap: 16 } }, h('div', { className: 'x6-legend' }, 'Bookings a day:', h('i', { style: { background: 'var(--card)' } }), 'none', h('i', { style: { background: 'color-mix(in oklab, var(--primary) 14%, var(--card))' } }), '1–3', h('i', { style: { background: 'color-mix(in oklab, var(--primary) 34%, var(--card))' } }), '4–6', h('i', { style: { background: 'var(--primary)' } }), '7 or more', h('span', { className: 'x4-sp' }), 'Click a day to open it'), h('div', { className: 'x6-year', style: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 } }, months)));
+  ReactDOM.createRoot(document.getElementById('root')).render(board(
+    frame('Day · one column, each booking with its room', dayV, 960),
+    frame('4 days · from today, the weekend shaded', fourV, 960),
+    frame('Month · up to three a day, then “more”; leave and day-long events as bars', monthV, 1000),
+    frame('Year · each day shaded by how many bookings it has', yearV, 1000),
+    note('The other views (3.5, CV.7)', ['Day: one wide column; bookings add their room and “waiting for payment”. 4 days: four days from the one in view (Google’s custom view), handy on a laptop. Keys: D, X, W, M, Y.', 'Month: each day shows up to three bookings as a coloured dot, the start time and the service; a fourth turns into “2 more”, which opens that day. Leave and day-long events are bars across the days they cover; days of the next month are grey.', 'Year: twelve months, each day shaded in steps of the main colour by how many bookings it has (the 2.7 rule for ordered data), the legend above, today outlined. Clicking a day opens it in Day.', 'Every view keeps the panel, Colour by and the checkboxes. The view and the range are remembered for each person; the first visit opens Week.', 'On a phone the web app shows Day, 3 days and Month (PW.7) with the same colours and Colour by; Year stays on bigger screens.'])));
+</script>
+</body>
+</html>

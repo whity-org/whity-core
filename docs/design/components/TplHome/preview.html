@@ -48,10 +48,10 @@
 
   var groups = [[null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox'], ['approval', 'Approvals']]], ['People', [['users', 'Users'], ['role', 'Roles']]], ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps']]], ['Documents', [['document', 'Library'], ['template', 'Templates']]], ['Apps', [['invoice', 'Front Office'], ['table', 'Stock'], ['routing', 'Deliveries']]], ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['settings', 'Settings']]]];
   var wait = [
-    { agent: 'Billing assistant', title: 'Send a payment reminder to Example Café', amt: 'JOD 312.000', what: 'overdue 12 days', age: '2 days ago', actions: [['Decline', 'ghost'], ['Approve']] },
-    { from: 'Ahmad Khalil', icon: 'document', title: 'Purchase order PO-0142 · Example Mills', amt: 'JOD 1,240.000', what: 'sent for your decision', age: 'yesterday', actions: [['Open']] },
-    { agent: 'Stock assistant', title: 'Reorder flour and butter from Example Mills', amt: 'JOD 412.500', what: 'orders from your usual supplier', age: '5 h ago', actions: [['Decline', 'ghost'], ['Approve']] },
-    { agent: 'Billing assistant', title: 'Issue credit note CN-0031 to Example Hotel', amt: 'JOD 48.000', what: 'for a returned order', age: '3 h ago', actions: [['Decline', 'ghost'], ['Approve']] },
+    { agent: 'Billing assistant', title: 'Send a payment reminder to Example Café', amt: '$312.00', what: 'overdue 12 days', age: '2 days ago', actions: [['Decline', 'ghost'], ['Approve']] },
+    { from: 'Ahmad Khalil', icon: 'document', title: 'Purchase order PO-0142 · Example Mills', amt: '$1,240.00', what: 'sent for your decision', age: 'yesterday', actions: [['Open']] },
+    { agent: 'Stock assistant', title: 'Reorder flour and butter from Example Mills', amt: '$412.50', what: 'orders from your usual supplier', age: '5 h ago', actions: [['Decline', 'ghost'], ['Approve']] },
+    { agent: 'Billing assistant', title: 'Issue credit note CN-0031 to Example Hotel', amt: '$48.00', what: 'for a returned order', age: '3 h ago', actions: [['Decline', 'ghost'], ['Approve']] },
     { from: 'Awss Haddad', icon: 'calendar', title: 'Leave request · 3–5 November', what: 'asks for 3 days', age: '2 h ago', actions: [['Reject', 'ghost'], ['Approve']] }];
   var today = [
     { actor: 'Billing assistant', onBehalfOf: 'Amro', text: 'sent 4 receipts by WhatsApp', time: '09:12', kind: 'act' },
@@ -74,9 +74,9 @@
             h('li', null, I('billing'), h('div', null, 'Choose a plan', h('small', null, 'Your trial ends on 9 November')), h(W.Button, { size: 'sm', variant: 'outline' }, 'Choose'))))))),
     h('div', { className: 'wy-home__h' }, h('h2', null, 'From your apps'), h('span', null, 'Each app can add one card. Hide any from its ⋯ menu.')),
     h('div', { className: 'wy-home__apps' },
-      appCard(P.front, h(F, null, h('div', { className: 'wy-appcard__big' }, 'JOD 18,240.500', h('small', null, 'sales this month')),
-        h(W.BarChart, { height: 92, data: [{ label: 'W1', value: 4120 }, { label: 'W2', value: 5310 }, { label: 'W3', value: 4870 }, { label: 'W4', value: 3940 }], format: function (v) { return 'JOD ' + v.toLocaleString('en-US'); } }),
-        h('a', { href: '#', className: 'wy-lnk', style: { color: 'var(--warning-text)', fontSize: 14 } }, '6 invoices overdue · JOD 2,115.000'))),
+      appCard(P.front, h(F, null, h('div', { className: 'wy-appcard__big' }, '$18,240.50', h('small', null, 'sales this month')),
+        h(W.BarChart, { height: 92, data: [{ label: 'W1', value: 4120 }, { label: 'W2', value: 5310 }, { label: 'W3', value: 4870 }, { label: 'W4', value: 3940 }], format: function (v) { return '$' + v.toLocaleString('en-US'); } }),
+        h('a', { href: '#', className: 'wy-lnk', style: { color: 'var(--warning-text)', fontSize: 14 } }, '6 invoices overdue · $2,115.00'))),
       appCard(P.inv, h(F, null, h('div', { className: 'wy-appcard__big' }, '3', h('small', null, 'items below reorder level')),
         h('ul', { className: 'wy-appcard__list' }, h('li', null, h('span', null, 'Flour, 25 kg · Abdoun'), h('b', null, '4 / 6')), h('li', null, h('span', null, 'Butter, 10 kg · Abdoun'), h('b', null, '2 / 3')), h('li', null, h('span', null, 'Yeast, 1 kg · Sweifieh'), h('b', null, '1 / 4')))), 'Stock'),
       appCard(P.del, h(F, null, h('div', { className: 'wy-appcard__big' }, '12', h('small', null, 'deliveries today')),

@@ -76,7 +76,7 @@ Done when: EditorArabic and EditorType match; an axe check passes on the editor;
 Live collaboration (cursors, presence, version history) comes after M8 (E.3).
 
 
-# App screens: build plan (2.3–3.4)
+# App screens: build plan (2.3–3.5)
 
 Every screen in the inventory now has cards (`13-app-map.md`). Build them after the foundation (editor M1) is in, one milestone per branch and pull request, comparing with `screenshots/` in both themes and in Arabic where there's an Arabic card.
 
@@ -131,7 +131,13 @@ Messages (inbox, chat box, settings), Approvals › Decided, impact plans, agent
 ## P1 · Form printouts (FP.1–FP.12)
 The print engine work in `handoff/print/FORM-PRINTOUTS.md`: the automatic layout from a form's sections, the blocks in `DocFormBlocks`, the decision and approvals, signatures confirmed in Whity (drawn on touch screens), the footer with reference, page x of y and the client's marks, and the Form printouts tab of a document theme (`TplFormPrintStyle`, paid plans and trials; free = standard). Done when: the ethics application in `DocFormPrintout` prints page for page from a real form, in English and Arabic; a trial ending changes only new printouts; the QR opens the verify page.
 
-Everything after A15 and P1 is in the long-term roadmap (section 28): the 3.1 modules (L8) and Whity mobile (L9) are designed and wait there.
+## A16 · The calendar, like Google Calendar (CV.1–CV.11)
+The sidebar as a rail on calendar screens; the left panel (mini month, search, people and rooms as coloured checkboxes, Also show); Colour by person, service or room per person; Day, 4 days, Week, Month, Year with keys; details beside a booking; click or drag to create with the quick booking; drag to move and pull to resize in 15-minute steps, the customer asked first, Undo for 10 seconds; conflicts (busy, room taken, closed, 409); the phone's Day, 3 days and Month with the drawer, sheets and press and hold. Builds on A15's calendar (`TplCalendarStaff` stays the booking sheet and setup). Done when: `TplCalendarWeek`, `TplCalendarViews`, `TplCalendarEditing` and `TplCalendarPhone` are matched in light, dark and Arabic; every drag can be done with the keyboard; a moved customer booking sends one updated `.ics` with the same UID.
+
+## A17 · One chat (UC.1–UC.13)
+Chat replaces Messages (`/admin/messages` redirects to `/chat`): one list for people, groups, customers on every channel, agents and bots, with tabs; three panes with details or a thread on the right; bubbles or compact rows (Preferences › Chat); replies, threads, reactions, mentions, pins, search in a chat; photos as albums, files, voice with its text; sending, not sent, ticks and Seen by; edit and delete for everyone within 2 days; blocks in messages (records, payment links, booking times, forms, polls, approvals); bots in Settings › Chat; new chat and new group; blocking customers; the phone screens. Customer chats keep notes, assigning and the channel. Done when: `TplChatHub`, `TplChatCompact`, `TplChatParts` and `TplChatPhone` are matched in light, dark and Arabic; a WhatsApp reply and an email reply land in the same conversation; agents never send to a customer without a person.
+
+Everything after A17 and P1 is in the long-term roadmap (section 28): the 3.1 modules (L8) and Whity mobile (L9) are designed and wait there.
 
 
 # Websites (3.3)

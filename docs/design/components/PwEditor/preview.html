@@ -83,7 +83,7 @@
       pub === false ? h('button', { className: 'pw-ib', 'aria-label': 'More' }, I('more', 22)) : h(W.Button, null, pub || 'Publish')),
       h('div', { className: 'pw-edsub' }, h('button', { className: 'pw-mode' + (M[1] ? ' is-' + M[1] : ''), 'aria-label': (ar ? 'الوضع: ' : 'Mode: ') + M[0] }, I(M[2], 18), M[0], I('chevron-down', 16)), h('small', null, st))); }
   function body(caret) { return h('div', { className: 'pw-doc' }, h('h2', null, 'Lease, Abdali branch'), h('p', null, 'This lease is between Example Bakery and Amman Properties for the shop on Wasfi Al-Tal Street, Abdali.'),
-    h('p', null, 'Rent is JOD 1,200 a month, paid by the 5th of each month.', caret ? h('span', { className: 'pw-caret' }) : null), h('p', null, 'The lease runs for two years from 1 January 2027.')); }
+    h('p', null, 'Rent is $1,200 a month, paid by the 5th of each month.', caret ? h('span', { className: 'pw-caret' }) : null), h('p', null, 'The lease runs for two years from 1 January 2027.')); }
   function tbar(o) { o = o || {}; return h('div', { className: 'pw-tb' + (o.sug ? ' is-sug' : ''), role: 'toolbar', 'aria-label': 'Formatting' }, h('button', { 'aria-label': 'Text style' }, 'Aa'), h('button', { className: 'is-on', 'aria-label': 'Bold', 'aria-pressed': true }, I('bold', 20)), h('button', { 'aria-label': 'Italic' }, I('italic', 20)), h('button', { 'aria-label': 'List' }, I('list-bullet', 20)), h('i'),
     h('button', { 'aria-label': 'Insert' }, I('plus', 22)), h('button', { 'aria-label': 'Comment' }, I('comment-add', 20)), h('span', { className: 'sp' }), h('button', { 'aria-label': 'More tools' }, I('more', 22)), o.kb ? h('button', { 'aria-label': 'Hide keyboard' }, I('keyboard', 22)) : null); }
   var p1 = phone('Editing · keyboard open', h(F, null, edhead('Lease, Abdali branch', 'Saved', 'edit'), body(true), tbar({ kb: true }), kb()));
@@ -91,7 +91,7 @@
     { overlay: sheet('Mode', h(F, null, opts(opt('Editing', true, 'Change the text directly', 'edit'), opt('Suggesting', false, 'Your changes wait for the owner to accept', 'suggest'), opt('Viewing', false, 'Read only. Nothing changes.', 'view'))
       , gf('People who can only suggest see Suggesting and Viewing.'))) });
   var p3 = phone('Suggesting', h(F, null, edhead('Lease, Abdali branch', 'Saved · 1 suggestion', 'sug'),
-    h('div', { className: 'pw-doc' }, h('h2', null, 'Lease, Abdali branch'), h('p', null, 'Rent is JOD ', h('span', { className: 'pw-del' }, '1,200'), ' ', h('span', { className: 'pw-ins' }, '1,250'), ' a month, paid by the 5th of each month.'),
+    h('div', { className: 'pw-doc' }, h('h2', null, 'Lease, Abdali branch'), h('p', null, 'Rent is USD ', h('span', { className: 'pw-del' }, '1,200'), ' ', h('span', { className: 'pw-ins' }, '1,250'), ' a month, paid by the 5th of each month.'),
       h('div', { className: 'pw-sugcard' }, h('div', null, pav('awss@ex', 'Awss Haddad', 28), h('span', null, h('b', null, 'Awss Haddad'), ' suggested 1,250 · 2 min')), h('div', null, h(W.Button, { icon: 'check' }, 'Accept'), h(W.Button, { variant: 'outline', icon: 'close' }, 'Reject'))),
       h('p', null, 'The lease runs for two years from 1 January 2027.')),
     h('div', { className: 'wm-bottom' }, tbar({ sug: true }), h('div', { className: 'wm-home-ind' }, h('i')))));
@@ -105,7 +105,7 @@
       h('li', { className: 'is-todo', style: { color: 'var(--foreground)' } }, h('span', { style: { color: 'var(--warning-text)', display: 'inline-flex' } }, I('alert', 20)), '1 suggestion to decide', h(W.Button, { variant: 'outline' }, 'Review')))),
       gf('Decide every suggestion first. Publishing sends the lease to Ahmad Khalil to sign.'), h('div', { className: 'pw-stack' }, h(W.Button, { disabled: true }, 'Publish')))) });
   var p7 = phone('Arabic · Editing · keyboard open', h(F, null, edhead('عقد إيجار، فرع العبدلي', 'محفوظ', 'editAr', 'نشر', true),
-    h('div', { className: 'pw-doc' }, h('h2', null, 'عقد إيجار، فرع العبدلي'), h('p', null, 'هذا العقد بين Example Bakery وشركة عقارات عمّان للمحل في شارع وصفي التل، العبدلي.'), h('p', null, 'الإيجار 1,200 دينار في الشهر، يُدفع قبل اليوم الخامس من كل شهر.', h('span', { className: 'pw-caret' }))),
+    h('div', { className: 'pw-doc' }, h('h2', null, 'عقد إيجار، فرع العبدلي'), h('p', null, 'هذا العقد بين Example Bakery وشركة عقارات عمّان للمحل في شارع وصفي التل، العبدلي.'), h('p', null, 'الإيجار 1,200 دولار في الشهر، يُدفع قبل اليوم الخامس من كل شهر.', h('span', { className: 'pw-caret' }))),
     h('div', { className: 'pw-tb', role: 'toolbar', 'aria-label': 'التنسيق' }, h('button', { 'aria-label': 'نمط النص' }, 'أب'), h('button', { className: 'is-on', 'aria-label': 'عريض' }, I('bold', 20)), h('button', { 'aria-label': 'مائل' }, I('italic', 20)), h('button', { 'aria-label': 'قائمة' }, I('list-bullet', 20)), h('i'), h('button', { 'aria-label': 'إدراج' }, I('plus', 22)), h('button', { 'aria-label': 'تعليق' }, I('comment-add', 20)), h('span', { className: 'sp' }), h('button', { 'aria-label': 'أدوات أخرى' }, I('more', 22)), h('button', { 'aria-label': 'إخفاء لوحة المفاتيح' }, I('keyboard', 22))),
     kb(true)), { dir: RT });
   var n = note('Editor toolbar on a phone', 'WHIT-1006. The editor is a full-screen task: no tab bar.', [

@@ -76,9 +76,23 @@
 
   /* ---------- Status ---------- */
   function Badge(props) { var v = props.variant || 'default'; return h('span', { className: cx('wy-badge', 'wy-badge--' + v, props.className) }, props.icon ? h(Icon, { name: props.icon, size: 12 }) : null, props.children); }
+  /* Currencies. The workspace's currency decides the symbol, the decimals and the words; designs default to US dollars.
+     Currencies with a symbol write it before the number with no space ($312.00); others write the code (JOD 312.000). */
+  var CURRENCIES = {
+    USD: { sym: '\u0024', dec: 2, sub: 100, en: ['US dollar', 'US dollars'], subEn: ['cent', 'cents'], ar: ['دولار أمريكي واحد', 'دولاران أمريكيان', 'دولارات أمريكية', 'دولاراً أمريكياً', 'دولار أمريكي'], subAr: ['سنت واحد', 'سنتان', 'سنتات', 'سنتاً', 'سنت'], arShort: 'دولار' },
+    EUR: { sym: '€', dec: 2, sub: 100, en: ['euro', 'euros'], subEn: ['cent', 'cents'], ar: ['يورو واحد', 'يوروان', 'يوروات', 'يورو', 'يورو'], subAr: ['سنت واحد', 'سنتان', 'سنتات', 'سنتاً', 'سنت'], arShort: 'يورو' },
+    JOD: { sym: null, dec: 3, sub: 1000, en: ['Jordanian dinar', 'Jordanian dinars'], subEn: ['fils', 'fils'], ar: ['دينار أردني واحد', 'ديناران أردنيان', 'دنانير أردنية', 'ديناراً أردنياً', 'دينار أردني'], subAr: ['فلس واحد', 'فلسان', 'فلسات', 'فلساً', 'فلس'], arShort: 'دينار' },
+    SAR: { sym: null, dec: 2, sub: 100, en: ['Saudi riyal', 'Saudi riyals'], subEn: ['halala', 'halalas'], ar: ['ريال سعودي واحد', 'ريالان سعوديان', 'ريالات سعودية', 'ريالاً سعودياً', 'ريال سعودي'], subAr: ['هللة واحدة', 'هللتان', 'هللات', 'هللة', 'هللة'], arShort: 'ريال' },
+    AED: { sym: null, dec: 2, sub: 100, en: ['UAE dirham', 'UAE dirhams'], subEn: ['fils', 'fils'], ar: ['درهم إماراتي واحد', 'درهمان إماراتيان', 'دراهم إماراتية', 'درهماً إماراتياً', 'درهم إماراتي'], subAr: ['فلس واحد', 'فلسان', 'فلسات', 'فلساً', 'فلس'], arShort: 'درهم' }
+  };
+  var DEFAULT_CURRENCY = 'USD';
+  function curInfo(c) { c = c || DEFAULT_CURRENCY; return CURRENCIES[c] || { sym: null, dec: 2, sub: 100, en: [c, c], subEn: ['cent', 'cents'], ar: [c, c, c, c, c], subAr: ['سنت', 'سنتان', 'سنتات', 'سنتاً', 'سنت'], arShort: c }; }
+  function moneyText(n, c, dec) { var ci = curInfo(c); n = Number(n || 0); var d = dec != null ? dec : ci.dec; var s = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+    return (n < 0 ? '−' : '') + (ci.sym ? ci.sym + s : (c || DEFAULT_CURRENCY) + ' ' + s); }
   function Money(props) {
-    var n = Number(props.amount || 0); var dec = props.decimals != null ? props.decimals : ((props.currency || 'JOD') === 'JOD' ? 3 : 2); var s = n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-    return h('span', { className: cx('wy-money', n < 0 && 'wy-money--neg', props.className) }, h('span', { className: 'wy-money__cur' }, props.currency || 'JOD'), ' ', s);
+    var n = Number(props.amount || 0); var c = props.currency || DEFAULT_CURRENCY, ci = curInfo(c); var dec = props.decimals != null ? props.decimals : ci.dec;
+    var s = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    return h('span', { className: cx('wy-money', n < 0 && 'wy-money--neg', props.className), dir: 'ltr' }, n < 0 ? '−' : null, h('span', { className: cx('wy-money__cur', ci.sym && 'wy-money__cur--sym') }, ci.sym || c), ci.sym ? null : ' ', s);
   }
   function Skeleton(props) { return h('span', { className: cx('wy-skeleton', props.className), style: { width: props.width || '100%', height: props.height || 12 }, 'aria-hidden': 'true' }); }
 
@@ -330,7 +344,7 @@
     method: { en: 'Payment method', ar: 'طريقة الدفع' }, receivedBy: { en: 'Received by', ar: 'المستلِم' },
     desc: { en: 'Description', ar: 'الوصف' }, qty: { en: 'Qty', ar: 'الكمية' }, unit: { en: 'Unit price', ar: 'سعر الوحدة' }, amount: { en: 'Amount', ar: 'المبلغ' },
     invoice: { en: 'Invoice', ar: 'الفاتورة' }, date: { en: 'Date', ar: 'التاريخ' }, invoiceTotal: { en: 'Invoice total', ar: 'قيمة الفاتورة' }, paidNow: { en: 'Paid now', ar: 'المدفوع الآن' }, stillDue: { en: 'Still due', ar: 'المتبقي' },
-    subtotal: { en: 'Subtotal', ar: 'المجموع' }, tax16: { en: 'Sales tax 16%', ar: 'ضريبة المبيعات 16%' }, total: { en: 'Total JOD', ar: 'الإجمالي (دينار)' }, credit: { en: 'Credit JOD', ar: 'قيمة الإشعار (دينار)' },
+    subtotal: { en: 'Subtotal', ar: 'المجموع' }, tax16: { en: 'Sales tax 16%', ar: 'ضريبة المبيعات 16%' }, total: { en: 'Total USD', ar: 'الإجمالي (دولار)' }, credit: { en: 'Credit USD', ar: 'قيمة الإشعار (دولار)' },
     received: { en: 'Amount received', ar: 'المبلغ المستلَم' }, balance: { en: 'Balance on account', ar: 'الرصيد المتبقي' },
     notes: { en: 'Notes', ar: 'ملاحظات' }, termsBlock: { en: 'Terms', ar: 'الشروط' }, acceptance: { en: 'Accepted by', ar: 'وافق عليه' },
     name: { en: 'Name', ar: 'الاسم' }, signature: { en: 'Signature', ar: 'التوقيع' }, stampSign: { en: 'Signature and stamp', ar: 'التوقيع والختم' },
@@ -350,7 +364,7 @@
     return h(props.as || 'span', { className: cx('wy-doc__bi', props.className) }, h('span', { lang: lead }, docFill(l[lead] != null ? l[lead] : l.en, vars)), l[o] && props.single !== true ? h('small', { lang: o, dir: o === 'ar' ? 'rtl' : 'ltr' }, docFill(l[o], vars)) : null);
   }
 
-  /* Amount in words for JOD (1 dinar = 1000 fils), English and Arabic. Arabic follows accounting usage
+  /* Amount in words for the workspace's currency (US dollars by default: 1 dollar = 100 cents), English and Arabic. Arabic follows accounting usage
      (tafqeet): the noun form follows the last two digits. Have an Arabic-speaking accountant review before shipping. */
   var EN1 = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
   var EN10 = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
@@ -385,14 +399,14 @@
   function arCount(n, f) { var n2 = n % 100;
     if (n === 1) return f[0]; if (n === 2) return f[1];
     return arInt(n) + ' ' + (n2 >= 3 && n2 <= 10 ? f[2] : n2 >= 11 ? f[3] : f[4]); }
-  function amountInWords(amount, lang) {
-    var t = Math.round(Math.abs(Number(amount)) * 1000), d = Math.floor(t / 1000), f = t % 1000;
+  function amountInWords(amount, lang, currency) {
+    var ci = curInfo(currency); var t = Math.round(Math.abs(Number(amount)) * ci.sub), d = Math.floor(t / ci.sub), f = t % ci.sub;
     if (lang === 'ar') {
-      var a = []; if (d || !f) a.push(arCount(d, ['دينار أردني واحد', 'ديناران أردنيان', 'دنانير أردنية', 'ديناراً أردنياً', 'دينار أردني']));
-      if (f) a.push(arCount(f, ['فلس واحد', 'فلسان', 'فلسات', 'فلساً', 'فلس']));
+      var a = []; if (d || !f) a.push(arCount(d, ci.ar));
+      if (f) a.push(arCount(f, ci.subAr));
       return a.join(' و');
     }
-    var e = []; if (d || !f) e.push(enInt(d) + ' Jordanian ' + (d === 1 ? 'dinar' : 'dinars')); if (f) e.push(enInt(f) + ' fils');
+    var e = []; if (d || !f) e.push(enInt(d) + ' ' + (d === 1 ? ci.en[0] : ci.en[1])); if (f) e.push(enInt(f) + ' ' + (f === 1 ? ci.subEn[0] : ci.subEn[1]));
     var s = e.join(' and '); return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
@@ -413,13 +427,13 @@
   function DocAmount(props) {
     var lead = props.lead || 'en', o = otherLang(lead);
     return h('div', { className: 'wy-doc__amount' }, h(DocLabel, { l: props.label || 'received', lead: lead, className: 'wy-doc__label' }),
-      h('div', { className: 'wy-doc__amount-n' }, h('bdi', null, (props.currency || 'JOD') + ' ' + docNum(props.value, 3))),
-      h('div', { className: 'wy-doc__words wy-doc__words--start' }, h('span', { lang: lead, dir: lead === 'ar' ? 'rtl' : 'ltr' }, amountInWords(props.value, lead)), h('span', { lang: o, dir: o === 'ar' ? 'rtl' : 'ltr' }, amountInWords(props.value, o))));
+      h('div', { className: 'wy-doc__amount-n' }, h('bdi', null, moneyText(props.value, props.currency))),
+      h('div', { className: 'wy-doc__words wy-doc__words--start' }, h('span', { lang: lead, dir: lead === 'ar' ? 'rtl' : 'ltr' }, amountInWords(props.value, lead, props.currency)), h('span', { lang: o, dir: o === 'ar' ? 'rtl' : 'ltr' }, amountInWords(props.value, o, props.currency))));
   }
 
   function docCell(col, row, lead) {
     var v = docText(row[col.key], lead); if (v == null || v === '') return '';
-    if (col.type === 'money') return docNum(v, 3);
+    if (col.type === 'money') return docNum(v, curInfo(col.currency).dec);
     if (col.type === 'percent') return docNum(v, 1) + '%';
     if (col.mono) return h('bdi', { className: 'wy-doc__mono' }, v);
     return v;
@@ -503,11 +517,11 @@
       var last = p === n - 1, bf = sum;
       if (carry) ch.forEach(function (r) { sum += Number(r[carry]) || 0; });
       var table = cols.length && (ch.length || p > 0) ? h(DocTable, { lead: lead, columns: cols, rows: ch,
-        before: p > 0 && carry ? h('tr', { className: 'wy-doc__bf' }, h('td', { colSpan: cols.length - 1 }, h(DocLabel, { l: 'brought', lead: lead, single: true })), h('td', { className: 'wy-doc__n' }, docNum(bf, 3))) : null }) : null;
-      var carryLine = !last && carry ? h('div', { className: 'wy-doc__carry' }, h(DocLabel, { l: 'carried', lead: lead }), h('span', { className: 'wy-doc__n' }, docNum(sum, 3))) : null;
-      var totals = last && (props.totals || props.grand) ? h('div', { className: 'wy-doc__totals' }, (props.totals || []).map(function (r, k) { return h('div', { key: k }, h(DocLabel, { l: r.label, lead: lead }), h('span', { className: 'wy-doc__n' }, docNum(r.value, 3))); }),
-        props.grand ? h('div', { className: 'wy-doc__grand' }, h(DocLabel, { l: props.grand.label || 'total', lead: lead }), h('span', { className: 'wy-doc__n' }, docNum(props.grand.value, 3))) : null) : null;
-      var words = last && props.grand && props.words !== false ? h('div', { className: 'wy-doc__words' }, h('span', { lang: lead, dir: rtl ? 'rtl' : 'ltr' }, amountInWords(props.grand.value, lead)), h('span', { lang: o, dir: rtl ? 'ltr' : 'rtl' }, amountInWords(props.grand.value, o))) : null;
+        before: p > 0 && carry ? h('tr', { className: 'wy-doc__bf' }, h('td', { colSpan: cols.length - 1 }, h(DocLabel, { l: 'brought', lead: lead, single: true })), h('td', { className: 'wy-doc__n' }, docNum(bf, curInfo(props.currency).dec))) : null }) : null;
+      var carryLine = !last && carry ? h('div', { className: 'wy-doc__carry' }, h(DocLabel, { l: 'carried', lead: lead }), h('span', { className: 'wy-doc__n' }, docNum(sum, curInfo(props.currency).dec))) : null;
+      var totals = last && (props.totals || props.grand) ? h('div', { className: 'wy-doc__totals' }, (props.totals || []).map(function (r, k) { return h('div', { key: k }, h(DocLabel, { l: r.label, lead: lead }), h('span', { className: 'wy-doc__n' }, docNum(r.value, curInfo(props.currency).dec))); }),
+        props.grand ? h('div', { className: 'wy-doc__grand' }, h(DocLabel, { l: props.grand.label || 'total', lead: lead }), h('span', { className: 'wy-doc__n' }, docNum(props.grand.value, curInfo(props.currency).dec))) : null) : null;
+      var words = last && props.grand && props.words !== false ? h('div', { className: 'wy-doc__words' }, h('span', { lang: lead, dir: rtl ? 'rtl' : 'ltr' }, amountInWords(props.grand.value, lead, props.currency)), h('span', { lang: o, dir: rtl ? 'ltr' : 'rtl' }, amountInWords(props.grand.value, o, props.currency))) : null;
       var sum_ = last && props.aside ? h('div', { className: 'wy-doc__sum' }, h('div', { className: 'wy-doc__aside' }, props.aside), h('div', { className: 'wy-doc__sum-end' }, totals, words)) : h(React.Fragment, null, totals, words);
       return docSheet(props, p, n, lead, h(React.Fragment, null, p === 0 ? docParties(props, lead) : null, p === 0 ? props.intro : null, table, carryLine, sum_, last ? props.children : null));
     });
@@ -643,17 +657,17 @@
         h(Icon, { name: 'calendar', size: 16 }), h('span', { className: shown ? 'wy-dp__value' : 'wy-dp__ph', lang: lang }, shown || (range ? L.two : L.one))),
       pop.open ? cal : null));
   }
-  /* Money: JOD with 3 decimals (fils), Western digits, the amount in words as the hint. */
+  /* Money: the workspace's currency with its own decimals (US dollars, 2), Western digits, the amount in words as the hint. */
   function MoneyInput(props) {
-    var dec = props.decimals != null ? props.decimals : 3, cur = props.currency || 'JOD'; var id = useId('wy-mi');
+    var cur = props.currency || DEFAULT_CURRENCY, ci = curInfo(cur), dec = props.decimals != null ? props.decimals : ci.dec; var id = useId('wy-mi');
     var st = useState(function () { var dv = props.defaultValue; if (dv == null || dv === '') return ''; var r = westernDigits(dv).replace(/[,\s]/g, ''), x = Number(r); return isNaN(x) || (r.split('.')[1] || '').length > dec ? r : docNum(x, dec); });
     var raw = westernDigits(st[0]).replace(/[,\s]/g, ''); var num = raw === '' ? null : Number(raw);
     var bad = raw !== '' && (isNaN(num) || (raw.split('.')[1] || '').length > dec);
-    var L = Object.assign({ decimals: cur + ' has ' + dec + ' decimals ({unit}). Use up to ' + dec + '.', unit: 'fils' }, props.labels || {});
+    var L = Object.assign({ decimals: cur + ' has ' + dec + ' decimals ({unit}). Use up to ' + dec + '.', unit: ci.subEn[1] }, props.labels || {});
     var err = props.errorText || (bad ? fill(L.decimals, { unit: L.unit }) : null);
-    var words = props.showWords && num && !bad ? amountInWords(num, props.wordsLang || 'en') : null;
+    var words = props.showWords && num && !bad ? amountInWords(num, props.wordsLang || 'en', cur) : null;
     var p = Object.assign({}, props, { _id: id, errorText: err, helperText: words || props.helperText });
-    return Field(p, h('div', { className: cx('wy-money-in', err && 'is-invalid'), dir: 'ltr' }, h('span', { className: 'wy-money-in__cur' }, cur),
+    return Field(p, h('div', { className: cx('wy-money-in', err && 'is-invalid'), dir: 'ltr' }, h('span', { className: 'wy-money-in__cur' }, ci.sym || cur),
       h('input', { id: id, className: 'wy-money-in__input', inputMode: 'decimal', autoComplete: 'off', value: st[0], placeholder: docNum(0, dec), required: props.required, readOnly: props.readOnly, disabled: props.disabled,
         'aria-invalid': err ? true : undefined, 'aria-describedby': (err || p.helperText) ? id + '-note' : undefined,
         onChange: function (e) { st[1](e.target.value); }, onFocus: function () { st[1](raw); },
@@ -1212,7 +1226,7 @@
     Button: Button, IconButton: IconButton, Badge: Badge, Money: Money, Skeleton: Skeleton, Card: Card, Dialog: Dialog, EmptyState: EmptyState,
     Input: Input, Select: Select, Switch: Switch, Checkbox: Checkbox, Tabs: Tabs, Breadcrumb: Breadcrumb, Pagination: Pagination, PageHeader: PageHeader, AppShell: AppShell,
     DataTable: DataTable, PluginCard: PluginCard, Alert: Alert, ActorChip: ActorChip, ActionProposal: ActionProposal, AgentActivity: AgentActivity, ScopeGrant: ScopeGrant,
-    TenantLogo: TenantLogo, Tooltip: Tooltip, Textarea: Textarea, Combobox: Combobox, RadioGroup: RadioGroup, DatePicker: DatePicker, MoneyInput: MoneyInput, OtpInput: OtpInput, SearchField: SearchField, TenantSwitcher: TenantSwitcher, Segmented: Segmented, LanguageSwitch: LanguageSwitch, ThemeSwitch: ThemeSwitch, Avatar: Avatar, DescriptionList: DescriptionList, Timeline: Timeline, Toast: Toast, ToastRegion: ToastRegion, ConfirmDialog: ConfirmDialog, Drawer: Drawer, Menu: Menu, Popover: Popover, ApprovalQueue: ApprovalQueue, UndoBar: UndoBar, DocPreview: DocPreview, westernDigits: westernDigits, tenantTheme: tenantTheme, avatarPattern: avatarPattern, brandHue: brandHue, contrast: contrast, formatDate: formatDate,
+    TenantLogo: TenantLogo, Tooltip: Tooltip, Textarea: Textarea, Combobox: Combobox, RadioGroup: RadioGroup, DatePicker: DatePicker, MoneyInput: MoneyInput, OtpInput: OtpInput, SearchField: SearchField, TenantSwitcher: TenantSwitcher, Segmented: Segmented, LanguageSwitch: LanguageSwitch, ThemeSwitch: ThemeSwitch, Avatar: Avatar, DescriptionList: DescriptionList, Timeline: Timeline, Toast: Toast, ToastRegion: ToastRegion, ConfirmDialog: ConfirmDialog, Drawer: Drawer, Menu: Menu, Popover: Popover, ApprovalQueue: ApprovalQueue, UndoBar: UndoBar, DocPreview: DocPreview, westernDigits: westernDigits, tenantTheme: tenantTheme, avatarPattern: avatarPattern, brandHue: brandHue, contrast: contrast, formatDate: formatDate, moneyText: moneyText, amountInWords: amountInWords, currencies: CURRENCIES,
     ButtonGroup: ButtonGroup, SplitButton: SplitButton, ToggleGroup: ToggleGroup, PhoneInput: PhoneInput, FileUpload: FileUpload, CommandPalette: CommandPalette, Stepper: Stepper, AgentRunStatus: AgentRunStatus, PlanGate: PlanGate, BarChart: BarChart, LineChart: LineChart, DonutChart: DonutChart, phoneCountries: COUNTRIES,
     Doc: Doc, DocLabel: DocLabel, DocSign: DocSign, DocNote: DocNote, DocAmount: DocAmount, DocTable: DocTable, DocPages: DocPages, DocKpis: DocKpis, DocBars: DocBars, amountInWords: amountInWords, docLabels: DOC_L
   });

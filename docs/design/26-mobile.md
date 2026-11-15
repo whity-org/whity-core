@@ -23,7 +23,7 @@ The Whity app for phones and tablets: a **do-on-the-go companion** to the web ap
 
 ## The web app on a phone
 
-The web app under 640px wide uses the same tab bar, rows, sheets and bottom bars as this app (PW.1–PW.11), so a person moving between them sees one product. It installs as the workspace’s own app and asks for notifications once (PW.11). Cards: `PwNav`, `PwLists`, `PwLibrary`, `PwEditor`, `PwCalendar`, `PwSettings`, `PwBuilders`, `PwInstall`.
+The web app under 640px wide uses the same tab bar, rows, sheets and bottom bars as this app (PW.1–PW.11), so a person moving between them sees one product. It installs as the workspace’s own app and asks for notifications once (PW.11). Cards: `PwNav`, `PwLists`, `PwLibrary`, `PwEditor`, `PwSettings`, `PwBuilders`, `PwInstall`; in 3.5 the calendar is `TplCalendarPhone` (CV.11) and chat is `TplChatPhone` (UC.13).
 
 ## Navigation
 

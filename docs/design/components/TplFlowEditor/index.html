@@ -34,7 +34,7 @@
   var canvas = h('div', { className: 'wy-flowed__canvas' },
     h('div', { className: 'wy-fnode is-start' }, I('send', 14), 'A purchase order is sent'), arrow(),
     node({ t: '1 · Branch manager checks', d: 'The manager of the sender’s unit', tags: [h(W.Badge, { key: 1, variant: 'secondary' }, 'Any one decides')] }), arrow(),
-    node({ t: '2 · Owner approval', d: 'Amro Saleh', on: true, tags: [h(W.Badge, { key: 1, variant: 'secondary' }, 'Decision'), h(W.Badge, { key: 2, variant: 'outline' }, 'Only over JOD 1,000')] }), arrow(),
+    node({ t: '2 · Owner approval', d: 'Amro Saleh', on: true, tags: [h(W.Badge, { key: 1, variant: 'secondary' }, 'Decision'), h(W.Badge, { key: 2, variant: 'outline' }, 'Only over $1,000')] }), arrow(),
     h('div', { className: 'wy-fbranch' },
       h('div', null, arrow('Approved'), node({ t: '3 · Finance records it', d: 'Awss Haddad', tags: [h(W.Badge, { key: 1, variant: 'outline' }, 'Sent, not asked')] }), arrow(), h('div', { className: 'wy-fnode is-end' }, I('success', 14), 'Done')),
       h('div', null, arrow('Rejected'), node({ t: 'Back to the sender', d: 'With the note' }), arrow(), h('div', { className: 'wy-fnode is-end' }, I('close', 14), 'Ends here'))),
@@ -44,7 +44,7 @@
     h(W.Select, { label: 'Who it goes to', defaultValue: 'p', options: [{ value: 'p', label: 'A person: Amro Saleh' }, { value: 'r', label: 'A role' }, { value: 'g', label: 'A group' }, { value: 'm', label: 'The sender’s manager' }], helperText: 'Reaches 1 person today.' }),
     h(W.RadioGroup, { label: 'What they do', defaultValue: 'd', options: [{ value: 'd', label: 'Decide: approve or reject' }, { value: 's', label: 'Receive it, no decision' }] }),
     h(W.Select, { label: 'Counts as approved when', defaultValue: 'one', options: [{ value: 'one', label: 'Any one approves' }, { value: 'all', label: 'Everyone approves' }] }),
-    h(W.Select, { label: 'Only when', defaultValue: 'amt', options: [{ value: 'always', label: 'Always' }, { value: 'amt', label: 'Amount is over JOD 1,000' }] }),
+    h(W.Select, { label: 'Only when', defaultValue: 'amt', options: [{ value: 'always', label: 'Always' }, { value: 'amt', label: 'Amount is over $1,000' }] }),
     h(W.Button, { variant: 'ghost', icon: 'delete' }, 'Remove this stage'));
   ReactDOM.createRoot(document.getElementById('root')).render(shell('Route templates', h(F, null,
     h(W.Breadcrumb, { items: [{ label: 'Route templates' }, { label: 'Purchase orders' }] }),

@@ -15,7 +15,7 @@ The stage 7 inventory: 56 components in 8 groups. The 41 P1 components (what the
 | | Select · combobox (search, empty, async) | P1 | Built · Select, Combobox |
 | | Checkbox · radio · switch (indeterminate) | P1 | Built · Switch, Choices |
 | | Date · date range (Arabic months, Western digits) | P1 | Built · DatePicker |
-| | Money input (JOD, 3 decimals) | P1 | Built · MoneyInput |
+| | Money input (the currency's decimals: USD 2, JOD 3) | P1 | Built · MoneyInput |
 | | One-time code (6 digits, paste) | P1 | Built · OtpInput |
 | | Search field (⌘K hint) | P1 | Built · SearchField |
 | | Phone input (+962 default) | P2 | Built · PhoneInput |
