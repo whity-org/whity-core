@@ -14,6 +14,7 @@ use Whity\Core\Document\DocumentSourceStarterSeeder;
 use Whity\Core\Document\Print\DocumentPublishCheck;
 use Whity\Core\Document\Print\PrintLabels;
 use Whity\Core\Document\Print\WhityDocumentPrinter;
+use Whity\Core\Tenant\TenantProvisioner;
 use Whity\Database\Database;
 
 /**
@@ -182,6 +183,44 @@ final class GuidelineStartersRealEngineTest extends TestCase
 
         $options = $printer->payload($doc, null, null, null, ['accent' => '#1f5fbf', 'titleFace' => 'noto', 'largePrint' => true]);
         self::assertSame(['accent' => '#1f5fbf', 'titleFace' => 'noto', 'largePrint' => true], $options['theme']);
+    }
+
+    public function testSampleAmountsAreInTheWorkspacesCurrency(): void
+    {
+        // US dollars by default (CU.1): two decimals, the symbol, cents in words.
+        $usd = $this->seeder->starters();
+        $receipt = $this->samples($usd['editor.receipt']);
+        self::assertSame('$203.00', $receipt['amount']);
+        self::assertSame('Two hundred and three US dollars', $receipt['amount_in_words']);
+        self::assertSame('301.60', $this->samples($usd['editor.invoice'])['total']);
+        self::assertStringContainsString('Total USD', $this->plainText($usd['editor.invoice']['blocks']));
+
+        // A workspace in dinars gets its samples in dinars, and the same totals.
+        $jod = $this->seeder->starters('JOD');
+        $receipt = $this->samples($jod['editor.receipt']);
+        self::assertSame('JOD 203.000', $receipt['amount']);
+        self::assertSame('Two hundred and three Jordanian dinars', $receipt['amount_in_words']);
+        self::assertSame('301.600', $this->samples($jod['editor.invoice.ar'])['total']);
+        self::assertStringContainsString('الإجمالي (دينار)', $this->plainText($jod['editor.invoice.ar']['blocks']));
+    }
+
+    public function testAWorkspaceIsSeededInItsOwnCurrency(): void
+    {
+        $this->pdo->exec("INSERT INTO app_settings (setting_key, value) VALUES ('billing.default_currency', 'JOD')");
+        TenantProvisioner::coreSteps($this->pdo)[0]->provisionTenant(1, 'Example Bakery');
+
+        $stmt = $this->pdo->prepare("SELECT own_fields FROM document_sources WHERE tenant_id = 1 AND starter_key = 'editor.receipt'");
+        $stmt->execute();
+        self::assertStringContainsString('JOD 203.000', (string) $stmt->fetchColumn());
+    }
+
+    /**
+     * @param array{own_fields: list<array<string, string>>} $starter
+     * @return array<string, string> key => sample
+     */
+    private function samples(array $starter): array
+    {
+        return array_column($starter['own_fields'], 'sample', 'key');
     }
 
     public function testANewWorkspaceGetsEveryStarter(): void

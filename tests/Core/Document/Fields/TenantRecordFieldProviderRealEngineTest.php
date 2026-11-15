@@ -116,7 +116,8 @@ final class TenantRecordFieldProviderRealEngineTest extends TestCase
         self::assertSame('Example Bakery', $v['record.customer']);
         self::assertSame('Wedding', $v['record.cake_type']);
         self::assertSame('2.5', $v['record.weight_kg']);
-        self::assertSame('18.000 JOD', $v['record.price'], 'JOD has three decimals');
+        self::assertSame('JOD 18.000', $v['record.price'], 'CU.2: the code first, and JOD has three decimals');
+        self::assertSame('Eighteen Jordanian dinars', $v['record.price_in_words_en']);
         self::assertSame('5 November 2026', $v['record.pickup_on']);
         self::assertSame('Yes', $v['record.paid']);
         self::assertSame('Example Clinic', $v['record.parent']);
