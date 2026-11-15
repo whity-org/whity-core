@@ -172,15 +172,17 @@ export function formatDateTime(value: string | null | undefined, locale: DateLoc
  *  - `dayMonth`: "14 Nov" / "14 تشرين الثاني", for a list grouped by day;
  *  - `monthYear`: "November 2026" / "تشرين الثاني 2026", for a page title;
  *  - `dayNumber`: "14", for a month cell;
- *  - `dayMonthLong`: "14 November" / "14 تشرين الثاني", for a range title.
+ *  - `dayMonthLong`: "14 November" / "14 تشرين الثاني", for a range title;
+ *  - `month`: "November" / "تشرين الثاني", for a month in a year.
  */
-export type CalendarLabelStyle = 'weekday' | 'weekdayDay' | 'dayMonth' | 'dayMonthLong' | 'monthYear' | 'dayNumber' | 'fullDate'
+export type CalendarLabelStyle = 'weekday' | 'weekdayDay' | 'dayMonth' | 'dayMonthLong' | 'month' | 'monthYear' | 'dayNumber' | 'fullDate'
 
 const CALENDAR_LABELS: Record<CalendarLabelStyle, Intl.DateTimeFormatOptions> = {
   weekday: { weekday: 'short' },
   weekdayDay: { weekday: 'short', day: 'numeric' },
   dayMonth: { day: 'numeric', month: 'short' },
   dayMonthLong: { day: 'numeric', month: 'long' },
+  month: { month: 'long' },
   monthYear: { month: 'long', year: 'numeric' },
   dayNumber: { day: 'numeric' },
   fullDate: { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' },

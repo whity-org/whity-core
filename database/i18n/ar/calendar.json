@@ -449,6 +449,11 @@
         "weekday.sunday": "الأحد",
         "weekday.thursday": "الخميس",
         "weekday.tuesday": "الثلاثاء",
-        "weekday.wednesday": "الأربعاء"
+        "weekday.wednesday": "الأربعاء",
+        "year.dayLabel": "{day}: {count} حجوزات",
+        "year.hint": "انقر يوماً لفتحه",
+        "year.legend": "الحجوزات في اليوم:",
+        "year.many": "7 أو أكثر",
+        "year.none": "لا شيء"
     }
 }

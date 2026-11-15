@@ -137,6 +137,39 @@ final class BookingRepository
         return array_values($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
+    /**
+     * Live bookings a day in the workspace's zone, split by person, room and
+     * service so a screen can leave out what the person unticked (design
+     * 3.5, CV.7: Year shades each day by how many bookings it has).
+     *
+     * @return list<array{date: string, profile_id: int, room_id: ?int, service_id: int, count: int}>
+     */
+    public function dayCounts(int $tenantId, DateTimeImmutable $from, DateTimeImmutable $to, \DateTimeZone $zone): array
+    {
+        $in = [];
+        $params = [':tenant_id' => $tenantId, ':from' => Interval::toDb($from), ':to' => Interval::toDb($to)];
+        foreach (self::LIVE as $i => $status) {
+            $in[] = ':s' . $i;
+            $params[':s' . $i] = $status;
+        }
+        $stmt = $this->db->prepare(
+            'SELECT starts_at, profile_id, room_id, service_id FROM calendar_bookings
+              WHERE tenant_id = :tenant_id AND starts_at >= :from AND starts_at < :to AND status IN (' . implode(', ', $in) . ')'
+        );
+        $stmt->execute($params);
+        $counts = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $date = Interval::fromDb((string) $row['starts_at'])->setTimezone($zone)->format('Y-m-d');
+            $room = $row['room_id'] !== null ? (int) $row['room_id'] : null;
+            $key = $date . '|' . (int) $row['profile_id'] . '|' . ($room ?? '') . '|' . (int) $row['service_id'];
+            $counts[$key] ??= ['date' => $date, 'profile_id' => (int) $row['profile_id'], 'room_id' => $room, 'service_id' => (int) $row['service_id'], 'count' => 0];
+            $counts[$key]['count']++;
+        }
+        ksort($counts);
+
+        return array_values($counts);
+    }
+
     public function move(int $tenantId, int $id, int $profileId, DateTimeImmutable $start, DateTimeImmutable $end, Interval $block, ?DateTimeImmutable $reminderDue): void
     {
         $this->db->prepare(

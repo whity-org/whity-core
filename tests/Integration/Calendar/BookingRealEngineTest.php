@@ -596,6 +596,23 @@ final class BookingRealEngineTest extends TestCase
         self::assertSame([], (new \Whity\Core\Calendar\MeetingBusySource($this->pdo))->busyTimes(2, 11, self::at('2026-11-16T00:00:00+03:00'), self::at('2026-11-17T00:00:00+03:00')));
     }
 
+    public function testDayCountsAreLocalDatesByPersonForLiveBookingsOnly(): void
+    {
+        $this->service->book(1, $this->desk('2026-11-16T10:00:00+03:00', 11));
+        $this->service->book(1, $this->desk('2026-11-16T12:00:00+03:00', 11));
+        // 01:00 on the 17th in Amman is still the 16th in UTC: counted on the 17th.
+        $this->service->book(1, $this->desk('2026-11-17T01:00:00+03:00', 12));
+        $gone = $this->service->book(1, $this->desk('2026-11-18T10:00:00+03:00', 12));
+        $this->service->cancel(1, (int) $gone['id'], 'staff', '');
+
+        $counts = $this->bookings->dayCounts(1, self::at('2026-11-01T00:00:00+03:00'), self::at('2026-12-01T00:00:00+03:00'), new DateTimeZone('Asia/Amman'));
+        self::assertSame([
+            ['date' => '2026-11-16', 'profile_id' => 11, 'room_id' => null, 'service_id' => $this->cake, 'count' => 2],
+            ['date' => '2026-11-17', 'profile_id' => 12, 'room_id' => null, 'service_id' => $this->cake, 'count' => 1],
+        ], $counts);
+        self::assertSame([], $this->bookings->dayCounts(2, self::at('2026-11-01T00:00:00+03:00'), self::at('2026-12-01T00:00:00+03:00'), new DateTimeZone('Asia/Amman')));
+    }
+
     public function testViewChoicesAreEachPersonsOwnAndCleaned(): void
     {
         $prefs = new \Whity\Core\Calendar\ViewPreferences($this->pdo);

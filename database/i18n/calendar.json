@@ -448,6 +448,11 @@
         "weekday.sunday": "Sunday",
         "weekday.thursday": "Thursday",
         "weekday.tuesday": "Tuesday",
-        "weekday.wednesday": "Wednesday"
+        "weekday.wednesday": "Wednesday",
+        "year.dayLabel": "{day}: {count} bookings",
+        "year.hint": "Click a day to open it",
+        "year.legend": "Bookings a day:",
+        "year.many": "7 or more",
+        "year.none": "none"
     }
 }

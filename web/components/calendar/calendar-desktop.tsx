@@ -34,7 +34,7 @@ import {
   dateKey,
   isTimeView,
   labelInstant,
-  monthWeeks,
+  addMonths,
   parseDateKey,
   rangeQuery,
   stepAnchor,
@@ -43,7 +43,7 @@ import {
   type CalendarView,
 } from '@/lib/calendar/layout';
 import { useNewIntent } from '@/lib/commands/new-intent';
-import { MonthGrid, type GridItem } from './calendar-grid';
+import { MonthView, YearLegend, YearView } from './month-year';
 import { CalendarBar, VIEW_KEYS } from './calendar-bar';
 import { CalendarPanel, zoneLabel, type PanelEntry } from './calendar-panel';
 import { BookingDetails } from './booking-details';
@@ -56,7 +56,7 @@ import { useCalendarAccess, type CalendarBasics } from './use-calendar-basics';
 import { useCalendarWords } from './use-calendar-words';
 
 /** The views a computer offers (CV.7). */
-export const DESKTOP_VIEWS: CalendarView[] = ['day', 'four_days', 'week', 'month'];
+export const DESKTOP_VIEWS: CalendarView[] = ['day', 'four_days', 'week', 'month', 'year'];
 const REQUESTS_AHEAD_DAYS = 60;
 const LIVE = 'confirmed,pending_payment,requested';
 
@@ -112,19 +112,37 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
   const showTimeOff = alsoShow.includes('time_off');
 
   const { data, loading, error, forbidden } = useFetch(async () => {
+    // Year reads counts only (below); the lists are capped at 62 days.
+    if (view === 'year') return { bookings: [], events: [], timeOff: [] };
     const [bookings, events, timeOff] = await Promise.all([
       calendarApi.bookings({ ...query, status: showCancelled ? `${LIVE},cancelled` : LIVE }),
       showEvents ? calendarApi.events(query) : Promise.resolve([]),
       showTimeOff ? calendarApi.timeOff(query).catch(() => []) : Promise.resolve([]),
     ]);
     return { bookings, events, timeOff };
-  }, [query.from, query.to, showCancelled, showEvents, showTimeOff, reloadKey]);
+  }, [view === 'year', query.from, query.to, showCancelled, showEvents, showTimeOff, reloadKey]);
 
   // The working hours of everyone, once, for the hours the grid draws (CV.6).
   const openings = useFetch(async () => {
     const all = await Promise.all(staff.map((s) => calendarApi.hours(s.profile_id).catch(() => [])));
     return all.flat();
   }, [staff.map((s) => s.profile_id).join(',')]);
+
+  // Year: bookings a day for the whole year, left out as the panel says (CV.7).
+  const yearCounts = useFetch(
+    async () => (view === 'year' ? calendarApi.dayCounts(query) : []),
+    [view, query.from, query.to, reloadKey]
+  );
+  const counts = useMemo(() => {
+    const byDay = new Map<string, number>();
+    for (const row of yearCounts.data ?? []) {
+      if (hiddenPeople.has(row.profile_id)) continue;
+      if (row.room_id !== null && hiddenRooms.has(row.room_id)) continue;
+      if (colourBy === 'service' && hiddenServices.has(row.service_id)) continue;
+      byDay.set(row.date, (byDay.get(row.date) ?? 0) + row.count);
+    }
+    return byDay;
+  }, [yearCounts.data, hiddenPeople, hiddenRooms, hiddenServices, colourBy]);
 
   const requests = useFetch(async () => {
     const from = new Date();
@@ -216,6 +234,7 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
   const title = (() => {
     if (view === 'day') return dates.calendarLabel(labelInstant(anchor, timeZone), 'fullDate') ?? '';
     if (view === 'month') return dates.calendarLabel(labelInstant(anchor, timeZone), 'monthYear') ?? '';
+    if (view === 'year') return String(anchor.year);
     const first = range.days[0];
     const last = range.days[range.days.length - 1];
     const start =
@@ -289,7 +308,7 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
 
   const notSetUp = services.length === 0 && staff.length === 0;
   const shownFrom = isTimeView(view) ? range.days[0] : { year: anchor.year, month: anchor.month, day: 1 };
-  const shownTo = isTimeView(view) ? range.days[range.days.length - 1] : addDays(monthWeeks(anchor, settings.week_start).flat().slice(-1)[0], 0);
+  const shownTo = isTimeView(view) ? range.days[range.days.length - 1] : addDays(addMonths(shownFrom, 1), -1);
 
   const openItem = (item: CalItem | null) => {
     if (item?.event) {
@@ -300,20 +319,6 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
     }
     setSelected(item);
   };
-
-  // Month keeps its grid until Month and Year are redrawn (WHIT-1101).
-  const monthItems: GridItem[] = items.map((item) => ({
-    key: item.key,
-    starts_at: item.starts_at,
-    ends_at: item.ends_at,
-    allDay: item.allDay,
-    title: item.title,
-    subtitle: item.who,
-    person: '',
-    tone: item.kind === 'wait' ? 'pending' : item.kind === 'request' ? 'request' : item.kind === 'event' || item.kind === 'timeoff' ? 'busy' : 'booking',
-    booking: item.booking,
-    event: item.event,
-  }));
 
   return (
     <div className="grid grid-cols-[256px_minmax(0,1fr)] items-start gap-5" data-testid="calendar-desktop" data-full-width="">
@@ -395,20 +400,31 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
             }
           />
         ) : view === 'month' ? (
-          <MonthGrid
-            items={monthItems}
-            timeZone={timeZone}
+          <MonthView
+            anchor={anchor}
+            weekStart={settings.week_start}
             weekendDays={settings.weekend_days}
             today={today}
-            weeks={monthWeeks(anchor, settings.week_start)}
-            month={anchor.month}
-            onOpen={(grid) => {
-              const item = items.find((i) => i.key === grid.key) ?? null;
-              if (item?.booking) setSheet({ booking: item.booking, startWith: null, suggest: false });
+            timeZone={timeZone}
+            items={items}
+            onOpenItem={(item) => {
+              if (item.booking) setSheet({ booking: item.booking, startWith: null, suggest: false });
               else openItem(item);
             }}
-            onPickDay={(date) => update({ date: dateKey(date), view: 'day' })}
+            onOpenDay={(date) => update({ date: dateKey(date), view: 'day' })}
           />
+        ) : view === 'year' ? (
+          <div className="grid gap-3">
+            <YearLegend />
+            <YearView
+              year={anchor.year}
+              weekStart={settings.week_start}
+              today={today}
+              timeZone={timeZone}
+              counts={counts}
+              onOpenDay={(date) => update({ date: dateKey(date), view: 'day' })}
+            />
+          </div>
         ) : (
           <TimeGrid
             days={range.days}

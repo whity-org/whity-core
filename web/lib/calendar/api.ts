@@ -161,6 +161,13 @@ export const calendarApi = {
       'Free times could not be loaded'
     ),
 
+  /** Live bookings a day by person, room and service, up to a year (design 3.5 Year view). */
+  dayCounts: async ({ from, to }: RangeParams) =>
+    read<Schemas['CalendarDayCount'][]>(
+      await api.GET('/api/v1/calendar/day-counts', { params: { query: query({ from, to }) } }),
+      'The bookings could not be counted'
+    ),
+
   bookings: async ({ from, to, profileId, unitId, status }: RangeParams) =>
     read<CalendarBooking[]>(
       await api.GET('/api/v1/calendar/bookings', {

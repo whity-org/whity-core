@@ -46,6 +46,8 @@ use Whity\Mcp\Auth\McpPrincipal;
 final class CalendarApiHandler
 {
     private const MAX_RANGE_DAYS = 62;
+    /** Year asks for a whole year; a leap year and a clock change fit. */
+    private const MAX_COUNT_DAYS = 367;
 
     public function __construct(
         private readonly CalendarRepository $calendar,
@@ -393,6 +395,28 @@ final class CalendarApiHandler
             $rows = $this->bookings->list($tenantId, $profileId !== null ? [$profileId] : [], $from, $to, $statuses, $this->optionalInt($request, 'unit_id'));
 
             return Response::json(['data' => array_map([BookingRepository::class, 'toApi'], $rows)]);
+        });
+    }
+
+    /**
+     * How many live bookings each day has, by person, room and service, for
+     * up to a year at a time (design 3.5, CV.7: the Year view). Days are the
+     * workspace's calendar dates.
+     */
+    public function dayCounts(Request $request): Response
+    {
+        return $this->run($request, 'bookings', function (int $tenantId) use ($request): Response {
+            $q = $this->query($request);
+            $from = Interval::fromApi($q['from'] ?? null);
+            $to = Interval::fromApi($q['to'] ?? null);
+            if ($from === null || $to === null || $to <= $from) {
+                throw new CalendarRejectedException('from and to are required, as dates and times with an offset, and from must be before to', 422);
+            }
+            if ($to->getTimestamp() - $from->getTimestamp() > self::MAX_COUNT_DAYS * 86400) {
+                throw new CalendarRejectedException('Ask for at most ' . self::MAX_COUNT_DAYS . ' days at a time', 422);
+            }
+
+            return Response::json(['data' => $this->bookings->dayCounts($tenantId, $from, $to, $this->booking->settingsFor($tenantId)->zone)]);
         });
     }
 

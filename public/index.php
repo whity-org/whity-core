@@ -5304,6 +5304,8 @@ $router->register('GET',    '/api/calendar/availability',                   [$ca
 $router->register('GET',    '/api/calendar/bookings',                       [$calendarHandler, 'listBookings'],    null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/bookings',                       [$calendarHandler, 'createBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('GET',    '/api/calendar/bookings/{id:\d+}',              [$calendarHandler, 'showBooking'],     null, null, CorePermissions::CALENDAR_READ);
+// Design 3.5 Year view: live bookings a day, up to a year at a time.
+$router->register('GET',    '/api/calendar/day-counts',                     [$calendarHandler, 'dayCounts'],       null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/move',         [$calendarHandler, 'moveBooking'],     null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/cancel',       [$calendarHandler, 'cancelBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
 // Design 3.3: rooms, requests (Accept, Suggest another time), check-in, Today.

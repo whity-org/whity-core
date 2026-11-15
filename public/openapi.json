@@ -8577,6 +8577,124 @@
                 ]
             }
         },
+        "/api/v1/calendar/day-counts": {
+            "get": {
+                "operationId": "get_api_v1_calendar_day_counts",
+                "summary": "Count live bookings a day, by person, room and service, for up to a year",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "For the Year view: each row is one day, person, room and service with its count. Days are the workspace's calendar dates.",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": true,
+                        "description": "Start of the range, ISO 8601 with an offset, such as `2026-11-16T00:00:00+03:00`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": true,
+                        "description": "End of the range (exclusive), with an offset. At most 62 days after `from`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Counts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarDayCount"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A missing or reversed range, or more than a year",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/events": {
             "get": {
                 "operationId": "get_api_v1_calendar_events",
@@ -73782,6 +73900,35 @@
                 },
                 "required": [
                     "starts_at"
+                ]
+            },
+            "CalendarDayCount": {
+                "type": "object",
+                "properties": {
+                    "date": {
+                        "type": "string",
+                        "description": "The workspace's calendar date, YYYY-MM-DD."
+                    },
+                    "profile_id": {
+                        "type": "integer"
+                    },
+                    "room_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "service_id": {
+                        "type": "integer"
+                    },
+                    "count": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "date",
+                    "profile_id",
+                    "room_id",
+                    "service_id",
+                    "count"
                 ]
             },
             "CalendarEvent": {
