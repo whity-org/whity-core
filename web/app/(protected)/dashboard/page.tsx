@@ -21,6 +21,7 @@ import { PlatformCards } from './platform-cards';
 import { RecentDocuments } from './recent-documents';
 import { partOfDay } from './relative-time';
 import { WaitingForYou } from './waiting-for-you';
+import { PushOffer } from '@/components/pwa/push-offer';
 
 /** The system tenant's id: its people are the platform's operators. */
 const SYSTEM_TENANT_ID = 0;
@@ -64,6 +65,7 @@ export default function DashboardPage() {
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="grid gap-6">
+          <PushOffer />
           <WaitingForYou onChange={() => setRefreshKey((key) => key + 1)} />
           <RecentDocuments />
         </div>
