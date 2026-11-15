@@ -24,7 +24,19 @@ export interface LoadedDocument {
 
 /** What a save sends: the fields of the document the editor changes. */
 export type DraftPatch = Pick<WhityDocument, 'title' | 'blocks'> &
-  Partial<Pick<WhityDocument, 'lang' | 'defaultView' | 'fullWidth' | 'page' | 'labels' | 'ownFields'>>;
+  Partial<Pick<WhityDocument, 'lang' | 'defaultView' | 'fullWidth' | 'page' | 'labels' | 'ownFields' | 'theme'>>;
+
+/** A theme the document can pick (E.44, `TplDocThemes`). */
+export interface ThemeChoice {
+  ref: string;
+  scope: 'system' | 'tenant';
+  name: string;
+  nameAr: string;
+  /** Its own print colour, when it sets one. */
+  accent?: string;
+  /** The workspace default: documents with no theme of their own use it. */
+  isDefault: boolean;
+}
 
 export type SaveResult =
   /** `resolvedTheme`: the saved draft's theme, when the server returns the row. */
@@ -45,6 +57,8 @@ export interface DocumentEditorAdapter {
    * Without it, those blocks say what is missing instead of loading.
    */
   loadServices?(id: string): Promise<EditorServices>;
+  /** The themes a document may pick, the workspace default marked (E.44). Without it, no theme picker. */
+  listThemes?(): Promise<ThemeChoice[]>;
   /**
    * Templates (M4): the fields the record type offers and the tenant's
    * letterhead lines and logos; the document's theme picks among them (E.44). Without it, a template edits like any

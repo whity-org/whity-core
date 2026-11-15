@@ -123,7 +123,7 @@ final class TeamInvitationsRealEngineTest extends TestCase
             new DatabaseSharedStore($this->pdo),
             $settings,
             $this->hooks,
-            new InvitationMailer($mailer, 'https://app.test/invite', new EmailLayout(), $settings),
+            new InvitationMailer(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $settings), 'https://app.test/invite'),
         );
         $this->admin = new WorkspaceSignupApiHandler(
             $this->pdo,
@@ -350,6 +350,51 @@ final class TeamInvitationsRealEngineTest extends TestCase
         }
         $over = $this->invite(self::CLINIC_OWNER, 'p11@example-clinic.com');
         self::assertSame(429, $over->getStatusCode());
+    }
+
+    /** WHIT-1043 (SC.11): each customer invites up to the number the workspace set; withdrawing frees a place. */
+    public function testEachCustomerInvitesUpToTheNumberSet(): void
+    {
+        $this->turnOn();
+        $res = $this->admin->updateSettings($this->authed(self::A, self::ADMIN, 'PUT', '/api/signup/settings', ['invites_per_customer' => 2]));
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        self::assertSame(2, $this->decode($res)['data']['invites_per_customer']);
+
+        self::assertSame(202, $this->invite(self::CLINIC_OWNER, 'one@example.test')->getStatusCode());
+        self::assertSame(202, $this->invite(self::CLINIC_OWNER, 'two@example.test')->getStatusCode());
+        $over = $this->invite(self::CLINIC_OWNER, 'three@example.test');
+        self::assertSame(409, $over->getStatusCode());
+        self::assertSame('invite_limit', $this->decode($over)['details']['code']);
+        self::assertSame(0, (int) $this->q("SELECT COUNT(*) FROM invitations WHERE email = 'three@example.test'")->fetchColumn());
+
+        $listed = $this->decode($this->list(self::CLINIC_OWNER))['data'];
+        self::assertSame(2, $listed['limit']);
+        self::assertSame(2, $listed['used']);
+
+        // Another customer has places of their own.
+        self::assertSame(202, $this->invite(self::OTHER_CUSTOMER, 'four@example.test')->getStatusCode());
+
+        // Withdrawing one frees its place.
+        $one = (int) $this->q("SELECT id FROM invitations WHERE email = 'one@example.test'")->fetchColumn();
+        self::assertSame(200, $this->revoke(self::CLINIC_OWNER, $one)->getStatusCode());
+        self::assertSame(202, $this->invite(self::CLINIC_OWNER, 'three@example.test')->getStatusCode());
+    }
+
+    public function testNoLimitUnlessTheWorkspaceSetsOneAndOnlyWholeNumbers(): void
+    {
+        $this->turnOn();
+        self::assertSame(0, (new WorkspaceSignupSettings($this->pdo))->get(self::A)['invites_per_customer'], 'as before the setting existed');
+
+        foreach (['5', -1, 1001, 2.5] as $bad) {
+            $res = $this->admin->updateSettings($this->authed(self::A, self::ADMIN, 'PUT', '/api/signup/settings', ['invites_per_customer' => $bad]));
+            self::assertSame(422, $res->getStatusCode(), (string) json_encode($bad));
+            self::assertSame('invites_per_customer_invalid', $this->decode($res)['details']['code']);
+        }
+
+        // Saving other settings keeps the number.
+        $this->admin->updateSettings($this->authed(self::A, self::ADMIN, 'PUT', '/api/signup/settings', ['invites_per_customer' => 3]));
+        $this->admin->updateSettings($this->authed(self::A, self::ADMIN, 'PUT', '/api/signup/settings', ['allowed_domains' => []]));
+        self::assertSame(3, (new WorkspaceSignupSettings($this->pdo))->get(self::A)['invites_per_customer']);
     }
 
     public function testACustomerWithdrawsOnlyTheirOwn(): void

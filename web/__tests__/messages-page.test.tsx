@@ -12,6 +12,7 @@ import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, within } from '@testing-library/react';
 
 const mockApiClient = jest.fn();
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockApiClient, user: { id: 7 } }),
 }));
@@ -32,7 +33,7 @@ jest.mock('@whity/features/i18n', () => ({
 }));
 
 jest.mock('@whity/features/datetime', () => ({
-  useDateDisplay: () => ({ dateTime: (v: string | null) => v, relative: () => '5 min' }),
+  useDateDisplay: () => ({ dateTime: (v: string | null) => v, time: (v: string | null) => v, date: (v: string | null) => v }),
 }));
 
 jest.mock('@/components/admin/admin-header', () => ({
@@ -118,7 +119,10 @@ test('lists conversations with status counts and opens one', async () => {
   render(<MessagesPage />);
 
   expect(await screen.findByText('Sara')).toBeInTheDocument();
-  expect(screen.getByRole('tab', { name: /Closed\s*3/ })).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: /Open\s*1/ })).toBeInTheDocument();
+  // Closed grows for ever, so its tab carries no count (TplMessagesInbox).
+  expect(screen.getByRole('tab', { name: 'Closed' })).toBeInTheDocument();
+  expect(screen.getByText('Unassigned', { selector: 'span[data-variant]' })).toBeInTheDocument();
 
   await userEvent.click(screen.getByRole('button', { name: /Sara/ }));
   expect(await screen.findByText('Check the oven')).toBeInTheDocument();
@@ -130,9 +134,9 @@ test('a held agent reply says it has not gone, and can be cancelled', async () =
   render(<MessagesPage />);
 
   expect(await screen.findByText(/Not sent yet\. Sends at 2026-11-11 08:05:00/)).toBeInTheDocument();
-  expect(screen.getByText('Agent for Lina')).toBeInTheDocument();
+  expect(screen.getByText(/Agent for Lina/)).toBeInTheDocument();
 
-  await userEvent.click(screen.getByRole('button', { name: 'Cancel this message' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(mockApiClient).toHaveBeenCalledWith('/api/v1/messages/3/cancel', { method: 'POST' }));
 });
 
@@ -164,9 +168,9 @@ test('without the reply permission there is no composer', async () => {
   window.history.replaceState(null, '', '/admin/messages?c=42');
   render(<MessagesPage />);
 
-  expect(await screen.findByText(/Replying needs the Reply permission/)).toBeInTheDocument();
+  expect(await screen.findByText(/Replying needs the “Reply to customers” permission/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Assign to me' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^Assign/ })).not.toBeInTheDocument();
 });
 
 test('a 403 says the person cannot see Messages', async () => {
@@ -184,11 +188,47 @@ test('assigning to me sends my id', async () => {
   render(<MessagesPage />);
 
   const header = await screen.findByRole('heading', { name: 'Sara', level: 2 });
-  await userEvent.click(within(header.closest('header') as HTMLElement).getByRole('button', { name: 'Assign to me' }));
+  await userEvent.click(within(header.closest('header') as HTMLElement).getByRole('button', { name: 'Assign' }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Assign to me' }));
   await waitFor(() =>
     expect(mockApiClient).toHaveBeenCalledWith(
       '/api/v1/messages/conversations/42',
       expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ assigned_profile_id: 7 }) })
+    )
+  );
+});
+
+test('Edit stops a held reply and puts its words in the composer', async () => {
+  window.history.replaceState(null, '', '/admin/messages?c=42');
+  render(<MessagesPage />);
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+  await waitFor(() => expect(mockApiClient).toHaveBeenCalledWith('/api/v1/messages/3/cancel', { method: 'POST' }));
+  expect(await screen.findByRole('textbox', { name: 'Your reply' })).toHaveValue('Sure, Thursday?');
+});
+
+test('a failed reply says why and can be sent again', async () => {
+  window.history.replaceState(null, '', '/admin/messages?c=42');
+  mockApiClient.mockImplementation((url: string, init?: RequestInit) =>
+    url === '/api/v1/messages/conversations/42' && !init?.method
+      ? json(200, {
+          data: {
+            ...conversation,
+            messages: [
+              message({ id: 9, kind: 'outbound', body: 'Confirmed', status: 'failed', status_detail: 'The address bounced.', author: { id: 7, name: 'Lina' } }),
+            ],
+          },
+        })
+      : routes(url, init)
+  );
+  render(<MessagesPage />);
+
+  expect(await screen.findByText(/Not sent: The address bounced\./)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  await waitFor(() =>
+    expect(mockApiClient).toHaveBeenCalledWith(
+      '/api/v1/messages/conversations/42/replies',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ body: 'Confirmed' }) })
     )
   );
 });

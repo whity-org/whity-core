@@ -28,6 +28,8 @@ export const EDITOR_LABELS = {
   link: "Link",
   highlight: "Highlight",
   insert: "Insert",
+  moreTools: "More tools",
+  hideKeyboard: "Hide keyboard",
   outline: "Outline",
   outlineEmpty: "Headings appear here",
   selection: "Selection",

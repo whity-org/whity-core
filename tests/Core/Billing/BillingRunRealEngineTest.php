@@ -54,6 +54,8 @@ final class BillingRunRealEngineTest extends TestCase
     protected function setUp(): void
     {
         $this->pdo = SchemaFromMigrations::make();
+        // This install sells in dinars; the default has been US dollars since 3.5.1.
+        $this->pdo->exec("INSERT INTO app_settings (setting_key, value) VALUES ('billing.default_currency', 'JOD')");
         $this->pdo->exec('PRAGMA foreign_keys = ON');
 
         $this->pdo->exec("INSERT OR IGNORE INTO tenants (id, name, slug) VALUES (0, 'system', 'system')");

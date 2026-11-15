@@ -26,7 +26,7 @@ export function TopBar() {
   );
 
   return (
-    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-card py-3 ps-17 pe-4 md:px-6">
+    <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-card py-3 ps-4 pe-4 sm:ps-17 md:px-6">
       <button
         type="button"
         onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT))}

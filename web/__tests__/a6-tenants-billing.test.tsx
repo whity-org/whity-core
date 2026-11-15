@@ -12,6 +12,7 @@ jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }))
 
 const apiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient }) }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => apiClient));
 
 const hasPermission = jest.fn<boolean, [string]>();
 jest.mock('@/hooks/useCapabilities', () => ({
@@ -87,14 +88,15 @@ describe('plan prices', () => {
     expect(await screen.findByTestId('price-9')).toHaveTextContent('JOD 49.000');
 
     await userEvent.click(screen.getByTestId('add-price-1'));
+    // A new price starts in the workspace currency, USD by default (CU.1): 12.5 is 1250 cents.
     await userEvent.type(screen.getByTestId('price-amount'), '12.5');
     await userEvent.click(screen.getByTestId('price-save'));
     await waitFor(() =>
       expect(apiClient).toHaveBeenCalledWith(
         '/api/v1/plans/1/prices',
-        expect.objectContaining({ method: 'POST', body: expect.stringContaining('"unit_amount":12500') })
+        expect.objectContaining({ method: 'POST', body: expect.stringContaining('"unit_amount":1250') })
       )
     );
-    expect(JSON.parse((apiClient.mock.calls.find((c) => c[1]?.method === 'POST') as [string, { body: string }])[1].body).currency).toBe('JOD');
+    expect(JSON.parse((apiClient.mock.calls.find((c) => c[1]?.method === 'POST') as [string, { body: string }])[1].body).currency).toBe('USD');
   });
 });

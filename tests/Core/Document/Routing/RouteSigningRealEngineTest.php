@@ -71,6 +71,8 @@ final class RouteSigningRealEngineTest extends TestCase
     private InstanceSealKeys $keys;
     private TotpService $totp;
     private SigningService $signing;
+    private \Tests\Unit\Core\Mail\CapturingMailer $mailer;
+    private HookManager $hooks;
 
     /** @var list<array{0: string, 1: array<string, mixed>}> */
     private array $fired = [];
@@ -100,6 +102,19 @@ final class RouteSigningRealEngineTest extends TestCase
 
         $hooks = new HookManager();
         $this->recordOn($hooks, Events::ROUTE_SIGNED, Events::ROUTE_COMPLETED);
+        // E2 `sign-request`: what a signer is emailed when the route reaches them.
+        $this->mailer = new \Tests\Unit\Core\Mail\CapturingMailer();
+        (new \Whity\Core\Document\Routing\SignRequestEmail(
+            $this->pdo,
+            new \Whity\Core\Identity\ProfileEmailRepository($this->pdo),
+            new \Whity\Core\Mail\BrandedEmailSender(
+                $this->mailer,
+                new \Whity\Core\Mail\EmailLayout(),
+                new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo)),
+            ),
+            'https://app.example.test',
+        ))->subscribe($hooks);
+        $this->hooks = $hooks;
 
         $this->router = new DocumentRouter(
             $this->pdo,
@@ -132,6 +147,45 @@ final class RouteSigningRealEngineTest extends TestCase
             $this->challenges,
             $this->keys,
         );
+    }
+
+    public function testEachSignerIsAskedByEmailFromTheWorkspace(): void
+    {
+        $this->issueSignStep($this->seedDocument(), 'all');
+
+        $to = array_column($this->mailer->sent, 0);
+        sort($to);
+        self::assertCount(2, $this->mailer->sent, 'one email per signer, none to the author');
+        [, $subject, $text, $html] = $this->mailer->sent[0];
+        self::assertStringContainsString(' asks you to sign Supply agreement', $subject);
+        self::assertStringContainsString('Please sign this', $text);
+        self::assertStringContainsString('Read and sign: https://app.example.test/admin/inbox', $text);
+        self::assertStringContainsString('<b style="font-weight:600">Supply agreement</b> to read and sign.', (string) $html);
+        self::assertStringContainsString('Nobody else can sign for you.', $text);
+    }
+
+    public function testASignerGetsTheSignRequestInsteadOfAnEmailedRoutingNotice(): void
+    {
+        $settings = new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo));
+        (new TenantSettingsRepository($this->pdo))->set(self::TENANT, \Whity\Core\Settings\SettingsRegistry::DOCUMENTS_ROUTING_NOTIFICATION_CHANNELS, 'in_app,email');
+        (new \Whity\Core\Document\Routing\RoutingNotifications(
+            new \Whity\Core\Notification\NotificationDispatcher(
+                new \Whity\Core\Notification\NotificationRepository($this->pdo),
+                \Whity\Core\Notification\CoreTransports::make(),
+                new \Whity\Core\Queue\QueueService(new \Whity\Core\Queue\JobRepository($this->pdo)),
+            ),
+            $settings,
+            $this->pdo,
+        ))->subscribe($this->hooks);
+
+        $this->issueSignStep($this->seedDocument(), 'all');
+
+        $channels = $this->column(
+            "SELECT d.channel FROM notification_deliveries d JOIN notifications n ON n.id = d.notification_id
+              WHERE n.recipient_profile_id IN (" . self::SIGNER_A . ', ' . self::SIGNER_B . ') ORDER BY d.channel'
+        );
+        self::assertSame(['in_app', 'in_app'], $channels, 'the in-app notice stays; the email is the sign request');
+        self::assertCount(2, $this->mailer->sent);
     }
 
     public function testQuorumAllWaitsForEverySigner(): void

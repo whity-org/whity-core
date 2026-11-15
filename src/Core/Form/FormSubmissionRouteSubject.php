@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 use Whity\Core\Document\Routing\RouteSubjectFinaliseInterface;
+use Whity\Core\Document\Routing\RouteSubjectApprovedInterface;
+use Whity\Core\Document\Routing\RouteSubjectPeopleInterface;
 use Whity\Core\Document\Routing\RouteSubjectProviderInterface;
+use Whity\Core\Document\Routing\RoutingRejectedException;
 
 /**
  * The `form_submission` route subject (WHIT-920, #1724).
@@ -24,8 +28,71 @@ use Whity\Core\Document\Routing\RouteSubjectProviderInterface;
  *
  * Stateless apart from the injected handle — worker-safe.
  */
-final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface, RouteSubjectFinaliseInterface
+final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface, RouteSubjectFinaliseInterface, RouteSubjectApprovedInterface, RouteSubjectPeopleInterface
 {
+    /**
+     * WHIT-1018: the people the submission names in these questions (its
+     * people pickers, such as a supervisor), from its answers as they are now.
+     * A key that is not a people question names nobody.
+     *
+     * WHIT-1028: an office (staff-audience) question is answered at review, not
+     * by the applicant, so its answer is read from the current review. That is
+     * how a public form, which cannot ask the applicant to pick people, still
+     * names a supervisor: the office records one at pre-check.
+     *
+     * @param list<string> $keys
+     * @return list<int>
+     */
+    public function peopleNamedIn(int $tenantId, int $subjectId, array $keys): array
+    {
+        if ($keys === []) {
+            return [];
+        }
+        $submission = (new FormSubmissionRepository($this->db))->find($tenantId, $subjectId);
+        if ($submission === null) {
+            return [];
+        }
+        $answers = is_array($submission['data']) ? $submission['data'] : [];
+        $office = null;
+        $people = [];
+        foreach ((new FormFieldRepository($this->db))->listForForm($tenantId, (int) $submission['form_id']) as $field) {
+            if (($field['field_type'] ?? null) !== 'profile_ref' || !in_array((string) $field['field_key'], $keys, true)) {
+                continue;
+            }
+            if (($field['audience'] ?? FormFieldRepository::AUDIENCE_APPLICANT) === FormFieldRepository::AUDIENCE_STAFF) {
+                $office ??= (new FormSubmissionReviewRepository($this->db))->currentAnswers($tenantId, $subjectId);
+                $answer = $office[(string) $field['field_key']] ?? null;
+            } else {
+                $answer = $answers[(string) $field['field_key']] ?? null;
+            }
+            foreach (is_array($answer) ? $answer : [$answer] as $id) {
+                if (is_int($id) || (is_string($id) && ctype_digit($id))) {
+                    $people[(int) $id] = (int) $id;
+                }
+            }
+        }
+
+        return array_values($people);
+    }
+
+    /**
+     * WHIT-1017: a submission whose form gives references on approval takes
+     * its reference now, printing its answers and the values entered on the
+     * route.
+     */
+    public function approved(int $tenantId, int $subjectId, int $routeId): void
+    {
+        try {
+            (new FormReferences($this->db))->onApproval($tenantId, $subjectId, $routeId);
+        } catch (FormRejectedException $e) {
+            // Refused rather than approved without the reference it was owed:
+            // the approval rolls back and can simply be given again.
+            throw RoutingRejectedException::because(
+                'The reference for this submission could not be made, so it was not approved. Try again.'
+            );
+        }
+    }
+
     public const TYPE = 'form_submission';
 
     public function __construct(private readonly PDO $db)
@@ -51,7 +118,7 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface,
             return null;
         }
 
-        $name = LocalizedLabel::preferred(LocalizedLabel::decode(isset($row['name']) ? (string) $row['name'] : null));
+        $name = LocalizedText::resolve(LocalizedText::decode(isset($row['name']) ? (string) $row['name'] : null, languages: LocalizedText::BILINGUAL));
 
         return $name !== '' ? $name : (string) $row['form_key'];
     }

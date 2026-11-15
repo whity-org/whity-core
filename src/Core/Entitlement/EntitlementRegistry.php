@@ -73,6 +73,14 @@ final class EntitlementRegistry
     public const DOCUMENTS_RENDER_PER_DAY = 'documents.render.per_day';
     public const DOCUMENTS_RENDER_PER_MONTH = 'documents.render.per_month';
 
+    /**
+     * Form printouts may be customised (design 3.4, FP.2): every option of a
+     * theme's Form printouts tab. Without it a workspace prints the standard
+     * layout with its logo, colour and marks. Read when a printout is made, so
+     * a trial ending changes only the printouts made after it.
+     */
+    public const DOCUMENTS_FORM_PRINTOUTS = 'documents.form_printouts';
+
     // -- Platform surfaces ----------------------------------------------------
     /**
      * May the tenant reach the MCP / AI endpoints?
@@ -190,6 +198,9 @@ final class EntitlementRegistry
         // operator does on purpose.
         self::DOCUMENTS_RENDER_PER_DAY   => '-1',
         self::DOCUMENTS_RENDER_PER_MONTH => '-1',
+        // Neutral like the brand flags below: an install that sells nothing
+        // customises its printouts. A hosted free tier sets it to false.
+        self::DOCUMENTS_FORM_PRINTOUTS => 'true',
         self::MCP_ACCESS             => 'true',
         // Neutral defaults: what an install that sells nothing does today. It
         // counts no customers against anything, may set its own web address
@@ -219,6 +230,7 @@ final class EntitlementRegistry
         self::DEVICES_MAX            => 'int',
         self::DOCUMENTS_RENDER_PER_DAY   => 'int',
         self::DOCUMENTS_RENDER_PER_MONTH => 'int',
+        self::DOCUMENTS_FORM_PRINTOUTS => 'bool',
         self::MCP_ACCESS             => 'bool',
         self::CUSTOMERS_PER_MONTH    => 'int',
         self::BRAND_CUSTOM_DOMAIN    => 'bool',
@@ -243,6 +255,7 @@ final class EntitlementRegistry
         self::DEVICES_MAX            => 'Maximum devices this workspace may have in service at once (-1 for unlimited).',
         self::DOCUMENTS_RENDER_PER_DAY   => 'Documents this workspace may render each day. Resets at midnight (-1 for unlimited).',
         self::DOCUMENTS_RENDER_PER_MONTH => 'Documents this workspace may render each calendar month. Resets on the 1st (-1 for unlimited).',
+        self::DOCUMENTS_FORM_PRINTOUTS => 'Allow this workspace to customise how form responses print. Without it they print in the standard layout with its logo, colour and marks.',
         self::MCP_ACCESS             => 'Allow this workspace to use the MCP and AI endpoints.',
         self::CUSTOMERS_PER_MONTH    => 'Customers this workspace may serve each calendar month. Passing it warns and never turns a customer away (-1 for unlimited).',
         self::BRAND_CUSTOM_DOMAIN    => 'Allow this workspace to be reached on its own web address.',

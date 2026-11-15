@@ -10,10 +10,11 @@ use Whity\Core\Convening\ConveningRejectedException;
 use Whity\Core\Convening\DecisionNumbers;
 use Whity\Core\Convening\DecisionVerdict;
 use Whity\Core\Convening\InvitationStatus;
-use Whity\Core\Convening\LocalizedText;
 use Whity\Core\Convening\MeetingStatus;
 use Whity\Core\Convening\MemberRole;
 use Whity\Core\Document\Routing\RouteVerdict;
+use Whity\Core\i18n\LocalizedText;
+use Whity\Core\i18n\LocalizedTextRejected;
 
 /**
  * The vocabularies, and the three places they are load-bearing rather than
@@ -146,13 +147,13 @@ final class ConveningVocabularyTest extends TestCase
     {
         self::assertSame(
             ['en' => 'Standards Board'],
-            LocalizedText::normalize('Standards Board', 'en', 'name')
+            LocalizedText::normalize('Standards Board', 'name', bareLanguage: 'en', required: true)
         );
     }
 
     public function testAnArabicOnlyLabelIsKeptAndSurvivesEncoding(): void
     {
-        $map = LocalizedText::normalize(['ar' => 'مجلس المعايير'], 'en', 'name');
+        $map = LocalizedText::normalize(['ar' => 'مجلس المعايير'], 'name', bareLanguage: 'en', required: true);
         $encoded = LocalizedText::encode($map);
 
         self::assertStringNotContainsString(
@@ -169,19 +170,19 @@ final class ConveningVocabularyTest extends TestCase
     {
         self::assertSame(
             ['en' => 'Board'],
-            LocalizedText::normalize(['en' => 'Board', 'ar' => '   '], 'en', 'name'),
+            LocalizedText::normalize(['en' => 'Board', 'ar' => '   '], 'name', bareLanguage: 'en', required: true),
             'a client sending every language it knows with the unfilled ones blank is doing the '
             . 'ordinary thing'
         );
 
-        $this->expectException(ConveningRejectedException::class);
-        LocalizedText::normalize(['en' => '', 'ar' => ''], 'en', 'name');
+        $this->expectException(LocalizedTextRejected::class);
+        LocalizedText::normalize(['en' => '', 'ar' => ''], 'name', bareLanguage: 'en', required: true);
     }
 
     public function testAMalformedLanguageKeyIsRefused(): void
     {
-        $this->expectException(ConveningRejectedException::class);
-        LocalizedText::normalize(['English' => 'Board'], 'en', 'name');
+        $this->expectException(LocalizedTextRejected::class);
+        LocalizedText::normalize(['English' => 'Board'], 'name', bareLanguage: 'en', required: true);
     }
 
     public function testALegacyNonJsonValueStillRenders(): void
@@ -195,14 +196,14 @@ final class ConveningVocabularyTest extends TestCase
 
     public function testPreferredFallsBackToAnyLanguageRatherThanToNothing(): void
     {
-        self::assertSame('Board', LocalizedText::preferred(['en' => 'Board', 'ar' => 'مجلس'], 'en'));
+        self::assertSame('Board', LocalizedText::resolve(['en' => 'Board', 'ar' => 'مجلس'], 'en'));
         self::assertSame(
             'مجلس',
-            LocalizedText::preferred(['ar' => 'مجلس'], 'en'),
+            LocalizedText::resolve(['ar' => 'مجلس'], 'en'),
             'a subject line in a language the reader did not ask for is still information; an empty one '
             . 'is not'
         );
-        self::assertSame('fallback', LocalizedText::preferred([], 'en', 'fallback'));
+        self::assertSame('fallback', LocalizedText::resolve([], 'en', fallback: 'fallback'));
     }
 
     public function testABodyKeyIsNarrowEnoughToQuoteInsideADecisionNumber(): void

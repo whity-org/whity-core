@@ -55,9 +55,6 @@ const rawApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ user: authUser, apiClient: (...args: unknown[]) => rawApiClient(...args) }),
 }));
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => rawApiClient(...args),
-}));
 
 const apiGet = jest.fn();
 const apiPatch = jest.fn();
@@ -68,6 +65,7 @@ jest.mock('@/lib/api/client', () => ({
     POST: jest.fn(),
     DELETE: jest.fn(),
   },
+  apiFetch: (...args: unknown[]) => rawApiClient(...args),
 }));
 
 const hasPermission = jest.fn<boolean, [string]>();
@@ -175,6 +173,7 @@ function mockTenantBackend({
   rawApiClient.mockImplementation((url: string) =>
     Promise.resolve(url.startsWith('/api/v1/tenants?') ? list : rawResponse({}, 404))
   );
+  apiPatch.mockResolvedValue(typedOk({}));
   apiGet.mockImplementation((path: string) => {
     if (path === '/api/v1/tenants/{id}/subscription') return Promise.resolve(subscription);
     if (path === '/api/v1/tenants/{id}/entitlements') return Promise.resolve(entitlements);
@@ -216,13 +215,12 @@ describe('/admin/tenants/[id] — the workspace record', () => {
     await user.click(screen.getByTestId('tenant-record-save'));
 
     await waitFor(() =>
-      expect(rawApiClient).toHaveBeenCalledWith(
-        '/api/v1/tenants/7',
-        expect.objectContaining({ method: 'PATCH' })
+      expect(apiPatch).toHaveBeenCalledWith(
+        '/api/v1/tenants/{id}',
+        expect.objectContaining({ params: { path: { id: 7 } } })
       )
     );
-    const patch = rawApiClient.mock.calls.find((call) => call[1]?.method === 'PATCH');
-    expect(JSON.parse(patch![1].body)).toEqual({
+    expect(apiPatch.mock.calls[0][1].body).toEqual({
       names: { en: 'Acme Widgets' },
       nameLanguage: 'en',
       slug: 'acme',
@@ -242,10 +240,9 @@ describe('/admin/tenants/[id] — the workspace record', () => {
     await user.type(document.getElementById('tenant-record-name-en')!, 'Acme Widgets');
     await user.click(screen.getByTestId('tenant-record-save'));
 
-    await waitFor(() => expect(rawApiClient.mock.calls.some((call) => call[1]?.method === 'PATCH')).toBe(true));
+    await waitFor(() => expect(apiPatch).toHaveBeenCalled());
     expect(screen.queryByTestId('tenant-record-slug-error')).not.toBeInTheDocument();
-    const patch = rawApiClient.mock.calls.find((call) => call[1]?.method === 'PATCH');
-    expect(JSON.parse(patch![1].body)).toEqual({ names: { en: 'Acme Widgets' }, nameLanguage: 'en' });
+    expect(apiPatch.mock.calls[0][1].body).toEqual({ names: { en: 'Acme Widgets' }, nameLanguage: 'en' });
   });
 
   it('saves an Arabic original with its English name (#821)', async () => {
@@ -261,9 +258,8 @@ describe('/admin/tenants/[id] — the workspace record', () => {
     await user.click(document.getElementById('tenant-record-name-original-ar')!);
     await user.click(screen.getByTestId('tenant-record-save'));
 
-    await waitFor(() => expect(rawApiClient.mock.calls.some((call) => call[1]?.method === 'PATCH')).toBe(true));
-    const patch = rawApiClient.mock.calls.find((call) => call[1]?.method === 'PATCH');
-    expect(JSON.parse(patch![1].body)).toEqual({
+    await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+    expect(apiPatch.mock.calls[0][1].body).toEqual({
       names: { en: 'Acme', ar: 'أكمي' },
       nameLanguage: 'ar',
       slug: 'acme',
@@ -283,7 +279,7 @@ describe('/admin/tenants/[id] — the workspace record', () => {
     await user.click(screen.getByTestId('tenant-record-save'));
 
     expect(await screen.findByTestId('tenant-record-name-error')).toBeInTheDocument();
-    expect(rawApiClient.mock.calls.some((call) => call[1]?.method === 'PATCH')).toBe(false);
+    expect(apiPatch).not.toHaveBeenCalled();
   });
 
   it('refuses a slug the backend would accept but no URL should carry', async () => {
@@ -300,7 +296,7 @@ describe('/admin/tenants/[id] — the workspace record', () => {
     await user.click(screen.getByTestId('tenant-record-save'));
 
     expect(await screen.findByTestId('tenant-record-slug-error')).toBeInTheDocument();
-    expect(rawApiClient.mock.calls.some((call) => call[1]?.method === 'PATCH')).toBe(false);
+    expect(apiPatch).not.toHaveBeenCalled();
   });
 
   it('names the CAPABILITY gate first when the caller fails both', async () => {

@@ -1,5 +1,6 @@
 /**
- * Whity document editor — the contract (design system 2.2, decisions E.1–E.43).
+ * Whity document editor — the contract (design system 2.2, decisions E.1–E.47;
+ * 3.4 adds stable keys for a saved block's per-document parts, E.23a).
  *
  * The design system defines the editor; the Whity team builds it (E.1).
  * This file is the shared vocabulary between the editor, Whity Render,
@@ -15,6 +16,8 @@ export type UserId = string;
 export type AgentId = string;      // an AI principal
 export type PluginId = string;     // e.g. "com.example.delivery-tracker"
 export type SavedBlockId = string;
+/** E.23a: names one per-document part inside a saved block. Minted once ("pd_" + 8-char nanoid), never reused or renumbered. */
+export type PerDocumentKey = string;
 export type ISODateTime = string;  // "2026-10-29T14:02:00Z"
 
 /** Who did something. Agents always carry the person they act for (stage 7 actor chip, E.4). */
@@ -78,7 +81,31 @@ export interface DocumentThemeTokens {
     logo?: 'wide' | 'square' | 'none';
     /** In this order, without repeats, at most four. */
     lines?: LetterheadLine[];
+    /** FP.3: how the letterhead is laid out. */
+    layout?: 'start' | 'centred' | 'bilingual';
   };
+  /** FP.2–FP.10: how form responses print. Anything but the standard needs a paid plan or a trial. */
+  form?: FormPrintoutStyle;
+}
+
+/** FP.2–FP.10 (3.4). Every key optional; missing keys take the standard layout. */
+export interface FormPrintoutStyle {
+  header?: 'letterhead' | 'centred' | 'bilingual';
+  officeDetails?: 'decisionLine' | 'strip';
+  decision?: 'topAndEnd' | 'top' | 'end';
+  /** A number, B the Whity mark (free workspaces always), C eyebrow, D rail, E tab, F plane. */
+  sectionStyle?: 'number' | 'mark' | 'eyebrow' | 'rail' | 'tab' | 'plane';
+  questions?: 'stacked' | 'twoColumns';
+  longAnswers?: 'countAndContinued' | 'plain';
+  /** More than 8 options always print the chosen only. */
+  choices?: 'allOptions' | 'chosenOnly';
+  yesNo?: 'word' | 'threeColumns';
+  empty?: 'collapseAndMark' | 'hide' | 'printAll';
+  signatures?: 'confirmedAndDrawn' | 'confirmedOnly' | 'withPaperLines';
+  approvals?: 'list' | 'cards';
+  footer?: { reference?: boolean; marks?: boolean; qrEveryPage?: boolean };
+  /** Theme images printed at the footer's end side (ISO, accreditation), at most 3, 8 mm tall. */
+  marks?: { src: string; alt: string }[];
 }
 
 /** What a document stores: the theme it names and its overrides of the print colour and letterhead. */
@@ -126,8 +153,8 @@ export interface FieldRef {
   label: string;           // "Customer name"
   /** E.27: required fields block issuing; fiscal fields are always required. */
   required?: boolean;
-  /** E.23: inside a synced saved block, filled per document. */
-  perDocument?: boolean;
+  /** E.23, E.23a: inside a synced saved block, filled per document. Names the part by its stable key. */
+  perDocument?: PerDocumentKey;
   marks?: Mark[];
 }
 
@@ -142,7 +169,7 @@ export type Mark =
   | { type: 'comment'; threadId: string }
   | { type: 'insertion'; suggestionId: string }   // E.4, part 6
   | { type: 'deletion'; suggestionId: string }
-  | { type: 'perDocument' };      // E.23: text filled per document in a synced block
+  | { type: 'perDocument'; key: PerDocumentKey };  // E.23a: text filled per document in a synced block; adjacent text with the same key is one part
 
 /* ------------------------------------------------------------- Blocks */
 
@@ -253,8 +280,12 @@ export interface SavedBlockRef extends BlockBase {
   savedBlockId: SavedBlockId;
   /** The library version this document shows; published templates pick up changes at their next publish. */
   version: number;
-  /** E.23: values for the parts marked "filled per document", by key. */
-  overrides: Record<string, Inline[]>;
+  /**
+   * E.23a: values for the parts filled per document, by the part's stable key (never by position).
+   * A key the library version no longer has is kept here, ignored, and reported (`orphanedParts`), so
+   * moving back to an older version or undoing a removal restores the value.
+   */
+  overrides: Partial<Record<PerDocumentKey, Inline[]>>;
 }
 
 /** E.17–E.19: a block from a plugin. The data is the plugin's own, validated against its schema. */
@@ -335,6 +366,39 @@ export interface MissingPluginState { plugin: PluginId; pluginName: string; canE
 
 /* -------------------------------------------------------- Saved blocks */
 
+/**
+ * E.23a: one part of a synced saved block that each document fills (a signer's name, a date).
+ *
+ * Rules:
+ * - The key is minted when the creator marks the part ("Fill per document") and stays with it through
+ *   edits, moves, reordering, version bumps and translation. Unmarking deletes the key; marking again mints a new one.
+ * - Keys are unique within a saved block. Copying a marked part inside the same block mints a new key;
+ *   pasting it into another block or document drops the mark.
+ * - Text: every run carrying the `perDocument` mark with this key is the part. A merge field: `FieldRef.perDocument` holds the key.
+ * - Documents store values in `SavedBlockRef.overrides[key]`. Nothing is ever looked up by position.
+ */
+export interface PerDocumentPart {
+  key: PerDocumentKey;
+  /** Shown in the "Fill in" prompt and the issuing bar: "Signer's name". English and Arabic. */
+  label: { en: string; ar?: string };
+  kind: 'text' | 'field';
+  /** Blocks issuing until filled, like E.27. */
+  required?: boolean;
+  /** Shown, dashed, until a document fills it. */
+  placeholder?: Inline[];
+}
+
+/** E.23a: what the editor reports when a document moves to a newer library version. */
+export interface SavedBlockVersionChange {
+  savedBlockId: SavedBlockId;
+  from: number;
+  to: number;
+  /** Parts the new version added: empty in this document until filled. */
+  newParts: PerDocumentKey[];
+  /** Values this document holds for parts the new version removed. Kept, not printed. */
+  orphanedParts: PerDocumentKey[];
+}
+
 /** E.21–E.24 */
 export interface SavedBlock {
   id: SavedBlockId;
@@ -344,8 +408,10 @@ export interface SavedBlock {
   sharing: 'me' | 'workspace';
   owner: Actor;
   blocks: Block[];
-  /** Keys of the parts filled per document (marked with `perDocument`). */
-  perDocumentKeys: string[];
+  /** E.23a: the parts filled per document, in reading order. Order is for display only; keys never change with it. */
+  perDocumentParts: PerDocumentPart[];
+  /** @deprecated 3.4: use `perDocumentParts`. Kept one release for reading old rows. */
+  perDocumentKeys?: PerDocumentKey[];
   version: number;
   usedIn?: number;                     // documents using a synced block
 }

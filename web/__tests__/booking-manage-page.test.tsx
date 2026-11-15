@@ -69,13 +69,21 @@ describe('ManageBookingScreen', () => {
     const replaceState = jest.spyOn(window.history, 'replaceState');
 
     render(<ManageBookingScreen token={OLD} />);
-    expect(await screen.findByTestId('manage-card')).toHaveTextContent('Your booking with Example Bakery');
+    const card = await screen.findByTestId('manage-card');
+    // TplBookingManage: the answer, then Add to my calendar as the main button, Move it and Cancel it.
+    expect(card).toHaveTextContent('You’re booked');
+    expect(card).toHaveTextContent('Hello Rana Haddad. Here is your booking with Example Bakery');
+    expect(screen.getByTestId('manage-ics')).toHaveTextContent('Add to my calendar');
+    expect(screen.getByTestId('manage-move')).toHaveTextContent('Move it');
+    expect(screen.getByTestId('manage-cancel')).toHaveTextContent('Cancel it');
 
     fireEvent.click(screen.getByTestId('manage-move'));
     // The booking's own time is not offered as a move.
     expect(await screen.findByRole('button', { name: '11:00' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '09:00' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '11:00' }));
+    // The button names the new time.
+    expect(screen.getByTestId('move-submit')).toHaveTextContent('11:00');
     fireEvent.click(screen.getByTestId('move-submit'));
 
     expect(await screen.findByTestId('manage-notice')).toHaveTextContent('the old link no longer works');
@@ -84,7 +92,7 @@ describe('ManageBookingScreen', () => {
     expect(replaceState).toHaveBeenCalledWith(null, '', `/booking/${NEW}`);
     expect(window.location.pathname).toBe(`/booking/${NEW}`);
     // The workspace's name and zone are kept though the move's answer leaves them out.
-    expect(screen.getByTestId('manage-card')).toHaveTextContent('Your booking with Example Bakery');
+    expect(screen.getByTestId('manage-card')).toHaveTextContent('Here is your booking with Example Bakery');
     expect(screen.getByTestId('manage-ics')).toHaveAttribute('href', `/api/v1/public/bookings/${NEW}/ics`);
 
     // Cancel now goes to the new link.
@@ -92,12 +100,13 @@ describe('ManageBookingScreen', () => {
     fireEvent.click(await screen.findByTestId('manage-cancel-confirm'));
     await waitFor(() => expect(calls.some((c) => c.url === `/api/v1/public/bookings/${NEW}/cancel`)).toBe(true));
     expect(await screen.findByTestId('booking-status')).toHaveTextContent('Cancelled');
+    expect(screen.getByTestId('manage-card')).toHaveTextContent('Your booking is cancelled');
     expect(screen.queryByTestId('manage-move')).toBeNull();
   });
 
   it('says a link that is not one of ours is invalid, without asking the server', async () => {
     render(<ManageBookingScreen token="not-a-link" />);
-    expect(await screen.findByTestId('manage-invalid')).toHaveTextContent('This link is invalid or has expired');
+    expect(await screen.findByTestId('manage-invalid')).toHaveTextContent('This booking link doesn’t work');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

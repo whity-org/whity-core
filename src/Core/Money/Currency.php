@@ -106,6 +106,21 @@ final class Currency
         'UYW' => 4,
     ];
 
+    /**
+     * The currencies written with a symbol before the number (CU.2). Every
+     * other currency writes its code and a space: "JOD 312.000", "SAR 312.00".
+     * The same two as the design's `Whity.currencies`.
+     *
+     * @var array<string, string>
+     */
+    private const SYMBOLS = [
+        'USD' => '$',
+        'EUR' => '€',
+    ];
+
+    /** The minus a person reads (U+2212), as the design writes −$35.00. */
+    private const MINUS = '−';
+
     /** Longest fractional part any listed currency has. */
     private const MAX_EXPONENT = 4;
 
@@ -174,6 +189,41 @@ final class Currency
 
         return $sign . $major . '.' . str_pad((string) $minor, $exponent, '0', STR_PAD_LEFT)
             . ' ' . $currency;
+    }
+
+    /**
+     * The amount as a person reads it, by CU.2: "$312.00", "−$35.00",
+     * "JOD 1,234.500", "SAR 312.00".
+     *
+     * A symbol goes before the number with no space; a currency without one
+     * writes its code and a space. Western digits and comma grouping in both
+     * languages, so the text is the same on an English or an Arabic page; the
+     * caller isolates it (bdi, dir="ltr") so it never flips in Arabic text.
+     *
+     * @throws MoneyException When the code is not three letters.
+     */
+    public static function display(int $minorUnits, string $currency): string
+    {
+        $currency = self::normalize($currency);
+        $exponent = self::exponentFor($currency);
+        $magnitude = abs($minorUnits);
+        $divisor = 10 ** $exponent;
+
+        $major = number_format(intdiv($magnitude, $divisor), 0, '.', ',');
+        $number = $exponent === 0
+            ? $major
+            : $major . '.' . str_pad((string) ($magnitude % $divisor), $exponent, '0', STR_PAD_LEFT);
+
+        $symbol = self::SYMBOLS[$currency] ?? null;
+
+        return ($minorUnits < 0 ? self::MINUS : '')
+            . ($symbol !== null ? $symbol . $number : $currency . ' ' . $number);
+    }
+
+    /** The symbol CU.2 writes before the number, or null when the code is written instead. */
+    public static function symbolFor(string $currency): ?string
+    {
+        return self::SYMBOLS[self::normalize($currency)] ?? null;
     }
 
     /**

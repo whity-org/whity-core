@@ -22,6 +22,7 @@ import { Textarea } from '@whity/ui/textarea';
 import { Checkbox } from '@whity/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { useTranslation } from '@whity/features/i18n';
+import type { SignatureAppearance } from '@/components/documents/signature-drawing';
 import {
   RepeatingField,
   SeveralFilesField,
@@ -91,7 +92,8 @@ export interface FormFieldSpec {
   } | null;
 }
 
-export type Answer = string | string[] | boolean | TableRow[] | { name: string };
+/** A signature's answer: the typed name and, when drawn, the strokes (design 3.4, FP.7). */
+export type Answer = string | string[] | boolean | TableRow[] | { name: string; drawing?: SignatureAppearance };
 
 /** Prefer the reading direction's language, then anything that is actually set. */
 export function localized(
@@ -374,7 +376,8 @@ export function FormField({
           id={id}
           required={field.is_required}
           value={typeof value === 'object' && value !== null && 'name' in value ? value.name : ''}
-          onChange={(name) => onChange({ name })}
+          drawing={typeof value === 'object' && value !== null && 'drawing' in value ? (value.drawing as SignatureAppearance | null) : null}
+          onChange={(name, drawing) => onChange(drawing !== null && drawing.strokes.length > 0 ? { name, drawing } : { name })}
         />
       ) : field.field_type === 'file' && (field.validation?.maxFiles ?? 1) > 1 ? (
         <SeveralFilesField

@@ -11,6 +11,7 @@ use Whity\Api\InboundMessagesApiHandler;
 use Whity\Api\MeMessagesApiHandler;
 use Whity\Api\MessagesApiHandler;
 use Whity\Api\PublicChatApiHandler;
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Http\HttpFetcher;
@@ -31,6 +32,8 @@ use Whity\Core\RateLimit\ClientIp;
 use Whity\Core\Request;
 use Whity\Core\Security\EncryptedSecretStore;
 use Whity\Core\Settings\GlobalSettingsRepository;
+use Whity\Core\Settings\SettingsService;
+use Whity\Core\Settings\TenantSettingsRepository;
 use Whity\Core\Store\DatabaseSharedStore;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Http\Response;
@@ -102,6 +105,62 @@ final class MessagingRealEngineTest extends TestCase
     protected function tearDown(): void
     {
         TenantContext::reset();
+    }
+
+    public function testWithTheSharedSenderAReplyIsTheWorkspacesHtmlCard(): void
+    {
+        $this->settings->save(self::A, false, null, 'hello@bakery.example');
+        $mails = [];
+        $mailer = new class (function (OutgoingEmail $e) use (&$mails): void {
+            $mails[] = $e;
+        }) implements ThreadedMailer, \Whity\Core\Mail\Mailer {
+            public function __construct(private readonly \Closure $sink)
+            {
+            }
+
+            public function sendThreaded(OutgoingEmail $email): void
+            {
+                ($this->sink)($email);
+            }
+
+            public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
+            {
+                throw new \LogicException('a message goes out threaded');
+            }
+        };
+        $settings = new \Whity\Core\Settings\SettingsService(new GlobalSettingsRepository($this->pdo), new \Whity\Core\Settings\TenantSettingsRepository($this->pdo));
+        $sender = new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $settings);
+        $messaging = CoreMessaging::build(
+            $this->pdo,
+            new MessageChannelRegistry(),
+            $mailer,
+            new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'),
+            static fn (string $name, array $payload, array $opts): int => 1,
+            null,
+            'https://app.whity.test',
+            $sender,
+        );
+
+        $first = $messaging->send(self::A, Recipient::person(self::CUSTOMER_A), 'Your cake is ready.', new SendOptions(subject: 'Your order'));
+        self::assertSame('sent', $messaging->deliver(self::A, (int) $first['id']));
+        $second = $messaging->reply(self::A, (int) $first['conversation_id'], self::STAFF_A, "Pick-up is at 5.\nSee you then.");
+        self::assertSame('sent', $messaging->deliver(self::A, (int) $second['id']));
+
+        self::assertCount(2, $mails);
+        $reply = $mails[1];
+        // E2 `message-reply`: HTML, not plain text, and still threaded into the conversation.
+        self::assertNotNull($reply->htmlBody);
+        self::assertStringContainsString('<b style="font-weight:600">Staff A</b> from ', (string) $reply->htmlBody);
+        self::assertStringContainsString(' replied:', (string) $reply->htmlBody);
+        self::assertStringContainsString('Pick-up is at 5.<br>', (string) $reply->htmlBody);
+        self::assertStringContainsString('it goes straight to the same conversation', (string) $reply->htmlBody);
+        self::assertStringContainsString('> Pick-up is at 5.', $reply->textBody);
+        self::assertSame('Re: Your order', $reply->subject);
+        self::assertSame('hello@bakery.example', $reply->replyTo);
+        self::assertSame($mails[0]->messageId, $reply->inReplyTo);
+        self::assertSame('Example Bakery', $reply->fromName, 'from the workspace itself');
+        // The first message is the workspace writing, not replying.
+        self::assertStringContainsString(' wrote:', (string) $mails[0]->htmlBody);
     }
 
     public function testSendQueuesThenDeliversWithThreadingHeaders(): void
@@ -216,6 +275,33 @@ final class MessagingRealEngineTest extends TestCase
         self::assertSame(0, $source->count(self::B, self::STAFF_A, true));
     }
 
+    public function testTheChatBoxCarriesTheWorkspacesOwnBrand(): void
+    {
+        // WHIT-1044 (card TplChatBox): the chat box wears the workspace's logo and colour, as booking pages do (WHIT-1014).
+        $settings = new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo));
+        $settings->setTenant(self::A, 'branding_main_color', '#b74c05');
+        $settings->setTenant(self::A, 'support_email', 'owner@example.com');
+        $chat = new PublicChatApiHandler(
+            $this->pdo,
+            $this->messaging,
+            $this->settings,
+            new TenantHostRepository($this->pdo),
+            new HostResolver(new TenantHostRepository($this->pdo), 'whity.test'),
+            new BotCheck(new GlobalSettingsRepository($this->pdo), new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'), new HttpFetcher()),
+            new DatabaseSharedStore($this->pdo),
+            'pepper',
+            new BrandingService($settings),
+        );
+        $this->settings->save(self::A, true, null, null);
+
+        $info = json_decode($chat->info(new Request('GET', '/api/public/chat/bakery', ['Host' => 'app.whity.test']), ['workspace' => 'bakery'])->getBody(), true);
+        $brand = $info['data']['brand'];
+        self::assertSame(['name', 'logo_wide_url', 'logo_square_url', 'main_color', 'theme'], array_keys($brand), 'only public brand fields');
+        self::assertSame('Example Bakery', $brand['name']);
+        self::assertSame('#b74c05', $brand['main_color']);
+        self::assertStringNotContainsString('owner@example.com', (string) json_encode($info));
+    }
+
     public function testWebChatForVisitorsHidesNotesAndChecksTheToken(): void
     {
         $chat = new PublicChatApiHandler(
@@ -239,6 +325,7 @@ final class MessagingRealEngineTest extends TestCase
         self::assertSame(404, $chat->info($req('GET'), $params)->getStatusCode(), 'off by default');
         $this->settings->save(self::A, true, 'Hello! How can we help?', null);
         self::assertSame('Hello! How can we help?', json_decode($chat->info($req('GET'), $params)->getBody(), true)['data']['greeting']);
+        self::assertNull(json_decode($chat->info($req('GET'), $params)->getBody(), true)['data']['brand'], 'no branding service, no brand');
 
         $bot = $chat->start($req('POST', ['message' => 'buy now', 'website' => 'spam.example']), $params);
         self::assertSame(201, $bot->getStatusCode());

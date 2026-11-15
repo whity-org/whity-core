@@ -46,7 +46,7 @@
   function node(kind, ic, t, sub, sel) { return h('div', { className: 'wk-node is-' + kind + (sel ? ' is-sel' : '') }, h('span', null, I(ic, 16)), h('div', null, h('b', null, t), sub ? h('small', null, sub) : null)); }
   function line(plus) { return h('div', { className: 'wk-line' + (plus ? ' has-plus' : '') }); }
 
-  var flow = h('div', { className: 'wk-flow' }, node('trigger', 'trigger', 'When a purchase order is created', 'Any branch'), line(1), node('cond', 'branch', 'Is it over JOD 500?', 'Amount, after tax'),
+  var flow = h('div', { className: 'wk-flow' }, node('trigger', 'trigger', 'When a purchase order is created', 'Any branch'), line(1), node('cond', 'branch', 'Is it over $500?', 'Amount, after tax'),
     h('div', { className: 'wk-branches' }, h('div', { className: 'wk-branch' }, h('em', null, 'Yes'), node('person', 'user', 'Emad Nasser approves', 'Manager of the branch · 1 day', 1), line(1), node('person', 'user', 'Amro Saleh approves', 'Owner · signs with Face ID'), line()),
       h('div', { className: 'wk-branch' }, h('em', null, 'No'), node('person', 'user', 'The branch manager approves', 'Within the day'), line())),
     line(), node('agent', 'robot', 'Stock assistant sends it to the supplier', 'By email, with the PDF'), line(1), node('person', 'clock', 'Wait for the supplier to confirm', 'Up to 2 days, then remind'), line(), h('div', { className: 'wk-node is-end' }, 'Done · filed under Purchases'));
@@ -54,7 +54,7 @@
     h('section', null, h('h3', null, 'Who decides'), h(W.Segmented, { label: 'Who decides', options: [{ value: 'p', label: 'A person' }, { value: 'r', label: 'A role' }, { value: 'u', label: 'Unit manager' }, { value: 'a', label: 'An agent' }], defaultValue: 'u' }), h('small', { style: { color: 'var(--muted-foreground)' } }, 'Abdoun: Emad Nasser · Sweifieh: Ahmad Khalil')),
     h('section', null, h('h3', null, 'They can'), h(W.Checkbox ? W.Checkbox : 'span', { label: 'Approve', defaultChecked: true }), h(W.Checkbox ? W.Checkbox : 'span', { label: 'Send back with a note', defaultChecked: true }), h(W.Checkbox ? W.Checkbox : 'span', { label: 'Change the amount', defaultChecked: false })),
     h('section', null, h('h3', null, 'If no one answers'), h(W.DescriptionList, { items: [{ label: 'Remind', value: 'After 1 day' }, { label: 'Then', value: 'Goes to Amro after 2 days' }, { label: 'While they’re away', value: 'Goes to who they handed over to' }] })));
-  ReactDOM.createRoot(document.getElementById('root')).render(shell('Flows', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: 'Flows' }, { label: 'Purchases over JOD 500' }], title: 'Purchases over JOD 500', description: 'Version 3 · on · ran 34 times this month · 2 running now', actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'play' }, 'Try it'), h(W.Button, { variant: 'outline', icon: 'audit' }, 'Runs'), h(W.Button, null, 'Publish version 4')) }),
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Flows', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: 'Flows' }, { label: 'Purchases over $500' }], title: 'Purchases over $500', description: 'Version 3 · on · ran 34 times this month · 2 running now', actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'play' }, 'Try it'), h(W.Button, { variant: 'outline', icon: 'audit' }, 'Runs'), h(W.Button, null, 'Publish version 4')) }),
     h('div', { className: 'wk-split', style: { gridTemplateColumns: 'minmax(0,1fr) 400px' } }, flow, insp))));
 </script>
 </body>

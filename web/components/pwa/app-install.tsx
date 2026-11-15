@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@whity/features/i18n';
 import { Button } from '@whity/ui/button';
+import { startInstallOffer } from '@/lib/pwa/install-offer';
 
 const SW_URL = '/sw.js';
 const MANIFEST_PATH = '/manifest.webmanifest';
@@ -63,7 +64,20 @@ function useManifestLanguage(enabled: boolean): void {
   }, [enabled]);
 }
 
-export function AppInstall({ state }: { state: AppInstallState }) {
+export function AppInstall({
+  state,
+  name,
+  iconUrl,
+}: {
+  state: AppInstallState;
+  name?: string;
+  iconUrl?: string | null;
+}) {
+  // Catch the browser's install prompt early; More offers it later.
+  useEffect(() => {
+    startInstallOffer(state === 'on', name, iconUrl ?? null);
+  }, [state, name, iconUrl]);
+
   const t = useTranslation('common');
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
   const reloading = useRef(false);

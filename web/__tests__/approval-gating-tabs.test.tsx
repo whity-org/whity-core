@@ -11,6 +11,7 @@ import PendingRegistrationsPage from '@/app/(protected)/admin/registrations/page
 const replace = jest.fn();
 let tenantId = 3;
 
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace }),
   usePathname: () => '/admin/registrations',

@@ -113,6 +113,7 @@
         "@whity/empty-state",
         "@whity/input",
         "@whity/pagination",
+        "@whity/sheet",
         "@whity/skeleton",
         "@whity/table"
       ]

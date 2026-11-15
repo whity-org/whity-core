@@ -10,7 +10,8 @@ use Whity\Core\Form\FormFieldRepository;
 use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormStatus;
-use Whity\Core\Form\LocalizedLabel;
+use Whity\Core\i18n\LocalizedText;
+use Whity\Core\i18n\LocalizedTextRejected;
 use Whity\Core\Form\PrefillSource;
 use Whity\Core\Form\SubmissionValidator;
 use Whity\Core\Request;
@@ -176,7 +177,7 @@ final class FormFieldsApiHandler
                 );
             }
 
-            $label = LocalizedLabel::fromInput($body['label'] ?? null, 'label');
+            $label = LocalizedText::label($body['label'] ?? null, 'label');
 
             $options = self::options($body, $fieldType);
             if ($options instanceof Response) {
@@ -193,7 +194,7 @@ final class FormFieldsApiHandler
                 return $prefill;
             }
 
-            $helpText = LocalizedLabel::optionalForStorage($body['help_text'] ?? null, 'help_text', InputLimits::TEXT_MAX);
+            $helpText = LocalizedText::optionalLabel($body['help_text'] ?? null, 'help_text', InputLimits::TEXT_MAX);
             $sectionKey = self::optionalName($body, 'section_key');
             if ($sectionKey instanceof Response) {
                 return $sectionKey;
@@ -229,7 +230,7 @@ final class FormFieldsApiHandler
             return Response::json([
                 'data' => $this->fields->find($tenantId, (int) $form['id'], $id),
             ], 201);
-        } catch (FormRejectedException $e) {
+        } catch (FormRejectedException | LocalizedTextRejected $e) {
             // ->clientMessage, never ->getMessage() (WC-186).
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
@@ -311,7 +312,7 @@ final class FormFieldsApiHandler
                     );
                 }
 
-                $label = LocalizedLabel::fromInput($entry['label'] ?? null, "fields[{$index}].label");
+                $label = LocalizedText::label($entry['label'] ?? null, "fields[{$index}].label");
 
                 $options = self::options($entry, $fieldType);
                 if ($options instanceof Response) {
@@ -325,7 +326,7 @@ final class FormFieldsApiHandler
                 if ($prefill instanceof Response) {
                     return $prefill;
                 }
-                $helpText = LocalizedLabel::optionalForStorage(
+                $helpText = LocalizedText::optionalLabel(
                     $entry['help_text'] ?? null,
                     "fields[{$index}].help_text",
                     InputLimits::TEXT_MAX,
@@ -360,7 +361,7 @@ final class FormFieldsApiHandler
             return Response::json([
                 'data' => $this->fields->replaceAll($tenantId, (int) $form['id'], $normalised),
             ]);
-        } catch (FormRejectedException $e) {
+        } catch (FormRejectedException | LocalizedTextRejected $e) {
             // ->clientMessage, never ->getMessage() (WC-186).
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
@@ -426,7 +427,7 @@ final class FormFieldsApiHandler
             }
 
             if (array_key_exists('label', $body)) {
-                $changes['label'] = LocalizedLabel::fromInput($body['label'], 'label');
+                $changes['label'] = LocalizedText::label($body['label'], 'label');
             }
             if (array_key_exists('is_required', $body)) {
                 $changes['is_required'] = $body['is_required'] === true;
@@ -434,7 +435,7 @@ final class FormFieldsApiHandler
             if (array_key_exists('help_text', $body)) {
                 /** @var array<string, string> $existingHelpText */
                 $existingHelpText = is_array($field['help_text_i18n']) ? $field['help_text_i18n'] : [];
-                $changes['help_text'] = LocalizedLabel::optionalForStorage(
+                $changes['help_text'] = LocalizedText::optionalLabel(
                     $body['help_text'],
                     'help_text',
                     InputLimits::TEXT_MAX,
@@ -520,7 +521,7 @@ final class FormFieldsApiHandler
             $this->fields->update($tenantId, $formId, $fieldId, $changes);
 
             return Response::json(['data' => $this->fields->find($tenantId, $formId, $fieldId)]);
-        } catch (FormRejectedException $e) {
+        } catch (FormRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[FormFieldsApiHandler] update failed: ' . $e->getMessage());
@@ -668,7 +669,7 @@ final class FormFieldsApiHandler
             $columns[] = [
                 'key' => $key,
                 'type' => $type,
-                'label' => LocalizedLabel::fromInput($column['label'] ?? null, "validation.columns[{$index}].label"),
+                'label' => LocalizedText::label($column['label'] ?? null, "validation.columns[{$index}].label"),
                 'required' => ($column['required'] ?? false) === true,
                 'options' => $options,
             ];
@@ -772,8 +773,8 @@ final class FormFieldsApiHandler
             $seen[$value] = true;
 
             try {
-                $label = LocalizedLabel::fromInput($option['label'] ?? $value, "options[{$index}].label");
-            } catch (FormRejectedException $e) {
+                $label = LocalizedText::label($option['label'] ?? $value, "options[{$index}].label");
+            } catch (LocalizedTextRejected $e) {
                 return Response::error($e->clientMessage, 422);
             }
 

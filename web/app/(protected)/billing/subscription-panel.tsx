@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { Badge } from '@whity/ui/badge';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -49,25 +49,24 @@ interface Receipt {
 }
 
 export function SubscriptionPanel() {
-  const { apiClient } = useAuth();
   const t = useTranslation('admin');
   const dates = useDateDisplay();
 
   const { data: access, loading, refetch: refetchAccess } = useFetch(async () => {
-    const res = await apiClient('/api/v1/billing/return');
+    const { data: body, response: res } = await api.GET('/api/v1/billing/return');
     if (!res.ok) {
       return null;
     }
-    return (await res.json()).data as AccessState;
-  }, [apiClient]);
+    return (body as { data?: AccessState } | undefined)?.data as AccessState;
+  }, []);
 
   const { data: receipts } = useFetch(async () => {
-    const res = await apiClient('/api/v1/billing/receipts');
+    const { data: body, response: res } = await api.GET('/api/v1/billing/receipts');
     if (!res.ok) {
       return [] as Receipt[];
     }
-    return ((await res.json()).data ?? []) as Receipt[];
-  }, [apiClient]);
+    return ((body as { data?: Receipt[] } | undefined)?.data ?? []) as Receipt[];
+  }, []);
 
   // Until the answer is known, offer nothing. Rendering the "activate" block
   // first and withdrawing it a moment later would invite the exact double

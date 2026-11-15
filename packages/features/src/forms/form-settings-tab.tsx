@@ -26,6 +26,8 @@ export interface FormSettings {
   description: LocalizedMap
   submit_label: LocalizedMap
   reference_format: string
+  /** WHIT-1017: when the reference is given. */
+  reference_assign: "submit" | "approval"
   sections: FormSectionDef[]
 }
 
@@ -183,6 +185,40 @@ export function FormSettingsTab({
                 "builder.settings.reference.hint",
                 "Optional. Use {SEQ} once for the running number, and {YYYY}, {YY} or {MM} for the date. Leave empty for no reference."
               )}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {t(
+                "builder.settings.reference.more",
+                "Also: {AY:9} for the academic year starting in September, {ANSWER:question} for an answer, {ANSWER:question|yes=A|no=B} to turn an answer into text, and {STEP:key} for a value entered during review."
+              )}
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="form-reference-assign" className="text-sm font-medium">
+              {t("builder.settings.referenceAssign", "When the reference is given")}
+            </label>
+            <Select
+              value={settings.reference_assign}
+              disabled={readOnly}
+              onValueChange={(value) =>
+                onChange({ ...settings, reference_assign: value === "approval" ? "approval" : "submit" })
+              }
+            >
+              <SelectTrigger id="form-reference-assign">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="submit">{t("builder.settings.referenceAssign.submit", "When the form is sent")}</SelectItem>
+                <SelectItem value="approval">{t("builder.settings.referenceAssign.approval", "When it is approved")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {settings.reference_assign === "approval"
+                ? t(
+                    "builder.settings.referenceAssign.approvalHint",
+                    "Given when the review flow finishes approved, before the final document is made. A submission that is not approved gets none."
+                  )
+                : t("builder.settings.referenceAssign.submitHint", "Given the moment someone sends the form.")}
             </p>
           </div>
         </CardContent>

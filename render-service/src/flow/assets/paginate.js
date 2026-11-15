@@ -181,6 +181,17 @@
         openPage();
       }
 
+      /* FP.8: a long answer that runs onto a new page repeats its question's
+       * number and text with "continued" above it (engine need 6). The line
+       * was built in html.js and rides on each of the answer's paragraphs. */
+      if (!current.content.firstChild && node.getAttribute && node.getAttribute('data-flow-continued')) {
+        var carry = document.createElement('div');
+        carry.className = 'ff ff-q-carry';
+        carry.setAttribute('data-flow-unit', 'formContinued');
+        carry.innerHTML = node.getAttribute('data-flow-continued');
+        current.content.appendChild(carry);
+      }
+
       current.content.appendChild(node);
       var overflows = bottomOf(node) > limit + FIT_EPSILON;
 
@@ -227,7 +238,9 @@
 
       current.content.removeChild(node);
 
-      var isFirstOnPage = !current.content.firstChild;
+      // A "continued" line alone on the page counts as an empty page.
+      var only = current.content.firstChild;
+      var isFirstOnPage = !only || (only === current.content.lastChild && only.getAttribute && only.getAttribute('data-flow-unit') === 'formContinued');
       var tail = null;
 
       /* "Do not let a page break fall inside this." The unit moves whole to the
@@ -666,6 +679,32 @@
         words.appendChild(sub);
       }
       slot.appendChild(words);
+      any = true;
+    }
+    if (part.marks && part.marks.length) {
+      var marks = document.createElement('div');
+      marks.className = 'flow-running-marks';
+      for (var m = 0; m < part.marks.length; m += 1) {
+        if (part.marks[m].image) {
+          var mi = document.createElement('img');
+          mi.src = part.marks[m].image.src;
+          mi.alt = part.marks[m].image.alt || '';
+          marks.appendChild(mi);
+        } else {
+          var mt = document.createElement('span');
+          mt.innerHTML = bidi.isolateForeignRuns(part.marks[m].text, doc.direction);
+          marks.appendChild(mt);
+        }
+      }
+      slot.appendChild(marks);
+      any = true;
+    }
+    if (part.qr && part.qr.svg) {
+      // Encoded on the server (html.js), never from page content.
+      var qr = document.createElement('div');
+      qr.className = 'flow-running-qr';
+      qr.innerHTML = part.qr.svg;
+      slot.appendChild(qr);
       any = true;
     }
     if (part.badge && part.badge.value) {

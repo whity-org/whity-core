@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { FormHeader, type FormBannerValue } from '@whity/features/forms';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useDirection } from '@/lib/direction-context';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import { useTranslation } from '@whity/features/i18n';
 import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
 import { localized, type Answer, type LocalizedText, type ReferenceOption } from '@/components/forms/form-fields';
@@ -54,9 +54,9 @@ export default function PreviewFormPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     let cancelled = false;
 
-    apiClient(`/api/v1/forms/${encodeURIComponent(id)}/preview`, { headers: { Accept: 'application/json' } })
-      .then(async (response) => {
-        const body = (await response.json().catch(() => ({}))) as { data?: PreviewForm };
+    api.GET('/api/v1/forms/{id}/preview', { params: { path: { id: Number(id) } } })
+      .then(({ data, error, response }) => {
+        const body = ((data ?? error ?? {}) as unknown) as { data?: PreviewForm };
         if (cancelled) return;
         if (!response.ok || !body.data) setFailed(true);
         else setRendered(body.data);
@@ -65,10 +65,10 @@ export default function PreviewFormPage({ params }: { params: Promise<{ id: stri
         if (!cancelled) setFailed(true);
       });
 
-    apiClient('/api/v1/ous', { headers: { Accept: 'application/json' } })
-      .then(async (response) => {
+    api.GET('/api/v1/ous')
+      .then(({ data, response }) => {
         if (!response.ok) return;
-        const body = (await response.json().catch(() => ({}))) as {
+        const body = (data ?? {}) as {
           data?: Array<Partial<UnitRow>>;
         };
         if (cancelled) return;

@@ -13,10 +13,11 @@ import { Tabs, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
-import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
 import { DOCUMENTS_WRITE } from '@/lib/capabilities';
 import { useToast } from '@/lib/toast-context';
 import { createDocumentSource, listDocumentSourcesWithPeople } from '@/lib/documents/sources';
@@ -34,7 +35,7 @@ export default function DocumentSourcesPage() {
   const t = useTranslation('documents');
   const router = useRouter();
   const { addToast } = useToast();
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const dates = useDateDisplay();
   const { hasPermission } = useCapabilities();
   const canWrite = hasPermission(DOCUMENTS_WRITE);
@@ -50,9 +51,11 @@ export default function DocumentSourcesPage() {
   // Names for "Shared with". A viewer who cannot list units gets the fallback
   // wording instead of ids. "Written by" comes with the list.
   const directory = useFetch(async () => {
-    const units = await fetchAllPages<{ id: number } & UnitNames>(apiClient, '/api/v1/ous').catch(() => null);
+    const units = await fetchAllPagesTyped<{ id: number } & UnitNames>((query) =>
+      api.GET('/api/v1/ous', { params: { query } })
+    ).catch(() => null);
     return { units: units?.items ?? [] };
-  }, [apiClient]);
+  }, []);
   const localizedUnits = useLocalizedUnits(directory.data?.units);
   const unitNames = useMemo(() => new Map(localizedUnits.map((u) => [u.id, u.name])), [localizedUnits]);
 

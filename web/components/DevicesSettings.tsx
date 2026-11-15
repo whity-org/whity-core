@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { Button } from '@whity/ui/button';
 import { useTranslation } from '@whity/features/i18n';
@@ -36,7 +36,6 @@ interface DeviceCredential {
 }
 
 export function DevicesSettings() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('auth');
   const dates = useDateDisplay();
@@ -49,7 +48,7 @@ export function DevicesSettings() {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await apiClient('/api/v1/devices', { method: 'GET' });
+      const res = await apiFetch('/api/v1/devices', { method: 'GET' });
       if (!res.ok) {
         setLoadError(true);
         setDevices([]);
@@ -63,7 +62,7 @@ export function DevicesSettings() {
     } finally {
       setLoading(false);
     }
-  }, [apiClient]);
+  }, []);
 
   useEffect(() => {
     // Deferred off the synchronous effect tick, matching SessionsSettings.
@@ -73,7 +72,7 @@ export function DevicesSettings() {
   const revoke = async (device: DeviceCredential) => {
     setBusyId(device.id);
     try {
-      const res = await apiClient(`/api/v1/devices/${device.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/v1/devices/${device.id}`, { method: 'DELETE' });
       if (!res.ok && res.status !== 404) {
         addToast(
           t('devices.remove.errorWithStatus', 'Failed to remove that device ({status}).', {

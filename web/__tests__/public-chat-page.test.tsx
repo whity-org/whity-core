@@ -24,6 +24,8 @@ jest.mock('@/components/auth/public-shell', () => ({
 }));
 jest.mock('@/components/auth/turnstile-widget', () => ({ TurnstileWidget: () => <div data-testid="bot-check" /> }));
 
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
+
 import PublicChatPage from '@/app/chat/[workspace]/page';
 
 const fetchMock = jest.fn();
@@ -53,7 +55,7 @@ test('chat off answers in plain words', async () => {
   fetchMock.mockImplementation(() => json(404, { error: 'Chat is not available here' }));
   await renderPage();
 
-  expect(await screen.findByText('Chat is not available here.')).toBeInTheDocument();
+  expect(await screen.findByText('Chat is closed right now')).toBeInTheDocument();
 });
 
 test('the first message starts a chat, keeps the token, and later reads send it', async () => {
@@ -96,4 +98,39 @@ test('the bot check has to be passed before the first message', async () => {
   expect(await screen.findByTestId('bot-check')).toBeInTheDocument();
   await userEvent.type(screen.getByRole('textbox', { name: 'Your message' }), 'Hello');
   expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+});
+
+test('too many messages says wait a minute and keeps what was written', async () => {
+  fetchMock.mockImplementation((url: string) =>
+    url === '/api/v1/public/chat/bakery'
+      ? json(200, { data: { workspace_name: 'Example Bakery', greeting: null, max_length: 4000, bot_check: null } })
+      : json(429, { error: 'Too many' })
+  );
+  await renderPage();
+
+  const box = await screen.findByRole('textbox', { name: 'Your message' });
+  await userEvent.type(box, 'Hello again');
+  await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+  expect(await screen.findByText('Wait a minute')).toBeInTheDocument();
+  expect(box).toHaveValue('Hello again');
+});
+
+test('a chat the workspace closed offers a new one', async () => {
+  window.localStorage.setItem('whity.chat.bakery', 'tok-old');
+  fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+    if (url === '/api/v1/public/chat/bakery') {
+      return json(200, { data: { workspace_name: 'Example Bakery', greeting: null, max_length: 4000, bot_check: null, brand: null } });
+    }
+    return init?.method === 'POST' ? json(401, { error: 'Ended' }) : json(200, { data: [] });
+  });
+  await renderPage();
+
+  await userEvent.type(await screen.findByRole('textbox', { name: 'Your message' }), 'Still there?');
+  await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+  expect(await screen.findByText('Example Bakery closed this chat. Your messages are kept.')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Start a new chat' }));
+  expect(await screen.findByLabelText('Your name (optional)')).toBeInTheDocument();
+  expect(window.localStorage.getItem('whity.chat.bakery')).toBeNull();
 });

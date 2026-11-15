@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
 use Whity\Core\Hooks\HookManager;
 use Whity\Sdk\Hooks\Events;
 use PDO;
@@ -14,7 +15,6 @@ use Whity\Core\Document\Routing\DocumentRouter;
 use Whity\Core\Document\Routing\RouteRecipientRepository;
 use Whity\Core\Document\Routing\RouteRepository;
 use Whity\Core\Document\Routing\RoutingRejectedException;
-use Whity\Database\SequenceCounters;
 
 /**
  * Turns a validated answer set into a SUBMISSION and — when the form names a
@@ -120,7 +120,7 @@ final class SubmissionIssuer
                 $actorProfileId,
                 null,
                 $values,
-                $this->referenceFor($tenantId, $form),
+                $this->referenceFor($tenantId, $form, $values),
             );
 
             // In this transaction, so the answers are either a draft or a submission,
@@ -332,7 +332,7 @@ final class SubmissionIssuer
                 if ($upload === null) {
                     /** @var array<string, string> $label */
                     $label = is_array($field['label'] ?? null) ? $field['label'] : [];
-                    $name = LocalizedLabel::preferred($label);
+                    $name = LocalizedText::resolve($label);
                     throw new FormRejectedException(
                         'We could not find the file attached to '
                             . ($name !== '' ? $name : $key)
@@ -392,42 +392,28 @@ final class SubmissionIssuer
     }
 
     /**
-     * The form's next reference, or null when it gives none.
-     *
-     * In the submission's transaction, so a refused submission does not spend a
-     * number. A sequence gives each format unique values, but two DIFFERENT formats
-     * can still print the same text (`A{SEQ}` at 15 and `A1{SEQ}` at 5), so a value
-     * already issued is skipped rather than left to fail on the unique index. The
-     * limit only guards against looping forever on a broken counter.
+     * The form's next reference, or null when it gives none or gives it on
+     * approval (WHIT-1017). In the submission's transaction, so a refused
+     * submission does not spend a number ({@see FormReferences}).
      *
      * @param array<string, mixed> $form
+     * @param array<string, mixed> $answers The normalized answers, for `{ANSWER:key}`.
      *
      * @throws FormRejectedException When no free reference can be found.
      */
-    private function referenceFor(int $tenantId, array $form): ?string
+    private function referenceFor(int $tenantId, array $form, array $answers): ?string
     {
-        $format = $form['reference_format'] ?? null;
-        if (!is_string($format) || $format === '') {
+        if (($form['reference_assign'] ?? FormReferenceAssign::SUBMIT) !== FormReferenceAssign::SUBMIT) {
             return null;
         }
+        $format = $form['reference_format'] ?? null;
 
-        $at = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-        $counters = new SequenceCounters($this->db);
-
-        for ($attempt = 0; $attempt < 20; $attempt++) {
-            $reference = FormReferenceFormat::render(
-                $format,
-                $counters->next($tenantId, FormReferenceFormat::counterName($format, $at)),
-                $at,
-            );
-            if (!$this->submissions->referenceExists($tenantId, $reference)) {
-                return $reference;
-            }
-        }
-
-        throw new FormRejectedException(
-            'This form could not give your submission a reference. Please try again.',
-            'no free form reference for format on form ' . (string) ($form['id'] ?? '?'),
+        return (new FormReferences($this->db))->next(
+            $tenantId,
+            is_string($format) ? $format : null,
+            $answers,
+            [],
+            isset($form['id']) ? (int) $form['id'] : null,
         );
     }
 
@@ -451,7 +437,7 @@ final class SubmissionIssuer
     {
         /** @var array<string, string> $name */
         $name = is_array($form['name'] ?? null) ? $form['name'] : [];
-        $title = LocalizedLabel::preferred($name);
+        $title = LocalizedText::resolve($name);
 
         if ($title === '') {
             $title = (string) ($form['form_key'] ?? 'Form submission');
@@ -496,7 +482,7 @@ final class SubmissionIssuer
             if (!$exists) {
                 /** @var array<string, string> $label */
                 $label = is_array($field['label'] ?? null) ? $field['label'] : [];
-                $name = LocalizedLabel::preferred($label);
+                $name = LocalizedText::resolve($label);
                 throw new FormRejectedException(
                     ($name !== '' ? $name : $key) . ' must name a record in this tenant',
                     '',

@@ -15,7 +15,8 @@ import { useEditorLabels } from './editor-labels';
 import { IssueBar } from './issue-bar';
 import { PrintLabelsDialog } from './print-labels-dialog';
 import { RecordPicker } from './record-picker';
-import type { DocumentEditorAdapter, RecordChoice, TemplateSetup } from './types';
+import { ThemePicker } from './theme-picker';
+import type { DocumentEditorAdapter, RecordChoice, TemplateSetup, ThemeChoice } from './types';
 
 /**
  * Issuing mode (editor M4c): the screen opened to issue a document rather than
@@ -118,6 +119,20 @@ export function DocumentEditorScreen({
   const [template, setTemplate] = React.useState<TemplateSetup | null>(null);
   // E.44: the draft's theme (or, issuing from a template, the published version's frozen one).
   const [theme, setTheme] = React.useState<ResolvedDocumentTheme | null>(null);
+  // WHIT-785: the themes the picker offers; empty until loaded (or without `listThemes`).
+  const [themeChoices, setThemeChoices] = React.useState<ThemeChoice[]>([]);
+  React.useEffect(() => {
+    let live = true;
+    adapter
+      .listThemes?.()
+      .then((list) => {
+        if (live) setThemeChoices(list);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [adapter]);
   const [preview, setPreview] = React.useState<FieldPreview | null>(null);
   const [previewRecord, setPreviewRecord] = React.useState<string | null>(null);
   const [pickerFor, setPickerFor] = React.useState<'preview' | 'pdf' | null>(null);
@@ -221,7 +236,9 @@ export function DocumentEditorScreen({
       // A label sheet's grid and sheet size are saved with it (E.43), and a template's own fields.
       const sheet = next.kind === 'label' ? { page: next.page, labels: next.labels } : {};
       const own = next.ownFields ? { ownFields: next.ownFields } : {};
-      const result = await adapter.save(id, { title: next.title, blocks: next.blocks, ...sheet, ...own }, version.current);
+      // E.44: the theme the picker chose (null follows the workspace default); untouched, it isn't sent.
+      const themed = next.theme !== undefined ? { theme: next.theme } : {};
+      const result = await adapter.save(id, { title: next.title, blocks: next.blocks, ...sheet, ...own, ...themed }, version.current);
       retryDelay.current = RETRY_FIRST_MS;
       if (result.ok) {
         version.current = result.version;
@@ -717,6 +734,17 @@ export function DocumentEditorScreen({
           agents={agents}
           services={editorServices}
           theme={theme?.tokens ?? null}
+          headerActions={
+            // WHIT-785: the theme picker, on printed kinds the person may edit, not while issuing.
+            printed && editCapable && !issuingMode && themeChoices.length > 0 ? (
+              <ThemePicker
+                value={doc.theme}
+                themes={themeChoices}
+                disabled={conflict}
+                onChange={(next) => onChange({ ...doc, theme: next })}
+              />
+            ) : undefined
+          }
           {...(printed && template
             ? {
                 fields: template.fields,

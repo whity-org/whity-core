@@ -258,6 +258,19 @@ export function QuestionPanel({
         </Row>
       )}
 
+      {field.field_type === "textarea" && (
+        <Row id="q-words" label={t("builder.panel.maxWords", "Most words")} hint={t("builder.panel.maxWords.hint", "Printed under the answer as \"142 of 300 words\". Leave empty for no limit.")}>
+          <Input
+            id="q-words"
+            type="number"
+            min={1}
+            disabled={readOnly}
+            value={validation.maxWords ?? ""}
+            onChange={(e) => setRules({ maxWords: e.target.value === "" ? undefined : Number(e.target.value) })}
+          />
+        </Row>
+      )}
+
       {field.field_type === "repeating" && (
         <div className="space-y-3">
           <div className="text-sm font-medium">{t("builder.panel.columns", "Columns")}</div>

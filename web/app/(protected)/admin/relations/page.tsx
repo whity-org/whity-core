@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { AdminHeader } from '@/components/admin/admin-header';
 import {
@@ -58,7 +58,6 @@ interface PersonRow {
 }
 
 export default function RelationsPage() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   // Caller's relations:manage capability (WC-177, WC-204). Fail-closed via
@@ -96,23 +95,26 @@ export default function RelationsPage() {
   const query = useDataTableQuery({ sortKeys: { name: 'name', account: 'account' } });
   const queryString = dataTableQueryString(query.request);
   const list = useFetch(async () => {
-    const response = await apiClient(`/api/v1/persons?${queryString}`);
+    // The table's query arrives as a query string; the typed client wants it as an object.
+    const { data: body, response } = await api.GET('/api/v1/persons', {
+      params: { query: Object.fromEntries(new URLSearchParams(queryString)) as never },
+    });
     if (response.status === 403) {
       return { forbidden: true as const, rows: [] as Person[], total: 0, totalPages: 1 };
     }
     if (!response.ok) throw new Error(t('relations.error.loadPersons', 'Failed to fetch persons'));
-    const body = (await response.json()) as {
+    const page = body as unknown as {
       data?: Person[];
       pagination?: { total: number; totalPages: number };
     };
-    const rows = body.data ?? [];
+    const rows = page.data ?? [];
     return {
       forbidden: false as const,
       rows,
-      total: body.pagination?.total ?? rows.length,
-      totalPages: body.pagination?.totalPages ?? 1,
+      total: page.pagination?.total ?? rows.length,
+      totalPages: page.pagination?.totalPages ?? 1,
     };
-  }, [queryString, apiClient]);
+  }, [queryString, t]);
 
   const selectView = (next: ViewMode) => {
     setView(next);
@@ -129,12 +131,12 @@ export default function RelationsPage() {
       // with >100 people are still capped until the backend grows real
       // search/sort support; that's a pre-existing limit, just moved further out.
       const [personsRes, edgesRes, typesRes] = await Promise.all([
-        apiClient('/api/v1/persons?per_page=100'),
-        apiClient('/api/v1/relations'),
-        apiClient('/api/v1/relationship-types'),
+        api.GET('/api/v1/persons', { params: { query: { per_page: 100 } } }),
+        api.GET('/api/v1/relations'),
+        api.GET('/api/v1/relationship-types'),
       ]);
 
-      if (personsRes.status === 403) {
+      if (personsRes.response.status === 403) {
         setIsForbidden(true);
         setPersons([]);
         setEdges([]);
@@ -142,15 +144,15 @@ export default function RelationsPage() {
       }
       setIsForbidden(false);
 
-      if (!personsRes.ok) {
+      if (!personsRes.response.ok) {
         throw new Error(t('relations.error.loadPersons', 'Failed to fetch persons'));
       }
-      setPersons(((await personsRes.json()).data ?? []) as Person[]);
-      if (edgesRes.ok) {
-        setEdges(((await edgesRes.json()).data ?? []) as RelationEdge[]);
+      setPersons(((personsRes.data as { data?: unknown[] } | undefined)?.data ?? []) as Person[]);
+      if (edgesRes.response.ok) {
+        setEdges(((edgesRes.data as { data?: unknown[] } | undefined)?.data ?? []) as RelationEdge[]);
       }
-      if (typesRes.ok) {
-        setTypes(((await typesRes.json()).data ?? []) as RelationshipType[]);
+      if (typesRes.response.ok) {
+        setTypes(((typesRes.data as { data?: unknown[] } | undefined)?.data ?? []) as RelationshipType[]);
       }
     } catch (error) {
       addToast(
@@ -162,7 +164,7 @@ export default function RelationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [apiClient, addToast, t]);
+  }, [addToast, t]);
 
   const refreshAll = useCallback(() => {
     void fetchAll();

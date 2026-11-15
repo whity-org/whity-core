@@ -97,7 +97,7 @@ describe('curated icons', () => {
       readFileSync(path.join(ROOT, 'docs', 'design', 'handoff', 'icons', 'icons.json'), 'utf8')
     ) as { icons: { name: string; tabler: string; mirrorsInRtl: boolean }[] };
     const map = readFileSync(path.join(UI, 'icon-map.ts'), 'utf8');
-    expect(icons).toHaveLength(156);
+    expect(icons).toHaveLength(163);
     for (const icon of icons) {
       expect(map).toContain(`${JSON.stringify(icon.name)}: {`);
       expect(map).toMatch(new RegExp(`${JSON.stringify(icon.name)}: \\{ icon: \\w+, mirror: ${icon.mirrorsInRtl} \\}`));

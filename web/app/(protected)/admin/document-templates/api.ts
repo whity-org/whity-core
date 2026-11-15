@@ -1,11 +1,8 @@
-import type { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import type { useToast } from '@/lib/toast-context';
 import type { DocumentNumberingRule, DocumentScope, TemplateKind, TemplateRow } from './types';
 
-export type ApiClient = ReturnType<typeof useAuth>['apiClient'];
 export type AddToast = ReturnType<typeof useToast>['addToast'];
-
-const BASE = '/api/v1/document-sources';
 
 /** The kinds this page lists, in the order they are fetched. */
 export const TEMPLATE_KINDS: readonly TemplateKind[] = ['template', 'label'];
@@ -18,8 +15,8 @@ export class ForbiddenError extends Error {
 }
 
 /** The server's own message from an error body, or the fallback. */
-async function errorOf(response: Response, fallback: string): Promise<string> {
-  const parsed = (await response.json().catch(() => null)) as { error?: unknown } | null;
+function errorOf(error: unknown, fallback: string): string {
+  const parsed = (error ?? null) as { error?: unknown } | null;
   return typeof parsed?.error === 'string' && parsed.error !== '' ? parsed.error : fallback;
 }
 
@@ -60,13 +57,15 @@ export function toTemplateRow(raw: Record<string, unknown>): TemplateRow {
 }
 
 /** Every editor template and label sheet the caller may see (server-filtered). */
-export async function listTemplates(apiClient: ApiClient, fallback: string): Promise<TemplateRow[]> {
+export async function listTemplates(fallback: string): Promise<TemplateRow[]> {
   const lists = await Promise.all(
     TEMPLATE_KINDS.map(async (kind) => {
-      const response = await apiClient(`${BASE}?kind=${kind}`);
+      const { data, error, response } = await api.GET('/api/v1/document-sources', {
+        params: { query: { kind } },
+      });
       if (response.status === 403) throw new ForbiddenError();
-      if (!response.ok) throw new Error(await errorOf(response, fallback));
-      const body = (await response.json()) as { data?: Record<string, unknown>[] };
+      if (!response.ok) throw new Error(errorOf(error, fallback));
+      const body = data as unknown as { data?: Record<string, unknown>[] };
       return (body.data ?? []).map(toTemplateRow);
     })
   );
@@ -79,7 +78,6 @@ export async function listTemplates(apiClient: ApiClient, fallback: string): Pro
  * documents:publish"), which says it better than any rewording here.
  */
 export async function patchTemplate(
-  apiClient: ApiClient,
   id: number,
   body: {
     scope?: DocumentScope;
@@ -90,14 +88,20 @@ export async function patchTemplate(
   },
   fallback: string
 ): Promise<string | null> {
-  const response = await apiClient(`${BASE}/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
-  return response.ok ? null : errorOf(response, fallback);
+  const { error, response } = await api.PATCH('/api/v1/document-sources/{id}', {
+    params: { path: { id } },
+    // The spec has no null for `numbering`, which the server reads as "clear it".
+    body: body as never,
+  });
+  return response.ok ? null : errorOf(error, fallback);
 }
 
 /** Delete a row. Returns null on success or the message to show. */
-export async function deleteTemplate(apiClient: ApiClient, id: number, fallback: string): Promise<string | null> {
-  const response = await apiClient(`${BASE}/${id}`, { method: 'DELETE' });
-  return response.ok ? null : errorOf(response, fallback);
+export async function deleteTemplate(id: number, fallback: string): Promise<string | null> {
+  const { error, response } = await api.DELETE('/api/v1/document-sources/{id}', {
+    params: { path: { id } },
+  });
+  return response.ok ? null : errorOf(error, fallback);
 }
 
 /**
@@ -105,13 +109,13 @@ export async function deleteTemplate(apiClient: ApiClient, id: number, fallback:
  * original's audience was. Resolves to the new row's id, or rejects with the
  * message to show.
  */
-export async function copyTemplate(apiClient: ApiClient, id: number, title: string, fallback: string): Promise<number> {
-  const response = await apiClient(`${BASE}/${id}/copy`, {
-    method: 'POST',
-    body: JSON.stringify(title.trim() === '' ? {} : { title: title.trim() }),
+export async function copyTemplate(id: number, title: string, fallback: string): Promise<number> {
+  const { data, error, response } = await api.POST('/api/v1/document-sources/{id}/copy', {
+    params: { path: { id } },
+    body: title.trim() === '' ? {} : { title: title.trim() },
   });
-  if (!response.ok) throw new Error(await errorOf(response, fallback));
-  const body = (await response.json().catch(() => null)) as { data?: { id?: unknown } } | null;
+  if (!response.ok) throw new Error(errorOf(error, fallback));
+  const body = (data ?? null) as { data?: { id?: unknown } } | null;
   const newId = body?.data?.id;
   if (typeof newId !== 'number') throw new Error(fallback);
   return newId;

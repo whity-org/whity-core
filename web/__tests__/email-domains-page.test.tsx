@@ -1,8 +1,8 @@
 /**
  * WC-ac35b6cf — EmailDomainsPage tests.
  *
- * Mocks @/lib/api-client (the page imports the module-level `apiClient`
- * singleton, like SsoProvidersPage does, rather than useAuth().apiClient),
+ * Mocks @/lib/api/client (the page imports the module-level client
+ * singleton, like SsoProvidersPage does, rather than a client from the auth context),
  * useCapabilities (for the `email_domains:manage` gate), and useToast.
  */
 
@@ -10,9 +10,7 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
-}));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 
 let mockCaps: string[] = ['email_domains:manage'];
 let mockCapsLoading = false;

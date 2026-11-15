@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.105).
+ * SDK identity (v1.106).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1282,12 +1282,21 @@ namespace Whity\Sdk;
  * `invited_by` and the `annotations` (#1872, WHIT-996).
  *
  * Purely additive.)
+ *
+ * 1.106 (ONE WHITY ID TOKEN VERIFIER: {@see Auth\Jwt\IssuerTokenVerifier} verifies a JWT from one
+ * issuer (Whity ID): issuer, `typ`, signature against the issuer's discovered key set, `exp`,
+ * `nbf`, `iat` and `aud`. {@see Auth\Jwt\JwsVerifier} checks a signature against a key set
+ * (RS256/384/512, ES256/384/512 only), {@see Auth\Jwt\JwksCache} caches key sets with a refetch
+ * for a rotated key, and {@see Auth\Jwt\HttpsJson} is a small https GET for metadata. Needs only
+ * PHP's openssl extension. The host, the store plugin and the builder connector share it (WHIT-1026).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.105.0';
+    public const VERSION = '1.106.0';
 
     /**
      * Static identity only — never instantiated.

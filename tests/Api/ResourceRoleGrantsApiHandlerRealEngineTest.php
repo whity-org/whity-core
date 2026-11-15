@@ -403,6 +403,57 @@ final class ResourceRoleGrantsApiHandlerRealEngineTest extends TestCase
         self::assertSame(422, $response->getStatusCode());
     }
 
+    /**
+     * #1074: which records one person stands at, without asking record by
+     * record. Everyone-grants and other people's grants are left out.
+     */
+    public function testListByProfileReturnsOnlyThatProfilesNamedGrants(): void
+    {
+        $roleId = $this->roleId('editor');
+        $ouA2 = $this->seedOu('a-second-unit', self::TENANT_A);
+        $this->createGrant(ResourceTypeRegistry::TYPE_OU, $this->ouA, $roleId, $this->memberProfileId);
+        $this->createGrant(ResourceTypeRegistry::TYPE_OU, $ouA2, $roleId, $this->memberProfileId);
+        $this->createGrant(ResourceTypeRegistry::TYPE_OU, $this->ouA, $this->roleId('viewer'), null);
+
+        $rows = $this->listGrantsFor(ResourceTypeRegistry::TYPE_OU, $this->memberProfileId);
+
+        self::assertSame([$this->ouA, $ouA2], array_column($rows, 'resource_id'));
+        self::assertSame([$this->memberProfileId, $this->memberProfileId], array_column($rows, 'profile_id'));
+    }
+
+    public function testListByProfileIsTenantScoped(): void
+    {
+        $this->pdo->prepare(
+            'INSERT INTO resource_role_assignments
+                 (tenant_id, resource_type, resource_id, role_id, profile_id, created_at)
+             VALUES (?, ?, ?, ?, ?, NOW())'
+        )->execute([self::TENANT_B, ResourceTypeRegistry::TYPE_OU, $this->ouA, $this->roleId('viewer'), $this->memberProfileId]);
+
+        self::assertSame([], $this->listGrantsFor(ResourceTypeRegistry::TYPE_OU, $this->memberProfileId));
+    }
+
+    public function testListByResourceIncludesTheResourceId(): void
+    {
+        $this->createGrant(ResourceTypeRegistry::TYPE_OU, $this->ouA, $this->roleId('editor'), null);
+
+        self::assertSame($this->ouA, $this->listGrants(ResourceTypeRegistry::TYPE_OU, $this->ouA)[0]['resource_id']);
+    }
+
+    public function testListRejectsBothResourceAndProfileOrABadProfileId(): void
+    {
+        foreach ([
+            '&resource_id=' . $this->ouA . '&profile_id=' . $this->memberProfileId,
+            '&profile_id=0',
+            '&profile_id=abc',
+        ] as $suffix) {
+            $response = $this->handler()->list($this->req(
+                'GET',
+                '/api/resource-role-grants?resource_type=' . rawurlencode(ResourceTypeRegistry::TYPE_OU) . $suffix
+            ));
+            self::assertSame(422, $response->getStatusCode(), $suffix);
+        }
+    }
+
     // ==================== revoke ====================
 
     public function testRevokeByIdRemovesOnlyThatGrant(): void
@@ -752,7 +803,130 @@ final class ResourceRoleGrantsApiHandlerRealEngineTest extends TestCase
         self::assertSame(403, $response->getStatusCode());
     }
 
+    /**
+     * #1074: a person without roles:read may list their OWN grants.
+     */
+    public function testAMemberMayListTheirOwnGrantsWithoutRolesRead(): void
+    {
+        $this->createGrant(ResourceTypeRegistry::TYPE_OU, $this->ouA, $this->roleId('editor'), $this->memberProfileId);
+
+        $response = $this->listByProfileAs($this->memberProfileId, $this->memberProfileId);
+
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getBody());
+        self::assertSame([$this->ouA], array_column($this->listData($response), 'resource_id'));
+    }
+
+    /**
+     * Denied cross-profile read: without roles:read, another person's grants
+     * are refused, not filtered to empty.
+     */
+    public function testAMemberMayNotListAnotherProfilesGrants(): void
+    {
+        $this->createGrant(ResourceTypeRegistry::TYPE_OU, $this->ouA, $this->roleId('editor'), $this->actorProfileId);
+
+        $response = $this->listByProfileAs($this->actorProfileId, $this->memberProfileId);
+
+        self::assertSame(403, $response->getStatusCode());
+        self::assertStringNotContainsString('"resource_id"', (string) $response->getBody());
+    }
+
+    /**
+     * Naming yourself AND a resource is not a self-read: it falls back to the
+     * roles:read gate rather than slipping past it.
+     */
+    public function testSelfProfilePlusResourceStillNeedsRolesRead(): void
+    {
+        $response = $this->handler()->list($this->req(
+            'GET',
+            '/api/resource-role-grants?resource_type=ou&resource_id=' . $this->ouA . '&profile_id=' . $this->memberProfileId,
+            null,
+            $this->memberProfileId
+        ));
+
+        self::assertSame(403, $response->getStatusCode());
+    }
+
+    /**
+     * An admin (roles:read) may list another person's grants.
+     */
+    public function testRolesReadMayListAnotherProfilesGrants(): void
+    {
+        $this->createGrant(ResourceTypeRegistry::TYPE_OU, $this->ouA, $this->roleId('editor'), $this->memberProfileId);
+
+        $response = $this->listByProfileAs($this->memberProfileId, $this->actorProfileId);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertCount(1, $this->listData($response));
+    }
+
+    /**
+     * Cross-tenant: the self-read is answered in the caller's CURRENT tenant
+     * only, so their grants in another tenant never appear, whoever asks.
+     */
+    public function testSelfReadIsScopedToTheCurrentTenant(): void
+    {
+        $this->pdo->prepare(
+            'INSERT INTO resource_role_assignments
+                 (tenant_id, resource_type, resource_id, role_id, profile_id, created_at)
+             VALUES (?, ?, ?, ?, ?, NOW())'
+        )->execute([self::TENANT_B, ResourceTypeRegistry::TYPE_OU, $this->ouB, $this->roleId('viewer'), $this->memberProfileId]);
+
+        $response = $this->listByProfileAs($this->memberProfileId, $this->memberProfileId);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame([], $this->listData($response));
+    }
+
+    /**
+     * Cross-tenant: an admin of tenant A asking about a tenant B person gets
+     * nothing of tenant B's.
+     */
+    public function testAdminCannotReadAnotherTenantsGrantsByProfile(): void
+    {
+        $tenantBProfile = $this->seedProfile('someone@t2.example', 'viewer', self::TENANT_B);
+        $this->pdo->prepare(
+            'INSERT INTO resource_role_assignments
+                 (tenant_id, resource_type, resource_id, role_id, profile_id, created_at)
+             VALUES (?, ?, ?, ?, ?, NOW())'
+        )->execute([self::TENANT_B, ResourceTypeRegistry::TYPE_OU, $this->ouB, $this->roleId('viewer'), $tenantBProfile]);
+
+        $response = $this->listByProfileAs($tenantBProfile, $this->actorProfileId);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame([], $this->listData($response));
+    }
+
+    public function testSelfReadNeedsATenantContext(): void
+    {
+        TenantContext::reset();
+
+        $response = $this->listByProfileAs($this->memberProfileId, $this->memberProfileId);
+
+        self::assertSame(403, $response->getStatusCode());
+    }
+
     // ==================== helpers ====================
+
+    private function listByProfileAs(int $profileId, int $actor): Response
+    {
+        return $this->handler()->list($this->req(
+            'GET',
+            '/api/resource-role-grants?resource_type=ou&profile_id=' . $profileId,
+            null,
+            $actor
+        ));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function listData(Response $response): array
+    {
+        $decoded = json_decode((string) $response->getBody(), true);
+        self::assertIsArray($decoded);
+
+        return $decoded['data'];
+    }
 
     private function handler(): ResourceRoleGrantsApiHandler
     {
@@ -822,6 +996,26 @@ final class ResourceRoleGrantsApiHandlerRealEngineTest extends TestCase
 
     /**
      * @return list<array{id: int, role_id: int, profile_id: int|null}>
+     */
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function listGrantsFor(string $resourceType, int $profileId): array
+    {
+        $response = $this->handler()->list($this->req(
+            'GET',
+            '/api/resource-role-grants?resource_type=' . rawurlencode($resourceType) . '&profile_id=' . $profileId
+        ));
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getBody());
+
+        $decoded = json_decode((string) $response->getBody(), true);
+        self::assertIsArray($decoded);
+
+        return $decoded['data'];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
      */
     private function listGrants(string $resourceType, int $resourceId): array
     {

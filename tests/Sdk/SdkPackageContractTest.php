@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.105.0',
+            '1.106.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.105 ADDS Events::MEMBERSHIP_CUSTOMER_INVITING and the invitation form of membership.customer_joined: customers invite their own team (#1872, WHIT-996). '
+            'SDK 1.106 ADDS Auth\Jwt\IssuerTokenVerifier, JwsVerifier, JwksCache and HttpsJson: one Whity ID token verifier for the host, plugins and services (WHIT-1026). '
+            . 'SDK 1.105 ADDS Events::MEMBERSHIP_CUSTOMER_INVITING and the invitation form of membership.customer_joined: customers invite their own team (#1872, WHIT-996). '
             . 'SDK 1.104 ADDS PluginCustomerPermissionsInterface: a plugin\'s own permissions that reach only the caller\'s records, which customers may hold (#1872, WHIT-995). '
             . 'SDK 1.102 ADDS the Mail\BillingEmails host service and PluginBillingEmailsInterface: Whity\'s own billing emails to a workspace\'s payers, operator-granted and capped (WHIT-985). '
             . 'SDK 1.101 ADDS Frontend\Blocks\BlockText: block screens take {en, ar} text, served in the language of the reader (WHIT-984). '

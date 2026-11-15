@@ -9,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useDateDisplay } from '@whity/features/datetime';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { useFetch } from '@/hooks/useFetch';
-import { useAuth } from '@/lib/auth-context';
-import type { components } from '@/lib/api/schema';
+import { api } from '@/lib/api/client';
+import type { components } from '@whity/api-client';
 import { localized, type WorkspaceAgent } from './workspace-agents';
 
 type Item = components['schemas']['AgentActivityItem'];
@@ -49,7 +49,6 @@ export function WorkspaceActivityPanel({
   const arabic = useFormattingLocale() === 'ar';
   const dates = useDateDisplay();
   const { showTechnicalDetails } = useDisplayPreferences();
-  const { apiClient } = useAuth();
   const [agent, setAgent] = useState(initialAgent !== undefined ? String(initialAgent) : ALL);
   const [status, setStatus] = useState<string>(ALL);
   const [pages, setPages] = useState(1);
@@ -59,17 +58,17 @@ export function WorkspaceActivityPanel({
   const shownAgent = agentId !== undefined ? String(agentId) : agent;
 
   const page = useFetch<{ data: Item[]; hasMore: boolean }>(async () => {
-    const query = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
-    if (shownAgent !== ALL) query.set('agent', shownAgent);
-    if (status !== ALL) query.set('status', status);
-    if (since !== undefined) query.set('since', since);
-    const response = await apiClient(`/api/v1/agent-activity?${query.toString()}`);
+    const query: Record<string, string | number> = { limit: PAGE_SIZE, offset };
+    if (shownAgent !== ALL) query.agent = shownAgent;
+    if (status !== ALL) query.status = status;
+    if (since !== undefined) query.since = since;
+    const { data, response } = await api.GET('/api/v1/agent-activity', { params: { query: query as never } });
     if (!response.ok) throw new Error(t('agentActivity.workspace.error', 'The workspace’s agent activity could not be loaded.'));
-    const body = (await response.json()) as { data: Item[]; hasMore: boolean };
+    const body = data as unknown as { data: Item[]; hasMore: boolean };
     // Each further page adds to the list; a new filter starts it again.
     setRows((current) => (offset === 0 ? body.data : [...current, ...body.data]));
     return body;
-  }, [apiClient, shownAgent, status, since, offset]);
+  }, [shownAgent, status, since, offset]);
 
   const restart = (apply: () => void) => {
     apply();
@@ -79,9 +78,9 @@ export function WorkspaceActivityPanel({
 
   const agents = useFetch<WorkspaceAgent[]>(async () => {
     if (agentId !== undefined) return [];
-    const response = await apiClient('/api/v1/agents?archived=1');
-    return response.ok ? ((await response.json()) as { data: WorkspaceAgent[] }).data : [];
-  }, [apiClient, agentId]);
+    const { data, response } = await api.GET('/api/v1/agents', { params: { query: { archived: 1 } as never } });
+    return response.ok ? (data as unknown as { data: WorkspaceAgent[] }).data : [];
+  }, [agentId]);
 
   const statusWords: Record<Status, string> = {
     done: t('agentActivity.status.done', 'Done'),

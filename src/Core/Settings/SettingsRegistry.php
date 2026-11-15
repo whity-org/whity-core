@@ -259,6 +259,12 @@ final class SettingsRegistry
     // invariant holds; this only decides how a price is decomposed.
     //
     // The seller an invoice is from is the workspace's company (COMPANY_*).
+    //
+    // `default_currency` is THE WORKSPACE'S CURRENCY (CU.4): what new prices,
+    // services and documents start in, and what Money shows when a screen has
+    // no row of its own. USD since design 3.5.1; workspaces that existed before
+    // were pinned to the currency they had (migration 277), and every stored
+    // amount keeps its own row's currency whatever this says.
     public const BILLING_DEFAULT_CURRENCY = 'billing.default_currency';
     // The plan_key a new workspace is put on. Empty means none, which is every
     // install that does not sell plans. Global-only: a workspace does not get to
@@ -279,6 +285,12 @@ final class SettingsRegistry
     public const COMPANY_TAX_ID = 'company.tax_id';
     public const COMPANY_PHONE = 'company.phone';
     public const COMPANY_EMAIL = 'company.email';
+    /**
+     * The company's name and address in Arabic, for a letterhead printed in
+     * English and Arabic (design 3.4, `letterhead.layout: bilingual`).
+     */
+    public const COMPANY_NAME_AR = 'company.name_ar';
+    public const COMPANY_ADDRESS_AR = 'company.address_ar';
 
     // THE WEBSITE (WS.5, WS.19): what whity.dev reads from this instance.
     // Global-only: the operator's own marketing site, not any workspace's.
@@ -814,6 +826,40 @@ final class SettingsRegistry
      */
     public const APP_INSTALLABLE = 'app.installable';
 
+    // Customer sign-up for one workspace (WHIT-915, #1872), kept in the
+    // workspace_signup_settings table until WHIT-1035 folded it in here. Set on
+    // the workspace's own Customer sign-up screen (signup:manage), which checks
+    // the starting role is customer-safe, so these are OWN-SCREEN keys: never
+    // published or writable on the generic settings API. Per workspace only;
+    // the global layer is just the default.
+    //   - mode: off, approval (an admin approves each request) or open.
+    //   - role_id: the starting role; 0 is "not chosen", which refuses sign-ups.
+    //   - allowed_domains: a JSON list of email domains; [] allows every address.
+    //   - customer_invites: whether customers may invite colleagues.
+    public const SIGNUP_MODE = 'signup.mode';
+    public const SIGNUP_ROLE_ID = 'signup.role_id';
+    public const SIGNUP_ALLOWED_DOMAINS = 'signup.allowed_domains';
+    public const SIGNUP_CUSTOMER_INVITES = 'signup.customer_invites';
+    //   - invites_per_customer: how many people one customer may invite (open,
+    //     accepted and not sent count); 0 is no limit (WHIT-1043, SC.11).
+    public const SIGNUP_INVITES_PER_CUSTOMER = 'signup.invites_per_customer';
+
+    /**
+     * Keys a dedicated screen and endpoint manage, with checks the generic
+     * settings API cannot make (a customer-safe role, a permission other than
+     * settings:write). Stored and resolved like every other key, but left out
+     * of {@see textKeys()} and refused by the generic settings write.
+     *
+     * @var list<string>
+     */
+    private const OWN_SCREEN_KEYS = [
+        self::SIGNUP_MODE,
+        self::SIGNUP_ROLE_ID,
+        self::SIGNUP_ALLOWED_DOMAINS,
+        self::SIGNUP_CUSTOMER_INVITES,
+        self::SIGNUP_INVITES_PER_CUSTOMER,
+    ];
+
     /**
      * The asset-kind keys (Tenant Branding). Their stored value is a storage
      * key (or '' when unset). They are NEVER writable via the text PATCH path —
@@ -922,6 +968,7 @@ final class SettingsRegistry
      * @var list<string>
      */
     private const BOOL_KEYS = [
+        self::SIGNUP_CUSTOMER_INVITES,
         self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_NOTIFY_ADMINS,
@@ -1020,6 +1067,7 @@ final class SettingsRegistry
      * @var array<string, list<string>>
      */
     private const ENUM_OPTIONS = [
+        self::SIGNUP_MODE => ['off', 'approval', 'open'],
         self::MAIL_TRANSPORT => ['none', 'log', 'smtp'],
         self::MAIL_SMTP_ENCRYPTION => ['none', 'tls', 'ssl'],
         self::MAIL_SMTP_AUTH_MODE => ['password', 'oauth2'],
@@ -1143,7 +1191,7 @@ final class SettingsRegistry
         self::SEATS_COUNT_INVITED => 'true',
         self::METERS_ENFORCEMENT => 'block',
         // Zero tax until an operator says otherwise — see the constant.
-        self::BILLING_DEFAULT_CURRENCY => 'JOD',
+        self::BILLING_DEFAULT_CURRENCY => 'USD',
         self::BILLING_DEFAULT_PLAN => '',
         self::BILLING_TAX_RATE_BP => '0',
         self::BILLING_TAX_LABEL => '',
@@ -1155,6 +1203,8 @@ final class SettingsRegistry
         self::COMPANY_TAX_ID => '',
         self::COMPANY_PHONE => '',
         self::COMPANY_EMAIL => '',
+        self::COMPANY_NAME_AR => '',
+        self::COMPANY_ADDRESS_AR => '',
         self::BILLING_INVOICE_NUMBER_FORMAT => 'INV-{YYYY}-{SEQ:5}',
         self::BILLING_INVOICE_NUMBER_SCOPE => 'shared',
         self::BILLING_INVOICE_NUMBER_RESET => 'yearly',
@@ -1289,6 +1339,14 @@ final class SettingsRegistry
         // contact form is off until a workspace is named.
         self::WEBSITE_PLANS => '',
         self::WEBSITE_CONTACT_WORKSPACE => '',
+        // Off with no starting role and no domain limit: a workspace that never
+        // opened sign-up takes nobody.
+        self::SIGNUP_MODE => 'off',
+        self::SIGNUP_ROLE_ID => '0',
+        self::SIGNUP_ALLOWED_DOMAINS => '[]',
+        self::SIGNUP_CUSTOMER_INVITES => 'false',
+        // No limit, as before the setting existed.
+        self::SIGNUP_INVITES_PER_CUSTOMER => '0',
     ];
 
     /**
@@ -1322,7 +1380,87 @@ final class SettingsRegistry
         return array_values(array_filter(
             self::keys(),
             static fn (string $k): bool => !in_array($k, self::ASSET_KEYS, true)
+                && !in_array($k, self::OWN_SCREEN_KEYS, true)
         ));
+    }
+
+    /**
+     * Whether the key is managed only on its own screen and endpoint, never on
+     * the generic settings API. See {@see OWN_SCREEN_KEYS}.
+     */
+    public static function isOwnScreen(string $key): bool
+    {
+        return in_array($key, self::OWN_SCREEN_KEYS, true);
+    }
+
+    // ── Notification senders (WHIT-1036) ────────────────────────────────────
+    //
+    // A workspace's sender for each notification channel, kept in the
+    // tenant_notification_settings table until WHIT-1036 folded it in here.
+    // Channels come and go with plugins, so these are a key FAMILY, not fixed
+    // keys: `notifications.<channel>.<field>`, the channel `[a-z0-9_]{1,64}`.
+    // They live per workspace in tenant_settings, are written only through
+    // {@see \Whity\Core\Notification\TenantNotificationSettingsRepository} (the
+    // notification-settings screen, notifications:manage), and are never on the
+    // generic settings API, which knows only the fixed keys above.
+    //
+    // `credentials_encrypted` holds the provider secret as EncryptedSecretStore
+    // wrote it; like mail.smtp.password_encrypted it is never returned by any
+    // read that leaves the server.
+
+    public const NOTIFICATIONS_PREFIX = 'notifications.';
+
+    /** @var list<string> */
+    public const NOTIFICATION_FIELDS = ['enabled', 'transport', 'from_address', 'from_name', 'reply_to', 'config', 'credentials_encrypted'];
+
+    /** `enabled` when a workspace never set it: a channel is on until turned off. */
+    public const NOTIFICATION_ENABLED_DEFAULT = 'true';
+
+    /** The tenant_settings key of one field of one channel's sender. */
+    public static function notificationKey(string $channel, string $field): string
+    {
+        if (preg_match('/^[a-z0-9_]{1,64}$/i', $channel) !== 1 || !in_array($field, self::NOTIFICATION_FIELDS, true)) {
+            throw new \InvalidArgumentException("Not a notification setting: {$channel}.{$field}");
+        }
+
+        return self::NOTIFICATIONS_PREFIX . $channel . '.' . $field;
+    }
+
+    /**
+     * The channel and field a key names, or null when it isn't one.
+     *
+     * @return array{channel: string, field: string}|null
+     */
+    public static function parseNotificationKey(string $key): ?array
+    {
+        if (preg_match('/^notifications\.([a-z0-9_]{1,64})\.([a-z_]+)$/i', $key, $m) !== 1
+            || !in_array($m[2], self::NOTIFICATION_FIELDS, true)) {
+            return null;
+        }
+
+        return ['channel' => $m[1], 'field' => $m[2]];
+    }
+
+    /** Why a value can't be stored for a notification field, or null when it can. */
+    public static function validateNotificationValue(string $field, string $value): ?string
+    {
+        return match ($field) {
+            'enabled' => self::validateBoolean($value, 'enabled'),
+            'transport' => preg_match('/^[a-z0-9_.-]{1,64}$/i', $value) === 1 ? null : 'transport must be a transport name.',
+            'from_address', 'reply_to' => filter_var($value, FILTER_VALIDATE_EMAIL) !== false ? null : "{$field} must be an email address.",
+            'from_name' => mb_strlen($value) <= 255 ? null : 'from_name must be at most 255 characters.',
+            'config' => self::isJsonObject($value) ? null : 'config must be a JSON object.',
+            'credentials_encrypted' => $value !== '' ? null : 'credentials_encrypted must not be empty.',
+            default => "Not a notification setting: {$field}",
+        };
+    }
+
+    /** `{}` or an object with keys; a list or a scalar is not one. */
+    private static function isJsonObject(string $value): bool
+    {
+        $decoded = json_decode($value);
+
+        return $decoded instanceof \stdClass;
     }
 
     /**
@@ -1678,7 +1816,9 @@ final class SettingsRegistry
             self::COMPANY_NAME,
             self::COMPANY_ADDRESS,
             self::COMPANY_TAX_ID,
-            self::COMPANY_PHONE => null,
+            self::COMPANY_PHONE,
+            self::COMPANY_NAME_AR,
+            self::COMPANY_ADDRESS_AR => null,
             self::COMPANY_EMAIL => $value === '' || filter_var($value, FILTER_VALIDATE_EMAIL) !== false
                 ? null
                 : self::COMPANY_EMAIL . ' must be an email address.',
@@ -1686,8 +1826,31 @@ final class SettingsRegistry
             self::WEBSITE_CONTACT_WORKSPACE => $value === '' || preg_match('/^[a-z0-9][a-z0-9-]{0,254}$/', $value) === 1
                 ? null
                 : self::WEBSITE_CONTACT_WORKSPACE . ' must be a workspace slug (lowercase letters, digits and hyphens).',
+            self::SIGNUP_MODE => self::validateEnum(self::SIGNUP_MODE, $value),
+            self::SIGNUP_ROLE_ID => preg_match('/^(0|[1-9][0-9]{0,9})$/', $value) === 1
+                ? null
+                : self::SIGNUP_ROLE_ID . ' must be a role id, or 0 for none.',
+            self::SIGNUP_ALLOWED_DOMAINS => self::validateSignupDomains($value),
+            self::SIGNUP_CUSTOMER_INVITES => self::validateBoolean($value, self::SIGNUP_CUSTOMER_INVITES),
+            self::SIGNUP_INVITES_PER_CUSTOMER => self::validateWholeNumberBetween($value, self::SIGNUP_INVITES_PER_CUSTOMER, 0, 1000),
             default => "Unknown setting key: {$key}",
         };
+    }
+
+    /**
+     * A JSON list of plain email domains, already normalised, at most
+     * {@see \Whity\Core\Signup\WorkspaceSignupSettings::MAX_DOMAINS}.
+     */
+    private static function validateSignupDomains(string $value): ?string
+    {
+        $list = json_decode($value, true);
+        $normalised = is_array($list) && array_is_list($list)
+            ? \Whity\Core\Signup\WorkspaceSignupSettings::normaliseDomains($list)
+            : null;
+
+        return $normalised !== null && $normalised === $list
+            ? null
+            : self::SIGNUP_ALLOWED_DOMAINS . ' must be a JSON list of lowercase email domains.';
     }
 
     /**
@@ -1963,7 +2126,7 @@ final class SettingsRegistry
     {
         return preg_match('/^[A-Z]{3}$/', strtoupper(trim($value))) === 1
             ? null
-            : 'must be a three-letter ISO 4217 currency code, such as JOD';
+            : 'must be a three-letter ISO 4217 currency code, such as USD';
     }
 
     /**

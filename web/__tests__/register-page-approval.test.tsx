@@ -28,6 +28,13 @@ jest.mock('@/lib/branding-context', () => ({
   useBranding: () => ({ siteName: 'Whity', logoWideUrl: null, logoSquareUrl: null, faviconUrl: null }),
 }));
 
+const mockPost = jest.fn();
+const mockApiFetch = jest.fn();
+jest.mock('@/lib/api/client', () => ({
+  api: { POST: (...a: unknown[]) => mockPost(...a) },
+  apiFetch: (...a: unknown[]) => mockApiFetch(...a),
+}));
+
 import RegisterPage from '@/app/register/page';
 
 const mockRouter = { push: jest.fn() };
@@ -35,7 +42,6 @@ const mockRouter = { push: jest.fn() };
 beforeEach(() => {
   jest.clearAllMocks();
   (useRouter as jest.Mock).mockReturnValue(mockRouter);
-  global.fetch = jest.fn();
 });
 
 function fillAndSubmit() {
@@ -51,11 +57,9 @@ function fillAndSubmit() {
 
 test('shows the pending-approval confirmation and does not chain a login', async () => {
   // 201 with approval_required=true (admin approval enforced).
-  (global.fetch as jest.Mock).mockResolvedValueOnce({
-    status: 201,
-    ok: true,
-    json: async () => ({ data: { profile_id: 5, tenant_id: 9, approval_required: true } }),
-  });
+  mockApiFetch.mockResolvedValueOnce(
+    new Response(JSON.stringify({ data: { profile_id: 5, tenant_id: 9, approval_required: true } }), { status: 201 })
+  );
 
   render(<RegisterPage />);
   fillAndSubmit();
@@ -64,26 +68,24 @@ test('shows the pending-approval confirmation and does not chain a login', async
     expect(screen.getByTestId('registration-pending-approval')).toBeInTheDocument()
   );
 
-  // Exactly one fetch: the register POST. The login endpoint must NOT be called.
-  expect(global.fetch).toHaveBeenCalledTimes(1);
-  expect(global.fetch).toHaveBeenCalledWith('/api/v1/register', expect.anything());
+  // Exactly one request: the register POST. The login endpoint must NOT be called.
+  expect(mockApiFetch).toHaveBeenCalledTimes(1);
+  expect(mockApiFetch).toHaveBeenCalledWith('/api/v1/register', expect.anything());
+  expect(mockPost).not.toHaveBeenCalled();
   expect(mockRouter.push).not.toHaveBeenCalled();
 });
 
 test('auto-logs in when approval is not required (approval_required=false)', async () => {
-  (global.fetch as jest.Mock)
-    .mockResolvedValueOnce({
-      status: 201,
-      ok: true,
-      json: async () => ({ data: { profile_id: 5, tenant_id: 9, approval_required: false } }),
-    })
-    .mockResolvedValueOnce({ ok: true, status: 200 }); // login
+  mockApiFetch.mockResolvedValueOnce(
+    new Response(JSON.stringify({ data: { profile_id: 5, tenant_id: 9, approval_required: false } }), { status: 201 })
+  );
+  mockPost.mockResolvedValueOnce({ data: undefined, error: undefined, response: new Response(null, { status: 200 }) }); // login
 
   render(<RegisterPage />);
   fillAndSubmit();
 
   await waitFor(() =>
-    expect(global.fetch).toHaveBeenCalledWith('/api/v1/login', expect.anything())
+    expect(mockPost).toHaveBeenCalledWith('/api/v1/login', expect.anything())
   );
   expect(screen.queryByTestId('registration-pending-approval')).not.toBeInTheDocument();
 });

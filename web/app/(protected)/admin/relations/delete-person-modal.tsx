@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   Dialog,
@@ -28,7 +28,6 @@ interface DeletePersonModalProps {
  * with 409); the page only opens this for non-user persons.
  */
 export function DeletePersonModal({ isOpen, onClose, onSuccess, person }: DeletePersonModalProps) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const [isLoading, setIsLoading] = useState(false);
@@ -36,12 +35,13 @@ export function DeletePersonModal({ isOpen, onClose, onSuccess, person }: Delete
   const handleDelete = async () => {
     try {
       setIsLoading(true);
-      const response = await apiClient(`/api/v1/persons/${person.id}`, { method: 'DELETE' });
+      const { response, error } = await api.DELETE('/api/v1/persons/{id}', {
+        params: { path: { id: person.id } },
+      });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
         throw new Error(
-          error.error || t('relations.deletePerson.error', 'Failed to delete person')
+          (error as { error?: string } | undefined)?.error || t('relations.deletePerson.error', 'Failed to delete person')
         );
       }
 

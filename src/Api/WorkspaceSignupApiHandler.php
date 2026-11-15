@@ -52,6 +52,8 @@ final class WorkspaceSignupApiHandler
         private readonly AuditLogger $audit,
         private readonly ?BotCheck $bot = null,
         private readonly ?\Whity\Core\Signup\JoinProviders $joinProviders = null,
+        // E2 `EmailJoining`: the person hears the decision.
+        private readonly ?\Whity\Core\Signup\JoinDecisionMailer $joinMailer = null,
     ) {
     }
 
@@ -140,8 +142,17 @@ final class WorkspaceSignupApiHandler
             ]);
         }
 
+        // WHIT-1043 (SC.11): how many people one customer may invite; 0 is no limit.
+        $perCustomer = array_key_exists('invites_per_customer', $body) ? $body['invites_per_customer'] : $current['invites_per_customer'];
+        if (!is_int($perCustomer) || $perCustomer < 0 || $perCustomer > 1000) {
+            return Response::error('Validation failed', 422, [
+                'invites_per_customer' => 'Enter a whole number from 0 to 1000 (0 is no limit).',
+                'code' => 'invites_per_customer_invalid',
+            ]);
+        }
+
         try {
-            $this->settings->save($tenantId, $mode, $roleId, $domains, $ctx['userId'], $customerInvites);
+            $this->settings->save($tenantId, $mode, $roleId, $domains, $ctx['userId'], $customerInvites, $perCustomer);
         } catch (\Throwable $e) {
             error_log('[customer-signup] settings save failed: ' . $e->getMessage());
 
@@ -158,6 +169,7 @@ final class WorkspaceSignupApiHandler
                 'role_id' => $roleId,
                 'allowed_domains' => $domains,
                 'customer_invites' => $customerInvites,
+                'invites_per_customer' => $perCustomer,
                 'previous_mode' => $current['mode'],
             ],
         ]);
@@ -242,6 +254,31 @@ final class WorkspaceSignupApiHandler
         };
     }
 
+    /**
+     * E2: email the person who asked to join, from the workspace. Best-effort:
+     * the decision stands whether or not the email goes.
+     */
+    private function tellThePerson(int $tenantId, int $signupId, bool $approve): void
+    {
+        if ($this->joinMailer === null) {
+            return;
+        }
+        try {
+            $stmt = $this->db->prepare('SELECT email, display_name FROM customer_signups WHERE id = :id AND tenant_id = :tid');
+            $stmt->execute([':id' => $signupId, ':tid' => $tenantId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!is_array($row) || trim((string) $row['email']) === '') {
+                return;
+            }
+            $name = (string) ($row['display_name'] ?? '');
+            $approve
+                ? $this->joinMailer->approved($tenantId, (string) $row['email'], $name)
+                : $this->joinMailer->declined($tenantId, (string) $row['email'], $name);
+        } catch (\Throwable $e) {
+            error_log('[customer-signup] decision email failed: ' . $e->getMessage());
+        }
+    }
+
     /** @param array{tenantId: int, userId: int} $ctx */
     private function decided(array $ctx, int $id, bool $approve, ?int $membershipId): Response
     {
@@ -254,6 +291,7 @@ final class WorkspaceSignupApiHandler
             'target_id' => $id,
             'metadata' => ['membership_id' => $membershipId],
         ]);
+        $this->tellThePerson($ctx['tenantId'], $id, $approve);
 
         return Response::json(['data' => ['id' => $id, 'status' => $status]], 200);
     }
@@ -286,6 +324,8 @@ final class WorkspaceSignupApiHandler
             'allowed_domains' => $current['allowed_domains'],
             // #1872: customers may invite colleagues into their own role.
             'customer_invites' => $current['customer_invites'],
+            // WHIT-1043: 0 is no limit.
+            'invites_per_customer' => $current['invites_per_customer'],
             'eligible_roles' => $roles,
             'pending_count' => $this->service->pendingCount($tenantId),
             'workspace_slug' => $slug,

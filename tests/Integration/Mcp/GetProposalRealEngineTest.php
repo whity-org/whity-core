@@ -115,6 +115,20 @@ final class GetProposalRealEngineTest extends TestCase
         self::assertSame(['id' => 1], json_decode((string) $approved['result']['content'][0]['text'], true));
     }
 
+    /** WHIT-1042: "Ask Whity Builder to fix it" is a decline the agent can read the reason of. */
+    public function testAnAgentReadsWhyItWasDeclined(): void
+    {
+        $id = $this->ask();
+        self::assertNull($this->get($id)['declineReason']);
+
+        $request       = new Request('POST', '/api/me/agent-proposals', ['Content-Type' => 'application/json'], '{"reason":"Fix the failing test: A customer is needed."}');
+        $request->user = (object) ['profile_id' => self::RANA];
+        self::assertSame(200, $this->inbox->decline($request, ['id' => (string) $id])->getStatusCode());
+
+        $declined = $this->get($id);
+        self::assertSame(['declined', 'Fix the failing test: A customer is needed.'], [$declined['status'], $declined['declineReason']]);
+    }
+
     public function testAProposalCarriesTheToolsPreviewOfWhatItWouldChange(): void
     {
         $id = $this->ask();

@@ -2,7 +2,7 @@
  * web/'s DemoCatalogAdapter implementation (multi-client feature-extraction
  * pilot) — wires the data-source-agnostic `DemoCatalogList`/`DemoCatalogDetail`
  * components (@whity/features/demo-catalog) to the DemoCatalog plugin's
- * REST API via web's own cookie-authenticated `apiClient` (silent token
+ * REST API via web's own cookie-authenticated typed `api` client (silent token
  * refresh on 401, same as every other authenticated fetch in this app — see
  * `lib/plugin-features.ts` for the same pattern).
  *
@@ -12,7 +12,7 @@
  * are unmodified.
  */
 
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import type {
   DemoCatalogAdapter,
   DemoCatalogItem,
@@ -32,11 +32,10 @@ function isItemListResponse(body: unknown): body is { data: DemoCatalogItem[] } 
 
 export const demoCatalogAdapter: DemoCatalogAdapter = {
   async list(): Promise<DemoCatalogItem[]> {
-    const response = await apiClient('/api/v1/demo-catalog/items');
+    const { data: body, response } = await api.GET('/api/v1/demo-catalog/items');
     if (!response.ok) {
       throw new Error(`Failed to list demo-catalog items (${response.status})`);
     }
-    const body: unknown = await response.json();
     if (!isItemListResponse(body)) {
       throw new Error('Malformed demo-catalog list response');
     }
@@ -44,14 +43,15 @@ export const demoCatalogAdapter: DemoCatalogAdapter = {
   },
 
   async get(id: number): Promise<DemoCatalogItem | null> {
-    const response = await apiClient(`/api/v1/demo-catalog/items/${id}`);
+    const { data: body, response } = await api.GET('/api/v1/demo-catalog/items/{id}', {
+      params: { path: { id } },
+    });
     if (response.status === 404) {
       return null;
     }
     if (!response.ok) {
       throw new Error(`Failed to fetch demo-catalog item ${id} (${response.status})`);
     }
-    const body: unknown = await response.json();
     if (!isItemResponse(body)) {
       throw new Error('Malformed demo-catalog item response');
     }
@@ -59,25 +59,21 @@ export const demoCatalogAdapter: DemoCatalogAdapter = {
   },
 
   async save(input: DemoCatalogItemInput): Promise<DemoCatalogItem> {
-    const isUpdate = input.id !== undefined;
-    const response = await apiClient(
-      isUpdate ? `/api/v1/demo-catalog/items/${input.id}` : '/api/v1/demo-catalog/items',
-      {
-        method: isUpdate ? 'PATCH' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: input.name,
-          description: input.description ?? null,
-          status: input.status ?? 'active',
-        }),
-      }
-    );
+    const payload = {
+      name: input.name,
+      description: input.description ?? null,
+      status: input.status ?? 'active',
+    };
+    const { data: body, response } =
+      input.id !== undefined
+        ? await api.PATCH('/api/v1/demo-catalog/items/{id}', {
+            params: { path: { id: input.id } },
+            body: payload as never,
+          })
+        : await api.POST('/api/v1/demo-catalog/items', { body: payload as never });
     if (!response.ok) {
       throw new Error(`Failed to save demo-catalog item (${response.status})`);
     }
-    const body: unknown = await response.json();
     if (!isItemResponse(body)) {
       throw new Error('Malformed demo-catalog save response');
     }
