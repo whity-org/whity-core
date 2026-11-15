@@ -28,7 +28,11 @@ jest.mock('@whity/features/i18n', () => ({
 }));
 
 jest.mock('@whity/features/datetime', () => ({
-  useDateDisplay: () => ({ dateTime: (v: string | null) => v }),
+  useDateDisplay: () => ({ dateTime: (v: string | null) => v, relative: (v: string | null) => v }),
+}));
+
+jest.mock('@/lib/auth-context', () => ({
+  useAuth: () => ({ user: { tenant_id: 1 }, memberships: [{ tenant_id: 1, tenant_name: 'Example Bakery' }] }),
 }));
 
 jest.mock('@/components/admin/admin-header', () => ({
@@ -215,4 +219,52 @@ test('a bad number per customer is explained in the page’s own words', async (
   fireEvent.click(await screen.findByRole('button', { name: '[t] Save changes' }));
 
   expect(await screen.findByText(/^\[t\] Enter a whole number from 1 to 1000/)).toBeInTheDocument();
+});
+
+test('allowed domains are chips: Enter adds one, its button takes it off, and the list is saved (TplSettingsSignup)', async () => {
+  const sent: unknown[] = [];
+  routes({
+    'GET /api/v1/signup/settings': () => json(settings({ allowed_domains: ['examplebakery.jo'] })),
+    'GET /api/v1/signup/requests': () => json({ data: [], pagination: {} }),
+    'PUT /api/v1/signup/settings': (init) => {
+      sent.push(JSON.parse(String(init?.body)));
+      return json(settings());
+    },
+  });
+
+  render(<CustomerSignupSettingsPage />);
+  const box = await screen.findByLabelText('[t] Allowed email domains');
+  fireEvent.change(box, { target: { value: 'ammancoffee.jo' } });
+  fireEvent.keyDown(box, { key: 'Enter' });
+  expect(screen.getByText('ammancoffee.jo')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: '[t] Remove examplebakery.jo' }));
+  fireEvent.click(await screen.findByRole('button', { name: '[t] Save changes' }));
+
+  await waitFor(() => expect(sent).toHaveLength(1));
+  expect(sent[0]).toMatchObject({ allowed_domains: ['ammancoffee.jo'] });
+});
+
+test('Approve all lets everyone waiting in, oldest first', async () => {
+  const approved: string[] = [];
+  const second = { ...REQUEST, id: 10, email: 'emad@example.com', display_name: 'Emad Nasser' };
+  routes({
+    'GET /api/v1/signup/settings': () => json(settings({ mode: 'approval', pending_count: 2 })),
+    'GET /api/v1/signup/requests': () => json({ data: [REQUEST, second], pagination: {} }),
+    'POST /api/v1/signup/requests/9/approve': () => {
+      approved.push('9');
+      return json({ data: { id: 9, status: 'approved' } });
+    },
+    'POST /api/v1/signup/requests/10/approve': () => {
+      approved.push('10');
+      return json({ data: { id: 10, status: 'approved' } });
+    },
+  });
+
+  render(<CustomerSignupSettingsPage />);
+  const all = await screen.findByTestId('customer-signup-approve-all');
+  expect(all).toHaveTextContent('[t] Approve all 2');
+  fireEvent.click(all);
+
+  await waitFor(() => expect(approved).toEqual(['9', '10']));
 });

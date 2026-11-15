@@ -1002,7 +1002,8 @@ describe('LoginPage - forgot-password / account-recovery links (WC-password-rese
       expect(screen.getByText(/Sign in to your account/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByRole('link', { name: /forgot password\?/i })).toHaveAttribute(
+    // Under the Sign in button, as TplSignInTwoColumn draws it (WHIT-1044).
+    expect(screen.getByRole('link', { name: /forgot your password\?/i })).toHaveAttribute(
       'href',
       '/forgot-password'
     );
