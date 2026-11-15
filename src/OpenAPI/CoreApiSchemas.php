@@ -5698,7 +5698,7 @@ final class CoreApiSchemas
             'InvoiceDetail' => self::object([
                 'lines' => ['type' => 'array', 'items' => SchemaBuilder::ref('InvoiceLine')],
                 'payments' => ['type' => 'array', 'items' => SchemaBuilder::ref('PaymentTransaction')],
-                // Both null for any currency but JOD.
+                // Both null for a currency without words (USD, EUR, JOD, SAR and AED have them).
                 'total_in_words' => self::object([
                     'en' => self::str(true),
                     'ar' => self::str(true),

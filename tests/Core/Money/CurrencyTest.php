@@ -237,4 +237,33 @@ final class CurrencyTest extends TestCase
         yield 'JPY negative'      => [-42, 'JPY'];
         yield 'CLF four places'   => [12345, 'CLF'];
     }
+
+    /** @return iterable<string, array{int, string, string}> */
+    public static function displayed(): iterable
+    {
+        // CU.2: a symbol before the number, otherwise the code and a space.
+        yield 'USD' => [31200, 'USD', '$312.00'];
+        yield 'USD grouped' => [1865235, 'USD', '$18,652.35'];
+        yield 'USD negative' => [-3500, 'USD', '−$35.00'];
+        yield 'USD a cent' => [1, 'usd', '$0.01'];
+        yield 'EUR' => [31200, 'EUR', '€312.00'];
+        yield 'JOD three places' => [312000, 'JOD', 'JOD 312.000'];
+        yield 'JOD grouped' => [1234567891, 'JOD', 'JOD 1,234,567.891'];
+        yield 'JOD negative' => [-500, 'JOD', '−JOD 0.500'];
+        yield 'SAR' => [31200, 'SAR', 'SAR 312.00'];
+        yield 'JPY none' => [5000, 'JPY', 'JPY 5,000'];
+    }
+
+    #[DataProvider('displayed')]
+    public function testDisplayWritesMoneyAsTheRegisterDoes(int $minorUnits, string $currency, string $expected): void
+    {
+        self::assertSame($expected, Currency::display($minorUnits, $currency));
+    }
+
+    public function testOnlyDollarsAndEurosHaveASymbol(): void
+    {
+        self::assertSame('$', Currency::symbolFor('USD'));
+        self::assertSame('€', Currency::symbolFor('eur'));
+        self::assertNull(Currency::symbolFor('JOD'));
+    }
 }

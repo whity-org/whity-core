@@ -105,7 +105,7 @@ final class BillingApiHandler
             'data' => $this->present($context, $invoice) + [
                 'lines' => $this->invoices->linesFor($context, $invoiceId),
                 'payments' => $this->ledger->historyFor($context, $invoiceId),
-                // Null for any currency but JOD (section 16).
+                // Null for a currency without words (section 16, CU.3).
                 'total_in_words' => [
                     'en' => AmountInWords::write((int) $invoice['total_minor'], (string) $invoice['currency'], 'en'),
                     'ar' => AmountInWords::write((int) $invoice['total_minor'], (string) $invoice['currency'], 'ar'),
