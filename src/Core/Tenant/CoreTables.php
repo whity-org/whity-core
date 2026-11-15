@@ -215,6 +215,8 @@ final class CoreTables
         'messaging_settings' => '245_create_webchat_and_messaging_settings.php',
         'chats' => '253_create_team_chat.php',
         'chat_members' => '253_create_team_chat.php',
+        // One chat (UC.1): each person's pins and read marks on any conversation.
+        'chat_person_state' => '278_create_chat_person_state.php',
         'tenant_settings' => '025_create_tenant_settings.php',
         'tenant_storage_config' => '053_create_tenant_storage_config.php',
         'tenants' => '001_create_users_roles.php',

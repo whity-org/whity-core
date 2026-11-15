@@ -1835,6 +1835,7 @@
         "messages.state.held": "لم تُرسل بعد. تُرسل في {time}",
         "messages.state.queued": "جارٍ الإرسال…",
         "messages.state.read": "قُرئت",
+        "messages.state.sent": "أُرسلت",
         "messages.status.closed": "مغلقة",
         "messages.status.open": "مفتوحة",
         "messages.status.pending": "بانتظار العميل",
@@ -4136,7 +4137,6 @@
         "users.title": "المستخدمون",
         "users.twoStep.off": "معطّل",
         "users.twoStep.on": "مفعّل",
-        "users.twoStep.required": "معطّل، ومطلوب",
-        "messages.state.sent": "أُرسلت"
+        "users.twoStep.required": "معطّل، ومطلوب"
     }
 }
