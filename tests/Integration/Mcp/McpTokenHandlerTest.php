@@ -366,6 +366,7 @@ final class McpTokenHandlerTest extends TestCase
             ['DELETE', '/api/mcp/tokens/{jti}'],
             ['GET', '/api/mcp/tokens/{jti}/grant'],
             ['PATCH', '/api/mcp/tokens/{jti}/grant'],
+            ['GET', '/api/mcp/tokens/starting-grant'],
             ['GET', '/api/mcp/connect'],
             ['POST', '/api/mcp/connect/preview'],
         ] as [$method, $path]) {

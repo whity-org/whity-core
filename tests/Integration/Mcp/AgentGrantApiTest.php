@@ -189,6 +189,36 @@ final class AgentGrantApiTest extends TestCase
         self::assertSame(201, $response->getStatusCode(), $response->getBody());
     }
 
+    /**
+     * WHIT-1040 (TplAgentCredential): the rows for a key not issued yet, so
+     * the starting grant is set before the key exists. What the person lacks
+     * comes back apart, to be shown and not given.
+     */
+    public function testTheStartingGrantReadsBeforeAnyKeyExists(): void
+    {
+        $_COOKIE['access_token'] = $this->session(self::RANA);
+
+        $response = $this->handler->startingGrant(new Request('GET', '/'));
+
+        self::assertSame(200, $response->getStatusCode(), $response->getBody());
+        $data = json_decode($response->getBody(), true)['data'];
+        $rows = array_combine(array_column($data['permissions'], 'permission'), $data['permissions']);
+        self::assertSame(['users:manage', 'users:read'], array_keys($rows));
+        self::assertNull($rows['users:read']['mode'], 'every row starts at the default');
+        self::assertSame(['read' => 'allow', 'write' => null], $rows['users:read']['effective']);
+        self::assertSame(['off', 'ask'], $rows['users:manage']['modes'], 'nothing without undo is Allowed');
+        self::assertSame(['roles:manage'], $data['notHeld']);
+        self::assertContains('tools:call', $data['scope']);
+        $count = $this->pdo->query('SELECT COUNT(*) FROM mcp_tokens');
+        self::assertNotFalse($count);
+        self::assertSame(0, (int) $count->fetchColumn(), 'reading it issues nothing');
+    }
+
+    public function testTheStartingGrantNeedsASignedInPerson(): void
+    {
+        self::assertSame(401, $this->handler->startingGrant(new Request('GET', '/'))->getStatusCode());
+    }
+
     public function testEveryChangeIsAuditLogged(): void
     {
         [$jti] = $this->issueAgent();

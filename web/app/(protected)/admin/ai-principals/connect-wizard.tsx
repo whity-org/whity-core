@@ -334,6 +334,14 @@ export function ConnectWizard({
             ))}
           </div>
         )}
+        {step === 'app' && renew === null && (
+          <p className="text-sm text-muted-foreground">
+            {t('aiPrincipals.connect.unattended', 'For an agent that runs on its own, like a nightly check, make it its own key.')}{' '}
+            <Link href="/admin/ai-principals/new-agent-key" className="font-medium text-primary hover:underline">
+              {t('aiPrincipals.connect.unattendedLink', 'New key for an agent')}
+            </Link>
+          </p>
+        )}
 
         {step === 'access' && info !== null && (
           <div className="space-y-4">

@@ -6021,6 +6021,7 @@ $mcpTokenHandler = new McpTokenHandler(
 );
 $router->register('POST',   '/api/mcp/tokens',       [$mcpTokenHandler, 'create']);
 $router->register('GET',    '/api/mcp/tokens',       [$mcpTokenHandler, 'list']);
+$router->register('GET',    '/api/mcp/tokens/starting-grant', [$mcpTokenHandler, 'startingGrant']);
 $router->register('DELETE', '/api/mcp/tokens/{jti}', [$mcpTokenHandler, 'revoke']);
 $router->register('GET',    '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'grant']);
 $router->register('PATCH',  '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'updateGrant']);
