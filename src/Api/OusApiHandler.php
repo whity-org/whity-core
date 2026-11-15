@@ -17,6 +17,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Hooks\HookVetoException;
 use PDO;
 use Whity\Core\i18n\LocalizedTextRejected;
+use Whity\Core\i18n\LocalizedText;
 use Whity\Core\i18n\LocalizedTexts;
 
 /**
@@ -290,11 +291,11 @@ class OusApiHandler
             // `name` alone is the original, in the language its letters are
             // written in; `names` with `name_language` carries every language (#821).
             try {
-                $naming = LocalizedTexts::fromBody(
+                $naming = LocalizedText::fromBody(
                     $body,
                     '',
                     is_string($body['name'] ?? null)
-                        ? LocalizedTexts::guessLanguage($body['name'])
+                        ? LocalizedText::guessLanguage($body['name'])
                         : (is_array($body['names'] ?? null) ? (string) (array_key_first(array_filter($body['names'], 'is_string')) ?? 'en') : 'en'),
                     [],
                     InputLimits::NAME_MAX
@@ -418,7 +419,7 @@ class OusApiHandler
                     'parent_id' => $parentId,
                     'name' => $name,
                     'name_language' => $naming['language'],
-                    'names' => self::namesMap(LocalizedTexts::merge((string) $name, $naming['language'], $naming['others'])),
+                    'names' => self::namesMap(LocalizedText::merge((string) $name, $naming['language'], $naming['others'])),
                     'slug' => $slug,
                     'description' => $description,
                     'ou_type_id' => $ouTypeId,
@@ -568,7 +569,7 @@ class OusApiHandler
             if (isset($body['name']) || array_key_exists('names', $body) || array_key_exists('name_language', $body)) {
                 $currentLanguage = (string) ($ou['name_language'] ?? '') !== '' ? (string) $ou['name_language'] : 'en';
                 try {
-                    $naming = LocalizedTexts::fromBody(
+                    $naming = LocalizedText::fromBody(
                         $body,
                         (string) $ou['name'],
                         $currentLanguage,
@@ -1435,7 +1436,7 @@ class OusApiHandler
         foreach ($rows as $i => $row) {
             $language = (string) ($row['name_language'] ?? '') !== '' ? (string) $row['name_language'] : 'en';
             $rows[$i]['name_language'] = $language;
-            $rows[$i]['names'] = self::namesMap(LocalizedTexts::merge(
+            $rows[$i]['names'] = self::namesMap(LocalizedText::merge(
                 (string) ($row['name'] ?? ''),
                 $language,
                 $others[(int) $row['tenant_id']][(int) $row['id']] ?? []

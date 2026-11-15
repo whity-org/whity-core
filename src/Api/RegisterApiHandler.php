@@ -6,7 +6,7 @@ namespace Whity\Api;
 
 use PDO;
 use Whity\Core\Plan\DefaultPlanAssigner;
-use Whity\Core\i18n\LocalizedTexts;
+use Whity\Core\i18n\LocalizedText;
 use Whity\Core\Identity\AccountActivationPolicy;
 use Whity\Core\Identity\EmailVerificationPolicy;
 use Whity\Core\Identity\EmailVerificationProvider;
@@ -213,7 +213,7 @@ final class RegisterApiHandler
                 $tenantId = $this->insertReturningId(
                     'INSERT INTO tenants (name, slug, name_language, created_at) VALUES (:name, :slug, :name_language, NOW())',
                     // The name is the original; Arabic letters mean an Arabic one (#821).
-                    [':name' => $tenantName, ':slug' => $slug, ':name_language' => LocalizedTexts::guessLanguage($tenantName)]
+                    [':name' => $tenantName, ':slug' => $slug, ':name_language' => LocalizedText::guessLanguage($tenantName)]
                 );
 
                 // 2. Global profile (bcrypt password; 2FA off; token epoch 0).

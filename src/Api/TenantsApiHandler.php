@@ -12,6 +12,7 @@ use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\ProfileProvisioner;
 use Whity\Core\PasswordPolicy;
 use Whity\Core\i18n\LocalizedTextRejected;
+use Whity\Core\i18n\LocalizedText;
 use Whity\Core\i18n\LocalizedTexts;
 use Whity\Http\InputLimits;
 use Whity\Http\JsonBody;
@@ -282,7 +283,7 @@ class TenantsApiHandler
     {
         $name = (string) ($row['name'] ?? '');
         $nameLanguage = (string) ($row['name_language'] ?? '') !== '' ? (string) $row['name_language'] : 'en';
-        $names = LocalizedTexts::merge($name, $nameLanguage, $otherNames);
+        $names = LocalizedText::merge($name, $nameLanguage, $otherNames);
 
         // The user-count aggregate is aliased `userCount` in SQL but the database
         // folds the unquoted result-set column name to lowercase, so accept either
@@ -368,7 +369,7 @@ class TenantsApiHandler
             // `name` alone is the original, in the language its letters are
             // written in; `names` with `nameLanguage` carries every language (#821).
             $defaultLanguage = is_string($body['name'] ?? null)
-                ? LocalizedTexts::guessLanguage($body['name'])
+                ? LocalizedText::guessLanguage($body['name'])
                 : (is_array($body['names'] ?? null) ? (string) (array_key_first(array_filter($body['names'], 'is_string')) ?? 'en') : 'en');
             $naming = $this->namingFromBody($body, '', $defaultLanguage, []);
             if ($naming instanceof Response) {
@@ -648,7 +649,7 @@ class TenantsApiHandler
     private function namingFromBody(array $body, string $currentName, string $currentLanguage, array $currentOthers): array|Response
     {
         try {
-            return LocalizedTexts::fromBody(
+            return LocalizedText::fromBody(
                 $body,
                 $currentName,
                 $currentLanguage,

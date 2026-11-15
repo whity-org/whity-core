@@ -14,6 +14,7 @@ use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Http\JsonBody;
 use PDO;
+use Whity\Core\i18n\LocalizedText;
 use Whity\Core\i18n\LocalizedTexts;
 use Whity\Core\Db\DbBool;
 use PDOStatement;
@@ -1177,7 +1178,7 @@ class AuthHandler
 
                 $tenantName = (string) ($row['tenant_name'] ?? '');
                 $nameLanguage = (string) ($row['tenant_name_language'] ?? '') !== '' ? (string) $row['tenant_name_language'] : 'en';
-                $names = LocalizedTexts::merge($tenantName, $nameLanguage, $others[$tenantId] ?? []);
+                $names = LocalizedText::merge($tenantName, $nameLanguage, $others[$tenantId] ?? []);
                 $out[$tenantId] = [
                     'tenant_id'   => $tenantId,
                     'tenant_name' => $tenantName,
