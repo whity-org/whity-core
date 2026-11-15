@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event';
 
 /**
  * The saved blocks library (editor M7; E.21, E.22): this person's own blocks
- * and the workspace library; a drawer to rename, share, see where a synced
- * block is used and delete, where a synced block still in use needs
+ * and the workspace library (TplSavedBlocks): filters, a row menu to rename,
+ * share and delete, a side panel with the text and where a synced block is used, where a synced block still in use needs
  * documents:publish and the name typed to delete anyway.
  */
 
@@ -42,6 +42,7 @@ const block = (over: Record<string, unknown>) => ({
   sharing: 'workspace',
   owner: { kind: 'person', id: 10, name: 'Awss Haddad' },
   blocks: [],
+  perDocumentParts: [],
   perDocumentKeys: [],
   version: 3,
   usedIn: 12,
@@ -63,45 +64,72 @@ beforeEach(() => {
   mockUsage.mockResolvedValue({ documents: [{ id: 40, title: 'Example Bakery invoice', kind: 'template', version: 3 }], hidden: 1 });
 });
 
-it('lists own and workspace blocks with how each is shared and where synced ones are used', async () => {
+it('lists blocks with their kind, who can use them and where synced ones are used, filtered by kind (TplSavedBlocks)', async () => {
   grant('documents:read', 'documents:write');
   render(<SavedBlocksPage />);
 
   const bank = await screen.findByRole('row', { name: /Bank details/ });
   expect(within(bank).getByText('Synced')).toBeInTheDocument();
   expect(within(bank).getByText('Everyone in the workspace')).toBeInTheDocument();
-  expect(within(bank).getByText('Awss Haddad')).toBeInTheDocument();
   expect(within(bank).getByText('12 documents')).toBeInTheDocument();
   const terms = screen.getByRole('row', { name: /Payment terms/ });
-  expect(within(terms).getByText('You')).toBeInTheDocument();
-  expect(within(terms).getByText('Only the person who saved it')).toBeInTheDocument();
+  expect(within(terms).getByText('Copy')).toBeInTheDocument();
+  expect(within(terms).getByText('Only me')).toBeInTheDocument();
 
-  await userEvent.click(screen.getByRole('tab', { name: 'Mine' }));
-  expect(screen.queryByRole('row', { name: /Bank details/ })).toBeNull();
+  await userEvent.click(screen.getByTestId('saved-blocks-filter-kind'));
+  await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Copy' }));
+  await userEvent.keyboard('{Escape}');
+  await waitFor(() => expect(screen.queryByRole('row', { name: /Bank details/ })).toBeNull());
   expect(screen.getByRole('row', { name: /Payment terms/ })).toBeInTheDocument();
 });
 
-it('renames your own block, and shows where a synced one is used', async () => {
+it('searches by name', async () => {
+  grant('documents:read');
+  render(<SavedBlocksPage />);
+  await screen.findByRole('row', { name: /Bank details/ });
+  await userEvent.type(screen.getByRole('searchbox', { name: 'Search saved blocks' }), 'terms');
+  await waitFor(() => expect(screen.queryByRole('row', { name: /Bank details/ })).toBeNull());
+  expect(screen.getByRole('row', { name: /Payment terms/ })).toBeInTheDocument();
+});
+
+it('renames your own block from its row menu', async () => {
   grant('documents:read', 'documents:write');
   mockUpdate.mockResolvedValue({ ok: true, block: { ...TERMS, name: 'Terms' } });
   render(<SavedBlocksPage />);
 
-  await userEvent.click(await screen.findByText('Payment terms'));
-  const name = await screen.findByLabelText('Name');
+  await userEvent.click(await screen.findByRole('button', { name: 'More for Payment terms' }));
+  // Sharing with the workspace is for people who manage the library.
+  expect(screen.queryByRole('menuitem', { name: 'Let everyone in the workspace use it' })).toBeNull();
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Rename saved block' });
+  const name = within(dialog).getByLabelText('Name');
   await userEvent.clear(name);
   await userEvent.type(name, 'Terms');
-  // Sharing with the workspace is for people who manage the library.
-  expect(screen.queryByRole('radio', { name: 'Everyone in the workspace' })).toBeNull();
-  await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-  expect(mockUpdate).toHaveBeenCalledWith(6, { name: 'Terms', sharing: 'me' });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Rename' }));
+  expect(mockUpdate).toHaveBeenCalledWith(6, { name: 'Terms' });
+});
 
-  await userEvent.keyboard('{Escape}');
+it('shows a synced block, its per-document parts and where it is used in the side panel', async () => {
+  grant('documents:read', 'documents:write');
+  mockList.mockResolvedValue([
+    block({
+      blocks: [{ id: 'p1', type: 'paragraph', content: [{ type: 'text', text: 'Pay to: ' }, { type: 'text', text: 'Workspace name', marks: [{ type: 'perDocument', key: 'pd_payto001' }] }] }],
+      perDocumentParts: [{ key: 'pd_payto001', label: { en: 'Pay to' }, kind: 'text', required: true }],
+      version: 4,
+    }),
+  ]);
+  render(<SavedBlocksPage />);
+
   await userEvent.click(await screen.findByText('Bank details'));
-  expect(await screen.findByRole('link', { name: 'Example Bakery invoice' })).toHaveAttribute('href', '/admin/document-sources/40');
-  expect(screen.getByText('And 1 you can’t see')).toBeInTheDocument();
+  const panel = await screen.findByRole('dialog');
+  expect(within(panel).getByText('Synced block')).toBeInTheDocument();
+  expect(within(panel).getByText('Used in 12 documents')).toBeInTheDocument();
+  expect(within(panel).getByText('Workspace name')).toHaveAttribute('title', 'Filled in each document, required: Pay to');
+  expect(await within(panel).findByRole('link', { name: 'Example Bakery invoice' })).toHaveAttribute('href', '/admin/document-sources/40');
+  expect(within(panel).getByText('Changes at next publish')).toBeInTheDocument();
+  expect(within(panel).getByText('And 1 you can’t see')).toBeInTheDocument();
   // Someone else's workspace block, without documents:publish: read only.
-  expect(screen.getByLabelText('Name')).toBeDisabled();
-  expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+  expect(within(panel).queryByRole('button', { name: 'Rename' })).toBeNull();
 });
 
 it('deleting a synced block still in use asks again, and needs the name typed', async () => {
@@ -109,8 +137,8 @@ it('deleting a synced block still in use asks again, and needs the name typed', 
   mockDelete.mockResolvedValueOnce({ ok: false, usedIn: 12 }).mockResolvedValueOnce({ ok: true });
   render(<SavedBlocksPage />);
 
-  await userEvent.click(await screen.findByText('Bank details'));
-  await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  await userEvent.click(await screen.findByRole('button', { name: 'More for Bank details' }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
   const first = await screen.findByRole('alertdialog');
   await userEvent.click(within(first).getByRole('button', { name: 'Delete' }));
   expect(mockDelete).toHaveBeenNthCalledWith(1, 5, false);

@@ -34,6 +34,8 @@ export function useEditorLabels(): EditorLabels {
     link: t('blockEditor.link', 'Link'),
     highlight: t('blockEditor.highlight', 'Highlight'),
     insert: t('blockEditor.insert', 'Insert'),
+    moreTools: t('blockEditor.moreTools', 'More tools'),
+    hideKeyboard: t('blockEditor.hideKeyboard', 'Hide keyboard'),
     outline: t('blockEditor.outline', 'Outline'),
     outlineEmpty: t('blockEditor.outlineEmpty', 'Headings appear here'),
     selection: t('blockEditor.selection', 'Selection'),

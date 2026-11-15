@@ -6,7 +6,7 @@ namespace Whity\Core\Calendar;
 
 use DateTimeImmutable;
 use PDO;
-use Whity\Core\Form\LocalizedLabel;
+use Whity\Core\i18n\LocalizedText;
 
 /**
  * A person's calendar as an ICS feed at a secret URL (ADR 0017, section 6).
@@ -62,7 +62,7 @@ final class CalendarFeed
         $to = $now->modify('+' . $settings->maxAdvanceDays . ' days');
         $events = [];
         foreach ($this->bookings->list($tenantId, [$profileId], $from, $to) as $row) {
-            $service = LocalizedLabel::preferred(LocalizedLabel::decode((string) $row['service_name']));
+            $service = LocalizedText::resolve(LocalizedText::decode((string) $row['service_name'], languages: LocalizedText::BILINGUAL));
             $events[] = [
                 'uid' => 'booking-' . (int) $row['id'] . '-' . $tenantId . '@whity',
                 'start' => Interval::fromDb((string) $row['starts_at']),

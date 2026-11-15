@@ -11,6 +11,7 @@ import {
 import { MOTION_MODES, type MotionMode } from '@whity/ui/lottie';
 
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 
 /**
  * A person's text size, Show technical details and Animations (W.3, A.1, A.3, LT.4).
@@ -59,7 +60,7 @@ export function DisplayPreferencesInitScript() {
 }
 
 export function DisplayPreferencesProvider({ children }: { children: ReactNode }) {
-  const { user, apiClient } = useAuth();
+  const { user } = useAuth();
   const [preferences, setPreferences] = useState<DisplayPreferences>({
     textSize: 'standard',
     showTechnicalDetails: false,
@@ -80,9 +81,9 @@ export function DisplayPreferencesProvider({ children }: { children: ReactNode }
     let cancelled = false;
     void (async () => {
       try {
-        const response = await apiClient('/api/v1/me/display-preferences');
+        const { data, response } = await api.GET('/api/v1/me/display-preferences');
         if (!response.ok || cancelled) return;
-        const body = (await response.json()) as { data?: Partial<DisplayPreferences> };
+        const body = (data ?? {}) as { data?: Partial<DisplayPreferences> };
         if (cancelled || body.data === undefined) return;
         accept({
           textSize: body.data.textSize === 'larger' ? 'larger' : 'standard',
@@ -96,7 +97,7 @@ export function DisplayPreferencesProvider({ children }: { children: ReactNode }
     return () => {
       cancelled = true;
     };
-  }, [userId, apiClient, accept]);
+  }, [userId, accept]);
 
   const update = useCallback(
     (patch: Partial<DisplayPreferences>) => {
@@ -105,15 +106,11 @@ export function DisplayPreferencesProvider({ children }: { children: ReactNode }
         accept(next);
         return next;
       });
-      void apiClient('/api/v1/me/display-preferences', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      }).catch(() => {
+      void api.PUT('/api/v1/me/display-preferences', { body: patch as never }).catch(() => {
         // The browser keeps the choice; the next change retries the account.
       });
     },
-    [apiClient, accept],
+    [accept],
   );
 
   const value = useMemo(() => ({ ...preferences, update }), [preferences, update]);

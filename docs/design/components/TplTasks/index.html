@@ -44,7 +44,7 @@
   function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
 
   function evList(items) { return h('ul', { className: 'wk-ev' }, items.map(function (e, i) { return h('li', { key: i, className: e[0] ? 'is-ok' : 'is-wait' }, I(e[0] ? 'success' : 'clock', 16), h('div', null, e[1], h('small', null, e[2]))); })); }
-  var EV = [[1, 'PO-0151 for 24 bags, JOD 384.000, approved by you', '08:55'], [1, 'Sent to Jordan Flour Mills by email', '09:01'], [1, 'Supplier confirmed delivery on Thursday 12 November', '09:40 · their reply is attached']];
+  var EV = [[1, 'PO-0151 for 24 bags, $384.00, approved by you', '08:55'], [1, 'Sent to Jordan Flour Mills by email', '09:01'], [1, 'Supplier confirmed delivery on Thursday 12 November', '09:40 · their reply is attached']];
   var DONEWHEN = 'A purchase order for 24 bags of flour is approved, sent to Jordan Flour Mills, and delivery is confirmed for this week.';
 
   function task(o) { return h('div', { className: 'wk-task' + (o.sel ? ' is-sel' : '') }, h('span', { className: 'wk-tick' + (o.st === 'done' ? ' is-done' : o.st === 'gate' ? ' is-gate' : ''), 'aria-hidden': 'true' }, o.st === 'done' ? I('check', 12) : null),

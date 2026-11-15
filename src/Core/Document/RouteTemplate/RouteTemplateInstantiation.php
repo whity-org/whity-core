@@ -234,6 +234,10 @@ final class RouteTemplateInstantiation
                 'satisfied_by' => $satisfiedBy,
                 // WHIT-919: carried like `decision`; absent reads as allowed.
                 'allow_send_back' => DbBool::of($step['allow_send_back'] ?? true),
+                // WHIT-1016: carried like `allow_send_back`; the router checks it again.
+                'inputs' => is_array($step['inputs'] ?? null) ? $step['inputs'] : [],
+                // WHIT-1018: carried the same way.
+                'exclude_named_in' => is_array($step['exclude_named_in'] ?? null) ? $step['exclude_named_in'] : [],
             ];
             if (($step['kind'] ?? null) === RouteStepKind::FINALISE) {
                 // WHIT-921: carried like everything else. The router checks it

@@ -1,5 +1,7 @@
 # Design asks for the brand team
 
+**Answered by design 3.4 (14 Nov 2026).** Every ask below now has a card: WHIT-821, 826, 827, 828, 829, 830, 906, 915, 939, 945, 946 and 1006 are closed, with the card for each in `IMPLEMENTATION-NOTES.md`, "Design asks 3.4 answers". The list stays as the record of what was asked.
+
 Screens the app needs that have no card in `components/` and aren't drawn in the app map. Owner rule (31 Oct 2026): don't invent layouts beyond the existing patterns. Each ask goes to the brand team through the owner. Meanwhile the screen is built from existing components behind a seam (one layout or card component), so the design can drop in later.
 
 Every ask needs both languages (English and Arabic, RTL) and both themes, and follows the register: tokens only, Noto Sans at 14px, one filled main button, dashed for "not happened yet".
@@ -26,6 +28,12 @@ Every ask needs both languages (English and Arabic, RTL) and both themes, and fo
 | WHIT-939 | **Settings: Messages** | Web chat on or off and its greeting; the reply address for email; the inbound webhook address and its secret, shown once. | Nothing set up; secret shown once; new secret confirmation | Two cards with the save bar |
 
 The Whity ID consent line for acting as an agent ("Claude Code wants to act as Finance clerk for you") is built with Whity ID's existing consent screen (whity-id #26), so it needs a look rather than a new design. Background for the agents asks: `AGENT-PERSONAS-AND-WHITY-AGENT.md` §8.
+
+## After design 3.4
+
+| Task | Ask | What the screen does | States to draw | Built meanwhile |
+| --- | --- | --- | --- | --- |
+| WHIT-1069 | **Command mode in ⌘K** (the `CommandPalette` card) | Typing `/` turns the palette into commands (owner-approved 14 Nov 2026): `/new`, `/go`, `/invite`, `/switch`, `/theme`, `/lang`, `/help`, then `/approve` and `/ask` (WHIT-1070). Each opens the screen the person would use, filled in; nothing is created or sent from the palette. Ask: `D:\Projects\Whity\brand-ask-command-mode.md`. | The box in command mode; the command list; a command picked with its details being typed; no match; `/help`; the phone version (full screen, box at the bottom, with the Create sheet); recent items, `/approve`, `/ask` | The card as it is, with a "Commands" chip on the tint before the input and Tab in the footer keys |
 
 ## The web app on a phone (WHIT-1006)
 

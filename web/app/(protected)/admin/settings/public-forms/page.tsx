@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -16,8 +16,13 @@ import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { Switch } from '@whity/ui/switch';
-import { Textarea } from '@whity/ui/textarea';
-import { IconAlertCircle, IconCopy, IconForms, IconPlus } from '@tabler/icons-react';
+import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@whity/ui/dropdown-menu';
+import { EmptyState } from '@whity/ui/empty-state';
+import { Icon } from '@whity/ui/icon';
+import { ChipsInput, splitChips } from '@/components/chips-input';
+import { cn } from '@/lib/utils';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { SETTINGS_MANAGE, SYSTEM_TENANT_ID } from '../settings-shared';
 
@@ -89,9 +94,9 @@ function codeText(t: TranslateFn, details: Record<string, unknown>): string | nu
   }
 }
 
-async function readError(res: Response, fallback: string, t: TranslateFn): Promise<string> {
+function readError(parsed: unknown, fallback: string, t: TranslateFn): string {
   try {
-    const body = (await res.json()) as { error?: unknown; details?: Record<string, unknown> };
+    const body = (parsed ?? {}) as { error?: unknown; details?: Record<string, unknown> };
     if (body.details) {
       const translated = codeText(t, body.details);
       if (translated !== null) return translated;
@@ -114,15 +119,9 @@ function kindLabel(t: TranslateFn, kind: 'form' | 'read'): string {
     : t('settings.publicForms.kind.form', 'Form');
 }
 
-function splitOrigins(text: string): string[] {
-  return text
-    .split(/[\s,]+/)
-    .map((origin) => origin.trim())
-    .filter((origin) => origin !== '');
-}
 
 /**
- * Public forms (WHIT-906): the keys that open a plugin's form to anonymous visitors
+ * Public forms (WHIT-906; card TplSettingsPublicForms, WHIT-1044): the keys that open a plugin's form to anonymous visitors
  * for this workspace, and, for an operator, the instance's bot check.
  *
  * A key is shown once, when issued. Everything after that is its name and hint.
@@ -142,15 +141,15 @@ export default function PublicFormsPage() {
   const isOperator = has(SETTINGS_MANAGE) && user?.tenant_id === SYSTEM_TENANT_ID;
 
   const { data, error: loadError, refetch } = useFetch<KeysPayload>(async () => {
-    const res = await apiClient('/api/v1/public-form-keys');
+    const { data: body, response: res, error } = await api.GET('/api/v1/public-form-keys');
     if (!res.ok) {
-      throw new Error(await readError(res, t('settings.publicForms.loadFailed', 'The keys could not be loaded'), t));
+      throw new Error(readError(error, t('settings.publicForms.loadFailed', 'The keys could not be loaded'), t));
     }
-    const body = (await res.json()) as {
+    const payload = body as unknown as {
       data: FormKey[];
       meta: { forms: FormRoute[]; bot_check_ready: boolean };
     };
-    return { keys: body.data, forms: body.meta.forms, botCheckReady: body.meta.bot_check_ready };
+    return { keys: payload.data, forms: payload.meta.forms, botCheckReady: payload.meta.bot_check_ready };
   }, []);
 
   if (!capabilitiesLoading && !canManage) {
@@ -171,9 +170,11 @@ export default function PublicFormsPage() {
 
   const handleRevoke = async () => {
     if (revoking === null) return;
-    const res = await apiClient(`/api/v1/public-form-keys/${revoking.id}/revoke`, { method: 'POST' });
+    const { response: res, error } = await api.POST('/api/v1/public-form-keys/{id}/revoke', {
+      params: { path: { id: revoking.id } },
+    });
     if (!res.ok && res.status !== 204) {
-      addToast(await readError(res, t('settings.publicForms.revoke.failed', 'The key could not be revoked'), t), 'error');
+      addToast(readError(error, t('settings.publicForms.revoke.failed', 'The key could not be revoked'), t), 'error');
       return;
     }
     addToast(
@@ -186,42 +187,136 @@ export default function PublicFormsPage() {
     refetch();
   };
 
+  const canIssue = (data?.forms.length ?? 0) > 0;
+  const issueButton = (
+    <Button size="sm" className="gap-1" data-testid="public-forms-issue" onClick={() => setIssuing(true)}>
+      <Icon name="plus" size={16} />
+      {t('settings.publicForms.issue', 'Issue a key')}
+    </Button>
+  );
+
   return (
-    <div className="space-y-8 max-w-4xl mx-auto px-4 md:px-0 pb-16">
+    <div className="space-y-6 max-w-4xl mx-auto px-4 md:px-0 pb-16">
       <AdminHeader
         title={t('settings.publicForms.title', 'Public forms')}
-        description={t(
-          'settings.publicForms.description',
-          'Let a plugin’s form take submissions from visitors with no account. Each key opens one form for this workspace, from the sites you list.'
-        )}
-        action={
-          !issuing && (data?.forms.length ?? 0) > 0 ? (
-            <Button className="gap-2" data-testid="public-forms-issue" onClick={() => setIssuing(true)}>
-              <IconPlus className="w-4 h-4" />
-              {t('settings.publicForms.issue', 'Issue a key')}
-            </Button>
-          ) : undefined
-        }
+        description={t('settings.publicForms.descriptionShort', 'Keys that open plugins’ public forms on your own sites.')}
       />
 
       {data !== null && !data.botCheckReady && (
-        <Alert testId="public-forms-closed">
-          {isOperator
-            ? t(
-                'settings.publicForms.closed.operator',
-                'Every public form is closed until you set up the bot check below, or choose to allow forms without one.'
-              )
-            : t(
-                'settings.publicForms.closed.member',
-                'Public forms stay closed until the instance’s operator sets up a bot check. You can still issue keys.'
-              )}
+        <Alert variant="destructive" data-testid="public-forms-closed">
+          <AlertTitle>{t('settings.publicForms.closed.title', 'Public forms are closed')}</AlertTitle>
+          <AlertDescription>
+            {isOperator
+              ? t(
+                  'settings.publicForms.closed.operator',
+                  'Every public form is closed until you set up the bot check below, or choose to allow forms without one.'
+                )
+              : t(
+                  'settings.publicForms.closed.memberKeys',
+                  'This Whity has no bot check. Ask the operator to set one up. Keys keep working once it’s back.'
+                )}
+          </AlertDescription>
         </Alert>
       )}
 
       {issued !== null && <IssuedCard issued={issued} onDone={() => setIssued(null)} />}
 
-      {issuing && data !== null && (
-        <IssueCard
+      {loadError && (
+        <Alert variant="destructive">
+          <AlertDescription>{loadError}</AlertDescription>
+        </Alert>
+      )}
+
+      {editing !== null && data !== null && data.keys.some((key) => key.id === editing) && (
+        <EditCard
+          formKey={data.keys.find((key) => key.id === editing)!}
+          onCancel={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            refetch();
+          }}
+        />
+      )}
+
+      <Card className="border border-border bg-card shadow-sm" data-testid="public-forms-keys">
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <CardTitle>{t('settings.publicForms.keys', 'Keys')}</CardTitle>
+              <CardDescription>
+                {t(
+                  'settings.publicForms.keys.hint',
+                  'A key lets a plugin’s public form take answers for this workspace on the sites you list.'
+                )}
+              </CardDescription>
+            </div>
+            {canIssue && (data?.keys.length ?? 0) > 0 && issueButton}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {data === null ? (
+            !loadError && (
+              <div className="space-y-3" data-testid="public-forms-loading">
+                {[0, 1].map((i) => (
+                  <div key={i} className="h-12 animate-pulse rounded-lg bg-muted/40" />
+                ))}
+              </div>
+            )
+          ) : data.keys.length === 0 ? (
+            <div data-testid="public-forms-empty">
+              {data.forms.length === 0 ? (
+                <EmptyState
+                  icon={<Icon name="form" size={24} />}
+                  title={t('settings.publicForms.empty.noFormsTitle', 'No public forms yet')}
+                  description={t(
+                    'settings.publicForms.empty.noFormsHint',
+                    'When a plugin with a public form is on, its keys are made here.'
+                  )}
+                />
+              ) : (
+                <EmptyState
+                  icon={<Icon name="key" size={24} />}
+                  title={t('settings.publicForms.empty.noKeysTitle', 'No keys yet')}
+                  description={t('settings.publicForms.empty.noKeysHint', 'Issue a key to put a form on your site.')}
+                  action={issueButton}
+                />
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted text-start text-xs text-muted-foreground">
+                  <tr>
+                    <th scope="col" className="px-4 py-2.5 text-start font-medium">{t('settings.publicForms.col.name', 'Name')}</th>
+                    <th scope="col" className="px-4 py-2.5 text-start font-medium">{t('settings.publicForms.col.key', 'Key')}</th>
+                    <th scope="col" className="px-4 py-2.5 text-start font-medium">{t('settings.publicForms.col.sites', 'Allowed sites')}</th>
+                    <th scope="col" className="px-4 py-2.5 text-start font-medium">{t('settings.publicForms.col.status', 'Status')}</th>
+                    <th scope="col" className="w-12 px-2 py-2.5">
+                      <span className="sr-only">{t('settings.publicForms.col.actions', 'Actions')}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {data.keys.map((key) => (
+                    <KeyRow
+                      key={key.id}
+                      formKey={key}
+                      onEdit={() => setEditing(key.id)}
+                      onRevoke={() => setRevoking(key)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {isOperator && <BotCheckCard onSaved={refetch} />}
+
+      {data !== null && (
+        <IssueDialog
+          open={issuing}
           forms={data.forms}
           onCancel={() => setIssuing(false)}
           onIssued={(key) => {
@@ -231,57 +326,6 @@ export default function PublicFormsPage() {
           }}
         />
       )}
-
-      {loadError && <Alert>{loadError}</Alert>}
-
-      {data === null ? (
-        !loadError && (
-          <div className="space-y-3" data-testid="public-forms-loading">
-            {[0, 1].map((i) => (
-              <div key={i} className="h-24 animate-pulse rounded-lg bg-muted/40" />
-            ))}
-          </div>
-        )
-      ) : data.keys.length === 0 ? (
-        <Card className="border border-dashed border-border bg-card/50" data-testid="public-forms-empty">
-          <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-            <IconForms className="w-8 h-8 text-muted-foreground" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">
-              {data.forms.length === 0
-                ? t('settings.publicForms.empty.noForms', 'None of the plugins here has a public form yet.')
-                : t(
-                    'settings.publicForms.empty.noKeys',
-                    'No keys yet. Issue one to open a plugin’s form for this workspace.'
-                  )}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {data.keys.map((key) =>
-            editing === key.id ? (
-              <EditCard
-                key={key.id}
-                formKey={key}
-                onCancel={() => setEditing(null)}
-                onSaved={() => {
-                  setEditing(null);
-                  refetch();
-                }}
-              />
-            ) : (
-              <KeyCard
-                key={key.id}
-                formKey={key}
-                onEdit={() => setEditing(key.id)}
-                onRevoke={() => setRevoking(key)}
-              />
-            )
-          )}
-        </div>
-      )}
-
-      {isOperator && <BotCheckCard onSaved={refetch} />}
 
       <ConfirmAction
         open={revoking !== null}
@@ -308,7 +352,8 @@ export default function PublicFormsPage() {
   );
 }
 
-function KeyCard({
+/** One key in the list: name and form, the short key, the sites, status, and ⋯ for Edit and Revoke. */
+function KeyRow({
   formKey,
   onEdit,
   onRevoke,
@@ -319,62 +364,75 @@ function KeyCard({
 }) {
   const t = useTranslation('admin');
   const revoked = formKey.revoked_at !== null;
-  const isRead = formKey.kind === 'read';
 
   return (
-    <Card data-testid={`public-form-key-${formKey.id}`} className="border border-border bg-card shadow-sm">
-      <CardContent className="flex flex-col gap-4 py-4 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0 space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-foreground">{formKey.label}</span>
-            <Badge variant={revoked ? 'outline' : 'default'} className="text-xs">
-              {revoked
-                ? t('settings.publicForms.status.revoked', 'Revoked')
-                : t('settings.publicForms.status.live', 'Live')}
+    <tr data-testid={`public-form-key-${formKey.id}`} className={cn('align-middle', revoked && 'text-muted-foreground')}>
+      <td className="px-4 py-3">
+        <p className={cn('text-sm', revoked ? 'text-muted-foreground' : 'text-foreground')}>{formKey.label}</p>
+        <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          <span dir="ltr">
+            {formKey.plugin} · {formKey.form}
+          </span>
+          {formKey.kind !== null && (
+            <Badge variant="outline" data-testid={`public-form-key-kind-${formKey.id}`}>
+              {kindLabel(t, formKey.kind)}
             </Badge>
-            {formKey.kind !== null && (
-              <Badge variant="outline" className="text-xs" data-testid={`public-form-key-kind-${formKey.id}`}>
-                {kindLabel(t, formKey.kind)}
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {isRead ? t('settings.publicForms.keyForRead', 'Shows') : t('settings.publicForms.keyFor', 'Opens')}{' '}
-            <span dir="ltr" className="font-mono text-sm">
-              {formKey.plugin}/{formKey.form}
-            </span>
-            {' · '}
-            {t('settings.publicForms.startsWith', 'Key starts')}{' '}
-            <span dir="ltr" className="font-mono text-sm">
-              {formKey.key_hint}
-            </span>
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {formKey.allowed_origins.length === 0 ? (
-              t('settings.publicForms.origins.instanceOnly', 'Only this instance’s own allowed sites')
-            ) : (
-              <span dir="ltr">{formKey.allowed_origins.join(', ')}</span>
-            )}
-          </p>
-        </div>
-        {!revoked && (
-          <div className="flex shrink-0 items-center gap-2">
-            <Button variant="outline" size="sm" data-testid={`public-form-key-edit-${formKey.id}`} onClick={onEdit}>
-              {t('settings.publicForms.edit', 'Edit')}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive"
-              data-testid={`public-form-key-revoke-${formKey.id}`}
-              onClick={onRevoke}
-            >
-              {t('settings.publicForms.revoke.action', 'Revoke key')}
-            </Button>
-          </div>
+          )}
+        </p>
+      </td>
+      <td className="px-4 py-3">
+        <code dir="ltr" className="font-mono text-xs">
+          {formKey.key_hint}…
+        </code>
+      </td>
+      <td className="px-4 py-3">
+        {formKey.allowed_origins.length === 0 ? (
+          <span className="text-xs text-muted-foreground">
+            {t('settings.publicForms.origins.instanceOnly', 'Only this instance’s own allowed sites')}
+          </span>
+        ) : (
+          <span dir="ltr" className="break-all">
+            {/* The address without its scheme, as the card lists it; the full origin is in the editor. */}
+            {formKey.allowed_origins.map((origin) => origin.replace(/^https?:\/\//, '')).join(', ')}
+          </span>
         )}
-      </CardContent>
-    </Card>
+      </td>
+      <td className="px-4 py-3">
+        <Badge variant={revoked ? 'outline' : 'success'}>
+          {revoked
+            ? t('settings.publicForms.status.revoked', 'Revoked')
+            : t('settings.publicForms.status.working', 'Working')}
+        </Badge>
+      </td>
+      <td className="px-2 py-3 text-end">
+        {!revoked && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t('settings.publicForms.more', 'More for {label}', { label: formKey.label })}
+                data-testid={`public-form-key-more-${formKey.id}`}
+              >
+                <Icon name="more" size={16} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem data-testid={`public-form-key-edit-${formKey.id}`} onSelect={onEdit}>
+                {t('settings.publicForms.edit', 'Edit')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                data-testid={`public-form-key-revoke-${formKey.id}`}
+                onSelect={onRevoke}
+              >
+                {t('settings.publicForms.revoke.action', 'Revoke key')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </td>
+    </tr>
   );
 }
 
@@ -385,12 +443,23 @@ function FieldRow({ id, label, hint, children }: { id: string; label: string; hi
         {label}
       </label>
       {children}
-      {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
 
-function OriginsField({ value, onChange, isRead }: { value: string; onChange: (value: string) => void; isRead: boolean }) {
+/** The allowed sites as chips; what is still typed in the box counts too. */
+function OriginsField({
+  values,
+  input,
+  onChange,
+  isRead,
+}: {
+  values: string[];
+  input: string;
+  onChange: (values: string[], input: string) => void;
+  isRead: boolean;
+}) {
   const t = useTranslation('admin');
   return (
     <FieldRow
@@ -401,26 +470,29 @@ function OriginsField({ value, onChange, isRead }: { value: string; onChange: (v
           : t('settings.publicForms.origins.label', 'Sites that may send this form')
       }
       hint={t(
-        'settings.publicForms.origins.hint',
-        'One per line, like https://www.example-bakery.com, with no path. Leave empty to allow only this instance’s own allowed sites.'
+        'settings.publicForms.origins.chipsHint',
+        'The form only works on these addresses, like https://www.example-bakery.com. Leave empty to allow only this instance’s own allowed sites.'
       )}
     >
-      <Textarea
+      <ChipsInput
         id="public-form-origins"
-        dir="ltr"
-        rows={3}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        values={values}
+        input={input}
+        onChange={onChange}
+        placeholder={t('settings.publicForms.origins.add', 'Add a site…')}
+        removeLabel={(site) => t('settings.publicForms.origins.remove', 'Remove {site}', { site })}
       />
     </FieldRow>
   );
 }
 
-function IssueCard({
+function IssueDialog({
+  open,
   forms,
   onCancel,
   onIssued,
 }: {
+  open: boolean;
   forms: FormRoute[];
   onCancel: () => void;
   onIssued: (issued: IssuedKey) => void;
@@ -429,25 +501,31 @@ function IssueCard({
   const { addToast } = useToast();
   const [form, setForm] = useState(forms.length === 1 ? `${forms[0].plugin}/${forms[0].form}` : '');
   const [label, setLabel] = useState('');
-  const [origins, setOrigins] = useState('');
+  const [origins, setOrigins] = useState<string[]>([]);
+  const [originInput, setOriginInput] = useState('');
   const [busy, setBusy] = useState(false);
   const chosen = forms.find((f) => `${f.plugin}/${f.form}` === form);
+
+  const reset = () => {
+    setLabel('');
+    setOrigins([]);
+    setOriginInput('');
+  };
 
   const submit = async () => {
     const [plugin, name] = form.split('/');
     setBusy(true);
-    const res = await apiClient('/api/v1/public-form-keys', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plugin, form: name, label, allowed_origins: splitOrigins(origins) }),
+    const { data: issued, response: res, error } = await api.POST('/api/v1/public-form-keys', {
+      body: { plugin, form: name, label, allowed_origins: [...origins, ...splitChips(originInput)] },
     });
     setBusy(false);
     if (!res.ok) {
-      addToast(await readError(res, t('settings.publicForms.issue.failed', 'The key could not be issued'), t), 'error');
+      addToast(readError(error, t('settings.publicForms.issue.failed', 'The key could not be issued'), t), 'error');
       return;
     }
-    const body = (await res.json()) as { data: { key: string; plugin: string; form: string; kind: RouteKind } };
+    const body = issued as unknown as { data: { key: string; plugin: string; form: string; kind: RouteKind } };
     const segment = body.data.kind === 'read' ? 'public' : 'forms';
+    reset();
     onIssued({
       key: body.data.key,
       path: `/api/v1/${body.data.plugin}/${segment}/${body.data.form}/${body.data.key}`,
@@ -456,45 +534,61 @@ function IssueCard({
   };
 
   return (
-    <Card className="border border-border bg-card shadow-sm" data-testid="public-forms-issue-card">
-      <CardHeader>
-        <CardTitle>{t('settings.publicForms.issue', 'Issue a key')}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <FieldRow id="public-form-route" label={t('settings.publicForms.route', 'What this key opens')}>
-          <FieldSelect
-            id="public-form-route"
-            value={form}
-            onChange={setForm}
-            placeholder={t('settings.publicForms.route.placeholder', 'Choose one')}
-            options={forms.map((f) => ({
-              value: `${f.plugin}/${f.form}`,
-              label: `${f.plugin} · ${f.form}${f.kind === null ? '' : ` (${kindLabel(t, f.kind)})`}`,
-            }))}
-          />
-        </FieldRow>
-        <FieldRow
-          id="public-form-label"
-          label={t('settings.publicForms.label', 'Name')}
-          hint={t('settings.publicForms.label.hint', 'So you can tell keys apart, like “Main website”.')}
-        >
-          <Input id="public-form-label" value={label} maxLength={120} onChange={(e) => setLabel(e.target.value)} />
-        </FieldRow>
-        <OriginsField value={origins} onChange={setOrigins} isRead={chosen?.kind === 'read'} />
-        <div className="flex items-center gap-2">
-          <Button
-            data-testid="public-forms-issue-submit"
-            disabled={busy || form === '' || label.trim() === ''}
-            onClick={() => void submit()}
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onCancel();
+      }}
+    >
+      <DialogContent data-testid="public-forms-issue-card" closeLabel={t('settings.publicForms.close', 'Close')}>
+        <DialogHeader>
+          <DialogTitle>{t('settings.publicForms.issue', 'Issue a key')}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <FieldRow id="public-form-route" label={t('settings.publicForms.route', 'What this key opens')}>
+            <FieldSelect
+              id="public-form-route"
+              value={form}
+              onChange={setForm}
+              placeholder={t('settings.publicForms.route.placeholder', 'Choose one')}
+              options={forms.map((f) => ({
+                value: `${f.plugin}/${f.form}`,
+                label: `${f.plugin} · ${f.form}${f.kind === null ? '' : ` (${kindLabel(t, f.kind)})`}`,
+              }))}
+            />
+          </FieldRow>
+          <FieldRow
+            id="public-form-label"
+            label={t('settings.publicForms.label', 'Name')}
+            hint={t('settings.publicForms.label.forYou', 'For you; visitors never see it.')}
           >
-            {t('settings.publicForms.issue', 'Issue a key')}
-          </Button>
+            <Input id="public-form-label" value={label} maxLength={120} onChange={(e) => setLabel(e.target.value)} />
+          </FieldRow>
+          <OriginsField
+            values={origins}
+            input={originInput}
+            onChange={(values, input) => {
+              setOrigins(values);
+              setOriginInput(input);
+            }}
+            isRead={chosen?.kind === 'read'}
+          />
+        </div>
+        <DialogFooter>
           <Button variant="ghost" onClick={onCancel}>
             {t('settings.publicForms.cancel', 'Cancel')}
           </Button>
-        </div>
-      </CardContent>
-    </Card>
+          <Button
+            data-testid="public-forms-issue-submit"
+            disabled={busy || form === '' || label.trim() === ''}
+            loading={busy}
+            onClick={() => void submit()}
+          >
+            {t('settings.publicForms.issueSubmit', 'Issue key')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -510,40 +604,41 @@ function IssuedCard({ issued, onDone }: { issued: IssuedKey; onDone: () => void 
 
   return (
     <Card className="border border-border bg-card shadow-sm" data-testid="public-forms-issued">
-      <CardHeader>
-        <CardTitle>{t('settings.publicForms.issued.title', 'Copy this key now')}</CardTitle>
-        <CardDescription>
-          {t(
-            'settings.publicForms.issued.description',
-            'This is the only time you’ll see it. Give it to whoever runs the site. If it’s lost, revoke it and issue another.'
-          )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {[
-          { id: 'key', label: t('settings.publicForms.issued.key', 'Key'), value: issued.key },
-          {
-            id: 'path',
-            label:
-              issued.kind === 'read'
-                ? t('settings.publicForms.issued.pathRead', 'Address to read it from')
-                : t('settings.publicForms.issued.path', 'Address to send the form to'),
-            value: issued.path,
-          },
-        ].map((row) => (
-          <div key={row.id} className="space-y-1 rounded-md border border-border bg-muted/20 p-3">
-            <p className="text-sm text-muted-foreground">{row.label}</p>
-            <div className="flex items-center gap-2">
-              <code dir="ltr" className="min-w-0 flex-1 break-all font-mono text-sm text-foreground">
-                {row.value}
-              </code>
-              <Button variant="outline" size="sm" className="gap-1 shrink-0" onClick={() => copy(row.value)}>
-                <IconCopy className="w-3.5 h-3.5" />
-                {t('settings.publicForms.copy', 'Copy')}
-              </Button>
-            </div>
+      <CardContent className="space-y-3 py-4">
+        <Alert variant="warning">
+          <AlertTitle>{t('settings.publicForms.issued.titleNow', 'Copy the key now')}</AlertTitle>
+          <AlertDescription>
+            {t(
+              'settings.publicForms.issued.once',
+              'You’ll only see it once. Paste it into the form’s snippet on your site. If it’s lost, revoke it and issue another.'
+            )}
+          </AlertDescription>
+        </Alert>
+        <div className="flex items-center gap-3 rounded-lg bg-muted px-4 py-3">
+          <code dir="ltr" className="min-w-0 flex-1 break-all font-mono text-sm text-foreground">
+            {issued.key}
+          </code>
+          <Button size="sm" className="shrink-0 gap-1" onClick={() => copy(issued.key)}>
+            <Icon name="copy" size={16} />
+            {t('settings.publicForms.copyKey', 'Copy key')}
+          </Button>
+        </div>
+        <div className="space-y-1 rounded-lg border border-border px-4 py-3">
+          <p className="text-xs text-muted-foreground">
+            {issued.kind === 'read'
+              ? t('settings.publicForms.issued.pathRead', 'Address to read it from')
+              : t('settings.publicForms.issued.path', 'Address to send the form to')}
+          </p>
+          <div className="flex items-center gap-2">
+            <code dir="ltr" className="min-w-0 flex-1 break-all font-mono text-sm text-foreground">
+              {issued.path}
+            </code>
+            <Button variant="outline" size="sm" className="shrink-0 gap-1" onClick={() => copy(issued.path)}>
+              <Icon name="copy" size={16} />
+              {t('settings.publicForms.copy', 'Copy')}
+            </Button>
           </div>
-        ))}
+        </div>
         <Button variant="outline" data-testid="public-forms-issued-done" onClick={onDone}>
           {t('settings.publicForms.issued.done', 'I’ve copied it')}
         </Button>
@@ -564,19 +659,19 @@ function EditCard({
   const t = useTranslation('admin');
   const { addToast } = useToast();
   const [label, setLabel] = useState(formKey.label);
-  const [origins, setOrigins] = useState(formKey.allowed_origins.join('\n'));
+  const [origins, setOrigins] = useState<string[]>(formKey.allowed_origins);
+  const [originInput, setOriginInput] = useState('');
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
     setBusy(true);
-    const res = await apiClient(`/api/v1/public-form-keys/${formKey.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label, allowed_origins: splitOrigins(origins) }),
+    const { response: res, error } = await api.PATCH('/api/v1/public-form-keys/{id}', {
+      params: { path: { id: formKey.id } },
+      body: { label, allowed_origins: [...origins, ...splitChips(originInput)] },
     });
     setBusy(false);
     if (!res.ok) {
-      addToast(await readError(res, t('settings.publicForms.edit.failed', 'The key could not be changed'), t), 'error');
+      addToast(readError(error, t('settings.publicForms.edit.failed', 'The key could not be changed'), t), 'error');
       return;
     }
     addToast(t('settings.publicForms.edit.done', 'Key changed.'), 'success');
@@ -585,11 +680,22 @@ function EditCard({
 
   return (
     <Card className="border border-border bg-card shadow-sm" data-testid={`public-form-key-editor-${formKey.id}`}>
-      <CardContent className="space-y-4 py-4">
+      <CardHeader>
+        <CardTitle>{t('settings.publicForms.editTitle', 'Edit {label}', { label: formKey.label })}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
         <FieldRow id="public-form-label" label={t('settings.publicForms.label', 'Name')}>
           <Input id="public-form-label" value={label} maxLength={120} onChange={(e) => setLabel(e.target.value)} />
         </FieldRow>
-        <OriginsField value={origins} onChange={setOrigins} isRead={formKey.kind === 'read'} />
+        <OriginsField
+          values={origins}
+          input={originInput}
+          onChange={(values, input) => {
+            setOrigins(values);
+            setOriginInput(input);
+          }}
+          isRead={formKey.kind === 'read'}
+        />
         <div className="flex items-center gap-2">
           <Button variant="outline" disabled={busy || label.trim() === ''} onClick={() => void save()}>
             {t('settings.publicForms.save', 'Save')}
@@ -609,26 +715,30 @@ const NO_PROVIDER = 'none';
 function BotCheckCard({ onSaved }: { onSaved: () => void }) {
   const t = useTranslation('admin');
   const { data, error, refetch } = useFetch<BotSettings>(async () => {
-    const res = await apiClient('/api/v1/settings/public-forms/bot-check');
+    const { data: body, response: res, error } = await api.GET('/api/v1/settings/public-forms/bot-check');
     if (!res.ok) {
-      throw new Error(await readError(res, t('settings.publicForms.bot.loadFailed', 'The bot check settings could not be loaded'), t));
+      throw new Error(readError(error, t('settings.publicForms.bot.loadFailed', 'The bot check settings could not be loaded'), t));
     }
-    return ((await res.json()) as { data: BotSettings }).data;
+    return (body as unknown as { data: BotSettings }).data;
   }, []);
 
   return (
     <Card className="border border-border bg-card shadow-sm" data-testid="public-forms-bot-check">
       <CardHeader>
-        <CardTitle>{t('settings.publicForms.bot.title', 'Bot check')}</CardTitle>
+        <CardTitle>{t('settings.publicForms.bot.titleWhity', 'Bot check for this Whity')}</CardTitle>
         <CardDescription>
           {t(
-            'settings.publicForms.bot.description',
-            'Applies to every public form on this instance. If the provider can’t be reached, forms refuse submissions until it’s back.'
+            'settings.publicForms.bot.operatorsOnly',
+            'Operators only. Every public form and the chat box use it. If the provider can’t be reached, forms refuse submissions until it’s back.'
           )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {error && <Alert>{error}</Alert>}
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         {data === null ? (
           !error && <div className="h-24 animate-pulse rounded-lg bg-muted/40" />
         ) : (
@@ -653,24 +763,24 @@ function BotCheckForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
   const [provider, setProvider] = useState(settings.provider ?? NO_PROVIDER);
   const [siteKey, setSiteKey] = useState(settings.site_key);
   const [secret, setSecret] = useState('');
+  // A stored secret is never shown: Replace opens an empty box for a new one.
+  const [replacing, setReplacing] = useState(!settings.has_secret);
   const [allowNone, setAllowNone] = useState(settings.allow_without_bot_check);
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
     setBusy(true);
-    const res = await apiClient('/api/v1/settings/public-forms/bot-check', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const { response: res, error } = await api.PUT('/api/v1/settings/public-forms/bot-check', {
+      body: {
         provider: provider === NO_PROVIDER ? null : provider,
         site_key: siteKey,
         allow_without_bot_check: provider === NO_PROVIDER && allowNone,
         ...(secret.trim() !== '' ? { secret } : {}),
-      }),
+      },
     });
     setBusy(false);
     if (!res.ok) {
-      addToast(await readError(res, t('settings.publicForms.bot.saveFailed', 'The bot check settings could not be saved'), t), 'error');
+      addToast(readError(error, t('settings.publicForms.bot.saveFailed', 'The bot check settings could not be saved'), t), 'error');
       return;
     }
     addToast(t('settings.publicForms.bot.saved', 'Bot check settings saved.'), 'success');
@@ -680,19 +790,19 @@ function BotCheckForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
 
   return (
     <>
-      <FieldRow id="public-form-bot-provider" label={t('settings.publicForms.bot.provider', 'Provider')}>
-        <FieldSelect
-          id="public-form-bot-provider"
-          value={provider}
-          onChange={setProvider}
-          options={[
-            { value: NO_PROVIDER, label: t('settings.publicForms.bot.provider.none', 'None') },
-            ...settings.providers.map((p) => ({ value: p, label: PROVIDER_LABELS[p] ?? p })),
-          ]}
-        />
-      </FieldRow>
-      {provider !== NO_PROVIDER && (
-        <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FieldRow id="public-form-bot-provider" label={t('settings.publicForms.bot.provider', 'Provider')}>
+          <FieldSelect
+            id="public-form-bot-provider"
+            value={provider}
+            onChange={setProvider}
+            options={[
+              { value: NO_PROVIDER, label: t('settings.publicForms.bot.provider.none', 'None') },
+              ...settings.providers.map((p) => ({ value: p, label: PROVIDER_LABELS[p] ?? p })),
+            ]}
+          />
+        </FieldRow>
+        {provider !== NO_PROVIDER && (
           <FieldRow
             id="public-form-bot-site-key"
             label={t('settings.publicForms.bot.siteKey', 'Site key')}
@@ -700,12 +810,16 @@ function BotCheckForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
           >
             <Input id="public-form-bot-site-key" dir="ltr" value={siteKey} onChange={(e) => setSiteKey(e.target.value)} />
           </FieldRow>
+        )}
+      </div>
+      {provider !== NO_PROVIDER &&
+        (replacing ? (
           <FieldRow
             id="public-form-bot-secret"
             label={t('settings.publicForms.bot.secret', 'Secret key')}
             hint={
               settings.has_secret
-                ? t('settings.publicForms.bot.secret.stored', 'A secret is stored and can’t be shown. Type a new one to replace it.')
+                ? t('settings.publicForms.bot.secret.writeOnly', 'Write-only: nobody can read it back. The stored one stays until you save a new one.')
                 : t('settings.publicForms.bot.secret.empty', 'No secret stored yet. Forms stay closed until there is one.')
             }
           >
@@ -718,45 +832,47 @@ function BotCheckForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
               onChange={(e) => setSecret(e.target.value)}
             />
           </FieldRow>
-        </>
-      )}
-      {provider === NO_PROVIDER && (
-        <div className="flex items-start justify-between gap-4 rounded-md border border-border p-3">
-          <div className="min-w-0 space-y-1">
-            <label htmlFor="public-form-bot-allow-none" className="text-sm font-medium text-foreground">
-              {t('settings.publicForms.bot.allowNone', 'Allow public forms with no bot check')}
-            </label>
-            <p className="text-sm text-muted-foreground">
-              {t(
-                'settings.publicForms.bot.allowNone.hint',
-                'Forms still have limits, but anything can send them. Leave this off unless something else in front of this instance stops bots.'
-              )}
+        ) : (
+          <div className="space-y-1.5" data-testid="public-forms-secret-stored">
+            <p className="text-sm font-medium text-foreground">{t('settings.publicForms.bot.secret', 'Secret key')}</p>
+            <div className="flex items-center gap-3">
+              <span dir="ltr" className="font-mono text-sm text-foreground" aria-hidden="true">
+                ••••••••••••
+              </span>
+              <span className="text-sm text-muted-foreground">{t('settings.publicForms.bot.secret.set', 'Set')}</span>
+              <Button variant="outline" size="sm" data-testid="public-forms-secret-replace" onClick={() => setReplacing(true)}>
+                {t('settings.publicForms.bot.secret.replace', 'Replace')}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {t('settings.publicForms.bot.secret.writeOnlyShort', 'Write-only: nobody can read it back.')}
             </p>
           </div>
-          <Switch
-            id="public-form-bot-allow-none"
-            data-testid="public-forms-allow-none"
-            checked={allowNone}
-            onCheckedChange={setAllowNone}
-          />
+        ))}
+      {provider === NO_PROVIDER && (
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <Switch
+              id="public-form-bot-allow-none"
+              data-testid="public-forms-allow-none"
+              checked={allowNone}
+              onCheckedChange={setAllowNone}
+            />
+            <label htmlFor="public-form-bot-allow-none" className="text-sm text-foreground">
+              {t('settings.publicForms.bot.allowNoneShort', 'Let forms work with no bot check')}
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {t(
+              'settings.publicForms.bot.allowNone.risk',
+              'Off: public forms close while no bot check is set. Turning it on lets spam through, unless something else in front of this Whity stops bots.'
+            )}
+          </p>
         </div>
       )}
       <Button variant="outline" data-testid="public-forms-bot-save" disabled={busy} onClick={() => void save()}>
         {t('settings.publicForms.save', 'Save')}
       </Button>
     </>
-  );
-}
-
-function Alert({ children, testId }: { children: ReactNode; testId?: string }) {
-  return (
-    <div
-      role="alert"
-      data-testid={testId}
-      className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
-    >
-      <IconAlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-      <span>{children}</span>
-    </div>
   );
 }

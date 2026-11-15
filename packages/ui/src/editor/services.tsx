@@ -12,7 +12,7 @@ export interface RecordView {
   /** "INV-1042 · Example Clinic" */
   title: string
   subtitle?: string
-  /** A formatted amount, e.g. "JOD 301.600". */
+  /** A formatted amount, e.g. "$301.60". */
   amount?: string
   status?: { label: string; tone: "success" | "warning" | "destructive" | "info" | "secondary" }
   /** Where the record opens. */
@@ -123,7 +123,7 @@ export interface PluginBlocks {
 }
 
 /** What Save as block sends: the contract's SavedBlock without what the library assigns. */
-export type NewSavedBlock = Pick<SavedBlock, "name" | "mode" | "sharing" | "blocks" | "perDocumentKeys">
+export type NewSavedBlock = Pick<SavedBlock, "name" | "mode" | "sharing" | "blocks" | "perDocumentParts">
 
 /**
  * Preview with a record (E.12): each field's value for that record, by path.

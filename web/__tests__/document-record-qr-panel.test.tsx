@@ -57,9 +57,7 @@ jest.mock('@/lib/auth-context', () => ({
     apiClient: (...args: unknown[]) => rawApiClient(...args),
   }),
 }));
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => rawApiClient(...args),
-}));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => rawApiClient));
 
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));

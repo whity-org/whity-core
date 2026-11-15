@@ -50,7 +50,7 @@ test.describe('Tenants (admin)', () => {
 
   test('tenants list shows the Default Tenant', async ({ adminPage, page }) => {
     await page.goto('/admin/tenants');
-    await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Workspaces' })).toBeVisible();
     await expect(
       page.getByRole('cell', { name: 'Default Tenant', exact: true })
     ).toBeVisible();

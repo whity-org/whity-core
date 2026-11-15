@@ -5,8 +5,8 @@
  * comes from the workspace's setting.
  */
 
-import { render, screen } from '@testing-library/react';
-import { TimeGrid, MonthGrid, type GridItem } from '@/components/calendar/calendar-grid';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { AgendaList, TimeGrid, MonthGrid, type GridItem } from '@/components/calendar/calendar-grid';
 import { monthWeeks, weekDays } from '@/lib/calendar/layout';
 
 const AMMAN = 'Asia/Amman';
@@ -68,6 +68,60 @@ describe('TimeGrid', () => {
   });
 });
 
+describe('TimeGrid week (TplCalendarStaff, WHIT-1044)', () => {
+  const booked: GridItem[] = [{ ...items[0], booking: { id: 1 } as unknown as GridItem['booking'] }];
+
+  it('heads each day with its date and how many bookings it has', () => {
+    render(
+      <TimeGrid
+        days={weekDays(WED, 'saturday')}
+        items={booked}
+        timeZone={AMMAN}
+        weekendDays={['friday', 'saturday']}
+        today={WED}
+        showPerson={false}
+        onOpen={() => {}}
+      />
+    );
+    const counts = screen.getAllByTestId('calendar-day-count').map((el) => el.textContent);
+    expect(counts[0]).toBe('1 booking');
+    expect(counts.slice(1).every((text) => text === '0 bookings')).toBe(true);
+  });
+
+  it('reads a booking as time and service, over the customer and the person', () => {
+    render(
+      <TimeGrid
+        days={weekDays(WED, 'saturday')}
+        items={booked}
+        timeZone={AMMAN}
+        weekendDays={['friday', 'saturday']}
+        today={WED}
+        showPerson
+        onOpen={() => {}}
+      />
+    );
+    const [first, second] = Array.from(screen.getByTestId('calendar-item').children).map((el) => el.textContent);
+    expect(first).toBe('09:00 Cake tasting');
+    expect(second).toBe('Rana Haddad · Lina Saleh');
+  });
+
+  it('marks now with a line on today’s column only', () => {
+    render(
+      <TimeGrid
+        days={weekDays(WED, 'saturday')}
+        items={[]}
+        timeZone={AMMAN}
+        weekendDays={['friday', 'saturday']}
+        today={WED}
+        showPerson={false}
+        onOpen={() => {}}
+      />
+    );
+    const line = screen.getByTestId('calendar-now');
+    expect(line.closest('[data-testid="calendar-day-column"]')).toHaveAttribute('data-date', '2026-11-11');
+  });
+});
+
 describe('MonthGrid', () => {
   it('heads the month with the workspace’s first day', () => {
     render(
@@ -90,5 +144,51 @@ describe('MonthGrid', () => {
       'Fri',
       'Sat',
     ]);
+  });
+});
+
+describe('on a phone', () => {
+  it('lists a week as one card per day with a count, and says when nothing is booked', () => {
+    render(
+      <AgendaList
+        days={weekDays(WED, 'saturday')}
+        items={items}
+        timeZone={AMMAN}
+        weekendDays={['friday', 'saturday']}
+        today={WED}
+        showPerson={false}
+        onOpen={() => {}}
+      />
+    );
+    const days = screen.getAllByTestId('calendar-agenda-day');
+    expect(days).toHaveLength(7);
+    const counts = screen.getAllByTestId('calendar-agenda-count').map((el) => el.textContent);
+    expect(counts[0]).toBe('1 bookings');
+    expect(counts.slice(1)).toEqual(Array(6).fill('Nothing booked'));
+  });
+
+  it('chooses a day in the month by its count and marks it', () => {
+    const onSelectDay = jest.fn();
+    const onPickDay = jest.fn();
+    window.matchMedia = ((query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    render(
+      <MonthGrid
+        weeks={monthWeeks(WED, 'sunday')}
+        month={11}
+        items={items}
+        timeZone={AMMAN}
+        weekendDays={['friday', 'saturday']}
+        today={WED}
+        onOpen={() => {}}
+        onPickDay={onPickDay}
+        selected={{ year: 2026, month: 11, day: 7 }}
+        onSelectDay={onSelectDay}
+      />
+    );
+    const selected = screen.getAllByTestId('calendar-month-day').filter((el) => el.hasAttribute('data-selected'));
+    expect(selected.map((el) => el.getAttribute('data-date'))).toEqual(['2026-11-07']);
+    fireEvent.click(within(selected[0]).getByText('1', { selector: 'button.block' }));
+    expect(onSelectDay).toHaveBeenCalledWith(expect.objectContaining({ day: 7 }));
+    expect(onPickDay).not.toHaveBeenCalled();
   });
 });

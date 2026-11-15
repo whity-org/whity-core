@@ -42,6 +42,7 @@ import {
 } from '@/components/forms/form-fields';
 import { FormFill, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
 import { useRefusalMessage, type RefusalBody } from '@/components/forms/form-refusals';
+import { api } from '@/lib/api/client';
 
 interface PublicForm {
   slug: string;
@@ -87,9 +88,9 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   useEffect(() => {
     let cancelled = false;
 
-    fetch(`/api/v1/public/forms/${encodeURIComponent(slug)}`, { headers: { Accept: 'application/json' } })
-      .then(async (response) => {
-        const body = (await response.json().catch(() => ({}))) as { data?: PublicForm; error?: string };
+    api.GET('/api/v1/public/forms/{slug}', { params: { path: { slug } } })
+      .then(({ data, error, response }) => {
+        const body = ((data ?? error ?? {}) as unknown) as { data?: PublicForm; error?: string };
         if (cancelled) return;
         if (!response.ok || !body.data) {
           // A wrong slug, a withdrawn link and an unpublished form are one
@@ -140,12 +141,12 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
     const body = new FormData();
     body.append('file', file);
 
-    const response = await fetch(`/api/v1/public/forms/${encodeURIComponent(slug)}/uploads`, {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-      body,
+    const { data: uploaded, error: uploadError, response } = await api.POST('/api/v1/public/forms/{slug}/uploads', {
+      params: { path: { slug } },
+      body: body as never,
+      bodySerializer: (b: unknown) => b as FormData,
     });
-    const payload = (await response.json().catch(() => ({}))) as RefusalBody & { data?: UploadedFileRef };
+    const payload = ((uploaded ?? uploadError ?? {}) as unknown) as RefusalBody & { data?: UploadedFileRef };
     if (!response.ok || payload.data === undefined) {
       throw new Error(
         refusalMessage(payload, labelOf, t('field.uploadFailed', 'That file could not be uploaded. Please try again.'))
@@ -157,21 +158,12 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
 
   /** Resolves with a refusal, or null once the server has the answers. */
   async function submitAnswers(toSend: Record<string, Answer>): Promise<RefusalBody | null> {
-    const response = await fetch(`/api/v1/public/forms/${encodeURIComponent(slug)}/submissions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        // The CSRF guard requires this on a cookie-authenticated write. It is
-        // NOT optional here: a bearer token is exempt from the guard, so every
-        // curl check of this endpoint passed while the browser — which has a
-        // session cookie and no token — was refused with "cross-site request
-        // rejected". The uploader already sent it; the submit did not.
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: JSON.stringify({ data: toSend }),
+    // The client sends the CSRF header (`X-Requested-With`) a cookie-authenticated write needs.
+    const { data: sentBody, error: sentError, response } = await api.POST('/api/v1/public/forms/{slug}/submissions', {
+      params: { path: { slug } },
+      body: { data: toSend } as never,
     });
-    const body = (await response.json().catch(() => ({}))) as RefusalBody & { data?: { reference?: string | null } };
+    const body = ((sentBody ?? sentError ?? {}) as unknown) as RefusalBody & { data?: { reference?: string | null } };
     if (!response.ok) return body;
 
     setReference(body.data?.reference ?? null);

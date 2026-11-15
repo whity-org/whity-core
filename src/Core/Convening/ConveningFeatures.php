@@ -373,7 +373,7 @@ final class ConveningFeatures
                                 // `display_name` and not `name`: `name` is a
                                 // locale MAP, and a table cell can only render a
                                 // string. Both are on the wire — a localizing
-                                // client reads the map. See LocalizedText.
+                                // client reads the map. See Whity\Core\i18n\LocalizedText.
                                 [
                                     'key' => 'display_name',
                                     'label' => 'Name',

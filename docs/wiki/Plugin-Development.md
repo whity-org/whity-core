@@ -1697,7 +1697,7 @@ public function getHomeCard(): ?array
 } }
 ```
 
-Only `value` is required, with at most 5 lines and 12 chart points. **The route decides the person's scope:** a branch manager's Stock card counts their branch. Answer in the language of the request's `Accept-Language`, and write amounts as they should appear (`JOD 18,240.500`).
+Only `value` is required, with at most 5 lines and 12 chart points. **The route decides the person's scope:** a branch manager's Stock card counts their branch. Answer in the language of the request's `Accept-Language`, and write amounts as they should appear (`$18,240.50`).
 
 A workspace plugin has no routes, so its `homeCard` names a `record` type instead of a `source`, plus a `caption`. The host counts the records.
 

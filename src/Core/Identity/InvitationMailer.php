@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace Whity\Core\Identity;
 
+use Whity\Core\Mail\BrandedEmailSender;
 use Whity\Core\Mail\EmailBranding;
 use Whity\Core\Mail\EmailContent;
-use Whity\Core\Mail\EmailLayout;
-use Whity\Core\Mail\Mailer;
+use Whity\Core\Mail\EmailOptions;
 use Whity\Core\Settings\SettingsRegistry;
-use Whity\Core\Settings\SettingsService;
 
 /**
  * Sends the tenant-invitation email (WHIT-417).
@@ -39,10 +38,8 @@ use Whity\Core\Settings\SettingsService;
 final class InvitationMailer
 {
     public function __construct(
-        private readonly Mailer $mailer,
+        private readonly BrandedEmailSender $sender,
         private readonly string $acceptUrlBase,
-        private readonly EmailLayout $layout,
-        private readonly SettingsService $settings,
     ) {}
 
     /**
@@ -62,13 +59,16 @@ final class InvitationMailer
             return;
         }
 
-        $branding = EmailBranding::fromSettings($this->settings);
+        $branding = $this->sender->branding(0);
         $workspace = trim($tenantName) !== '' ? trim($tenantName) : $branding->siteName;
         $link = $this->buildLink($rawToken);
         $expiry = $ttlDays === 1 ? '1 day' : $ttlDays . ' days';
 
         // EM.1 `invitation`: sent by the workspace, so its name heads the email.
-        $rendered = $this->layout->render(
+        $this->sender->deliver(
+            0,
+            $email,
+            'You have been invited to ' . $workspace,
             new EmailContent(
                 heading: 'You are invited to ' . $workspace,
                 paragraphs: [
@@ -80,21 +80,13 @@ final class InvitationMailer
                 preheader: 'Join the team in ' . $workspace . '. The link works for ' . $expiry . '.',
                 notice: 'Sent by ' . $workspace . ' because someone invited this address.',
             ),
-            new EmailBranding($workspace, $branding->brandColor, $branding->supportEmail, $branding->footerText, $branding->whiteLabel),
+            new EmailOptions(branding: new EmailBranding($workspace, $branding->brandColor, $branding->supportEmail, $branding->footerText, $branding->whiteLabel)),
         );
-
-        $this->mailer->send($email, 'You have been invited to ' . $workspace, $rendered->text, $rendered->html);
     }
 
     private function eventEnabled(): bool
     {
-        try {
-            $global = $this->settings->getGlobal();
-        } catch (\Throwable) {
-            return false;
-        }
-
-        return (string) ($global[SettingsRegistry::MAIL_EVENT_INVITATION] ?? 'false') === 'true';
+        return $this->sender->gate()->instanceEvent(SettingsRegistry::MAIL_EVENT_INVITATION);
     }
 
     private function buildLink(string $token): string

@@ -10,6 +10,10 @@ use RuntimeException;
 use Whity\Core\Document\DocumentSourceRepository;
 use Whity\Core\Document\DocumentSourceStarterSeeder;
 use Whity\Core\Hooks\HookManager;
+use Whity\Core\Settings\GlobalSettingsRepository;
+use Whity\Core\Settings\SettingsRegistry;
+use Whity\Core\Settings\SettingsService;
+use Whity\Core\Settings\TenantSettingsRepository;
 
 /**
  * How a tenant comes into existence, and what it is given when it does (#1012).
@@ -109,7 +113,13 @@ final class TenantProvisioner
             // nothing else — no storage driver, no settings service — which is
             // why it is cheap enough to be composed here and to run in the CLI
             // seed path.
-            new DocumentSourceStarterSeeder(new DocumentSourceRepository($db), $logger),
+            new DocumentSourceStarterSeeder(
+                new DocumentSourceRepository($db),
+                $logger,
+                // The sample amounts follow the workspace's currency (CU.4).
+                static fn (int $tenantId): string => (new SettingsService(new GlobalSettingsRepository($db), new TenantSettingsRepository($db)))
+                    ->effective($tenantId)[SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? 'USD',
+            ),
         ];
     }
 

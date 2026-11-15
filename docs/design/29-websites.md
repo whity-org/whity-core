@@ -20,7 +20,7 @@ The public Whity sites, redesigned on the 3.x brand (WS.1–WS.3, 8 November 202
 4. **Agents** (WS.8, LT.2): one proposal visitors try themselves (Approve sets it down, Undo plays it back) beside the three steps, which light up as it goes; then "Agents never".
 5. **Works locally** (WS.9, WS.17): "Local where it matters": Arabic and English in both directions, your tax system's e-invoicing (Jordan's JoFotara first), local payments, cards and cash (like CliQ in Jordan), WhatsApp, and your currency to the right decimals, each with a small animation, beside a receipt visitors switch between English and Arabic.
 6. **Your name on it:** the white-label promise, with the brand animation (the workspace's sheet sets down on Whity's platform) and "Try a colour" buttons that recolour it.
-7. **Plans** (BM.3–BM.5): Free (5 people, 500 customers a month, JOD 0), Team (25, 5,000) and Business (100, 25,000) at `[currency] [price]` (the currency comes from the backend; the built-in copy says JOD); a line on dedicated hosting, your own server and reselling (BM.2, BM.10); then the four promises (BM.11).
+7. **Plans** (BM.3–BM.5): Free (5 people, 500 customers a month, $0), Team (25, 5,000) and Business (100, 25,000) at `[currency] [price]` (the currency comes from the backend; the built-in copy says USD); a line on dedicated hosting, your own server and reselling (BM.2, BM.10); then the four promises (BM.11).
 8. **For builders** (WS.11): a terminal that types the real install commands (from whity.dev/install) with Copy and Play again; open source (AGPL core, MIT SDK), build apps and agents can run it (MCP), each with a small animation; and one line for agencies linking to a partners page. Install takes three commands today; a single-line installer would make this section stronger.
 9. **Questions** (WS.12): eight straight answers, always open, then "Book 30 minutes with the team". **Final call:** on its own sheet on the plane, with four ticks. **Footer:** every Whity site, live status from `health.whity.dev/status` (`{"status": "ok" | "degraded" | "down"}`; a plain link if it doesn't answer in 3 seconds), the four promises and Back to top.
 
@@ -166,8 +166,8 @@ The plans on whity.dev (prices, limits, features, which plan is highlighted, the
 ```json
 {
   "version": 1,
-  "currency": "JOD",
-  "decimals": 3,
+  "currency": "USD",
+  "decimals": 2,
   "updatedAt": "2026-11-09",
   "plans": [
     {
@@ -175,16 +175,16 @@ The plans on whity.dev (prices, limits, features, which plan is highlighted, the
       "highlight": true,
       "name": { "en": "Team", "ar": "الفريق" },
       "tagline": { "en": "For growing teams", "ar": "للفرق المتنامية" },
-      "price": { "monthly": "29.000" },
+      "price": { "monthly": "29.00" },
       "limits": { "staff": 25, "customersPerMonth": 5000 },
       "features": [ { "en": "Your own web address and sign-in", "ar": "عنوانك وصفحة دخولك الخاصة" } ],
       "cta": { "label": { "en": "Start free", "ar": "ابدأ مجاناً" }, "href": "https://app.whity.dev/register?plan=team" }
     }
   ],
-  "dedicatedHosting": { "fromMonthly": "150.000" }
+  "dedicatedHosting": { "fromMonthly": "150.00" }
 }
 ```
 
-Rules the page checks (anything else is ignored and the fallback is used): `version` is 1; 1–4 plans; prices are decimal strings in normal units (`"29.000"`, never minor units) or `null` for "not set" (shown as `JOD [price]`); limits are whole numbers; up to 6 features, each with an English text (Arabic optional, English is the fallback); links are `https://`. The page writes the limit lines itself ("Up to 25 people", "حتى 25 شخصاً") and shows numbers in Western digits. All text is inserted as text, never as HTML.
+Rules the page checks (anything else is ignored and the fallback is used): `version` is 1; 1–4 plans; prices are decimal strings in normal units (`"29.00"`, never minor units) or `null` for "not set" (shown as `$[price]`); limits are whole numbers; up to 6 features, each with an English text (Arabic optional, English is the fallback); links are `https://`. The page writes the limit lines itself ("Up to 25 people", "حتى 25 شخصاً") and shows numbers in Western digits. All text is inserted as text, never as HTML.
 
 Cards: `SiteHome`, `SiteHomeAr`, `SiteModMoney`, `SiteModMoneyAr`, `SiteModStock`, `SiteModApprovals`, `SiteModDocuments`, `SiteBrand`, `SiteStatus`, `SiteId`, `SiteDocs`.

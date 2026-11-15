@@ -149,16 +149,17 @@ export function PublicBookingScreen({ workspace }: { workspace: string }) {
     );
   }
 
+  // WHIT-1014: once the page is known, it shows in the workspace's own brand.
   if (phase === 'booked' && result !== null) {
     return (
-      <PublicShell wide>
+      <PublicShell wide brand={page.brand}>
         <BookedView page={page} result={result} />
       </PublicShell>
     );
   }
 
   return (
-    <PublicShell wide>
+    <PublicShell wide brand={page.brand}>
       {page.services.length === 0 ? (
         <Card className="border-t-4 border-t-primary text-sm" data-testid="book-no-services">
           <CardHeader>

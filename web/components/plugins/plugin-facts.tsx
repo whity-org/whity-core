@@ -1,6 +1,6 @@
 'use client';
 
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { PermissionButton } from '@/components/rbac/permission-button';
 import { useTranslation } from '@whity/features/i18n';

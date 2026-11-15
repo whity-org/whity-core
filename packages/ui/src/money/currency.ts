@@ -26,16 +26,13 @@
  * construction; a test asserts the two tables entry-for-entry and separately
  * pins the ICU divergences so they cannot change unnoticed.
  *
- * `Intl` is still used for what it is actually good at: placing symbols and
- * digits for a locale. `formatMoney` forces the fraction digits to OUR
- * exponent, so the figure is ISO-correct even where CLDR would round it away.
- *
- * WHAT IS DELIBERATELY SPLIT IN TWO. `toDecimalString` is exact — integer
- * arithmetic only, correct for any amount an integer can hold. `formatMoney`
- * is the locale-aware one, and it is what screens use: `Intl` places the symbol
- * and picks the digits, which is how the Arabic build gets Arabic-Indic
- * numerals and correct RTL placement without this file knowing anything about
- * either.
+ * HOW AN AMOUNT IS WRITTEN (design 3.5.1, CU.2). `toDecimalString` is exact —
+ * integer arithmetic only. `moneyText` (and `formatMoney`, its old name) puts
+ * that figure in the one form the register gives for every language: a symbol
+ * before the number for dollars and euros ($312.00), otherwise the code and a
+ * space (JOD 312.000), Western digits, a real minus (−$35.00). Until 3.5.1
+ * this used `Intl`, which gave Arabic-Indic digits and moved the symbol by
+ * locale; the register now keeps amounts in Western digits in Arabic too.
  */
 
 /** Two decimal places, which is every active ISO 4217 code not listed below. */
@@ -121,53 +118,70 @@ export function toDecimalString(minorUnits: number, currency: string): string {
 }
 
 /**
- * The amount as a person in this locale reads it — symbol, grouping, digits and
- * direction all decided by `Intl`.
- *
- * Pass the UI's active locale so the Arabic build renders Arabic-Indic numerals
- * and places the currency correctly for RTL; this file must not try to do
- * either itself.
- *
- * PRECISION NOTE: the exact decimal string is handed to `Intl` directly where
- * the engine accepts one (ES2023), so no precision is lost. Where it does not,
- * this falls back to a `Number`, which is exact below 2^53 — about nine
- * quadrillion fils, or nine trillion dinars. `toDecimalString` has no such
- * bound if an exact rendering is what is needed.
+ * The currencies written with a symbol before the number (CU.2), as the
+ * design's `Whity.currencies` has them. Every other currency writes its code.
+ * Identical to the PHP `Currency::SYMBOLS`.
  */
-export function formatMoney(
-  minorUnits: number,
-  currency: string,
-  locale?: string,
-): string {
+const SYMBOLS: Readonly<Record<string, string>> = { USD: '$', EUR: '€' };
+
+/** The minus a person reads (U+2212), as the design writes −$35.00. */
+const MINUS = '−';
+
+/** The symbol CU.2 writes before the number, or null when the code is written. */
+export function currencySymbol(currency: string): string | null {
+  const code = normalize(currency);
+  return code === null ? null : (SYMBOLS[code] ?? null);
+}
+
+/**
+ * The sub-unit's name for the currencies the design names one for — what
+ * MoneyInput's decimals message says in brackets.
+ */
+const SUB_UNITS: Readonly<Record<string, string>> = { USD: 'cents', EUR: 'cents', JOD: 'fils', SAR: 'halalas', AED: 'fils' };
+
+export function currencySubUnit(currency: string): string | null {
+  const code = normalize(currency);
+  return code === null ? null : (SUB_UNITS[code] ?? null);
+}
+
+/**
+ * The amount as a person reads it, by CU.2: "$312.00", "−$35.00",
+ * "JOD 1,234.500", "SAR 312.00". The same text as the PHP
+ * `Currency::display`, in every language.
+ *
+ * Western digits and comma grouping in English and Arabic alike (CU.1, 3.7b):
+ * an amount is a code, not prose, so the Arabic page shows the same figures.
+ * The caller isolates it (`<bdi>` or the `Money` component) so it never
+ * flips inside Arabic text.
+ *
+ * Exact: built from `toDecimalString`, so no float is involved.
+ */
+export function moneyText(minorUnits: number, currency: string): string {
   const code = normalize(currency);
   if (code === null) {
     throw new Error(`Not an ISO 4217 currency code: '${currency}'`);
   }
 
-  const decimal = toDecimalString(minorUnits, code);
-  const exponent = currencyExponent(code);
+  const decimal = toDecimalString(Math.abs(minorUnits), code);
+  const [whole = '0', fraction] = decimal.split('.');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const number = fraction === undefined ? grouped : `${grouped}.${fraction}`;
+  const symbol = SYMBOLS[code];
 
-  let formatter: Intl.NumberFormat;
-  try {
-    formatter = new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: code,
-      minimumFractionDigits: exponent,
-      maximumFractionDigits: exponent,
-    });
-  } catch {
-    // Unknown to this engine's ICU data: show the exact figure and the code
-    // rather than nothing.
-    return `${decimal} ${code}`;
-  }
+  return (minorUnits < 0 ? MINUS : '') + (symbol !== undefined ? `${symbol}${number}` : `${code} ${number}`);
+}
 
-  try {
-    // Intl.NumberFormat v3 accepts a decimal string, which keeps full
-    // precision. Older engines throw or coerce, hence the fallback.
-    return formatter.format(decimal as unknown as number);
-  } catch {
-    return formatter.format(Number(decimal));
-  }
+/**
+ * The amount as a person reads it. Since design 3.5.1 this is `moneyText`:
+ * one form in every language (CU.2), so `locale` no longer changes it. Kept
+ * so existing callers need not change.
+ */
+export function formatMoney(
+  minorUnits: number,
+  currency: string,
+  _locale?: string,
+): string {
+  return moneyText(minorUnits, currency);
 }
 
 /**

@@ -27,6 +27,7 @@ import { RecordTimeline, RecordTimelineItem } from '@whity/features/record';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useDirection } from '@/lib/direction-context';
 import { useToast } from '@/lib/toast-context';
 import { RouteActPanel } from '@/components/documents/route-act-panel';
@@ -117,7 +118,7 @@ function answerText(field: SubjectField | undefined, value: unknown, preferArabi
 export default function RouteSubjectPage({ params }: { params: Promise<{ type: string; id: string }> }) {
   const { type, id } = use(params);
   const t = useTranslation('documents');
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const { dir } = useDirection();
   const preferArabic = dir === 'rtl';
   const { dateTime } = useDateDisplay();
@@ -130,15 +131,15 @@ export default function RouteSubjectPage({ params }: { params: Promise<{ type: s
   const load = useCallback(async () => {
     setFailed(null);
     try {
-      const response = await apiClient(
-        `/api/v1/routes?subject_type=${encodeURIComponent(type)}&subject_id=${encodeURIComponent(id)}`,
-        { headers: { Accept: 'application/json' } }
-      );
+      // `id` is the URL segment, passed through as given (the spec calls it a number).
+      const { data, response } = await api.GET('/api/v1/routes', {
+        params: { query: { subject_type: type, subject_id: id as unknown as number } },
+      });
       if (response.status === 404) {
         setFailed('missing');
         return;
       }
-      const body = (await response.json().catch(() => null)) as { data?: SubjectView } | null;
+      const body = (data ?? null) as { data?: SubjectView } | null;
       if (!response.ok || !body?.data) {
         setFailed('error');
         return;
@@ -147,7 +148,7 @@ export default function RouteSubjectPage({ params }: { params: Promise<{ type: s
     } catch {
       setFailed('error');
     }
-  }, [apiClient, id, type]);
+  }, [id, type]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the fetch on mount is the effect
@@ -283,6 +284,8 @@ export default function RouteSubjectPage({ params }: { params: Promise<{ type: s
               onSent={() => setVersion((current) => current + 1)}
             />
 
+            <EnteredValues route={route} preferArabic={preferArabic} nameOf={nameOf} />
+
             <section className="space-y-2">
               <h3 className="text-sm font-medium">{t('subject.trail', 'What happened')}</h3>
               <RecordTimeline>
@@ -356,6 +359,52 @@ export default function RouteSubjectPage({ params }: { params: Promise<{ type: s
   );
 }
 
+/**
+ * WHIT-1016: the values people entered at the stages that ask for them, such
+ * as a committee meeting number, with who entered each and when.
+ */
+function EnteredValues({
+  route,
+  preferArabic,
+  nameOf,
+}: {
+  route: SubjectRoute;
+  preferArabic: boolean;
+  nameOf: (profileId: number | null) => string;
+}) {
+  const t = useTranslation('documents');
+  const { dateTime } = useDateDisplay();
+  const entered = route.values ?? [];
+  if (entered.length === 0) return null;
+  const labels = new Map<string, string>();
+  for (const step of route.steps) {
+    for (const input of step.inputs ?? []) {
+      labels.set(input.key, (preferArabic && input.label_ar) || input.label);
+    }
+  }
+
+  return (
+    <section className="space-y-2" aria-labelledby={`route-values-${route.id}`}>
+      <h3 id={`route-values-${route.id}`} className="text-sm font-medium">
+        {t('subject.values', 'Entered during review')}
+      </h3>
+      <dl className="space-y-2">
+        {entered.map((value) => (
+          <div key={value.key} className="space-y-0.5">
+            <dt className="text-sm text-muted-foreground">{labels.get(value.key) ?? value.key}</dt>
+            <dd className="text-sm">
+              <span className="font-medium">{value.value}</span>
+              <span className="ms-2 text-muted-foreground">
+                {nameOf(value.entered_by)} · {dateTime(value.entered_at) ?? ''}
+              </span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 function trailWord(t: (key: string, fallback?: string) => string, entry: TrailEntry): string {
   switch (entry.action) {
     case 'issued':
@@ -394,7 +443,6 @@ function SendBack({
   onSent: () => void;
 }) {
   const t = useTranslation('documents');
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState('');
@@ -415,12 +463,11 @@ function SendBack({
     setBusy(true);
     setRefusal(null);
     try {
-      const response = await apiClient(`/api/v1/routes/${route.id}/actions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        body: JSON.stringify({ action: 'sent_back', note: note.trim(), resume_from: resume }),
+      const { response, error } = await api.POST('/api/v1/routes/{routeId}/actions', {
+        params: { path: { routeId: route.id } },
+        body: { action: 'sent_back', note: note.trim(), resume_from: resume },
       });
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (error ?? null) as { error?: string } | null;
       if (!response.ok) {
         setRefusal(body?.error ?? t('subject.sendBack.failed', 'It could not be sent back. Try again.'));
         return;
@@ -491,16 +538,17 @@ function SendBack({
  */
 function TryFinalAgain({ routeId, onQueued }: { routeId: number; onQueued: () => void }) {
   const t = useTranslation('documents');
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const [busy, setBusy] = useState(false);
 
   async function retry() {
     setBusy(true);
     try {
-      const response = await apiClient(`/api/v1/routes/${routeId}/final-document/retry`, { method: 'POST' });
+      const { response, error } = await api.POST('/api/v1/routes/{routeId}/final-document/retry', {
+        params: { path: { routeId } },
+      });
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        const body = (error ?? null) as { error?: string } | null;
         addToast(body?.error ?? t('subject.final.retryFailed', 'It could not be tried again. Try once more.'), 'error');
         return;
       }

@@ -25,12 +25,10 @@ jest.mock('@/lib/api/client', () => ({
     GET: (...args: unknown[]) => mockApiGet(...args),
     PATCH: (...args: unknown[]) => mockApiPatch(...args),
   },
+  apiFetch: (...args: unknown[]) => mockApiClient(...args),
 }));
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
-}));
 
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({

@@ -32,9 +32,8 @@
 
 import { useCallback, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { apiClient } from '@/lib/api-client';
-import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import { api, apiFetch } from '@/lib/api/client';
+import type { components } from '@whity/api-client';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import {
@@ -204,7 +203,8 @@ export function TenantRecordScreen({
     async () => {
       // The whole list, walked to the end. `complete: false` is a LOAD failure,
       // never "not found" — see the file docblock.
-      const result = await fetchAllPages<Tenant>(apiClient, '/api/v1/tenants');
+      // apiFetch: the spec declares no pagination parameters for the tenants list.
+      const result = await fetchAllPages<Tenant>(apiFetch, '/api/v1/tenants');
       if (!result.complete) {
         throw new Error(
           t('tenants.record.error.partial', 'The workspace list could not be read in full.')
@@ -356,11 +356,9 @@ export function TenantRecordScreen({
 
     try {
       setIsSaving(true);
-      const response = await apiClient(`/api/v1/tenants/${current.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(
-          leaveSlug ? { names, nameLanguage } : { names, nameLanguage, slug }
-        ),
+      const { response, error: errorBody } = await api.PATCH('/api/v1/tenants/{id}', {
+        params: { path: { id: current.id } },
+        body: leaveSlug ? { names, nameLanguage } : { names, nameLanguage, slug },
       });
       if (response.status === 409) {
         onNotify(
@@ -370,7 +368,7 @@ export function TenantRecordScreen({
         return;
       }
       if (!response.ok) {
-        const body: unknown = await response.json().catch(() => ({}));
+        const body: unknown = errorBody ?? {};
         const message =
           body !== null && typeof body === 'object' && 'error' in body
             ? String((body as { error: unknown }).error)

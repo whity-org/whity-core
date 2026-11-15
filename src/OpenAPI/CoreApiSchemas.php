@@ -2196,6 +2196,22 @@ final class CoreApiSchemas
                     503 => self::errorResponse('The file could not be read from storage'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/printout', 'forms:read', [
+                'summary' => 'Print a response in the automatic layout',
+                'description' => 'Design 3.4 (P1): the response laid out from its form’s sections and questions in the '
+                    . 'workspace theme’s form printout options, as it would print now. Not stored: the record is the '
+                    . 'PDF its route’s final step makes. `lang` is `en` or `ar`; left out, the language of the person '
+                    . 'who sent it. One render against the workspace’s limits.',
+                'tags' => ['forms'],
+                'parameters' => [['name' => 'lang', 'in' => 'query', 'required' => false, 'description' => 'The printout language, `en` or `ar`. Left out, the language of the person who sent the response.', 'schema' => ['type' => 'string', 'enum' => ['en', 'ar']]]],
+                'responses' => [
+                    200 => ['description' => 'The PDF', 'content' => ['application/pdf' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                    404 => self::errorResponse('Submission not found'),
+                    422 => self::errorResponse('The render service refused the printout'),
+                    429 => self::errorResponse('The document render limit has been reached'),
+                    503 => self::errorResponse('PDFs are turned off, or the render service is unavailable'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/review', 'forms:read', [
                 'summary' => 'What the office recorded about a submission',
                 'description' => 'The current review, every earlier one, and the staff fields they answer. '
@@ -3292,6 +3308,48 @@ final class CoreApiSchemas
                     'responses' => [
                         200 => self::jsonResponse('The caller\'s updated preferences', 'NotificationPreferencesResponse'),
                         422 => self::errorResponse('Invalid preferences, or an attempt to disable a transactional type'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/push-subscriptions',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The web push public key of the instance and the devices of the caller with push on, in the active workspace',
+                    'tags' => ['notifications'],
+                    'responses' => [
+                        200 => self::jsonResponse('The public key and the devices of the caller', 'PushSubscriptionsResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/push-subscriptions',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Turn web push on for this browser (its PushSubscription JSON), for the caller in the active workspace',
+                    'tags' => ['notifications'],
+                    'request' => 'PushSubscriptionRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('Stored; the new id with the devices of the caller', 'PushSubscriptionsResponse'),
+                        422 => self::errorResponse('Not a push subscription from a known push service, or no active workspace'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'DELETE',
+                'path' => '/api/me/push-subscriptions/{id:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Turn web push off for one device of the caller',
+                    'tags' => ['notifications'],
+                    'responses' => [
+                        200 => self::jsonResponse('The remaining devices of the caller', 'PushSubscriptionsResponse'),
+                        404 => self::errorResponse('Not a device of the caller'),
                     ] + self::authErrors(),
                 ],
             ],
@@ -4639,7 +4697,10 @@ final class CoreApiSchemas
             'tenant_name' => self::str(),
             'tenant_name_language' => self::str(),
             'tenant_names' => self::localizedText(),
+            // The primary role; `roles` names every role held in the workspace.
             'role' => self::str(),
+            'roles' => ['type' => 'array', 'items' => ['type' => 'string']],
+            'kind' => ['type' => 'string', 'enum' => ['member', 'customer']],
         ], ['tenant_id', 'tenant_name', 'role']);
 
         // Token mode (`X-Auth-Mode: token`, WC-ddcd16ad): every endpoint that
@@ -5640,7 +5701,7 @@ final class CoreApiSchemas
             'InvoiceDetail' => self::object([
                 'lines' => ['type' => 'array', 'items' => SchemaBuilder::ref('InvoiceLine')],
                 'payments' => ['type' => 'array', 'items' => SchemaBuilder::ref('PaymentTransaction')],
-                // Both null for any currency but JOD.
+                // Both null for a currency without words (USD, EUR, JOD, SAR and AED have them).
                 'total_in_words' => self::object([
                     'en' => self::str(true),
                     'ar' => self::str(true),
@@ -6378,6 +6439,10 @@ final class CoreApiSchemas
                 // WHIT-921: the template a `finalise` step renders the final
                 // document with. Null on every other step.
                 'final_template_id' => self::int(true),
+                // WHIT-1016: the values a person letting it through here fills in.
+                'inputs' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepInput')],
+                // WHIT-1018: the subject's people questions whose answers this step leaves out.
+                'exclude_named_in' => ['type' => 'array', 'items' => ['type' => 'string']],
                 // #1037. HOW MANY TIMES A REJECTION HAS SENT THE DOCUMENT BACK
                 // FROM HERE. A backwards reject edge - "to the author, to fix" -
                 // is the most common approval design there is, and nothing
@@ -6434,7 +6499,28 @@ final class CoreApiSchemas
                 // without this a client could not tell an approver whether their
                 // single approval carries the gate or is one of four hundred.
                 'default_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority']],
+                // WHIT-1016: what people entered at the steps that ask for
+                // values, each key's latest. On the route lists; absent on the
+                // response that issues a route, where nothing is entered yet.
+                'values' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepValue')],
             ], ['id', 'document_id', 'title', 'created_at', 'steps', 'edges', 'default_quorum']),
+            // WHIT-1016: one value a step asks the person letting it through for.
+            'RouteStepInput' => self::object([
+                'key' => self::str() + ['description' => 'Small letters, digits and _, up to 40 characters. Templates print it as `route.value.<key>`.'],
+                'label' => self::str() + ['description' => 'What the person filling it in reads. At most 80 characters.'],
+                'label_ar' => self::str(true) + ['description' => 'The label in Arabic, when it differs.'],
+                'required' => self::bool() + ['description' => 'Whether approving needs it. True when absent.'],
+                'max_length' => self::int() + ['description' => 'Longest value, 1 to 200. 100 when absent.'],
+            ], ['key', 'label']),
+            // WHIT-1016: a value entered on a route.
+            'RouteStepValue' => self::object([
+                'key' => self::str(),
+                'value' => self::str(),
+                'step_id' => self::int(),
+                'event_id' => self::int() + ['description' => 'The trail entry it was entered with.'],
+                'entered_by' => self::int(true),
+                'entered_at' => self::str(),
+            ], ['key', 'value', 'step_id', 'event_id', 'entered_by', 'entered_at']),
             'DocumentRouteListResponse' => self::listEnvelope('DocumentRoute'),
             // `resolved` and `delivered` are on the envelope rather than on the
             // route, because they describe what THIS request did rather than a
@@ -6495,6 +6581,10 @@ final class CoreApiSchemas
                         // WHIT-919: false turns off sending back to the author
                         // at this step. True when absent.
                         'allow_send_back' => self::bool(),
+                        // WHIT-1016: values the person letting it through fills in.
+                        'inputs' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepInput'), 'maxItems' => 5],
+                        // WHIT-1018.
+                        'exclude_named_in' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 10, 'description' => "The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this step leaves out: not asked, not counted in the quorum, not printed among the approvals."],
                         // WHIT-922: `sign` makes the step a signing step, answered
                         // by signing or declining. Its quorum is `all` (the
                         // default) or `any`; it takes no edges.
@@ -6618,6 +6708,8 @@ final class CoreApiSchemas
                 // WHIT-919.
                 'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true, 'description' => 'With `sent_back` only: where the route resumes when the author resubmits. `sender` (this step, the default) or `start` (step 1).'],
                 'to_author' => self::bool() + ['description' => 'With `noted`: the note is meant for the author. Notes are internal by default.'],
+                // WHIT-1016.
+                'values' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'The values the step asks for, by key. Only with an approval, `acknowledged` or `forwarded`; required ones must be filled in.'],
             ], ['action']),
             'DocumentRouteActionResponse' => self::object([
                 'data' => SchemaBuilder::ref('DocumentTrailEvent'),
@@ -6954,6 +7046,9 @@ final class CoreApiSchemas
             'ChatReadRequest' => self::object([
                 'message_id' => self::int() + ['description' => 'The newest message you have read.'],
             ], ['message_id']),
+            'ChatFocusRequest' => self::object([
+                'focused' => self::bool() + ['description' => 'True while the chat is open in a focused window; false when it stops.'],
+            ], []),
 
             // -- Messages (ADR 0016, WHIT-938) ------------------------------------
             // People are id and name, never a bare id.
@@ -7070,6 +7165,7 @@ final class CoreApiSchemas
                     'provider' => self::str(),
                     'site_key' => self::str(),
                 ]],
+                'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'The brand of the workspace, for the chat box (WHIT-1014).'],
             ], ['workspace_name', 'max_length'])),
             'PublicPlansResponse' => self::object([
                 'version' => self::int(),
@@ -7240,6 +7336,8 @@ final class CoreApiSchemas
                 'decidedAt' => self::str(true),
                 'expiresAt' => self::str(),
                 'createdAt' => self::str(),
+                // WHIT-1042: why the person declined, when they said.
+                'declineReason' => self::str(true),
                             // WHIT-812: once approved and run, what can be undone and until when.
                 'action' => ['allOf' => [SchemaBuilder::ref('AgentAction')], 'nullable' => true],
                 'agentPaused' => ['type' => 'boolean', 'description' => 'The agent is paused, so this can be declined but not approved until it is resumed'],
@@ -7643,6 +7741,11 @@ final class CoreApiSchemas
                 // (last, at most one, no rule); null on every other stage.
                 'kind' => ['type' => 'string', 'enum' => ['finalise'], 'nullable' => true],
                 'final_template_id' => self::int(true),
+                // WHIT-1016: values the person letting it through fills in. Not
+                // on a delivery or final document stage.
+                'inputs' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepInput'), 'maxItems' => 5],
+                // WHIT-1018: people named in these questions are left out at this stage.
+                'exclude_named_in' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 10, 'description' => "The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this stage leaves out: not asked, not counted in the quorum, not printed among the approvals."],
                 'canvas_x' => self::int(),
                 'canvas_y' => self::int(),
                 // NOT in the required list, unlike `DocumentRouteStep` above.
@@ -8201,13 +8304,24 @@ final class CoreApiSchemas
                 'sharing' => ['type' => 'string', 'enum' => ['me', 'workspace'], 'description' => 'Only me, or everyone in the workspace'],
                 'owner' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('DocumentActor')], 'description' => 'Who saved it; null when that person was removed'],
                 'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The contract Block[] at the current version'],
-                'perDocumentKeys' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Keys of the parts each document fills itself (E.23)'],
+                'perDocumentParts' => ['type' => 'array', 'items' => SchemaBuilder::ref('SavedBlockPart'), 'description' => 'E.23a: the parts each document fills itself, in reading order, by stable key'],
+                'perDocumentKeys' => ['type' => 'array', 'items' => ['type' => 'string'], 'deprecated' => true, 'description' => 'Deprecated in 3.4, kept one release: the keys of perDocumentParts'],
                 'version' => self::int() + ['description' => 'Starts at 1; goes up by one on every change of blocks'],
                 'usedIn' => self::int() + ['description' => 'How many documents use it'],
                 'archivedAt' => self::str(true) + ['description' => 'When it was deleted, ISO 8601 UTC; null while it is live'],
                 'createdAt' => self::str() + ['description' => 'ISO 8601 UTC'],
                 'updatedAt' => self::str() + ['description' => 'ISO 8601 UTC'],
-            ], ['id', 'name', 'description', 'mode', 'sharing', 'owner', 'blocks', 'perDocumentKeys', 'version', 'usedIn', 'archivedAt', 'createdAt', 'updatedAt']),
+            ], ['id', 'name', 'description', 'mode', 'sharing', 'owner', 'blocks', 'perDocumentParts', 'perDocumentKeys', 'version', 'usedIn', 'archivedAt', 'createdAt', 'updatedAt']),
+            'SavedBlockPart' => self::object([
+                'key' => self::str() + ['description' => 'Stable key (pd_ + 8 characters), minted once when the part is marked'],
+                'label' => self::object([
+                    'en' => self::str(),
+                    'ar' => self::str(),
+                ], ['en']),
+                'kind' => ['type' => 'string', 'enum' => ['text', 'field']],
+                'required' => self::bool() + ['description' => 'Blocks issuing until a document fills it'],
+                'placeholder' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'Inline[] shown, dashed, until a document fills it'],
+            ], ['key', 'label', 'kind']),
             'SavedBlockResponse' => self::dataEnvelope(SchemaBuilder::ref('SavedBlock')),
             'SavedBlockListResponse' => self::listEnvelope('SavedBlock'),
             'SavedBlockCreateRequest' => self::object([
@@ -8216,14 +8330,16 @@ final class CoreApiSchemas
                 'mode' => ['type' => 'string', 'enum' => ['synced', 'copy'], 'description' => 'synced: editing it once updates every document that uses it; copy: inserts ordinary blocks'],
                 'sharing' => ['type' => 'string', 'enum' => ['me', 'workspace'], 'description' => 'Left out, me. workspace needs documents:publish'],
                 'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The contract Block[]: 1 to 200 objects, each with a string id and type, at most 256 KiB'],
-                'per_document_keys' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Keys used by perDocument marks in the blocks; at most 200'],
+                'per_document_parts' => ['type' => 'array', 'items' => SchemaBuilder::ref('SavedBlockPart'), 'description' => 'E.23a: labels, required and placeholders by key; which parts exist comes from the blocks. At most 200'],
+                'per_document_keys' => ['type' => 'array', 'items' => ['type' => 'string'], 'deprecated' => true, 'description' => 'Deprecated in 3.4: accepted and ignored'],
             ], ['name', 'mode', 'blocks']),
             'SavedBlockUpdateRequest' => self::object([
                 'name' => self::str() + ['description' => 'At most 120 characters'],
                 'description' => self::str(true) + ['description' => 'At most 1000 characters; null clears it'],
                 'sharing' => ['type' => 'string', 'enum' => ['me', 'workspace'], 'description' => 'Sharing with the workspace needs documents:publish'],
                 'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The new contract Block[]; a change bumps the version'],
-                'per_document_keys' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Keys used by perDocument marks in the blocks'],
+                'per_document_parts' => ['type' => 'array', 'items' => SchemaBuilder::ref('SavedBlockPart'), 'description' => 'E.23a: labels, required and placeholders by key; left out, they are kept'],
+                'per_document_keys' => ['type' => 'array', 'items' => ['type' => 'string'], 'deprecated' => true, 'description' => 'Deprecated in 3.4: accepted and ignored'],
                 'version' => self::int() + ['description' => 'The version the change was made against; a different current version is 409 changed'],
             ], []),
             'SavedBlockArchiveResponse' => self::dataEnvelope(self::object([
@@ -8358,7 +8474,15 @@ final class CoreApiSchemas
                         'labelAr' => self::str(),
                     ], ['value', 'label', 'labelAr'])],
                 ], ['key', 'type', 'overridable', 'label', 'labelAr'])],
+                'form' => ['type' => 'object', 'description' => 'The Form printouts tab (design 3.4): the entitlement that unlocks it, whether this workspace holds it (allowed), each option with its standard value and English and Arabic labels, the footer parts and the marks limit.'],
             ], ['tokens']),
+            'FormPrintoutPreviewRequest' => self::object([
+                'form' => ['type' => 'object', 'description' => 'Unsaved `form` options (FormPrintoutStyle) to preview.'],
+                'letterhead' => ['type' => 'object', 'description' => 'Unsaved letterhead options, `layout` among them.'],
+                'accent' => self::str() + ['pattern' => '^#[0-9A-Fa-f]{6}$', 'description' => 'An unsaved print colour.'],
+                'submissionId' => self::int() + ['description' => 'The response to print. Left out, the workspace’s latest.'],
+                'lang' => ['type' => 'string', 'enum' => ['en', 'ar'], 'description' => 'The printout’s language. Left out, the language of the person who sent it.'],
+            ], []),
             'DocumentThemeUsage' => self::object([
                 'drafts' => ['type' => 'array', 'items' => self::object([
                     'id' => self::int(),
@@ -8449,9 +8573,10 @@ final class CoreApiSchemas
             // "this profile at this resource" grant.
             'ResourceRoleGrant' => self::object([
                 'id' => self::int(),
+                'resource_id' => self::int(),
                 'role_id' => self::int(),
                 'profile_id' => self::int(true),
-            ], ['id', 'role_id', 'profile_id']),
+            ], ['id', 'resource_id', 'role_id', 'profile_id']),
             'ResourceRoleGrantListResponse' => self::listEnvelope('ResourceRoleGrant'),
             'ResourceRoleGrantCreateRequest' => self::object([
                 'resource_type' => self::str(),
@@ -8981,6 +9106,8 @@ final class CoreApiSchemas
                 'banner' => SchemaBuilder::ref('FormBanner') + ['nullable' => true],
                 'submit_label' => self::localizedText() + ['nullable' => true],
                 'reference_format' => self::str(true),
+                // WHIT-1017: when the reference is given.
+                'reference_assign' => ['type' => 'string', 'enum' => ['submit', 'approval'], 'description' => '`submit`: when the form is sent. `approval`: when its route finishes approved.'],
                 // Off on every form until somebody with `forms:manage` opens it.
                 // On the list, and on one form's detail.
                 'submission_count' => self::int(),
@@ -9290,7 +9417,8 @@ final class CoreApiSchemas
                 'title' => self::localizedText() + ['nullable' => true, 'description' => 'The heading the person filling it in reads; null shows the name.'],
                 'banner' => SchemaBuilder::ref('FormBannerInput') + ['nullable' => true, 'description' => 'A drawn pattern, `{"kind": "image"}` to keep the uploaded picture, or null for none. Upload a picture with POST /api/v1/forms/{id}/banner.'],
                 'sections' => ['type' => 'array', 'maxItems' => 100, 'items' => SchemaBuilder::ref('FormSectionText'), 'description' => 'The title and description of each section, by `section_key`.'],
-                'reference_format' => ['type' => 'string', 'maxLength' => 64, 'nullable' => true, 'description' => 'The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none.'],
+                'reference_format' => ['type' => 'string', 'maxLength' => 160, 'nullable' => true, 'description' => 'The reference each submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}` or `{ANSWER:subject|human=IRB-AAU|animal=AUB-AAU} {SEQ}/{STEP:meeting_no}/{AY:9}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}; {AY:m}, the academic year starting in month m, as 2026-2027; {ANSWER:question}, an answer, optionally looked up in a list (`|answer=text`, `|*=text` for any other); {STEP:key}, a value entered during review (only with `reference_assign` `approval`). {SEQ} is required, and each different prefix, year or answer counts on its own. Dates are UTC. Null gives none.'],
+                'reference_assign' => ['type' => 'string', 'enum' => ['submit', 'approval'], 'description' => 'When the reference is given: `submit` (default) when the form is sent, or `approval` when its route finishes approved, before the final document is made.'],
                 'public_requires_sign_in' => self::bool() + ['description' => 'The public link asks visitors to sign in: only the workspace\'s members and customers can send it, under their own name, so it can be sent back to them for changes.'],
                 'final_template_id' => self::int(true) + ['description' => 'The document template a route\'s final document stage uses when it names none; null for none.'],
                 'final_document_to_applicant' => self::bool() + ['description' => 'Whether the person who sent the form can open its final document from My submissions.'],
@@ -9687,6 +9815,8 @@ final class CoreApiSchemas
                                 ], ['key'])],
                             ], ['seen_version', 'current_version', 'changes']),
                             'can_send_back' => self::bool(),
+                            // WHIT-1016: what people entered at the steps that ask for values.
+                            'values' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepValue')],
                             // WHIT-921: what the finalise step did - the engine's
                             // own act, so not a trail entry. Null until reached.
                             'finalisation' => SchemaBuilder::ref('RouteFinalisation') + ['nullable' => true],
@@ -10156,7 +10286,26 @@ final class CoreApiSchemas
                 ], ['id', 'name', 'duration_minutes', 'price_minor', 'currency', 'staff_profile_ids'])],
                 'staff' => ['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'display_name' => self::str()], ['profile_id', 'display_name'])],
                 'bot_check' => ['type' => 'object', 'nullable' => true, 'properties' => ['provider' => self::str(), 'site_key' => self::str()]],
+                'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'The brand of the workspace, for the page (WHIT-1014).'],
             ], ['workspace', 'settings', 'services', 'staff', 'bot_check']),
+            // WHIT-1014: what a workspace's public pages show of its brand. Only
+            // public values: the name, logo addresses and the main colour.
+            'PublicWorkspaceBrand' => self::object([
+                'name' => self::str() + ['description' => 'The site name the workspace set, else its name.'],
+                'logo_wide_url' => ['type' => 'string', 'nullable' => true],
+                'logo_square_url' => ['type' => 'string', 'nullable' => true],
+                'main_color' => ['type' => 'string', 'nullable' => true, 'description' => 'The workspace main colour as #rrggbb, or null for Whity Blue.'],
+                'theme' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'description' => 'Token values derived from the main colour (decision 2.8), keyed by token name without the leading dashes; null when no main colour is set.',
+                    'properties' => [
+                        'light' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                        'dark' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                    ],
+                    'required' => ['light', 'dark'],
+                ],
+            ], ['name', 'logo_wide_url', 'logo_square_url', 'main_color', 'theme']),
             'PublicBookingRequest' => self::object([
                 'service_id' => self::int() + ['description' => 'The service.'],
                 'profile_id' => self::int() + ['description' => 'One person; leave out for anyone.'],
@@ -10192,6 +10341,7 @@ final class CoreApiSchemas
                     'hold_expires_at' => self::str(),
                 ]],
                 'workspace' => self::object(['name' => self::str()], ['name']),
+                'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'Only on the manage link: the brand of the workspace (WHIT-1014).'],
                 'time_zone' => self::str(),
             ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
             'CalendarSettings' => self::object([
@@ -10721,6 +10871,23 @@ final class CoreApiSchemas
                     'plugin' => self::str(),
                 ], ['type', 'label', 'plugin'])],
             ], ['data', 'transactional_prefixes', 'plugin_types']),
+            'PushDevice' => self::object([
+                'id' => self::int(),
+                'endpoint_hash' => self::str(),
+                'user_agent' => self::str(),
+                'created_at' => self::str(),
+                'last_success_at' => self::str(true),
+                'failing' => self::bool(),
+            ], ['id', 'endpoint_hash', 'user_agent', 'created_at', 'last_success_at', 'failing']),
+            'PushSubscriptionsResponse' => self::object([
+                'id' => self::int(),
+                'public_key' => self::str(),
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('PushDevice')],
+            ], ['public_key', 'data']),
+            'PushSubscriptionRequest' => self::object([
+                'endpoint' => self::str(),
+                'keys' => self::object(['p256dh' => self::str(), 'auth' => self::str()], ['p256dh', 'auth']),
+            ], ['endpoint', 'keys']),
             'DisplayPreferences' => self::object([
                 'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
                 'showTechnicalDetails' => self::bool(),
@@ -11215,6 +11382,8 @@ final class CoreApiSchemas
                 'installable' => ['type' => 'boolean', 'description' => 'Whether the web app offers a manifest and service worker so it can be installed as an app. An instance setting (app.installable, else the PWA_ENABLED environment variable, else on).'],
                 // WHIT-932: the brand.remove_badge entitlement, read the other way round.
                 'builtOnWhity' => ['type' => 'boolean', 'description' => 'Whether this workspace\'s public pages show "Built on Whity". False when its plan removes the credit.'],
+                // CU.4: the workspace currency, so the app writes money in it.
+                'currency' => ['type' => 'string', 'description' => 'The workspace currency as an ISO 4217 code (billing.default_currency; USD by default). Amounts with a currency of their own show in that one.'],
             ], ['siteName', 'logoWideUrl', 'logoSquareUrl', 'faviconUrl', 'mainColor', 'theme', 'installable']),
             // GET /api/branding — the standard data envelope around Branding.
             'BrandingResponse' => self::dataEnvelope(SchemaBuilder::ref('Branding')),
@@ -11370,6 +11539,7 @@ final class CoreApiSchemas
                 // The operator's sign-in providers a visitor may join with: link
                 // to GET /api/v1/auth/sso/{provider_key}/start?join={workspace_slug}.
                 'providers' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupJoinProvider')],
+                'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'The workspace logo and colour for the page (WHIT-1044).'],
             ], [
                 'workspace_name', 'workspace_slug', 'approval_required', 'allowed_domains', 'bot_check',
                 'email_signup', 'email_signup_reason', 'providers',
@@ -11391,6 +11561,7 @@ final class CoreApiSchemas
                 'workspace_name' => self::str(),
                 'email' => self::str(),
                 'requires_password' => self::bool(),
+                'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'The workspace logo and colour for the page (WHIT-1044).'],
             ], ['workspace_name', 'email', 'requires_password'])),
             'PublicSignupConfirmRequest' => self::object([
                 'token' => self::str(),
@@ -11413,6 +11584,7 @@ final class CoreApiSchemas
                 'role_customer_safe' => self::bool(true),
                 'allowed_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'customer_invites' => self::bool(),
+                'invites_per_customer' => self::int() + ['description' => 'How many people one customer may invite; 0 is no limit (WHIT-1043).'],
                 'eligible_roles' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupEligibleRole')],
                 'pending_count' => self::int(),
                 'workspace_slug' => self::str(true),
@@ -11421,7 +11593,7 @@ final class CoreApiSchemas
                 'join_providers' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupJoinProvider')],
                 'updated_at' => self::str(true),
             ], [
-                'mode', 'role_id', 'role_name', 'role_customer_safe', 'allowed_domains', 'customer_invites',
+                'mode', 'role_id', 'role_name', 'role_customer_safe', 'allowed_domains', 'customer_invites', 'invites_per_customer',
                 'eligible_roles', 'pending_count', 'workspace_slug', 'bot_check_ready',
                 'email_signup_ready', 'join_providers', 'updated_at',
             ]),
@@ -11443,6 +11615,9 @@ final class CoreApiSchemas
                 'customer_invites' => self::bool() + [
                     'description' => 'Whether customers may invite colleagues into their own role, as customers (POST /api/v1/team-invitations). Off by default.',
                 ],
+                'invites_per_customer' => self::int() + [
+                    'description' => 'How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043).',
+                ],
             ], []),
             'TeamInvitationItem' => self::object([
                 'id' => self::int(),
@@ -11453,8 +11628,10 @@ final class CoreApiSchemas
             ], ['id', 'email', 'status', 'expires_at', 'created_at']),
             'TeamInvitationListResponse' => self::dataEnvelope(self::object([
                 'enabled' => self::bool(),
+                'limit' => self::int() + ['description' => 'How many people you may invite; 0 is no limit (WHIT-1043).'],
+                'used' => self::int() + ['description' => 'How many places your invitations take: open, accepted and not sent.'],
                 'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('TeamInvitationItem')],
-            ], ['enabled', 'items'])),
+            ], ['enabled', 'limit', 'used', 'items'])),
             'TeamInvitationCreateRequest' => self::object([
                 'email' => self::str() + ['description' => 'The colleague\'s email address. They join in your own role, as a customer.'],
             ], ['email']),
@@ -12663,6 +12840,14 @@ final class CoreApiSchemas
                 'summary' => 'Mark a chat read up to a message',
                 'tags' => ['chat'],
                 'request' => 'ChatReadRequest',
+                'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/focus', [
+                'mcp' => $personOnly,
+                'summary' => 'Say the caller is looking at this chat in a focused window (every 20 seconds), or stopped',
+                'description' => 'While a person looks at a chat, its new lines are not pushed to their devices (WHIT-1077).',
+                'tags' => ['chat'],
+                'request' => 'ChatFocusRequest',
                 'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
             ]),
             self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/members', [
@@ -15924,12 +16109,20 @@ final class CoreApiSchemas
             'description' => $description,
             'tags' => ['me'],
             'parameters' => [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'ID of the proposal.', 'schema' => ['type' => 'integer']]],
-            'request' => $editable ? self::object(['arguments' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Edited arguments to run with instead of the agent\'s (optional).']], []) : null,
+            'request' => $editable
+                ? self::object([
+                    'arguments' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Edited arguments to run with instead of the agent\'s (optional).'],
+                    // WHIT-1042: the tick on a destructive impact plan.
+                    'acknowledgedDestructive' => ['type' => 'boolean', 'description' => 'Needed for a Whity Builder publish or roll back that stops showing data people entered: the person ticked that they understand what is lost.'],
+                ], [])
+                // WHIT-1042: the agent reads this back from get_proposal.
+                : self::object(['reason' => ['type' => 'string', 'maxLength' => 1000, 'description' => 'Why, for the agent to read back (optional), such as which tests to fix.']], []),
             'responses' => [
                 200 => self::jsonResponse('The proposal after the decision', 'AgentProposalResponse'),
                 404 => self::errorResponse('No such proposal made on your behalf'),
                 409 => self::errorResponse('The proposal is no longer waiting (decided or expired)'),
-            ] + self::authErrors(),
+            ] + ($editable ? [422 => self::errorResponse('An impact plan whose tests failed (code tests_failed), or a destructive one without acknowledgedDestructive (code acknowledge_destructive)')] : [])
+              + self::authErrors(),
         ];
 
         return [
@@ -15950,22 +16143,22 @@ final class CoreApiSchemas
                 'path' => '/api/me/agent-proposals/{id:\d+}/approve',
                 'requiredRole' => null,
                 'requiredPermission' => null,
-                'schema' => array_filter($decision(
+                'schema' => $decision(
                     'Approve an agent\'s proposal and run it for you',
                     'Runs the operation as your delegate, after checking again that you and the agent may. Edit the arguments by sending them. Runs once, however many times it is approved.',
                     true,
-                ), static fn (mixed $v): bool => $v !== null),
+                ),
             ],
             [
                 'method' => 'POST',
                 'path' => '/api/me/agent-proposals/{id:\d+}/decline',
                 'requiredRole' => null,
                 'requiredPermission' => null,
-                'schema' => array_filter($decision(
+                'schema' => $decision(
                     'Decline an agent\'s proposal',
-                    'Nothing runs. The agent can ask again.',
+                    'Nothing runs. The agent can ask again, and reads the reason when you give one.',
                     false,
-                ), static fn (mixed $v): bool => $v !== null),
+                ),
             ],
             [
                 'method' => 'POST',
@@ -16177,6 +16370,11 @@ final class CoreApiSchemas
                                                     'issued_on' => ['type' => 'string', 'nullable' => true],
                                                 ],
                                                 'required' => ['revision', 'issued_on'],
+                                            ],
+                                            'brand' => [
+                                                'nullable' => true,
+                                                'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')],
+                                                'description' => 'Only beside a code that verified and names its issuer: the issuer logo and colour (WHIT-1044).',
                                             ],
                                         ],
                                         'required' => ['verified'],
@@ -17405,6 +17603,21 @@ final class CoreApiSchemas
                     422 => self::errorResponse('Invalid ref, overrides or kind'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('POST', '/api/document-themes/form-printout-preview', 'documents:themes', [
+                'summary' => 'Preview form printouts with unsaved theme options',
+                'description' => 'Design 3.4 (`TplFormPrintStyle`): the workspace’s latest form response (or `submissionId`) '
+                    . 'printed with the `form`, `letterhead` and `accent` options in the body over the workspace theme. '
+                    . 'A free workspace previews the standard layout, as it would print. One render against the limits.',
+                'tags' => ['documents'],
+                'request' => 'FormPrintoutPreviewRequest',
+                'responses' => [
+                    200 => ['description' => 'The PDF', 'content' => ['application/pdf' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                    404 => self::errorResponse('No form response to preview yet'),
+                    422 => self::errorResponse('Some options are not valid'),
+                    429 => self::errorResponse('The document render limit has been reached'),
+                    503 => self::errorResponse('PDFs are turned off, or the render service is unavailable'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('POST', '/api/document-themes', 'documents:themes', [
                 'summary' => 'Create a workspace document theme',
                 'description' =>
@@ -17538,6 +17751,7 @@ final class CoreApiSchemas
                     'items' => ['type' => 'string', 'enum' => ['address', 'taxId', 'phone', 'email']],
                     'description' => 'The workspace lines printed under the name, in this order, without repeats: up to four of `address`, `taxId`, `phone`, `email`.',
                 ],
+                'layout' => ['type' => 'string', 'enum' => ['start', 'centred', 'bilingual'], 'description' => 'Where the letterhead puts the logo and name: `start` (the default), `centred`, or `bilingual` (English and Arabic either side of the logo).'],
             ],
         ];
         $properties = [
@@ -17552,15 +17766,64 @@ final class CoreApiSchemas
             // E.46 and E.47 (editor M8).
             $properties['titleFace'] = ['type' => 'string', 'enum' => ['readex', 'noto'], 'description' => 'The document title in Readex Pro 600 (`readex`, the default) or in Noto Sans 600 (`noto`; Noto Sans Arabic in Arabic).'];
             $properties['largePrint'] = ['type' => 'boolean', 'description' => 'Large print: an 11pt body in print, with headings scaled by the same steps.'];
+            // Design 3.4, FP.2-FP.10.
+            $properties['form'] = self::formPrintoutStyle();
         }
 
         $schema = ['type' => 'object', 'additionalProperties' => false, 'properties' => $properties];
         if ($complete) {
-            $schema['required'] = array_keys($properties);
+            // `form` is present only when the theme sets it.
+            $schema['required'] = array_values(array_diff(array_keys($properties), ['form']));
             $schema['properties']['letterhead']['required'] = ['logo', 'lines'];
         }
 
         return $schema;
+    }
+
+    /**
+     * How form responses print (FormPrintStyle, design 3.4). Every key is
+     * optional; anything but the standard needs `documents.form_printouts`.
+     *
+     * @return array<string, mixed>
+     */
+    private static function formPrintoutStyle(): array
+    {
+        $properties = [];
+        foreach (\Whity\Core\Document\Theme\FormPrintStyle::OPTIONS as $key => $values) {
+            $properties[$key] = ['type' => 'string', 'enum' => $values, 'description' => "Standard: `{$values[0]}`."];
+        }
+        $properties['footer'] = [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'description' => 'What the footer prints beside "Page x of y", which always prints.',
+            'properties' => [
+                'reference' => ['type' => 'boolean'],
+                'pageCount' => ['type' => 'boolean', 'enum' => [true]],
+                'marks' => ['type' => 'boolean'],
+                'qrEveryPage' => ['type' => 'boolean'],
+            ],
+        ];
+        $properties['marks'] = [
+            'type' => 'array',
+            'maxItems' => \Whity\Core\Document\Theme\FormPrintStyle::MAX_MARKS,
+            'description' => 'Images printed at the end of the footer (ISO, accreditation), 8 mm tall, on every plan.',
+            'items' => [
+                'type' => 'object',
+                'additionalProperties' => false,
+                'required' => ['src'],
+                'properties' => [
+                    'src' => ['type' => 'string', 'pattern' => '^data:image/(png|jpeg|webp);base64,', 'description' => 'The image embedded as a data: URI, at most 300 KB.'],
+                    'alt' => ['type' => 'string', 'maxLength' => 80],
+                ],
+            ],
+        ];
+
+        return [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'description' => 'How form responses print (FP.2-FP.10). Missing keys take the standard layout; a workspace without `documents.form_printouts` always prints the standard layout.',
+            'properties' => $properties,
+        ];
     }
 
     /**
@@ -17577,22 +17840,37 @@ final class CoreApiSchemas
     private static function resourceRoleGrantRoutes(): array
     {
         return [
-            self::permissionRoute('GET', '/api/resource-role-grants', 'roles:read', [
-                'summary' => 'List the role grants addressed at one resource',
-                'description' => 'Returns both grant shapes: a null `profile_id` is the '
-                    . '"everyone at this resource" grant, a set `profile_id` grants to that one profile. '
-                    . 'Always scoped to the caller\'s tenant, so a resource belonging to another tenant '
-                    . 'yields an empty list rather than an error.',
-                'tags' => ['rbac'],
-                'parameters' => [
-                    self::queryParam('resource_type', 'string', 'A registered resource type (e.g. `ou`, `acme:record`)', true),
-                    self::queryParam('resource_id', 'integer', 'The record the grants are addressed at', true),
+            [
+                'method' => 'GET',
+                'path' => '/api/resource-role-grants',
+                'requiredRole' => null,
+                // Checked in the handler: your own grants (profile_id = you) need
+                // no permission; every other read needs roles:read.
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'List the role grants at one resource, or made to one profile',
+                    'description' => 'With `resource_id`: the grants at that record, in both shapes: a null '
+                        . '`profile_id` is the "everyone at this resource" grant, a set `profile_id` grants to '
+                        . 'that one profile. With `profile_id` instead: the grants of this type made to that '
+                        . 'profile by name, which are the records they stand at. Everyone-grants are left out '
+                        . 'there, because on their own they give nobody access. Pass one of the two, not both. '
+                        . 'Anyone may list their own grants (`profile_id` = their own profile); listing '
+                        . 'another person\'s, or the grants at a resource, needs `roles:read`. '
+                        . 'Always scoped to the caller\'s tenant, so another tenant\'s resource or profile '
+                        . 'yields an empty list rather than an error.',
+                    'tags' => ['rbac'],
+                    'parameters' => [
+                        self::queryParam('resource_type', 'string', 'A registered resource type (e.g. `ou`, `acme:record`)', true),
+                        self::queryParam('resource_id', 'integer', 'The record the grants are addressed at. Required unless profile_id is given', false),
+                        self::queryParam('profile_id', 'integer', 'List the grants made to this profile by name instead', false),
+                    ],
+                    'responses' => [
+                        200 => self::jsonResponse('The grants', 'ResourceRoleGrantListResponse'),
+                        403 => self::errorResponse('Listing another person\'s grants, or the grants at a resource, without roles:read'),
+                        422 => self::errorResponse('resource_type is unregistered, neither or both of resource_id and profile_id were given, or one is invalid'),
+                    ] + self::authErrors(),
                 ],
-                'responses' => [
-                    200 => self::jsonResponse('The grants at this resource', 'ResourceRoleGrantListResponse'),
-                    422 => self::errorResponse('resource_type is unregistered, or resource_id is missing/invalid'),
-                ] + self::authErrors(),
-            ]),
+            ],
             self::permissionRoute('POST', '/api/resource-role-grants', 'roles:manage', [
                 'summary' => 'Grant a role at one resource (idempotent)',
                 'description' => 'Granting a role that is already granted at that resource is a SUCCESS '

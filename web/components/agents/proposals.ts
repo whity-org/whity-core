@@ -1,5 +1,5 @@
 import { parseWireDate } from '@whity/features/datetime';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import type { ActionProposalChange, ActionProposalStatus } from '@whity/ui/action-proposal';
 import type { AgentActivityItem } from '@whity/ui/agent-activity';
 
@@ -56,12 +56,98 @@ function display(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** One change in an impact plan (WHIT-764 `ManifestImpact`). */
+export interface ImpactChange {
+  effect: 'safe' | 'data' | 'destructive';
+  change: string;
+  path: string;
+  records?: number;
+  message: string;
+  messageAr: string;
+}
+
+/**
+ * A Whity Builder publish or roll back, as core previewed it for the person
+ * approving (WHIT-764, WHIT-1042; TplImpactPlan).
+ */
+export interface ImpactPlan {
+  kind: 'publish' | 'rollback';
+  label: { en: string; ar: string } | null;
+  plugin: string;
+  from: string | null;
+  to: string;
+  level: 'safe' | 'data' | 'destructive';
+  changes: ImpactChange[];
+  tests: { passed: number; failed: number; failures: { en: string; ar: string }[]; ranAt: string | null } | null;
+}
+
+/** The workspace plugin operations whose proposals carry an impact plan. */
+export const IMPACT_PLAN_TOOLS = ['post_api_workspace_plugins', 'post_api_workspace_plugins_plugin_versions_id_activate'];
+
+const EFFECTS = ['safe', 'data', 'destructive'] as const;
+
+function isEffect(value: unknown): value is ImpactChange['effect'] {
+  return typeof value === 'string' && (EFFECTS as readonly string[]).includes(value);
+}
+
+/** The impact plan on a proposal, or null when it has none. */
+export function impactPlanOf(proposal: Pick<AgentProposal, 'tool' | 'diff'>): ImpactPlan | null {
+  const diff = proposal.diff as Record<string, unknown> | null | undefined;
+  if (!IMPACT_PLAN_TOOLS.includes(proposal.tool) || !diff || Array.isArray(diff) || typeof diff !== 'object') return null;
+  if (!isEffect(diff.level) || !Array.isArray(diff.changes) || typeof diff.to !== 'string') return null;
+  const label = diff.label as { en?: unknown; ar?: unknown } | undefined;
+  const tests = diff.tests as Record<string, unknown> | undefined;
+  return {
+    kind: diff.kind === 'rollback' ? 'rollback' : 'publish',
+    label: label && typeof label.en === 'string' ? { en: label.en, ar: typeof label.ar === 'string' && label.ar ? label.ar : label.en } : null,
+    plugin: typeof diff.plugin === 'string' ? diff.plugin : '',
+    from: typeof diff.from === 'string' ? diff.from : null,
+    to: diff.to,
+    level: diff.level,
+    changes: diff.changes
+      .filter((row): row is Record<string, unknown> => typeof row === 'object' && row !== null && isEffect((row as Record<string, unknown>).effect))
+      .map((row) => ({
+        effect: row.effect as ImpactChange['effect'],
+        change: String(row.change ?? ''),
+        path: String(row.path ?? ''),
+        records: typeof row.records === 'number' ? row.records : undefined,
+        message: String(row.message ?? ''),
+        messageAr: String(row.messageAr ?? row.message ?? ''),
+      })),
+    tests:
+      tests && typeof tests === 'object'
+        ? {
+            passed: Number(tests.passed ?? 0),
+            failed: Number(tests.failed ?? 0),
+            failures: Array.isArray(tests.failures)
+              ? tests.failures
+                  .filter((f): f is { en: string; ar?: string } => typeof f === 'object' && f !== null && typeof (f as { en?: unknown }).en === 'string')
+                  .map((f) => ({ en: f.en, ar: f.ar || f.en }))
+              : [],
+            ranAt: typeof tests.ranAt === 'string' ? tests.ranAt : null,
+          }
+        : null,
+  };
+}
+
+/** The records a destructive plan stops showing values for. */
+export function recordsLost(plan: ImpactPlan): number {
+  return plan.changes.filter((c) => c.effect === 'destructive').reduce((sum, c) => sum + (c.records ?? 0), 0);
+}
+
+/** Approve waits: the tests failed, or a destructive plan has no tick yet. */
+export function impactPlanBlocks(plan: ImpactPlan, acknowledged: boolean): boolean {
+  return (plan.tests?.failed ?? 0) > 0 || (plan.level === 'destructive' && !acknowledged);
+}
+
 /**
  * What will change. A `diff` the operation previewed wins: a list of
  * `{label|field, before, after}`. Without one, the arguments the agent will
  * send are the change: one row per argument, with no "before".
  */
 export function proposalChanges(proposal: AgentProposal): ActionProposalChange[] {
+  // An impact plan has its own rows (ImpactPlanView), never the manifest as text.
+  if (impactPlanOf(proposal) !== null) return [];
   const diff = proposal.diff as unknown;
   if (Array.isArray(diff)) {
     return diff

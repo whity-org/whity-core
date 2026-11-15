@@ -236,7 +236,7 @@ final class MockPaymentProvider implements PaymentProviderAdapter
         $reference = is_string($raw['reference'] ?? null) ? $raw['reference'] : '';
         $amount = Money::of(
             is_int($raw['amount_minor'] ?? null) ? $raw['amount_minor'] : 0,
-            is_string($raw['currency'] ?? null) ? $raw['currency'] : 'JOD',
+            is_string($raw['currency'] ?? null) ? $raw['currency'] : 'USD',
         );
 
         $occurredAt = is_string($raw['occurred_at'] ?? null)

@@ -303,6 +303,8 @@ final class TenantOwnedTables
         'document_route_recipients'  => '112_create_document_routing.php',
         // WHIT-919: the versions of whatever a route travels on.
         'route_subject_versions'     => '226_add_route_send_back_and_versions.php',
+        // WHIT-1016: values a person entered at a route step (migration 267).
+        'route_step_values'          => '267_add_route_step_inputs.php',
         // WHIT-922: signatures, saved drawn signatures and signing confirmations.
         'route_signatures'           => '232_add_route_signatures.php',
         'saved_signatures'           => '232_add_route_signatures.php',
@@ -608,6 +610,8 @@ final class TenantOwnedTables
         // profile-only join condition would be satisfiable by another tenant's
         // invitation row.
         'meeting_attendees' => '134_create_meeting_attendance.php',
+        // Web push: one browser per person per workspace (WHIT-1073).
+        'push_subscriptions' => '276_create_push_subscriptions.php',
     ];
 
     /**

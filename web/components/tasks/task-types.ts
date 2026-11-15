@@ -1,4 +1,4 @@
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 /** A task as Taskaat's record tools return it, through /api/v1/tasks (A10). */
 export type TaskRecord = components['schemas']['TaskRecord'];

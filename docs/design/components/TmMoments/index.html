@@ -52,7 +52,7 @@
     h('div', { style: { display: 'grid', gap: 10, width: '100%', paddingTop: 6 } }, h(W.Button, { icon: 'plus' }, 'New invoice'), h(W.Button, { variant: 'outline' }, 'Import from a spreadsheet'))), bottom({ active: 'more' }));
   var sent = h(F, null, nav('INV-1043'), h('div', { className: 'wm-empty' }, lot('invoice-sent'), h('h2', null, 'On its way'), h('p', null, 'INV-1043 went to Ahmad Khalil by WhatsApp. You’ll see when it’s opened and paid.'),
     h('div', { style: { display: 'grid', gap: 10, width: '100%', paddingTop: 6 } }, h(W.Button, null, 'Done'), h(W.Button, { variant: 'outline' }, 'View invoice'))), bottom({ tabs: false }));
-  var paid = h(F, null, nav('Payment'), h('div', { className: 'wm-empty' }, lot('payment-received'), h('h2', null, 'Ahmad Khalil paid'), h('p', null, 'JOD 46.168 for INV-1042, matched and in your accounts.'),
+  var paid = h(F, null, nav('Payment'), h('div', { className: 'wm-empty' }, lot('payment-received'), h('h2', null, 'Ahmad Khalil paid'), h('p', null, '$46.17 for INV-1042, matched and in your accounts.'),
     h('div', { style: { display: 'grid', gap: 10, width: '100%', paddingTop: 6 } }, h(W.Button, { variant: 'outline' }, 'See the invoice'))), bottom({ active: 'home' }));
   var ready = h(F, null, h('div', { className: 'wm-empty' }, lot('setup-done'), h('h2', null, 'Example Bakery is ready'), h('p', null, 'Your logo, your colour and your team are set.'),
     h('div', { style: { display: 'grid', gap: 10, width: '100%', paddingTop: 6 } }, h(W.Button, null, 'Send my first invoice'), h(W.Button, { variant: 'outline' }, 'Go to Home'))), foot(h('span')));

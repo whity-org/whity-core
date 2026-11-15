@@ -542,7 +542,7 @@ jobs:
       # The committed public/openapi.json must match a fresh generation from
       # the live PHP router — API changes that skip `generate:openapi` would
       # ship a published contract that lies to the typed client (#168) and the
-      # schema-driven UI (#169). Mirrors the `web` job's schema.d.ts drift
+      # schema-driven UI (#169). Mirrors the `web` job's typed-client drift
       # check (WC-168); the PHPUnit OpenApiSpecDriftTest is the primary gate,
       # this byte-level diff is defense-in-depth (WC-179).
       - name: OpenAPI spec drift check
@@ -629,7 +629,7 @@ jobs:
       # is missing the /v1 the router serves it at.
       #
       # `Router::versionPrefix()` adds the prefix at REGISTRATION, and
-      # web/lib/api-client.ts passes /api paths through verbatim — so a declared
+      # the web app's API client passes /api paths through verbatim — so a declared
       # path is correct written bare and an emitted one is not. Both are
       # '/api/...' literals, which is why the convention (documented in comments
       # at four call sites) was not enough: seven emitters read their neighbours
@@ -1902,19 +1902,10 @@ jobs:
         working-directory: .
         run: npm audit --audit-level=high
 
-      # The committed lib/api/schema.d.ts must match a fresh generation from
-      # public/openapi.json — API changes that skip `npm run generate:api`
-      # would ship a typed client that lies about the contract (WC-168).
-      - name: Typed-client schema drift check
-        run: |
-          npm run generate:api
-          git diff --exit-code -- lib/api/schema.d.ts
-
-      # The SAME spec also generates the PUBLISHED @whity/api-client
-      # types, and that copy had no drift gate at all — it went ~4 weeks and
-      # 8,000 lines out of date while the web copy above stayed honest, because
-      # only the web one was checked. Downstream consumers install the package,
-      # not web/, so the unchecked copy was the one that mattered.
+      # The web app imports its types from @whity/api-client (it kept its own
+      # copy until WHIT A14's clean-up), so this one gate covers both: the
+      # published package and the app must match a fresh generation from
+      # public/openapi.json, or the typed client lies about the contract.
       #
       # `frontend` already filters on packages/** and public/openapi.json, so
       # this job runs whenever either side can move.

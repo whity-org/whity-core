@@ -87,11 +87,14 @@ final class TeamInvitationsApiHandler
             return $ctx;
         }
 
-        $enabled = $this->signupSettings->get($ctx['tenantId'])['customer_invites'];
+        $settings = $this->signupSettings->get($ctx['tenantId']);
 
         try {
             return Response::json(['data' => [
-                'enabled' => $enabled,
+                'enabled' => $settings['customer_invites'],
+                // WHIT-1043: how many this customer may invite (0 is no limit) and how many places are taken.
+                'limit' => $settings['invites_per_customer'],
+                'used' => $this->service->customerInvitesUsed($ctx['tenantId'], $ctx['profileId']),
                 'items' => $this->service->listSentBy($ctx['tenantId'], $ctx['profileId']),
             ]], 200);
         } catch (\Throwable $e) {
@@ -134,6 +137,17 @@ final class TeamInvitationsApiHandler
                 'email' => 'This workspace only takes addresses on its own list of domains.',
                 'code' => 'domain_not_allowed',
             ]);
+        }
+
+        // WHIT-1043 (SC.11): each customer may invite up to the number the
+        // workspace set; 0 is no limit. Withdrawn invitations free a place.
+        $cap = $settings['invites_per_customer'];
+        if ($cap > 0 && $this->service->customerInvitesUsed($tenantId, $profileId) >= $cap) {
+            return Response::error(
+                "You've invited as many people as this workspace allows ({$cap}). Withdraw one, or ask the workspace to invite more.",
+                409,
+                ['code' => 'invite_limit', 'limit' => $cap]
+            );
         }
 
         $throttled = $this->throttle($tenantId, $profileId);

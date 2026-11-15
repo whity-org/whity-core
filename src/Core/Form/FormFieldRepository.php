@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 use PDOException;
 
@@ -286,7 +287,7 @@ final class FormFieldRepository
                 ':form_id' => $formId,
                 ':field_key' => $fieldKey,
                 ':field_type' => $fieldType,
-                ':label' => LocalizedLabel::encode($label),
+                ':label' => LocalizedText::encode($label),
                 ':help_text' => $helpText,
                 // Bound as an int rather than a PHP bool: PDO renders `false` as
                 // an empty string on some drivers, which PostgreSQL refuses for a
@@ -351,7 +352,7 @@ final class FormFieldRepository
             /** @var array<string, string> $label */
             $label = $changes['label'];
             $sets[] = 'label = :label';
-            $params[':label'] = LocalizedLabel::encode($label);
+            $params[':label'] = LocalizedText::encode($label);
         }
         if (array_key_exists('is_required', $changes)) {
             $sets[] = 'is_required = :is_required';
@@ -428,7 +429,7 @@ final class FormFieldRepository
      */
     private static function encodeJson(array $value, string $fallback): string
     {
-        // JSON_UNESCAPED_UNICODE for the same reason LocalizedLabel gives: an
+        // JSON_UNESCAPED_UNICODE for the same reason LocalizedText::encode() gives: an
         // Arabic option label stored as escape sequences decodes back correctly
         // and stops being readable by whoever queries the column.
         //
@@ -455,12 +456,13 @@ final class FormFieldRepository
             'form_id' => (int) $row['form_id'],
             'field_key' => (string) $row['field_key'],
             'field_type' => $type,
-            'label' => LocalizedLabel::decode(isset($row['label']) ? (string) $row['label'] : null),
+            'label' => LocalizedText::decode(isset($row['label']) ? (string) $row['label'] : null, languages: LocalizedText::BILINGUAL),
             // The string stays the one existing clients read, and the map is the
-            // whole text: see {@see LocalizedLabel::preferred()}.
+            // whole text: see {@see LocalizedText::resolve()}.
             'help_text' => self::preferredOrNull($row['help_text'] ?? null),
-            'help_text_i18n' => LocalizedLabel::decode(
-                isset($row['help_text']) ? (string) $row['help_text'] : null
+            'help_text_i18n' => LocalizedText::decode(
+                isset($row['help_text']) ? (string) $row['help_text'] : null,
+                languages: LocalizedText::BILINGUAL,
             ) ?: new \stdClass(),
             // PostgreSQL hands a BOOLEAN back as the string 't'/'f' through PDO
             // on some driver builds and as a PHP bool on others; SQLite hands
@@ -523,7 +525,7 @@ final class FormFieldRepository
         if ($stored === null) {
             return null;
         }
-        $text = LocalizedLabel::preferred(LocalizedLabel::decode((string) $stored));
+        $text = LocalizedText::resolve(LocalizedText::decode((string) $stored, languages: LocalizedText::BILINGUAL));
 
         return $text === '' ? null : $text;
     }

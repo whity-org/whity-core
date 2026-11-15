@@ -53,11 +53,11 @@
   function docBody(o) { o = o || {}; var p = o.preview;
     return h(F, null,
       blk('p', h('p', null, 'Dear ', mf('Customer name', 'Example Clinic', p), ',')),
-      blk('p', h('p', null, 'Invoice ', mf('Invoice number', 'INV-1042', p), ' for ', mf('Invoice total', 'JOD 301.600', p), ' was due on ', mf('Due date', '14 Oct 2026', p), '. ', p ? 'Please pay within 30 days of this letter.' : h(F, null, h('mark', { className: 'wy-cmt' + (o.activeCmt ? ' is-active' : '') }, 'Please pay within '), h('del', { className: 'wy-sug-del' }, '30 days'), h('ins', { className: 'wy-sug-ins' }, '14 days'), ' of this letter.')), { gutter: true, cls: o.hover ? 'is-hover' : '' }),
+      blk('p', h('p', null, 'Invoice ', mf('Invoice number', 'INV-1042', p), ' for ', mf('Invoice total', '$301.60', p), ' was due on ', mf('Due date', '14 Oct 2026', p), '. ', p ? 'Please pay within 30 days of this letter.' : h(F, null, h('mark', { className: 'wy-cmt' + (o.activeCmt ? ' is-active' : '') }, 'Please pay within '), h('del', { className: 'wy-sug-del' }, '30 days'), h('ins', { className: 'wy-sug-ins' }, '14 days'), ' of this letter.')), { gutter: true, cls: o.hover ? 'is-hover' : '' }),
       blk('callout', h('div', null, I('info'), h('p', null, 'Pay by bank transfer to ', h('b', null, 'Example Bank'), ', IBAN ', mf('Company IBAN', 'JO94 CBJO 0010 0000 0000 0131 0003 02', p), ', with the invoice number as the reference.'))),
       blk('h2', h('h3', null, 'Open invoices')),
       blk('table', h('table', null, h('thead', null, h('tr', null, h('th', null, 'Invoice'), h('th', null, 'Due'), h('th', { className: 'is-num' }, 'Amount'))),
-        h('tbody', null, h('tr', null, h('td', null, 'INV-1042'), h('td', null, '14 Oct 2026'), h('td', { className: 'is-num' }, 'JOD 301.600')), h('tr', null, h('td', null, 'INV-1051'), h('td', null, '21 Oct 2026'), h('td', { className: 'is-num' }, 'JOD 96.000'))))),
+        h('tbody', null, h('tr', null, h('td', null, 'INV-1042'), h('td', null, '14 Oct 2026'), h('td', { className: 'is-num' }, '$301.60')), h('tr', null, h('td', null, 'INV-1051'), h('td', null, '21 Oct 2026'), h('td', { className: 'is-num' }, '$96.00'))))),
       o.agentBlock === false ? null : h('div', { className: 'wy-blk wy-blk--p is-suggested' }, h('div', { className: 'wy-blk__by' }, h(W.ActorChip, { kind: 'agent', name: 'Billing assistant', onBehalfOf: 'Amro' }), 'suggests a paragraph'), h('p', null, 'If you have already paid, thank you, and please ignore this letter. Payments can take two working days to reach us.')),
       blk('p', h('p', null, 'Kind regards,')),
       blk('p', h('p', null, mf('Sender name', 'Amro Saleh', p), h('br'), mf('Company name', 'Example Bakery', p))));

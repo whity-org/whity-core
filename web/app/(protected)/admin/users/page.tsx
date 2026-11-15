@@ -4,14 +4,13 @@ import { useCallback, useState } from 'react';
 import { LoadProblem } from '@/components/load-problem';
 import { throwUnlessOk } from '@/lib/forbidden';
 import { useRouter } from 'next/navigation';
-import { apiClient } from '@/lib/api-client';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { USERS_WRITE, USERS_DELETE, SECURITY_MANAGE, ROLES_READ, OUS_READ } from '@/lib/capabilities';
-import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
 import { FilterMenu } from '@/components/admin/filter-menu';
 import { AdminHeader } from '@/components/admin/admin-header';
 import {
@@ -41,6 +40,7 @@ import { CreateUserModal } from './create-modal';
 import { DeleteUserModal } from './delete-modal';
 import { InvitationsPanel } from './invitations-panel';
 import { MembershipsModal } from './memberships-modal';
+import { useNewIntent } from '@/lib/commands/new-intent';
 
 /**
  * The user row shape, derived from the OpenAPI schema (WC-168) so it tracks
@@ -73,6 +73,14 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [tab, setTab] = useState('people');
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  // ⌘K `/invite` and `/new person` (WHIT-1069): the invite form, filled in
+  // with the first address typed. Nothing is sent until Invite is pressed.
+  useNewIntent('person', ({ text }) => {
+    setInviteEmail(text.split(/[\s,;]+/).find((part) => part.includes('@')) ?? '');
+    setTab('invitations');
+    setIsInviteOpen(true);
+  });
   const canReadRoles = hasPermission(ROLES_READ);
   const canReadUnits = hasPermission(OUS_READ);
   const canRequireTwoStep = hasPermission(SECURITY_MANAGE);
@@ -123,12 +131,16 @@ export default function UsersPage() {
   // rather than offering a short set of choices.
   const roleOptions = useFetch(async () => {
     if (!canReadRoles) return [];
-    const result = await fetchAllPages<{ id: number; name: string }>(apiClient, '/api/v1/roles');
+    const result = await fetchAllPagesTyped<{ id: number; name: string }>((query) =>
+      api.GET('/api/v1/roles', { params: { query } })
+    );
     return result.complete ? result.items : [];
   }, [canReadRoles]);
   const unitOptions = useFetch(async () => {
     if (!canReadUnits) return [];
-    const result = await fetchAllPages<{ id: number } & UnitNames>(apiClient, '/api/v1/ous');
+    const result = await fetchAllPagesTyped<{ id: number } & UnitNames>((query) =>
+      api.GET('/api/v1/ous', { params: { query } })
+    );
     return result.complete ? result.items : [];
   }, [canReadUnits]);
   const units = useLocalizedUnits(unitOptions.data);
@@ -151,9 +163,12 @@ export default function UsersPage() {
   // the refetch carries the page, sort and term the operator was looking at
   // rather than dropping them back to an unfiltered page 1.
   const { data, loading, error, forbidden, refetch: fetchUsers } = useFetch(async () => {
-    const response = await apiClient(`/api/v1/users?${queryString}`);
+    // The table's query and the filters arrive as a query string; the typed client wants an object.
+    const { data: parsed, response } = await api.GET('/api/v1/users', {
+      params: { query: Object.fromEntries(new URLSearchParams(queryString)) as never },
+    });
     throwUnlessOk(response, t('users.error.load', 'Failed to fetch users'));
-    const body: UsersResponse = await response.json();
+    const body = parsed as unknown as UsersResponse;
     const rows = body.data ?? [];
     return {
       rows,
@@ -193,14 +208,14 @@ export default function UsersPage() {
     return t('users.bulk.refused.notFound', '{name} is no longer in this workspace.', { name });
   };
 
-  const submitBulk = async (path: string, body: Record<string, unknown>, failed: string, done: string) => {
-    const response = await apiClient(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+  const submitBulk = async (
+    send: () => Promise<{ response: Response; error?: unknown }>,
+    failed: string,
+    done: string
+  ) => {
+    const { response, error } = await send();
     if (!response.ok) {
-      addToast(refusalMessage(await response.json().catch(() => null), failed), 'error');
+      addToast(refusalMessage(error ?? null, failed), 'error');
       return;
     }
     addToast(done, 'success');
@@ -210,16 +225,14 @@ export default function UsersPage() {
 
   const handleBulkRole = (roleId: number) =>
     submitBulk(
-      '/api/v1/users/bulk/role',
-      { role_id: roleId, targets },
+      () => api.POST('/api/v1/users/bulk/role', { body: { role_id: roleId, targets } }),
       t('users.bulk.role.error', 'The role could not be changed.'),
       t('users.bulk.role.success', 'Role changed.')
     );
 
   const handleBulkTwoStep = () =>
     submitBulk(
-      '/api/v1/users/bulk/require-two-step',
-      { targets },
+      () => api.POST('/api/v1/users/bulk/require-two-step', { body: { targets } }),
       t('users.bulk.twoStep.error', 'Two-step could not be required.'),
       t('users.bulk.twoStep.success', 'Two-step is now required of them.')
     );
@@ -410,6 +423,87 @@ export default function UsersPage() {
 
   const firstLoadFailed = error !== null && data === null;
 
+
+  // The list's filters: a row above the table on a computer, a sheet on a phone.
+  const filterControls = (
+    <>
+    {(roleOptions.data?.length ?? 0) > 0 && (
+      <FilterMenu
+        testId="users-filter-role"
+        label={t('users.filter.role', 'Role')}
+        options={(roleOptions.data ?? []).map((role) => ({ value: String(role.id), label: roleLabel(role.name) }))}
+        selected={roleFilter}
+        onChange={changeFilter(setRoleFilter)}
+      />
+    )}
+    {units.length > 0 && (
+      <FilterMenu
+        testId="users-filter-unit"
+        label={t('users.filter.unit', 'Unit')}
+        options={units.map((unit) => ({ value: String(unit.id), label: unit.name }))}
+        selected={unitFilter}
+        onChange={changeFilter(setUnitFilter)}
+      />
+    )}
+    <FilterMenu
+      testId="users-filter-two-step"
+      single
+      label={t('users.filter.twoStep', 'Two-step')}
+      options={[
+        { value: 'on', label: t('users.twoStep.on', 'On') },
+        { value: 'off', label: t('users.twoStep.off', 'Off') },
+      ]}
+      selected={twoStepFilter}
+      onChange={changeFilter(setTwoStepFilter)}
+    />
+    <ToggleGroup
+      required
+      label={t('users.filter.status', 'Status')}
+      value={statusFilter}
+      options={[
+        { value: 'active', label: t('users.filter.status.active', 'Active') },
+        { value: 'inactive', label: t('users.filter.status.inactive', 'Deactivated') },
+        { value: 'all', label: t('users.filter.status.all', 'All') },
+      ]}
+      onChange={(value) => changeFilter(setStatusFilter)(String(value))}
+    />
+    </>
+  );
+  const roleName = (id: string) => {
+    const role = (roleOptions.data ?? []).find((r) => String(r.id) === id);
+    return role ? roleLabel(role.name) : id;
+  };
+  const unitName = (id: string) => units.find((unit) => String(unit.id) === id)?.name ?? id;
+  const filterChips = [
+    ...roleFilter.map((id) => ({
+      id: `role-${id}`,
+      label: roleName(id),
+      onRemove: () => changeFilter(setRoleFilter)(roleFilter.filter((value) => value !== id)),
+    })),
+    ...unitFilter.map((id) => ({
+      id: `unit-${id}`,
+      label: unitName(id),
+      onRemove: () => changeFilter(setUnitFilter)(unitFilter.filter((value) => value !== id)),
+    })),
+    ...twoStepFilter.map((value) => ({
+      id: `two-step-${value}`,
+      label: `${t('users.filter.twoStep', 'Two-step')}: ${value === 'on' ? t('users.twoStep.on', 'On') : t('users.twoStep.off', 'Off')}`,
+      onRemove: () => changeFilter(setTwoStepFilter)([]),
+    })),
+    ...(statusFilter !== 'active'
+      ? [
+          {
+            id: 'status',
+            label:
+              statusFilter === 'inactive'
+                ? t('users.filter.status.inactive', 'Deactivated')
+                : t('users.filter.status.all', 'All'),
+            onRemove: () => changeFilter(setStatusFilter)('active'),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="space-y-6">
       <AdminHeader
@@ -423,7 +517,8 @@ export default function UsersPage() {
                   setTab('invitations');
                   setIsInviteOpen(true);
                 }}
-                className="gap-2"
+                // On a phone the list's bottom bar holds it (PwLists): one main button per view.
+                className="gap-2 max-sm:hidden"
               >
                 <IconPlus />
                 {t('users.invitePeople', 'Invite people')}
@@ -465,47 +560,9 @@ export default function UsersPage() {
             />
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2" data-testid="users-filters">
-                {(roleOptions.data?.length ?? 0) > 0 && (
-                  <FilterMenu
-                    testId="users-filter-role"
-                    label={t('users.filter.role', 'Role')}
-                    options={(roleOptions.data ?? []).map((role) => ({ value: String(role.id), label: roleLabel(role.name) }))}
-                    selected={roleFilter}
-                    onChange={changeFilter(setRoleFilter)}
-                  />
-                )}
-                {units.length > 0 && (
-                  <FilterMenu
-                    testId="users-filter-unit"
-                    label={t('users.filter.unit', 'Unit')}
-                    options={units.map((unit) => ({ value: String(unit.id), label: unit.name }))}
-                    selected={unitFilter}
-                    onChange={changeFilter(setUnitFilter)}
-                  />
-                )}
-                <FilterMenu
-                  testId="users-filter-two-step"
-                  single
-                  label={t('users.filter.twoStep', 'Two-step')}
-                  options={[
-                    { value: 'on', label: t('users.twoStep.on', 'On') },
-                    { value: 'off', label: t('users.twoStep.off', 'Off') },
-                  ]}
-                  selected={twoStepFilter}
-                  onChange={changeFilter(setTwoStepFilter)}
-                />
-                <ToggleGroup
-                  required
-                  label={t('users.filter.status', 'Status')}
-                  value={statusFilter}
-                  options={[
-                    { value: 'active', label: t('users.filter.status.active', 'Active') },
-                    { value: 'inactive', label: t('users.filter.status.inactive', 'Deactivated') },
-                    { value: 'all', label: t('users.filter.status.all', 'All') },
-                  ]}
-                  onChange={(value) => changeFilter(setStatusFilter)(String(value))}
-                />
+              {/* On a phone the same filters open from Filter in the list's bottom bar (PwLists). */}
+              <div className="flex flex-wrap items-center gap-2 max-sm:hidden" data-testid="users-filters">
+                {filterControls}
               </div>
             <DataTable
               ariaLabel={t('users.table.label', 'Users')}
@@ -560,6 +617,19 @@ export default function UsersPage() {
                   : undefined
               }
               rowActions={rowActions}
+              phone={{
+                filters: { content: filterControls, chips: filterChips, onClear: clearFilters },
+                mainAction:
+                  canCreate && !forbidden
+                    ? {
+                        label: t('users.invitePeople', 'Invite people'),
+                        onClick: () => {
+                          setTab('invitations');
+                          setIsInviteOpen(true);
+                        },
+                      }
+                    : undefined,
+              }}
               isLoading={isLoading}
               emptyState={
                 query.search.value !== ''
@@ -600,7 +670,7 @@ export default function UsersPage() {
         </TabsContent>
 
         <TabsContent value="invitations" className="mt-6">
-          <InvitationsPanel inviteOpen={isInviteOpen} onInviteOpenChange={setIsInviteOpen} />
+          <InvitationsPanel inviteOpen={isInviteOpen} onInviteOpenChange={setIsInviteOpen} inviteEmail={inviteEmail} />
         </TabsContent>
       </Tabs>
 

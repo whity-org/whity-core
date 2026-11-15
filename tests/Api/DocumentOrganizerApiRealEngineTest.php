@@ -339,8 +339,10 @@ final class DocumentOrganizerApiRealEngineTest extends TestCase
         // reached a stage, so nothing could have fired an effect at one.
         // `route_signatures` (migration 232) is the fourth: a signature points at
         // the trail entry it was made on, and no signature can exist where no
-        // route event ever did.
+        // route event ever did. `route_step_values` (migration 267) is the
+        // fifth: a value entered at a step names the trail entry it came with.
         $this->pdo->exec('DROP TABLE meeting_decisions');
+        $this->pdo->exec('DROP TABLE route_step_values');
         $this->pdo->exec('DROP TABLE route_signatures');
         $this->pdo->exec('DROP TABLE document_route_effect_attempts');
         $this->pdo->exec('DROP TABLE document_route_recipients');

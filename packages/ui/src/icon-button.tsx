@@ -27,7 +27,7 @@ function IconButton({
   label: string
   variant?: "ghost" | "outline" | "secondary"
   /** `sm` is 28px for tables and toolbars; `default` is 36px. */
-  size?: "sm" | "default"
+  size?: "sm" | "default" | "lg"
   /** Show the label as a tooltip above (`true`), below (`"bottom"`), or not at all. */
   tooltip?: boolean | "bottom"
   /** A keyboard shortcut shown in the tooltip, e.g. "⌘B". */
@@ -38,7 +38,7 @@ function IconButton({
   const button = (
     <Button
       variant={variant}
-      size={size === "sm" ? "icon-sm" : "icon"}
+      size={size === "sm" ? "icon-sm" : size === "lg" ? "icon-lg" : "icon"}
       aria-label={label}
       active={pressed}
       aria-pressed={pressed === undefined ? undefined : pressed}

@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { useTranslation } from '@whity/features/i18n';
@@ -20,7 +20,6 @@ export function DeleteTenantModal({
   tenant,
   onSuccess,
 }: DeleteTenantModalProps) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -29,14 +28,13 @@ export function DeleteTenantModal({
     try {
       setIsDeleting(true);
 
-      const response = await apiClient(`/api/v1/tenants/${tenant.id}`, {
-        method: 'DELETE',
+      const { response, error } = await api.DELETE('/api/v1/tenants/{id}', {
+        params: { path: { id: tenant.id } },
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message || t('tenants.delete.error', 'Failed to delete tenant')
+          (error as { message?: string } | undefined)?.message || t('tenants.delete.error', 'Failed to delete tenant')
         );
       }
 

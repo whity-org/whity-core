@@ -36,9 +36,9 @@
     h('div', { className: 'wy-rectabs' }, h(W.Tabs, { items: [{ value: 'd', label: T.tDoc }, { value: 'r', label: T.tRoute, count: 1 }, { value: 'h', label: T.tHist }, { value: 'v', label: T.tVer }], defaultValue: tab }))); }
 
   ReactDOM.createRoot(document.getElementById('root')).render(shell('Library', h(F, null, docHead({ lib: 'Library', title: 'Purchase order PO-0142', waiting: 'Waiting for your decision', raised: 'Raised by Ahmad Khalil', issued: 'Issued yesterday, 16:20', stage: 'Stage 2 of 3: Owner approval', code: 'Verification code active', pdf: 'Download PDF', print: 'Print', more: 'More', coll: 'Add to collection', withdraw: 'Withdraw this document', tDoc: 'Document', tRoute: 'Routing', tHist: 'History', tVer: 'Verification' }, 'd'),
-    h('div', { className: 'wy-docrec' }, h(W.DocPreview, { title: 'PO-0142 · version 1', meta: 'Example Mills · JOD 1,240.000', height: 640, zoom: 0.62, onSend: false }, PO),
+    h('div', { className: 'wy-docrec' }, h(W.DocPreview, { title: 'PO-0142 · version 1', meta: 'Example Mills · $1,240.00', height: 640, zoom: 0.62, onSend: false }, PO),
       h('div', { style: { display: 'grid', gap: 16 } },
-        h(W.Card, { title: 'About this document' }, h(W.DescriptionList, { items: [{ label: 'Template', value: 'Purchase order' }, { label: 'Supplier', value: 'Example Mills' }, { label: 'Amount', value: 'JOD 1,240.000' }, { label: 'Raised from', value: 'Stock › Reorder list' }, { label: 'Unit', value: 'Sweifieh' }] })),
+        h(W.Card, { title: 'About this document' }, h(W.DescriptionList, { items: [{ label: 'Template', value: 'Purchase order' }, { label: 'Supplier', value: 'Example Mills' }, { label: 'Amount', value: '$1,240.00' }, { label: 'Raised from', value: 'Stock › Reorder list' }, { label: 'Unit', value: 'Sweifieh' }] })),
         h(W.Card, { title: 'Versions', description: 'Each issue is kept; the newest is current.' }, h('div', { style: { display: 'grid', gap: 8, fontSize: 14 } }, h('div', { className: 'wy-person' }, h(W.Badge, { variant: 'success' }, 'Current'), h('span', null, 'Version 1 · yesterday, 16:20')))))))));
 </script>
 </body>

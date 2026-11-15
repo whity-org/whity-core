@@ -48,6 +48,17 @@
  *   roles.areaGrid.none = No permissions are defined on this installation.
  *   roles.areaGrid.noMatch = No areas match “{query}”.
  *   roles.areaGrid.notAllowed = not allowed
+ *   roles.areaGrid.phone.allowed = Allowed
+ *   roles.areaGrid.phone.close = Close
+ *   roles.areaGrid.phone.copied = Link copied
+ *   roles.areaGrid.phone.copy = Copy link
+ *   roles.areaGrid.phone.email = Email me the link
+ *   roles.areaGrid.phone.emailSubject = A Whity role to change on a computer
+ *   roles.areaGrid.phone.notAllowed = Not allowed
+ *   roles.areaGrid.phone.notNow = Not now
+ *   roles.areaGrid.phone.note = You can read permissions here. To change them, open this role on a computer.
+ *   roles.areaGrid.phone.open = Open on a computer
+ *   roles.areaGrid.phone.sheet = Open this role on a computer to change what it can do. Copy the link, or email it to yourself.
  *   roles.areaGrid.onlyAllowed = Only allowed
  *   roles.areaGrid.search = Search areas
  *   roles.areaGrid.summary = {selected} of {total} allowed
@@ -56,8 +67,10 @@
 import { useMemo, useState } from 'react';
 import { Input } from '@whity/ui/input';
 import { Switch } from '@whity/ui/switch';
-import { IconCheck, IconCircle, IconSearch } from '@tabler/icons-react';
+import { IconCheck, IconCircle, IconMinus, IconSearch } from '@tabler/icons-react';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
+import { OpenOnComputerBar, PhoneReadOnlyNote } from '@whity/ui/open-on-computer';
+import { useViewportAtLeast } from '@whity/ui/screen-too-small';
 import { groupOf, titleCase } from './permission-groups';
 import type { Permission, RolesTranslate } from './types';
 
@@ -130,6 +143,10 @@ export function PermissionAreaGrid({
 }: PermissionAreaGridProps) {
   const [query, setQuery] = useState('');
   const [onlyAllowed, setOnlyAllowed] = useState(false);
+  // Under 640px the grid is a list per area, read-only (PwBuilders): five
+  // columns of ticks do not fit a phone, and the owner answered that reading
+  // is enough there. Not measured yet counts as wide, so nothing is gated.
+  const phone = useViewportAtLeast(640) === false;
 
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
   const saved = useMemo(() => new Set(savedIds ?? selectedIds), [savedIds, selectedIds]);
@@ -182,8 +199,62 @@ export function PermissionAreaGrid({
     (entry) => entry.areas.length > 0
   );
 
+  const phoneAreas = (rows: Area[]) =>
+    rows.map((area) => {
+      const rowsOf: Array<{ key: string; label: string; held: boolean }> = [
+        ...ACTIONS.filter((action) => area.cells[action] !== undefined).map((action) => ({
+          key: action,
+          label: actionLabel(action),
+          held: (area.cells[action] ?? []).some((p) => selected.has(p.id)),
+        })),
+        ...area.other.map((p) => ({
+          key: `other-${p.id}`,
+          label: p.description || p.name || '',
+          held: selected.has(p.id),
+        })),
+      ];
+      return (
+        <section key={area.key} data-testid={`perm-list-area-${area.key}`} aria-label={area.label}>
+          <h3 className="px-1 pb-2 text-sm font-medium text-muted-foreground">{area.label}</h3>
+          <TechnicalDetails>
+            <span className="block px-1 pb-2 font-mono text-xs text-muted-foreground">
+              {area.all.map((p) => p.name).join(', ')}
+            </span>
+          </TechnicalDetails>
+          <ul className="divide-y divide-border rounded-card border border-border bg-card">
+            {rowsOf.map((row) => (
+              <li key={row.key} className="flex min-h-12 items-center justify-between gap-3 px-4 py-2 text-base text-foreground">
+                <span className="min-w-0">{row.label}</span>
+                <span
+                  className={
+                    row.held
+                      ? 'flex shrink-0 items-center gap-1.5 text-sm text-primary'
+                      : 'flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground'
+                  }
+                >
+                  {row.held ? (
+                    <IconCheck size={18} aria-hidden="true" />
+                  ) : (
+                    <IconMinus size={18} aria-hidden="true" />
+                  )}
+                  {row.held
+                    ? t('roles.areaGrid.phone.allowed', 'Allowed')
+                    : t('roles.areaGrid.phone.notAllowed', 'Not allowed')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      );
+    });
+
   return (
     <div className="space-y-4" data-testid="perm-grid">
+      {phone && (
+        <PhoneReadOnlyNote>
+          {t('roles.areaGrid.phone.note', 'You can read permissions here. To change them, open this role on a computer.')}
+        </PhoneReadOnlyNote>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-48 flex-1">
           <IconSearch
@@ -216,6 +287,14 @@ export function PermissionAreaGrid({
         <p className="py-6 text-center text-sm text-muted-foreground" data-testid="perm-grid-no-match">
           {t('roles.areaGrid.noMatch', 'No areas match “{query}”.', { query: query.trim() })}
         </p>
+      ) : phone ? (
+        <div className="space-y-5" data-testid="perm-list">
+          {groups.map(({ group, areas: rows }) => (
+            <div key={group} className="space-y-5">
+              {phoneAreas(rows)}
+            </div>
+          ))}
+        </div>
       ) : (
         groups.map(({ group, areas: rows }) => (
           <section key={group} className="overflow-x-auto rounded-card border border-border" data-testid={`perm-grid-group-${group}`}>
@@ -314,6 +393,23 @@ export function PermissionAreaGrid({
             </table>
           </section>
         ))
+      )}
+      {phone && (
+        <OpenOnComputerBar
+          labels={{
+            open: t('roles.areaGrid.phone.open', 'Open on a computer'),
+            description: t(
+              'roles.areaGrid.phone.sheet',
+              'Open this role on a computer to change what it can do. Copy the link, or email it to yourself.'
+            ),
+            copy: t('roles.areaGrid.phone.copy', 'Copy link'),
+            copied: t('roles.areaGrid.phone.copied', 'Link copied'),
+            email: t('roles.areaGrid.phone.email', 'Email me the link'),
+            notNow: t('roles.areaGrid.phone.notNow', 'Not now'),
+            close: t('roles.areaGrid.phone.close', 'Close'),
+            emailSubject: t('roles.areaGrid.phone.emailSubject', 'A Whity role to change on a computer'),
+          }}
+        />
       )}
     </div>
   );

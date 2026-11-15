@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LoadProblem } from '@/components/load-problem';
 import { throwUnlessOk } from '@/lib/forbidden';
-import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
@@ -39,7 +39,6 @@ const ALL_AREAS = 'all';
  * the technical view (docs/design/MCP-TOOL-SURFACE.md §5.10, owner decision 5).
  */
 export default function McpToolsPage() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const language = useFormattingLocale();
@@ -51,10 +50,11 @@ export default function McpToolsPage() {
   const [area, setArea] = useState(ALL_AREAS);
 
   const { data, loading: isLoading, error, forbidden, refetch } = useFetch(async () => {
-    const response = await apiClient('/api/v1/admin/mcp/tools');
+    // apiFetch: the route is not in the OpenAPI spec yet.
+    const response = await apiFetch('/api/v1/admin/mcp/tools');
     throwUnlessOk(response, t('mcpTools.error.load', 'What AI can do could not be loaded.'));
     return (await response.json()) as McpToolListResponse;
-  }, [apiClient]);
+  }, []);
 
   const tools = useMemo(() => data?.data ?? [], [data]);
   const sizes = data?.sizes;
@@ -89,13 +89,11 @@ export default function McpToolsPage() {
     if (on) enabled.push(tool.name);
     setSaving(tool.name);
     try {
-      const response = await apiClient('/api/v1/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: { [ALWAYS_ON_SETTING]: enabled.join(',') } }),
+      const { response, error } = await api.PATCH('/api/v1/settings', {
+        body: { settings: { [ALWAYS_ON_SETTING]: enabled.join(',') } },
       });
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { message?: string };
+        const body = (error ?? {}) as { message?: string };
         throw new Error(body.message ?? t('mcpTools.alwaysOn.saveFailed', 'Could not change how {name} is listed', { name: tool.name }));
       }
       addToast(

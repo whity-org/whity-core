@@ -28,6 +28,7 @@ import { render, screen } from '@testing-library/react';
 
 const mockApiClient = { post: jest.fn() };
 
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockApiClient, user: { id: 7 } }),
 }));

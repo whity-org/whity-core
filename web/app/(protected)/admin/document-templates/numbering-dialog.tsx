@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { patchTemplate, type AddToast, type ApiClient } from './api';
+import { patchTemplate, type AddToast } from './api';
 import type { NumberingAssign, TemplateRow } from './types';
 
 const SEQUENCE = /\{SEQ(?::([0-9]+))?\}/;
@@ -50,7 +50,6 @@ export function numberingSample(pattern: string, now: Date = new Date()): string
 export function NumberingDialog({
   row,
   name,
-  apiClient,
   addToast,
   onClose,
   onSaved,
@@ -58,7 +57,6 @@ export function NumberingDialog({
   row: TemplateRow;
   /** The row's title as the page shows it ("Untitled" for an empty one). */
   name: string;
-  apiClient: ApiClient;
   addToast: AddToast;
   onClose: () => void;
   onSaved: () => void;
@@ -77,7 +75,6 @@ export function NumberingDialog({
     setSubmitting(true);
     try {
       const failure = await patchTemplate(
-        apiClient,
         row.id,
         { numbering: trimmed === '' ? null : { pattern: trimmed, assign } },
         t('documentTemplates.numbering.failed', 'Failed to save the numbering')

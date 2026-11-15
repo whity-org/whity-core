@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { deleteTemplate, type AddToast, type ApiClient } from './api';
+import { deleteTemplate, type AddToast } from './api';
 import type { TemplateRow } from './types';
 
 /**
@@ -27,7 +27,6 @@ export function DeleteDialog({
   row,
   name,
   ouName,
-  apiClient,
   addToast,
   onClose,
   onDeleted,
@@ -36,7 +35,6 @@ export function DeleteDialog({
   /** The row's title as the page shows it ("Untitled" for an empty one). */
   name: string;
   ouName: string | null;
-  apiClient: ApiClient;
   addToast: AddToast;
   onClose: () => void;
   onDeleted: () => void;
@@ -49,7 +47,7 @@ export function DeleteDialog({
     setError(null);
     setSubmitting(true);
     try {
-      const failure = await deleteTemplate(apiClient, row.id, t('documentTemplates.delete.failed', 'Failed to delete'));
+      const failure = await deleteTemplate(row.id, t('documentTemplates.delete.failed', 'Failed to delete'));
       if (failure !== null) {
         setError(failure);
         return;

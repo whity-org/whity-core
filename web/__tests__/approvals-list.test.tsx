@@ -5,13 +5,14 @@
 
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { proposalAmount, waitedWords } from '@/app/(protected)/admin/approvals/list-helpers';
+import { proposalAmount, proposalMoney, waitedWords } from '@/app/(protected)/admin/approvals/list-helpers';
 import type { AgentProposal } from '@/components/agents/proposals';
 
 const mockApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockApiClient, user: { id: 7 } }),
 }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({
@@ -83,6 +84,10 @@ it('says each kind and lets only ordinary items be ticked', async () => {
 it('helpers: amount in normal units, and how long it waited', () => {
   expect(proposalAmount({ arguments: { amount: 312, currency: 'JOD' } } as unknown as AgentProposal)).toBe('JOD 312.000');
   expect(proposalAmount({ arguments: { name: 'x' } } as unknown as AgentProposal)).toBeNull();
+  // Each currency's own decimals (CU.2), not three for all: $312.50 is 31250 cents.
+  expect(proposalAmount({ arguments: { amount: '312.5', currency: 'usd' } } as unknown as AgentProposal)).toBe('$312.50');
+  expect(proposalMoney({ arguments: { amount: 312.5, currency: 'USD' } } as unknown as AgentProposal)).toEqual({ currency: 'USD', minor: 31250 });
+  expect(proposalMoney({ arguments: { amount: 1.005, currency: 'USD' } } as unknown as AgentProposal)).toBeNull();
   const words = { minutes: '{n} min', hours: '{n} h', days: '{n} d' };
   const now = Date.parse('2026-11-12T10:00:00Z');
   expect(waitedWords('2026-11-12T09:40:00Z', now, words)).toBe('20 min');

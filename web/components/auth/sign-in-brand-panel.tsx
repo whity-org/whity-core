@@ -81,35 +81,35 @@ export function SignInBrandPanel() {
       data-testid="sign-in-brand-panel"
       className="flex flex-col justify-center px-4 pb-10 sm:px-10 lg:px-16 lg:py-16"
     >
-      <aside className="mx-auto w-full max-w-sm space-y-8 lg:max-w-md">
-        <PaperSheet className="hidden space-y-4 p-8 lg:block">
-          <PaperEyebrow>{t('login.panel.eyebrow', 'Public document check')}</PaperEyebrow>
-          <PaperHeadline>{t('login.panel.headline', 'Paper you can check.')}</PaperHeadline>
+      <aside className="mx-auto w-full max-w-sm lg:max-w-md">
+        {/* TplSignInTwoColumn (WHIT-1044): one sheet with one message, resting on
+            the plane because its one action, Verify a document, is what matters
+            here. The plane falls down-left in both directions (4.3), so the room
+            for it is on the physical left, also in RTL. */}
+        <PaperSheet plane className="hidden space-y-4 p-7 lg:ml-3 lg:block">
+          <PaperEyebrow>{t('login.panel.eyebrowPrinted', 'Holding a printed page?')}</PaperEyebrow>
+          <PaperHeadline>{t('login.panel.headlineGenuine', 'Check it’s genuine.')}</PaperHeadline>
           <p className="text-muted-foreground">
-            {t(
-              'login.panel.body',
-              'Every document issued here carries a QR code. Anyone holding one can confirm it is genuine, without an account.'
-            )}
+            {t('login.panel.bodyFoot', 'Scan the QR code at the foot of the page. No account needed.')}
           </p>
+          <Button type="button" data-testid="verify-document-open" onClick={() => setVerifyOpen(true)}>
+            <IconQrcode aria-hidden />
+            {verifyLabel}
+          </Button>
         </PaperSheet>
-        <PaperSheet
-          as="button"
-          type="button"
-          plane
-          onClick={() => setVerifyOpen(true)}
-          // The plane falls down-left in both directions (4.3), so the room
-          // for it is on the physical left, also in RTL.
-          className="flex w-full items-center gap-4 p-5 lg:ml-6 lg:w-[calc(100%-1.5rem)]"
-          data-testid="verify-document-open"
-        >
-          <span className="grid size-11 shrink-0 place-items-center rounded-control-lg bg-primary-tint text-primary-tint-foreground">
-            <IconQrcode className="size-6" aria-hidden />
-          </span>
-          <span className="min-w-0 space-y-0.5">
-            <span className="block font-semibold text-foreground">{verifyLabel}</span>
-            <span className="block text-sm text-muted-foreground">{verifyHint}</span>
-          </span>
-        </PaperSheet>
+        {/* Under 1024px only the form shows, with Verify a document as a line under it. */}
+        <p className="text-center lg:hidden">
+          <Button
+            type="button"
+            variant="link"
+            data-testid="verify-document-open-phone"
+            onClick={() => setVerifyOpen(true)}
+          >
+            <IconQrcode aria-hidden />
+            {verifyLabel}
+          </Button>
+          <span className="block text-sm text-muted-foreground">{verifyHint}</span>
+        </p>
       </aside>
       {dialog}
     </PaperGround>

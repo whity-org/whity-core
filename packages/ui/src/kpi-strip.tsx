@@ -4,7 +4,7 @@ import { cn } from "./utils"
  * A row of headline numbers (docs/design/components/TplReports, TplImport;
  * `.wk-kpis`, `.wk-kpi` in bundle.css), for Reports, Import and Bank. Values
  * are mono and stay left to right; money comes already formatted in normal
- * units with the currency's decimals ("JOD 31,880.000").
+ * units with the currency's decimals ("$31,880.00").
  */
 
 export interface KpiItem {

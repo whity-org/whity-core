@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace Whity\Core\Mail;
 
-use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 
 /**
  * Sends the platform's customer-facing lifecycle emails (WC-email) by listening
- * on {@see HookManager} events, rendering them through the branded
- * {@see EmailLayout}, and delivering via the {@see Mailer}.
+ * on {@see HookManager} events and sending them through {@see BrandedEmailSender}
+ * in the instance's brand (or the new workspace's name, for `workspace-ready`).
  *
  * Decoupled by design: the flows that create/approve/invite accounts just
  * dispatch a hook; this subscriber (and any plugin) reacts. Every send is:
@@ -26,16 +24,11 @@ use Whity\Core\Settings\SettingsService;
  */
 final class EmailNotifications
 {
-    private LoggerInterface $logger;
-
     public function __construct(
-        private readonly Mailer $mailer,
-        private readonly EmailLayout $layout,
+        private readonly BrandedEmailSender $sender,
         private readonly SettingsService $settings,
         private readonly string $appUrl = '',
-        ?LoggerInterface $logger = null,
     ) {
-        $this->logger = $logger ?? new NullLogger();
     }
 
     /**
@@ -69,7 +62,7 @@ final class EmailNotifications
         if ($email === '') {
             return $data;
         }
-        $branding = EmailBranding::fromSettings($this->settings);
+        $branding = $this->sender->branding(0);
         $workspace = trim((string) ($data['tenant_name'] ?? ''));
         $where = $workspace !== '' ? $workspace : 'your workspace';
         $isTermination = (string) ($data['reason'] ?? '') === 'terms_violation';
@@ -131,7 +124,7 @@ final class EmailNotifications
         if ($email === '') {
             return $data;
         }
-        $branding = EmailBranding::fromSettings($this->settings);
+        $branding = $this->sender->branding(0);
         $workspace = trim((string) ($data['tenant_name'] ?? ''));
         $where = $workspace !== '' ? 'the ' . $workspace . ' workspace' : 'a workspace';
 
@@ -177,7 +170,7 @@ final class EmailNotifications
             return $data;
         }
         $name = trim((string) ($data['name'] ?? ''));
-        $base = EmailBranding::fromSettings($this->settings);
+        $base = $this->sender->branding(0);
         $workspace = trim((string) ($data['tenant_name'] ?? '')) ?: $base->siteName;
         // EM.1 `workspace-ready`: from the new workspace, in its name.
         $branding = new EmailBranding($workspace, $base->brandColor, $base->supportEmail, $base->footerText, $base->whiteLabel);
@@ -224,7 +217,7 @@ final class EmailNotifications
             return $data;
         }
         $name = trim((string) ($data['name'] ?? ''));
-        $branding = EmailBranding::fromSettings($this->settings);
+        $branding = $this->sender->branding(0);
 
         $this->trySend(
             $email,
@@ -263,7 +256,7 @@ final class EmailNotifications
             return $data;
         }
         $name = trim((string) ($data['name'] ?? ''));
-        $branding = EmailBranding::fromSettings($this->settings);
+        $branding = $this->sender->branding(0);
 
         $paragraphs = [
             'Thank you for your interest in ' . $branding->siteName
@@ -305,25 +298,15 @@ final class EmailNotifications
      */
     private function eventEnabled(string $key): bool
     {
-        try {
-            $global = $this->settings->getGlobal();
-        } catch (\Throwable) {
-            return false;
-        }
-
-        return (string) ($global[$key] ?? 'false') === 'true';
+        return $this->sender->gate()->instanceEvent($key);
     }
 
     /**
-     * Render + send, swallowing any failure (best-effort side channel).
+     * Send as the instance (tenant 0) in the given brand; a failure is logged
+     * by the sender and swallowed (best-effort side channel).
      */
     private function trySend(string $toEmail, string $subject, EmailContent $content, EmailBranding $branding): void
     {
-        try {
-            $rendered = $this->layout->render($content, $branding);
-            $this->mailer->send($toEmail, $subject, $rendered->text, $rendered->html);
-        } catch (\Throwable $e) {
-            $this->logger->warning('[mail] lifecycle notification failed: ' . $e->getMessage());
-        }
+        $this->sender->send(0, $toEmail, $subject, $content, new EmailOptions(branding: $branding));
     }
 }

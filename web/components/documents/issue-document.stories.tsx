@@ -21,7 +21,7 @@ const FIELDS: FieldGroup[] = [
     group: "Invoice",
     items: [
       { path: "invoice.number", label: "Invoice number", sample: "INV-1042", required: true },
-      { path: "invoice.total", label: "Invoice total", sample: "JOD 301.600" },
+      { path: "invoice.total", label: "Invoice total", sample: "$301.60" },
       { path: "customer.name", label: "Customer name", sample: "Example Café" },
     ],
   },
@@ -66,7 +66,7 @@ function adapter(document: WhityDocument): DocumentEditorAdapter {
     ],
     preview: async () => ({
       label: "INV-031 · Example Café",
-      values: { "invoice.number": "INV-031", "invoice.total": "JOD 48.250", "customer.name": "Example Café", today: "31 October 2026" },
+      values: { "invoice.number": "INV-031", "invoice.total": "$48.25", "customer.name": "Example Café", today: "31 October 2026" },
     }),
     loadVersion: async () => ({ title: document.title, blocks: BLOCKS, ownFields: document.ownFields }),
     copyForIssue: async () => "2",

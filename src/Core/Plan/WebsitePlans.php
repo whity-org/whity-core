@@ -86,7 +86,7 @@ final class WebsitePlans
         try {
             $decimals = Currency::exponentFor($currency);
         } catch (MoneyException) {
-            $currency = 'JOD';
+            $currency = 'USD';
             $decimals = Currency::exponentFor($currency);
         }
         $perPlan = is_array($layer['plans'] ?? null) ? $layer['plans'] : [];

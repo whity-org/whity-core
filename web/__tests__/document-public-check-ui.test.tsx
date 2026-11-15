@@ -2,9 +2,19 @@
  * The public check's `described` level on the verify page, and the template's
  * public name that feeds it (#1627).
  */
-import { Suspense } from 'react';
+import React, { Suspense } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
+// The brand the page hands its frame (WHIT-1044), readable in the tests.
+jest.mock('@/components/auth/public-shell', () => ({
+  PublicShell: ({ children, brand }: { children: React.ReactNode; brand?: { name: string } | null }) => (
+    <main data-testid="public-shell" data-brand={brand?.name ?? ''}>
+      {children}
+    </main>
+  ),
+}));
 
 import VerifyDocumentPage from '@/app/verify/[token]/page';
 import { PublicNameDialog } from '@/app/(protected)/admin/document-templates/public-name-dialog';
@@ -80,6 +90,23 @@ describe('the verify page at the described level', () => {
     expect(screen.queryByText('Pages')).not.toBeInTheDocument();
   });
 
+  it('wears the issuer brand only beside a code that verified (WHIT-1044)', async () => {
+    const brand = { name: 'Example Bakery', logo_wide_url: null, logo_square_url: null, main_color: '#7a1f3d', theme: null };
+    answer({ verified: true, reference: 'ABCD-EFGH', issuer: 'Example Bakery', issued_on: '2026-11-12', brand });
+    await renderPage();
+    await waitFor(() => expect(screen.getByTestId('verify-title')).toHaveTextContent('This document is genuine'));
+    expect(screen.getByTestId('public-shell')).toHaveAttribute('data-brand', 'Example Bakery');
+    expect(screen.getByTestId('verify-proves')).toHaveTextContent('What this proves');
+  });
+
+  it('a code it cannot find says so in grey words, with no brand and no alarm', async () => {
+    answer({ verified: false, reason: 'unrecognised' });
+    await renderPage();
+    await waitFor(() => expect(screen.getByTestId('verify-title')).toHaveTextContent('We can’t find this document'));
+    expect(screen.getByTestId('public-shell')).toHaveAttribute('data-brand', '');
+    expect(document.querySelector('[data-tone="muted"]')).not.toBeNull();
+  });
+
   it('says which revision replaced a revised document', async () => {
     answer({
       verified: false,
@@ -90,23 +117,25 @@ describe('the verify page at the described level', () => {
     await renderPage();
 
     await waitFor(() => expect(screen.getByTestId('verify-replaced-by')).toBeInTheDocument());
-    expect(screen.getByTestId('verify-title')).toHaveTextContent('This copy has been replaced');
+    expect(screen.getByTestId('verify-title')).toHaveTextContent('A newer version exists');
     expect(screen.getByTestId('verify-replaced-by')).toHaveTextContent('Revision B replaced it.');
   });
 });
 
 describe('the public name dialog', () => {
   function setup(publicName: string | null = null, ok = true) {
+    // The dialog saves through the typed client, which the mock forwards to `fetch`.
     const apiClient = jest.fn(async () => ({
       ok,
+      status: ok ? 200 : 403,
       json: async () => ({ error: 'Naming a template for the public check requires documents:publish' }),
-    })) as unknown as Parameters<typeof PublicNameDialog>[0]['apiClient'];
+    }));
+    global.fetch = apiClient as unknown as typeof fetch;
     const onSaved = jest.fn();
     render(
       <PublicNameDialog
         row={{ ...template, public_name: publicName }}
         name="Handover for Example Bakery"
-        apiClient={apiClient}
         addToast={jest.fn()}
         onClose={jest.fn()}
         onSaved={onSaved}

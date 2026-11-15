@@ -13,6 +13,7 @@
  * seconds and the list every 15, and nothing while the tab is hidden.
  */
 
+import { apiFetch } from '@/lib/api/client';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Avatar } from '@whity/ui/avatar';
@@ -34,6 +35,7 @@ import type { ChatAgentMember, ChatDetail, ChatMember, ChatMention, ChatMessage,
 import { chatApi, chatErrorText, type ChatApi } from './chat-api';
 import { AddMemberDialog } from './add-member-dialog';
 import { NewChatDialog } from './new-chat-dialog';
+import { useNewIntent } from '@/lib/commands/new-intent';
 
 const THREAD_MS = 5000;
 const LIST_MS = 15000;
@@ -55,20 +57,58 @@ function usePoll(fn: () => void, ms: number, active: boolean) {
   }, [ms, active]);
 }
 
+/** Seconds between "I'm looking at this chat" beats; the server's ChatPushNotifier::HEARTBEAT. */
+export const FOCUS_BEAT_MS = 20_000;
+
+/**
+ * While the open chat is on screen in a focused window, tell the server every
+ * beat, so its new lines aren't pushed to this person's devices (WHIT-1077).
+ * Losing focus, hiding the tab or leaving the chat says so at once.
+ */
+export function useChatFocus(chatId: number | null, send: (id: number, focused: boolean) => Promise<unknown>) {
+  useEffect(() => {
+    if (chatId === null) return;
+    const looking = () => document.visibilityState === 'visible' && document.hasFocus();
+    let on = false;
+    const beat = () => {
+      const now = looking();
+      if (now || on) void send(chatId, now).catch(() => undefined);
+      on = now;
+    };
+    beat();
+    const timer = window.setInterval(beat, FOCUS_BEAT_MS);
+    window.addEventListener('focus', beat);
+    window.addEventListener('blur', beat);
+    document.addEventListener('visibilitychange', beat);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', beat);
+      window.removeEventListener('blur', beat);
+      document.removeEventListener('visibilitychange', beat);
+      if (on) void send(chatId, false).catch(() => undefined);
+    };
+  }, [chatId, send]);
+}
+
 export function ChatScreen() {
   const t = useTranslation('chat');
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
   const selected = Number(params.get('c') ?? '') || null;
   const myId = Number((user as { profile_id?: number; id?: number } | null)?.profile_id ?? (user as { id?: number } | null)?.id ?? 0);
-  const api = useMemo(() => chatApi(apiClient), [apiClient]);
+  const api = useMemo(() => chatApi(apiFetch), []);
 
   const [chats, setChats] = useState<ChatSummary[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
   const [newOpen, setNewOpen] = useState(false);
+  // ⌘K `/new message` (WHIT-1069) opens New chat.
+  useNewIntent('message', () => setNewOpen(true));
+  // ⌘K `/ask` (WHIT-1070): the direct chat with that agent, the words in the
+  // message box and not sent. The agent answers here, proposing; you approve.
+  const [askDraft, setAskDraft] = useState<{ chatId: number; text: string } | null>(null);
 
   const loadList = useCallback(async () => {
     try {
@@ -90,6 +130,7 @@ export function ChatScreen() {
     };
   }, [api]);
   usePoll(loadList, LIST_MS, true);
+  useChatFocus(selected, api.focus);
 
   const open = useCallback(
     (id: number | null) => {
@@ -99,6 +140,21 @@ export function ChatScreen() {
     },
     [router]
   );
+
+  useNewIntent('ask', ({ text, target }) => {
+    if (target === undefined) return;
+    void (async () => {
+      try {
+        // Opens the direct chat, or starts it: one per person and agent, as New chat does.
+        const started = await api.direct({ agent_id: target });
+        setAskDraft({ chatId: started.id, text });
+        void loadList();
+        open(started.id);
+      } catch (e) {
+        setListError(chatErrorText(e, ''));
+      }
+    })();
+  });
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -135,7 +191,16 @@ export function ChatScreen() {
         hidden={selected !== null}
       />
       {selected !== null ? (
-        <OpenChat key={selected} t={t} api={api} chatId={selected} myId={myId} onBack={() => open(null)} onChanged={() => void loadList()} />
+        <OpenChat
+          key={selected}
+          t={t}
+          api={api}
+          chatId={selected}
+          myId={myId}
+          initialDraft={askDraft?.chatId === selected ? askDraft.text : undefined}
+          onBack={() => open(null)}
+          onChanged={() => void loadList()}
+        />
       ) : (
         <div className="hidden place-items-center p-8 md:grid xl:col-span-2">
           <EmptyState
@@ -331,6 +396,7 @@ function OpenChat({
   api,
   chatId,
   myId,
+  initialDraft,
   onBack,
   onChanged,
 }: {
@@ -338,6 +404,8 @@ function OpenChat({
   api: ChatApi;
   chatId: number;
   myId: number;
+  /** Words to start the message box with (⌘K `/ask`). */
+  initialDraft?: string;
   onBack: () => void;
   onChanged: () => void;
 }) {
@@ -455,7 +523,7 @@ function OpenChat({
             {notice || t('error.generic', 'Something went wrong with Chat. Please try again.')}
           </p>
         )}
-        <Composer t={t} api={api} chat={chat} onSent={(m) => merge([m])} onError={setNotice} />
+        <Composer t={t} api={api} chat={chat} initialDraft={initialDraft} onSent={(m) => merge([m])} onError={setNotice} />
       </section>
       <SidePanel
         t={t}
@@ -819,16 +887,18 @@ function Composer({
   t,
   api,
   chat,
+  initialDraft,
   onSent,
   onError,
 }: {
   t: TranslateFn;
   api: ChatApi;
   chat: ChatDetail;
+  initialDraft?: string;
   onSent: (m: ChatMessage) => void;
   onError: (s: string | null) => void;
 }) {
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(initialDraft ?? '');
   const [sending, setSending] = useState(false);
   const [picked, setPicked] = useState<ChatMention[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);

@@ -23,8 +23,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 export type AwayPeriod = components['schemas']['AwayPeriod'];
 type Cover = AwayPeriod['covers'][number];
@@ -44,7 +45,7 @@ function isoDay(date: Date): string {
 export function AwayCard({ people, onChanged }: { people: AwayPerson[]; onChanged?: () => void }) {
   const t = useTranslation('admin');
   const dates = useDateDisplay();
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const { addToast } = useToast();
 
   const [current, setCurrent] = useState<AwayPeriod | null>(null);
@@ -59,8 +60,8 @@ export function AwayCard({ people, onChanged }: { people: AwayPerson[]; onChange
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const response = await apiClient('/api/v1/me/away');
-      const body = (await response.json().catch(() => null)) as { data?: AwayPeriod | null } | null;
+      const { data, response } = await api.GET('/api/v1/me/away');
+      const body = (data ?? null) as { data?: AwayPeriod | null } | null;
       if (!cancelled) {
         setCurrent(response.ok ? (body?.data ?? null) : null);
         setLoaded(true);
@@ -69,7 +70,7 @@ export function AwayCard({ people, onChanged }: { people: AwayPerson[]; onChange
     return () => {
       cancelled = true;
     };
-  }, [apiClient]);
+  }, []);
 
   const others = useMemo(() => people.filter((p) => p.id !== user?.id), [people, user?.id]);
   const delegate = others.find((p) => String(p.id) === delegateId) ?? null;
@@ -79,18 +80,16 @@ export function AwayCard({ people, onChanged }: { people: AwayPerson[]; onChange
   const handOver = async () => {
     setBusy(true);
     try {
-      const response = await apiClient('/api/v1/me/away', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { data, error, response } = await api.PUT('/api/v1/me/away', {
+        body: {
           delegateProfileId: Number(delegateId),
           startsOn,
           backOn,
           covers: (Object.keys(covers) as Cover[]).filter((key) => covers[key]),
           message: message.trim() === '' ? null : message.trim(),
-        }),
+        },
       });
-      const body = (await response.json().catch(() => null)) as { data?: AwayPeriod; error?: string } | null;
+      const body = ((data ?? error ?? null) as unknown) as { data?: AwayPeriod; error?: string } | null;
       if (!response.ok || !body?.data) {
         addToast(body?.error ?? t('away.error', 'That could not be saved. Try again.'), 'error', 6000);
         return;
@@ -106,7 +105,7 @@ export function AwayCard({ people, onChanged }: { people: AwayPerson[]; onChange
   const comeBack = async () => {
     setBusy(true);
     try {
-      const response = await apiClient('/api/v1/me/away', { method: 'DELETE' });
+      const { response } = await api.DELETE('/api/v1/me/away');
       if (!response.ok) {
         addToast(t('away.error', 'That could not be saved. Try again.'), 'error', 6000);
         return;

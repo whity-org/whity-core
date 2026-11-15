@@ -42,6 +42,8 @@ final class PublicWebsiteRealEngineTest extends TestCase
     {
         TenantContext::reset();
         $this->pdo = SchemaFromMigrations::make(true);
+        // This install sells in dinars; the default has been US dollars since 3.5.1.
+        $this->pdo->exec("INSERT INTO app_settings (setting_key, value) VALUES ('billing.default_currency', 'JOD')");
         $this->pdo->exec("INSERT OR IGNORE INTO tenants (id, name, slug) VALUES (0, 'system', 'system')");
         $this->pdo->exec("INSERT INTO tenants (id, name, slug) VALUES (" . self::TEAM_INBOX . ", 'Whity team', 'whity-team')");
         SchemaFromMigrations::syncSequences($this->pdo);

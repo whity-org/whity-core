@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -33,7 +33,6 @@ interface PlanOption {
  * so a workspace is never left with neither.
  */
 export function ChangePlan({ onChanged }: { onChanged: () => void }) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
@@ -43,10 +42,10 @@ export function ChangePlan({ onChanged }: { onChanged: () => void }) {
   const idempotencyKey = useRef('');
 
   const { data } = useFetch(async () => {
-    const res = await apiClient('/api/v1/billing/plans');
+    const { data: body, response: res } = await api.GET('/api/v1/billing/plans');
     if (!res.ok) return [] as PlanOption[];
-    return ((await res.json()).data ?? []) as PlanOption[];
-  }, [apiClient]);
+    return ((body as { data?: PlanOption[] } | undefined)?.data ?? []) as PlanOption[];
+  }, []);
 
   const tiers = (data ?? []).filter((plan) => !plan.is_addon);
   const others = tiers.filter((plan) => !plan.is_current);
@@ -67,20 +66,18 @@ export function ChangePlan({ onChanged }: { onChanged: () => void }) {
 
   const confirm = async () => {
     if (target === null) return;
-    const res = await apiClient('/api/v1/billing/change-plan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const { data: body, response: res } = await api.POST('/api/v1/billing/change-plan', {
+      body: {
         plan_key: target.plan_key,
         billing_period: target.billing_period,
         idempotency_key: idempotencyKey.current,
-      }),
+      } as never,
     });
     if (!res.ok) {
       addToast(t('billing.changePlan.failed', 'The plan was not changed. Please try again.'), 'error');
       return;
     }
-    const takesEffect = (await res.json()).data?.takes_effect as string | undefined;
+    const takesEffect = (body as { data?: { takes_effect?: string } } | undefined)?.data?.takes_effect;
     addToast(
       takesEffect === 'now'
         ? t('billing.changePlan.doneNow', 'You’re now on {plan}.', { plan: target.name })
