@@ -17,6 +17,7 @@ import { SsoLoginButtons } from '@/components/sso-login-buttons';
 import { TwoFactorSetupWizard } from '@/components/TwoFactorSettings';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { localizedName } from '@/lib/localized-name';
+import { oneEntryPerWorkspace, rolesLabel } from '@/lib/workspace-memberships';
 import { SSO_ERROR_KEYS } from './sso-error-keys';
 
 /**
@@ -136,6 +137,7 @@ export default function LoginPage() {
       tenant_name_language?: string;
       tenant_names?: Record<string, string>;
       role: string;
+      roles?: string[];
     }> | null
   >(null);
   const [selectingTenant, setSelectingTenant] = useState(false);
@@ -191,7 +193,7 @@ export default function LoginPage() {
           const body = (response.ok ? data ?? null : null) as { data?: { memberships?: unknown } } | null;
           const memberships = body?.data?.memberships;
           if (Array.isArray(memberships) && memberships.length > 0) {
-            setPendingMemberships(memberships as never);
+            setPendingMemberships(oneEntryPerWorkspace(memberships as never));
           } else {
             showBounce();
           }
@@ -257,7 +259,7 @@ export default function LoginPage() {
         if (data.requires_tenant_selection && Array.isArray(data.memberships)) {
           // Multi-membership profile: no session minted yet — prompt the user
           // to choose which tenant to sign in to before completing login.
-          setPendingMemberships(data.memberships as never);
+          setPendingMemberships(oneEntryPerWorkspace(data.memberships as never));
           setPassword('');
           setFieldErrors({});
         } else {
@@ -584,7 +586,7 @@ export default function LoginPage() {
                 <span>
                   {localizedName(m.tenant_names, readerLanguage, m.tenant_name_language, m.tenant_name)}
                 </span>
-                <span className="text-xs capitalize text-muted-foreground">{m.role}</span>
+                <span className="text-xs capitalize text-muted-foreground">{rolesLabel(m)}</span>
               </Button>
             ))}
           </div>

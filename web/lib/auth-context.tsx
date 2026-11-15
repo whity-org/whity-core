@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { api, SESSION_EXPIRED_EVENT } from './api/client';
 import { forgetPushOnSignOut } from '@/lib/pwa/push';
+import { oneEntryPerWorkspace } from '@/lib/workspace-memberships';
 
 interface User {
   id: number;
@@ -25,6 +26,8 @@ export interface Membership {
   tenant_name_language?: string;
   tenant_names?: Record<string, string>;
   role: string;
+  /** Every role held in the workspace, the primary one first. */
+  roles?: string[];
   /**
    * `customer` when the person joined through the workspace's own sign-up
    * (WHIT-915). The server caps a customer's permissions, so admin screens
@@ -113,7 +116,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setUser(data.user);
           }
           if (Array.isArray(data.memberships)) {
-            setMemberships(data.memberships as Membership[]);
+            setMemberships(oneEntryPerWorkspace(data.memberships as Membership[]));
           }
         }
       } catch (error) {
@@ -226,7 +229,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(data.user);
         }
         if (Array.isArray(data.memberships)) {
-          setMemberships(data.memberships as Membership[]);
+          setMemberships(oneEntryPerWorkspace(data.memberships as Membership[]));
         }
       } else {
         setUser(null);

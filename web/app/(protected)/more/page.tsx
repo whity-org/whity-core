@@ -21,6 +21,7 @@ import { useShellNav } from '@/components/shell/use-shell-nav';
 import { TenantSwitcher } from '@/components/sidebar';
 import { InstallOffer } from '@/components/pwa/install-offer';
 import { localizedName } from '@/lib/localized-name';
+import { rolesLabel } from '@/lib/workspace-memberships';
 import { SETTINGS_MENU_HREF } from '@/components/settings/settings-area';
 
 /** Nav items the tab bar already holds. */
@@ -47,7 +48,7 @@ export default function MorePage() {
   const workspace = membership
     ? localizedName(membership.tenant_names, currentLanguage ?? 'en', membership.tenant_name_language, membership.tenant_name)
     : '';
-  const role = membership?.role ?? user?.role ?? '';
+  const role = (membership ? rolesLabel(membership) : '') || user?.role || '';
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-5 pb-4">

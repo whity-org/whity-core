@@ -319,6 +319,12 @@ function EnrollForm({ onEnrolled }: { onEnrolled: () => void | Promise<void> }) 
   )
 }
 
+/** Every role held in the tenant; an older backend sends only `role`. */
+function rolesOf(membership: TenantMembership): string[] {
+  if (Array.isArray(membership.roles) && membership.roles.length > 0) return membership.roles
+  return membership.role ? [membership.role] : []
+}
+
 /** A tenant's display label, falling back to its id when the row has no name. */
 function tenantLabel(membership: TenantMembership): string {
   const name = membership.tenantName.trim()
@@ -404,9 +410,9 @@ function TenantPicker({
                     <span dir="auto" className="text-sm font-medium">
                       {tenantLabel(membership)}
                     </span>
-                    {membership.role ? (
+                    {rolesOf(membership).length > 0 ? (
                       <span dir="auto" className="text-xs text-muted-foreground">
-                        {membership.role}
+                        {rolesOf(membership).join(", ")}
                       </span>
                     ) : null}
                   </span>
