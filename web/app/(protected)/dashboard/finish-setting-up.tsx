@@ -15,7 +15,7 @@ import { Icon } from '@whity/ui/icon';
 import { Lottie } from '@whity/ui/lottie';
 import type { IconName } from '@whity/ui/icon-map';
 import { useTranslation } from '@whity/features/i18n';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 
 interface SetupSteps {
@@ -29,14 +29,13 @@ const SETUP_PENDING_KEY = 'whity.setup.pending';
 
 export function FinishSettingUp() {
   const t = useTranslation('common');
-  const { apiClient } = useAuth();
 
   const setup = useFetch<SetupSteps | null>(async () => {
-    const response = await apiClient('/api/v1/me/setup-steps');
+    const { data: body, response } = await api.GET('/api/v1/me/setup-steps');
     // Not worth an error on the home: the card just doesn't appear.
     if (!response.ok) return null;
-    return ((await response.json()) as { data?: SetupSteps }).data ?? null;
-  }, [apiClient]);
+    return ((body as { data?: SetupSteps } | undefined)?.data) ?? null;
+  }, []);
 
   const data = setup.data;
   const complete = data !== null && data.total > 0 && data.done === data.total;

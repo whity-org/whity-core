@@ -12,7 +12,7 @@ import { Card } from '@whity/ui/card';
 import { ActorChip } from '@whity/ui/actor-chip';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { isToday, type AgentAction, type AgentProposal } from '@/components/agents/proposals';
 
@@ -28,19 +28,18 @@ export function AgentsToday({ refreshKey }: { refreshKey: number }) {
   const t = useTranslation('common');
   const locale = useFormattingLocale();
   const dates = useDateDisplay();
-  const { apiClient } = useAuth();
 
   const activity = useFetch<{ actions: AgentAction[]; proposals: AgentProposal[] }>(async () => {
     const [actions, proposals] = await Promise.all([
-      apiClient('/api/v1/me/agent-actions'),
-      apiClient('/api/v1/me/agent-proposals'),
+      api.GET('/api/v1/me/agent-actions'),
+      api.GET('/api/v1/me/agent-proposals'),
     ]);
     // A failed read leaves the card out; it is not worth an error on the home.
     return {
-      actions: actions.ok ? (((await actions.json()) as { data?: AgentAction[] }).data ?? []) : [],
-      proposals: proposals.ok ? (((await proposals.json()) as { data?: AgentProposal[] }).data ?? []) : [],
+      actions: actions.response.ok ? (((actions.data as { data?: AgentAction[] } | undefined)?.data) ?? []) : [],
+      proposals: proposals.response.ok ? (((proposals.data as { data?: AgentProposal[] } | undefined)?.data) ?? []) : [],
     };
-  }, [apiClient, refreshKey]);
+  }, [refreshKey]);
 
   const unknown = t('dashboard.agent.unknown', 'An agent');
   const name = (subject: { agent: { name: string | null; nameAr: string | null } | null }): string =>

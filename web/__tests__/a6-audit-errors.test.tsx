@@ -12,6 +12,10 @@ jest.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams
 
 const apiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient }) }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => (...[url, init]: [string, RequestInit?]) =>
+    // The errors inbox below is still stubbed through `fetch`.
+    url.includes('/errors') ? (globalThis.fetch as unknown as typeof apiClient)(url, init) : apiClient(...[url, init].slice(0, init === undefined ? 1 : 2) as [string])
+  ));
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast: jest.fn() }) }));
 jest.mock('@/hooks/useCapabilities', () => ({
   useCapabilities: () => ({ has: () => true, hasPermission: () => true, loading: false }),
@@ -140,7 +144,7 @@ describe('audit log', () => {
     URL.revokeObjectURL = jest.fn();
     apiClient.mockImplementationOnce(async () => ({ ok: true, status: 200, blob: async () => new Blob(['x']) }));
     fireEvent.click(exportButton);
-    await waitFor(() => expect(apiClient).toHaveBeenCalledWith(expect.stringContaining('/api/v1/audit-logs/export?')));
+    await waitFor(() => expect(apiClient).toHaveBeenCalledWith(expect.stringContaining('/api/v1/audit-logs/export')));
     const call = apiClient.mock.calls.find(([url]: [string]) => url.includes('/export'));
     expect(call?.[0]).not.toContain('technical=1');
   });

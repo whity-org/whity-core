@@ -6,6 +6,9 @@ import { useAuth } from '@/lib/auth-context';
 // Mock global fetch before any imports
 global.fetch = jest.fn();
 
+let mockApiClient: jest.Mock;
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
+
 // Mock the auth context
 jest.mock('@/lib/auth-context', () => {
   const actual = jest.requireActual('@/lib/auth-context');
@@ -83,8 +86,6 @@ async function submitProof(code: string) {
 }
 
 describe('TwoFactorSettings', () => {
-  let mockApiClient: jest.Mock;
-
   beforeEach(() => {
     jest.clearAllMocks();
     mockClick.mockClear();
@@ -120,9 +121,7 @@ describe('TwoFactorSettings', () => {
       render(<TwoFactorSettings />);
 
       await waitFor(() => {
-        expect(mockApiClient).toHaveBeenCalledWith('/api/v1/auth/2fa/status', {
-          method: 'GET',
-        });
+        expect(mockApiClient).toHaveBeenCalledWith('/api/v1/auth/2fa/status');
       });
     });
 
@@ -321,7 +320,6 @@ describe('TwoFactorSettings', () => {
       await waitFor(() => {
         expect(mockApiClient).toHaveBeenCalledWith('/api/v1/auth/2fa/disable', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ password: 'the password' }),
         });
       });
@@ -358,7 +356,6 @@ describe('TwoFactorSettings', () => {
       await waitFor(() => {
         expect(mockApiClient).toHaveBeenCalledWith('/api/v1/auth/2fa/disable', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: '123456' }),
         });
       });
@@ -458,7 +455,6 @@ describe('TwoFactorSettings', () => {
       await waitFor(() => {
         expect(mockApiClient).toHaveBeenCalledWith('/api/v1/auth/2fa/regenerate-codes', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: '123456' }),
         });
       });

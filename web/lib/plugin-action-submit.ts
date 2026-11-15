@@ -10,7 +10,7 @@
  * including file-download remains unchanged).
  */
 
-import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api/client';
 
 /** One issue from a server validation report (best-effort shape). */
 export interface ActionIssue {
@@ -48,7 +48,7 @@ export type SubmitResult =
   | { ok: false; issues?: ActionIssue[]; error?: string };
 
 /**
- * Submit a JSON payload to an interactive-block endpoint via `apiClient`.
+ * Submit a JSON payload to an interactive-block endpoint via `apiFetch`.
  *
  * - 2xx           → `{ ok: true }`
  * - 4xx/5xx with `{ issues }` → `{ ok: false, issues }`
@@ -57,7 +57,7 @@ export type SubmitResult =
  * - thrown        → `{ ok: false, error: <message> }`
  *
  * The endpoint must be a versioned relative path (`/api/v1/…`) — the host
- * validates and rewrites it before serving; we pass it verbatim to apiClient.
+ * validates and rewrites it before serving; we pass it verbatim to apiFetch.
  */
 export async function submitPluginAction(
   endpoint: string,
@@ -65,7 +65,7 @@ export async function submitPluginAction(
   payload: Record<string, unknown>
 ): Promise<SubmitResult> {
   try {
-    const response = await apiClient(endpoint, {
+    const response = await apiFetch(endpoint, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

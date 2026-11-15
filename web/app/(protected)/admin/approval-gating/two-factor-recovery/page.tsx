@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { ApprovalGatingTabs } from '@/components/admin/approval-gating-tabs';
@@ -71,7 +72,8 @@ interface IdentityCheck {
   email_hint: string | null;
 }
 
-const JSON_HEADERS = { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json' };
+/** A response body whose shape the screen reads field by field. */
+type Loose = { error?: string; reason?: string; data?: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 export default function TwoFactorRecoveryApprovalsPage() {
   const { addToast } = useToast();
@@ -97,16 +99,16 @@ export default function TwoFactorRecoveryApprovalsPage() {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await fetch('/api/v1/2fa-recovery/pending?page=1&per_page=100', {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'include',
+      // The spec lists no query for this route; the server pages it.
+      const { data, response: res } = await api.GET('/api/v1/2fa-recovery/pending', {
+        params: { query: { page: 1, per_page: 100 } as never },
       });
       if (!res.ok) {
         setLoadError(true);
         setItems([]);
         return;
       }
-      const body = await res.json().catch(() => ({}));
+      const body = (data ?? {}) as { data?: unknown };
       const rows = Array.isArray(body?.data) ? (body.data as PendingTwoFactorRecovery[]) : [];
       setItems(rows);
       setSelectedId((current) => (current !== null && rows.some((r) => r.id === current) ? current : rows[0]?.id ?? null));
@@ -129,16 +131,15 @@ export default function TwoFactorRecoveryApprovalsPage() {
   const isRequester = selected !== null && selected.profile_id === me;
   const gaveFirst = selected?.first_approval?.profile_id === me && me !== null;
 
-  const post = async (path: string, body: unknown) =>
-    fetch(path, { method: 'POST', headers: JSON_HEADERS, credentials: 'include', body: JSON.stringify(body) });
-
   /** Step 1: find out the check, and have the code emailed when that is the check. */
   const startApproval = async () => {
     if (selected === null) return;
     setBusy(true);
     try {
-      const res = await post('/api/v1/2fa-recovery/identity-check', { request_id: selected.id });
-      const body = await res.json().catch(() => ({}));
+      const { data, error, response: res } = await api.POST('/api/v1/2fa-recovery/identity-check', {
+        body: { request_id: selected.id },
+      });
+      const body = (data ?? error ?? {}) as Loose;
       if (!res.ok) {
         addToast(body?.error ?? t('twoStep.identity.failed', 'We could not start the check. Try again in a few minutes.'), 'error');
         return;
@@ -156,8 +157,11 @@ export default function TwoFactorRecoveryApprovalsPage() {
     if (selected === null) return;
     setBusy(true);
     try {
-      const res = await post(`/api/v1/2fa-recovery/${selected.id}/approve`, { code: value });
-      const body = await res.json().catch(() => ({}));
+      const { data, error, response: res } = await api.POST('/api/v1/2fa-recovery/{id}/approve', {
+        params: { path: { id: selected.id } },
+        body: { code: value },
+      });
+      const body = (data ?? error ?? {}) as Loose;
       if (!res.ok) {
         if (body?.reason === 'identity_check_failed') {
           setCodeError(t('twoStep.identity.wrong', 'That code is not right or has expired.'));
@@ -185,7 +189,9 @@ export default function TwoFactorRecoveryApprovalsPage() {
     if (selected === null) return;
     setBusy(true);
     try {
-      const res = await post(`/api/v1/2fa-recovery/${selected.id}/reject`, {});
+      const { response: res } = await api.POST('/api/v1/2fa-recovery/{id}/reject', {
+        params: { path: { id: selected.id } },
+      });
       if (!res.ok) {
         addToast(t('twoStep.reject.failed', 'The request could not be rejected.'), 'error');
       } else {
@@ -201,7 +207,10 @@ export default function TwoFactorRecoveryApprovalsPage() {
     if (selected === null || checkText.trim() === '') return;
     setBusy(true);
     try {
-      const res = await post(`/api/v1/2fa-recovery/${selected.id}/checks`, { text: checkText.trim() });
+      const { response: res } = await api.POST('/api/v1/2fa-recovery/{id}/checks', {
+        params: { path: { id: selected.id } },
+        body: { text: checkText.trim() },
+      });
       if (!res.ok) {
         addToast(t('twoStep.check.failed', 'The check could not be saved.'), 'error');
         return;

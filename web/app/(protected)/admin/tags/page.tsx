@@ -12,7 +12,7 @@
 
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -58,13 +58,11 @@ interface TagGroup {
 
 const KEY_PATTERN = /^[A-Za-z0-9_.:-]{1,64}$/;
 
-type ApiClient = ReturnType<typeof useAuth>['apiClient'];
 type AddToast = ReturnType<typeof useToast>['addToast'];
 
 const groupLabel = (g: TagGroup): string => g.display_name?.en || g.display_name?.ar || g.key;
 
 export default function TagsPage() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
@@ -73,17 +71,17 @@ export default function TagsPage() {
 
   const { data, loading, error, refetch } = useFetch(async () => {
     const [tagsRes, groupsRes] = await Promise.all([
-      apiClient('/api/v1/tags'),
-      apiClient('/api/v1/tag-groups'),
+      api.GET('/api/v1/tags'),
+      api.GET('/api/v1/tag-groups'),
     ]);
-    if (!tagsRes.ok || !groupsRes.ok) {
+    if (!tagsRes.response.ok || !groupsRes.response.ok) {
       throw new Error(t('tags.error.load', 'Failed to fetch tags'));
     }
     return {
-      tags: ((await tagsRes.json()).data ?? []) as Tag[],
-      groups: ((await groupsRes.json()).data ?? []) as TagGroup[],
+      tags: ((tagsRes.data as { data?: unknown[] } | undefined)?.data ?? []) as Tag[],
+      groups: ((groupsRes.data as { data?: unknown[] } | undefined)?.data ?? []) as TagGroup[],
     };
-  }, [apiClient]);
+  }, []);
 
   const [creating, setCreating] = useState(false);
   // `/admin/tag-groups/<id>` redirects here with ?group=<id>, so an old link
@@ -174,7 +172,6 @@ export default function TagsPage() {
 
       {creating && (
         <CreateGroupDialog
-          apiClient={apiClient}
           addToast={addToast}
           onClose={() => setCreating(false)}
           onSaved={() => {
@@ -190,7 +187,6 @@ export default function TagsPage() {
           group={open}
           tags={tags.filter((tag) => tag.group_id === open.id)}
           canManage={canManage}
-          apiClient={apiClient}
           addToast={addToast}
           onClose={() => setOpenId(null)}
           onChanged={refetch}
@@ -214,7 +210,7 @@ export default function TagsPage() {
             label: t('tags.deleteGroup.type', 'Type {name} to confirm', { name: groupLabel(deleting) }),
           }}
           onConfirm={async () => {
-            const response = await apiClient(`/api/v1/tag-groups/${deleting.id}`, { method: 'DELETE' });
+            const { response } = await api.DELETE('/api/v1/tag-groups/{id}', { params: { path: { id: deleting.id } } });
             if (!response.ok) {
               addToast(t('tags.deleteGroup.error', 'Failed to delete tag group'), 'error');
               return;
@@ -234,7 +230,6 @@ function GroupDrawer({
   group,
   tags,
   canManage,
-  apiClient,
   addToast,
   onClose,
   onChanged,
@@ -243,7 +238,6 @@ function GroupDrawer({
   group: TagGroup;
   tags: Tag[];
   canManage: boolean;
-  apiClient: ApiClient;
   addToast: AddToast;
   onClose: () => void;
   onChanged: () => void;
@@ -270,10 +264,9 @@ function GroupDrawer({
     setKeyError(null);
     setSaving(true);
     try {
-      const response = await apiClient(`/api/v1/tag-groups/${group.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: trimmed, display_name: { ar: name.ar ?? '', en: name.en ?? '' } }),
+      const { response } = await api.PATCH('/api/v1/tag-groups/{id}', {
+        params: { path: { id: group.id } },
+        body: { key: trimmed, display_name: { ar: name.ar ?? '', en: name.en ?? '' } },
       });
       if (response.status === 409) {
         setKeyError(t('tags.key.conflict', 'Another group already uses this key.'));
@@ -290,8 +283,8 @@ function GroupDrawer({
   };
 
   const tagCall = useCallback(
-    async (url: string, init: RequestInit, done: string, failed: string) => {
-      const response = await apiClient(url, init);
+    async (request: () => Promise<{ response: Response }>, done: string, failed: string) => {
+      const { response } = await request();
       if (response.status === 409) {
         addToast(t('tags.tag.conflict', 'A tag with this name already exists in this group.'), 'error');
         return false;
@@ -304,19 +297,14 @@ function GroupDrawer({
       onChanged();
       return true;
     },
-    [apiClient, addToast, onChanged, t]
+    [addToast, onChanged, t]
   );
 
   const addTag = async () => {
     const trimmed = newTag.trim();
     if (trimmed === '' || trimmed.length > 128) return;
     const ok = await tagCall(
-      '/api/v1/tags',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ group_id: group.id, name: trimmed }),
-      },
+      () => api.POST('/api/v1/tags', { body: { group_id: group.id, name: trimmed } }),
       t('tags.tag.created', 'Tag added'),
       t('tags.tag.createError', 'Failed to add the tag')
     );
@@ -328,12 +316,7 @@ function GroupDrawer({
     const trimmed = renaming.name.trim();
     if (trimmed === '' || trimmed.length > 128) return;
     const ok = await tagCall(
-      `/api/v1/tags/${renaming.id}`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmed }),
-      },
+      () => api.PATCH('/api/v1/tags/{id}', { params: { path: { id: renaming.id } }, body: { name: trimmed } }),
       t('tags.tag.renamed', 'Tag renamed'),
       t('tags.tag.renameError', 'Failed to rename the tag')
     );
@@ -464,8 +447,7 @@ function GroupDrawer({
             cancelLabel={t('tags.cancel', 'Cancel')}
             onConfirm={async () => {
               await tagCall(
-                `/api/v1/tags/${removing.id}`,
-                { method: 'DELETE' },
+                () => api.DELETE('/api/v1/tags/{id}', { params: { path: { id: removing.id } } }),
                 t('tags.tag.removed', 'Tag removed'),
                 t('tags.tag.removeError', 'Failed to remove the tag')
               );
@@ -479,12 +461,10 @@ function GroupDrawer({
 }
 
 function CreateGroupDialog({
-  apiClient,
   addToast,
   onClose,
   onSaved,
 }: {
-  apiClient: ApiClient;
   addToast: AddToast;
   onClose: () => void;
   onSaved: () => void;
@@ -506,10 +486,8 @@ function CreateGroupDialog({
     setKeyError(null);
     setSubmitting(true);
     try {
-      const response = await apiClient('/api/v1/tag-groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: typed, display_name: { ar: displayName.ar ?? '', en: displayName.en ?? '' } }),
+      const { response } = await api.POST('/api/v1/tag-groups', {
+        body: { key: typed, display_name: { ar: displayName.ar ?? '', en: displayName.en ?? '' } },
       });
       if (response.status === 409) {
         setKeyError(t('tags.key.conflict', 'Another group already uses this key.'));

@@ -20,7 +20,7 @@ import { Icon } from '@whity/ui/icon';
 import { iconNames, type IconName } from '@whity/ui/icon-map';
 import { Skeleton } from '@whity/ui/skeleton';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
-import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 
@@ -52,24 +52,25 @@ const MAX_CHART_POINTS = 12;
 export function HomeApps() {
   const t = useTranslation('common');
   const locale = useFormattingLocale();
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
 
   const cards = useFetch<HomeCard[]>(async () => {
-    const response = await apiClient('/api/v1/me/home-cards');
+    const { data: body, response } = await api.GET('/api/v1/me/home-cards');
     // A failed read leaves the section out; the home's first job is Waiting for you.
     if (!response.ok) return [];
-    return ((await response.json()) as { data?: HomeCard[] }).data ?? [];
-  }, [apiClient]);
+    return ((body as { data?: HomeCard[] } | undefined)?.data) ?? [];
+  }, []);
 
   const name = (card: HomeCard) => (locale === 'ar' ? card.labelAr : card.label);
 
   const setHidden = async (card: HomeCard, hidden: boolean) => {
-    const response = await apiClient(`/api/v1/me/home-cards/${encodeURIComponent(card.key)}/hidden`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hidden }),
-    }).catch(() => null);
+    const response = await api
+      .PUT('/api/v1/me/home-cards/{key}/hidden', {
+        params: { path: { key: card.key } },
+        body: { hidden } as never,
+      })
+      .then((r) => r.response)
+      .catch(() => null);
     if (response === null || !response.ok) {
       addToast(t('dashboard.apps.hideFailed', 'That card could not be changed. Try again.'), 'error', 6000);
       return;
@@ -120,14 +121,13 @@ export function HomeApps() {
 function AppCard({ card, name, onHide }: { card: HomeCard; name: string; onHide: () => void }) {
   const t = useTranslation('common');
   const locale = useFormattingLocale();
-  const { apiClient } = useAuth();
   const router = useRouter();
   const [denied, setDenied] = useState(false);
 
   const data = useFetch<HomeCardData | null>(async () => {
     if (card.source === null || card.source === undefined) return null;
     // The person's choice in this product, which the browser's own header may not be.
-    const response = await apiClient(card.source, locale ? { headers: { 'Accept-Language': locale } } : undefined);
+    const response = await apiFetch(card.source, locale ? { headers: { 'Accept-Language': locale } } : undefined);
     // The app says this person may not see it now, so there is no card to show.
     if (response.status === 403 || response.status === 404) {
       setDenied(true);
@@ -135,7 +135,7 @@ function AppCard({ card, name, onHide }: { card: HomeCard; name: string; onHide:
     }
     if (!response.ok) throw new Error(t('dashboard.apps.error', 'This card could not be loaded.'));
     return ((await response.json()) as { data?: HomeCardData }).data ?? null;
-  }, [apiClient, card.source, locale]);
+  }, [card.source, locale]);
 
   if (denied) return null;
 

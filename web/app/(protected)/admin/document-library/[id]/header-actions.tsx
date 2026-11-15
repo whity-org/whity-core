@@ -6,7 +6,7 @@
  * Withdrawing asks first (tier 2): it cannot be undone. A withdrawn document keeps
  * Download and Print, because the record is kept and someone may need the paper.
  *
- * The PDF is fetched through `apiClient` because its address is an API path that
+ * The PDF is fetched through `apiFetch` because its address is an API path that
  * needs the session; a plain link would arrive without it. The current version
  * is the newest artifact (`artifacts` is newest first).
  */
@@ -22,7 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@whity/ui/dropdown-menu';
-import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { DOCUMENTS_WITHDRAW } from '@/lib/capabilities';
@@ -44,7 +44,6 @@ function pdfName(title: string): string {
 
 export function DocumentHeaderActions({ record, onWithdrawn }: DocumentHeaderActionsProps) {
   const t = useTranslation('documents');
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const current = record.artifacts[0] ?? null;
 
@@ -59,10 +58,11 @@ export function DocumentHeaderActions({ record, onWithdrawn }: DocumentHeaderAct
 
   const fetchPdf = useCallback(async (): Promise<Blob> => {
     if (current === null) throw new Error('no artifact');
-    const response = await apiClient(current.content_url);
+    // The address comes from the server's own record, so it is not a spec path.
+    const response = await apiFetch(current.content_url);
     if (!response.ok) throw new Error(t('record.actions.error', 'The PDF could not be fetched'));
     return response.blob();
-  }, [apiClient, current, t]);
+  }, [current, t]);
 
   const download = useCallback(async () => {
     setBusy('download');
@@ -106,24 +106,24 @@ export function DocumentHeaderActions({ record, onWithdrawn }: DocumentHeaderAct
   const openFiling = useCallback(async () => {
     setFiling(true);
     try {
-      const response = await apiClient('/api/v1/document-collections');
+      const { data, response } = await api.GET('/api/v1/document-collections');
       if (!response.ok) throw new Error(t('organizer.error.collections', 'Failed to load your collections'));
-      const body = (await response.json()) as { data?: DocumentCollection[] };
+      const body = data as unknown as { data?: DocumentCollection[] };
       setCollections(body.data ?? []);
     } catch (error) {
       setFiling(false);
       addToast(error instanceof Error ? error.message : String(error), 'error');
     }
-  }, [addToast, apiClient, t]);
+  }, [addToast, t]);
 
   const toggle = useCallback(
     async (collectionId: number, next: boolean) => {
       setFilingBusy(true);
       try {
-        const response = await apiClient(
-          `/api/v1/document-collections/${collectionId}/documents/${record.id}`,
-          { method: next ? 'PUT' : 'DELETE' }
-        );
+        const params = { params: { path: { id: collectionId, documentId: record.id } } };
+        const { response } = next
+          ? await api.PUT('/api/v1/document-collections/{id}/documents/{documentId}', params)
+          : await api.DELETE('/api/v1/document-collections/{id}/documents/{documentId}', params);
         if (!response.ok) {
           throw new Error(
             t('organizer.error.file', 'Failed to change what this document is filed in')
@@ -136,18 +136,20 @@ export function DocumentHeaderActions({ record, onWithdrawn }: DocumentHeaderAct
         setFilingBusy(false);
       }
     },
-    [addToast, apiClient, record.id, t]
+    [addToast, record.id, t]
   );
 
   const withdraw = useCallback(async () => {
-    const response = await apiClient(`/api/v1/documents/${record.id}/withdraw`, { method: 'POST' });
+    const { response } = await api.POST('/api/v1/documents/{id}/withdraw', {
+      params: { path: { id: record.id } },
+    });
     if (!response.ok) {
       addToast(t('record.withdraw.error', 'The document could not be withdrawn'), 'error');
       return;
     }
     addToast(t('record.withdraw.done', 'The document was withdrawn'), 'success');
     onWithdrawn();
-  }, [addToast, apiClient, onWithdrawn, record.id, t]);
+  }, [addToast, onWithdrawn, record.id, t]);
 
   const noFile = t('record.actions.noFile', 'Nothing has been rendered from this document yet');
 

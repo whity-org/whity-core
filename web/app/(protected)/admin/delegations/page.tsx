@@ -20,7 +20,6 @@ import { permissionInWords } from './permission-words';
 import type { Delegation, UserOption } from './types';
 import { AwayCard, type AwayPeriod, type AwayPerson } from './away-card';
 import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
-import { useAuth } from '@/lib/auth-context';
 
 /**
  * Row view-model for the delegations table. Display strings are precomputed so
@@ -52,7 +51,6 @@ export default function DelegationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
 
-  const { apiClient } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   // OR.1: "I'm away" periods sit in the same list, in names.
   const [awayPeriods, setAwayPeriods] = useState<AwayPeriod[]>([]);
@@ -108,10 +106,10 @@ export default function DelegationsPage() {
   }, [addToast, t, showAll]);
 
   const fetchAway = useCallback(async () => {
-    const response = await apiClient('/api/v1/away-periods');
-    const body = (await response.json().catch(() => null)) as { data?: AwayPeriod[] } | null;
+    const { data, response } = await api.GET('/api/v1/away-periods');
+    const body = (data ?? null) as { data?: AwayPeriod[] } | null;
     setAwayPeriods(response.ok ? (body?.data ?? []) : []);
-  }, [apiClient]);
+  }, []);
 
   useEffect(() => {
     void (async () => {

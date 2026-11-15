@@ -9,9 +9,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
-}));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 
 jest.mock('@/hooks/useCapabilities', () => ({
   useCapabilities: () => ({ has: (c: string) => c === 'signup:manage', loading: false }),

@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { patchTemplate, type AddToast, type ApiClient } from './api';
+import { patchTemplate, type AddToast } from './api';
 import type { TemplateRow } from './types';
 
 /** The longest public name the server accepts. */
@@ -29,7 +29,6 @@ export const PUBLIC_NAME_MAX = 120;
 export function PublicNameDialog({
   row,
   name,
-  apiClient,
   addToast,
   onClose,
   onSaved,
@@ -37,7 +36,6 @@ export function PublicNameDialog({
   row: TemplateRow;
   /** The row's title as the page shows it ("Untitled" for an empty one). */
   name: string;
-  apiClient: ApiClient;
   addToast: AddToast;
   onClose: () => void;
   onSaved: () => void;
@@ -54,7 +52,6 @@ export function PublicNameDialog({
     setSubmitting(true);
     try {
       const failure = await patchTemplate(
-        apiClient,
         row.id,
         { public_name: trimmed === '' ? null : trimmed },
         t('documentTemplates.publicName.failed', 'Failed to save the public name')

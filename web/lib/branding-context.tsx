@@ -24,6 +24,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { Branding } from '@/lib/branding';
 import { brandThemeCss } from '@/lib/brand-theme-css';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 
 const FALLBACK: Branding = {
   siteName: 'Whity',
@@ -75,9 +76,9 @@ export function BrandingProvider({
   const refreshBranding = useCallback(async () => {
     const ticket = ++latest.current;
     try {
-      const res = await fetch('/api/v1/branding', { credentials: 'include', cache: 'no-store' });
+      const { data, response: res } = await api.GET('/api/v1/branding', { cache: 'no-store' });
       if (!res.ok) return;
-      const parsed = parseBrandingResponse(await res.json());
+      const parsed = parseBrandingResponse(data);
       if (parsed === null || ticket !== latest.current) return;
       setBranding(parsed.branding);
       setThemeCss(parsed.themeCss);

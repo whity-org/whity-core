@@ -102,6 +102,7 @@ import { RecordList, RecordListItem } from '@whity/features/record';
 import { useDateDisplay } from '@whity/features/datetime';
 import type { DateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
+import { api } from '@/lib/api/client';
 import {
   Dialog,
   DialogContent,
@@ -120,9 +121,6 @@ type Translate = (
   fallback?: string,
   vars?: Record<string, string | number>
 ) => string;
-
-/** Minimal shape of the app's fetch wrapper — the panel needs nothing more. */
-type ApiClient = (path: string, init?: RequestInit) => Promise<Response>;
 
 /** Which confirm is open, if any. Both are destructive in different ways. */
 type PendingAct = 'mint' | 'withdraw' | null;
@@ -163,7 +161,6 @@ export interface DocumentQrPanelProps {
    * applies to nothing in front of the reader.
    */
   directoryNotice?: ReactNode;
-  apiClient: ApiClient;
 }
 
 export function DocumentQrPanel({
@@ -173,7 +170,6 @@ export function DocumentQrPanel({
   directory,
   canWrite,
   directoryNotice,
-  apiClient,
 }: DocumentQrPanelProps) {
   const t = useTranslation('documents');
   const dates = useDateDisplay();
@@ -197,7 +193,9 @@ export function DocumentQrPanel({
   }, []);
 
   const read = useCallback(async (): Promise<DocumentQrPanelData | null> => {
-    const response = await apiClient(`/api/v1/documents/${documentId}/qr`);
+    const { data, response } = await api.GET('/api/v1/documents/{id}/qr', {
+      params: { path: { id: documentId } },
+    });
     // A person a route reached can read the document without the permission this
     // panel needs (WHIT-902). Nothing went wrong, so there is nothing to report.
     if (response.status === 403) {
@@ -207,9 +205,9 @@ export function DocumentQrPanel({
     if (!response.ok) {
       throw new Error(String(response.status));
     }
-    const body = (await response.json()) as { data?: Partial<DocumentQrPanelData> };
+    const body = data as unknown as { data?: Partial<DocumentQrPanelData> };
     return body.data === undefined ? null : normalize(body.data);
-  }, [apiClient, documentId]);
+  }, [documentId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -245,9 +243,11 @@ export function DocumentQrPanel({
       setActError(null);
       setBusy(kind);
       try {
-        const response = await apiClient(`/api/v1/documents/${documentId}/qr`, {
-          method: kind === 'mint' ? 'POST' : 'DELETE',
-        });
+        const params = { params: { path: { id: documentId } } };
+        const { response } =
+          kind === 'mint'
+            ? await api.POST('/api/v1/documents/{id}/qr', params)
+            : await api.DELETE('/api/v1/documents/{id}/qr', params);
         if (!response.ok) {
           // LOCALIZED BY STATUS, not by passing the server's prose through.
           //
@@ -298,7 +298,7 @@ export function DocumentQrPanel({
         if (mounted.current) setBusy(null);
       }
     },
-    [apiClient, documentId, read, t]
+    [documentId, read, t]
   );
 
   if (hidden) return null;

@@ -31,6 +31,35 @@ jest.mock('@/components/auth/sign-in-brand-panel', () => ({
   SignInBrandPanel: () => null,
 }));
 
+// The page talks to the typed client. This stands in for it with a thin adapter
+// onto the global fetch mock below, so each test still queues responses and
+// asserts the endpoint, method and JSON body of the call the page makes. The
+// AuthProvider's calls go through it too.
+jest.mock('@/lib/api/client', () => {
+  const call = async (method: string, path: string, options?: { body?: unknown }) => {
+    const init: RequestInit = { method };
+    if (options?.body !== undefined) {
+      init.body = JSON.stringify(options.body);
+    }
+    const response = await (global.fetch as jest.Mock)(path, init);
+    // The real client answers a 401 with one refresh and a replay. The queued
+    // mocks below expect that refresh request right after the AuthProvider's
+    // /me call, so reproduce it for the startup call.
+    if (path === '/api/v1/me' && response?.status === 401) {
+      await (global.fetch as jest.Mock)('/api/v1/auth/refresh', { method: 'POST' });
+    }
+    const body = typeof response?.json === 'function' ? await response.json().catch(() => undefined) : undefined;
+    const failed = (response?.status ?? 0) >= 400;
+    return { data: failed ? undefined : body, error: failed ? body : undefined, response };
+  };
+  return {
+    api: {
+      GET: (path: string, options?: { body?: unknown }) => call('GET', path, options),
+      POST: (path: string, options?: { body?: unknown }) => call('POST', path, options),
+    },
+  };
+});
+
 // Mock global fetch
 global.fetch = jest.fn();
 

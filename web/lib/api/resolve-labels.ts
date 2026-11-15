@@ -12,7 +12,10 @@
  * screens' "names could not be loaded" notices report.
  */
 
-type ApiClient = (url: string, options?: RequestInit) => Promise<Response>;
+import { api } from '@/lib/api/client';
+
+/** The old `useAuth()` client, still accepted (and used) until its callers drop it. */
+type LegacyClient = (url: string, options?: RequestInit) => Promise<Response>;
 
 export type LabelSurface = 'documents' | 'documents.route';
 
@@ -44,11 +47,19 @@ export function labelRequestKey(request: LabelRequest): string {
   return `${unique(request.ous).join(',')}|${unique(request.roles).join(',')}`;
 }
 
+export async function resolveLabels(surface: LabelSurface, request: LabelRequest): Promise<ResolvedLabels>;
 export async function resolveLabels(
-  apiClient: ApiClient,
+  legacyClient: LegacyClient | null | undefined,
   surface: LabelSurface,
   request: LabelRequest
+): Promise<ResolvedLabels>;
+export async function resolveLabels(
+  first: LegacyClient | LabelSurface | null | undefined,
+  second: LabelSurface | LabelRequest,
+  third?: LabelRequest
 ): Promise<ResolvedLabels> {
+  const surface = (typeof first === 'string' ? first : second) as LabelSurface;
+  const request = (typeof first === 'string' ? second : third) as LabelRequest;
   const result: ResolvedLabels = { ous: new Map(), roles: new Map(), available: true };
   const pending: { kind: 'ous' | 'roles'; id: number }[] = [
     ...unique(request.ous).map((id) => ({ kind: 'ous' as const, id })),
@@ -63,16 +74,27 @@ export async function resolveLabels(
       roles: chunk.filter((item) => item.kind === 'roles').map((item) => item.id),
     };
     try {
-      const response = await apiClient('/api/v1/labels/resolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!response.ok) {
+      let ok: boolean;
+      let payload: unknown;
+      if (typeof first === 'function') {
+        // A caller that still holds the old client: its own requests, as before.
+        const response = await first('/api/v1/labels/resolve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        ok = response.ok;
+        payload = ok ? await response.json().catch(() => null) : null;
+      } else {
+        const { data, response } = await api.POST('/api/v1/labels/resolve', { body });
+        ok = response.ok;
+        payload = data;
+      }
+      if (!ok) {
         result.available = false;
         continue;
       }
-      const parsed = (await response.json().catch(() => null)) as {
+      const parsed = (payload ?? null) as {
         data?: { ous?: Record<string, string>; roles?: Record<string, string> };
       } | null;
       for (const [id, name] of Object.entries(parsed?.data?.ous ?? {})) {

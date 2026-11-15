@@ -25,10 +25,10 @@ import { useTranslation } from '@whity/features/i18n';
 import { ToolsetPicker } from '@/components/agents/toolset-picker';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { useFetch } from '@/hooks/useFetch';
-import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
-  refusal,
+  refusalText,
   templateGroups,
   toolsetsFromSplits,
   type AgentLanguage,
@@ -43,7 +43,6 @@ const INSTRUCTIONS_MAX = 4000;
 export function PersonaEditor({ agent }: { agent: WorkspaceAgent | null }) {
   const t = useTranslation('admin');
   const router = useRouter();
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
 
   const [name, setName] = useState(agent?.name ?? '');
@@ -60,11 +59,11 @@ export function PersonaEditor({ agent }: { agent: WorkspaceAgent | null }) {
   const [error, setError] = useState<string | null>(null);
 
   const splits = useFetch<{ toolsets: string[] }[]>(async () => {
-    const response = await apiClient('/api/v1/mcp/splits');
+    const response = await apiFetch('/api/v1/mcp/splits');
     if (!response.ok) return [];
     const body = (await response.json()) as { data?: { toolsets: string[] }[] };
     return body.data ?? [];
-  }, [apiClient]);
+  }, []);
   const offered = toolsetsFromSplits(splits.data ?? [], toolsets);
 
   const save = async (event: FormEvent) => {
@@ -72,19 +71,19 @@ export function PersonaEditor({ agent }: { agent: WorkspaceAgent | null }) {
     setSaving(true);
     setError(null);
     try {
-      const response = await apiClient(agent === null ? '/api/v1/agents' : `/api/v1/agents/${agent.id}`, {
-        method: agent === null ? 'POST' : 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, nameAr, role, roleAr, instructions, instructionsAr, tone, language, toolsets, grant }),
-      });
+      const persona = { name, nameAr, role, roleAr, instructions, instructionsAr, tone, language, toolsets, grant } as never;
+      const { data, error, response } =
+        agent === null
+          ? await api.POST('/api/v1/agents', { body: persona })
+          : await api.PATCH('/api/v1/agents/{id}', { params: { path: { id: agent.id } }, body: persona });
       const fallback = t('agents.error.save', 'This agent could not be saved. Try again.');
       if (!response.ok) {
-        setError(await refusal(response, fallback));
+        setError(refusalText(error, fallback));
         return;
       }
       addToast(t('agents.saved', 'Saved'), 'success');
       if (agent === null) {
-        const body = (await response.json()) as { data: WorkspaceAgent };
+        const body = data as unknown as { data: WorkspaceAgent };
         router.push(`/admin/agents/${body.data.id}`);
       }
     } catch {

@@ -34,16 +34,12 @@ jest.mock('@/lib/toast-context', () => ({
 }));
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
-}));
-
 const mockApiPatch = jest.fn();
-jest.mock('@/lib/api/client', () => ({
-  api: {
-    PATCH: (...args: unknown[]) => mockApiPatch(...args),
-  },
-}));
+jest.mock('@/lib/api/client', () => {
+  // List reads go through the URL-based mock; the status toggle has its own PATCH spy.
+  const via = jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient);
+  return { ...via, api: { ...via.api, PATCH: (...args: unknown[]) => mockApiPatch(...args) } };
+});
 
 // Stub the heavy modal children — this test is about the row's status badge
 // and Deactivate/Reactivate action, not the Create/Edit/Delete modals.

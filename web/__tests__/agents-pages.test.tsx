@@ -15,6 +15,7 @@ import { isReadPermission, localized, templateGroups, toolsetsFromSplits, type W
 
 const mockApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient: mockApiClient }) }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
 jest.mock('@/hooks/useCapabilities', () => ({ useCapabilities: () => ({ hasPermission: () => true }) }));

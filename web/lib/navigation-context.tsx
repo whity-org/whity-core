@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 
 export interface NavigationItem {
   id: string;
@@ -87,13 +88,11 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     const controller = new AbortController();
     const hangGuard = setTimeout(() => controller.abort(), 15_000);
     try {
-      const response = await fetch('/api/v1/navigation', {
-        credentials: 'include',
+      const { data, response } = await api.GET('/api/v1/navigation', {
         signal: controller.signal,
       });
       if (!response.ok) throw new Error('Failed to fetch navigation');
-      const data = await response.json();
-      return data.data || [];
+      return ((data as { data?: NavigationItem[] } | undefined)?.data) || [];
     } catch (error) {
       console.error('Error fetching navigation:', error);
       return [];

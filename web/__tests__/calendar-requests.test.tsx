@@ -11,9 +11,9 @@ import { BookingSheet } from '@/components/calendar/booking-sheet';
 import type { CalendarBooking, CalendarService, CalendarStaff } from '@/lib/calendar/api';
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
-}));
+jest.mock('@/lib/api/client', () =>
+  jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient)
+);
 
 const mockToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({

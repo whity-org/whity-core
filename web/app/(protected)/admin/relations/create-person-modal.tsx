@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api, type components } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   Dialog,
@@ -27,7 +27,6 @@ interface CreatePersonModalProps {
  * never links to a user — it only captures the genealogy fields.
  */
 export function CreatePersonModal({ isOpen, onClose, onSuccess }: CreatePersonModalProps) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const [isLoading, setIsLoading] = useState(false);
@@ -51,7 +50,7 @@ export function CreatePersonModal({ isOpen, onClose, onSuccess }: CreatePersonMo
 
     try {
       setIsLoading(true);
-      const payload: Record<string, unknown> = { displayName: displayName.trim() };
+      const payload: components['schemas']['PersonCreateRequest'] = { displayName: displayName.trim() };
       if (birthDate) {
         payload.birthDate = birthDate;
       }
@@ -62,15 +61,11 @@ export function CreatePersonModal({ isOpen, onClose, onSuccess }: CreatePersonMo
         payload.notes = notes.trim();
       }
 
-      const response = await apiClient('/api/v1/persons', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
+      const { response, error } = await api.POST('/api/v1/persons', { body: payload });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
         throw new Error(
-          error.error || t('relations.createPerson.error', 'Failed to create person')
+          (error as { error?: string } | undefined)?.error || t('relations.createPerson.error', 'Failed to create person')
         );
       }
 

@@ -56,20 +56,21 @@ jest.mock('@/lib/toast-context', () => ({
 
 /** The users screen's transport. */
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
-}));
 
-/** The user-groups screen's transport, which comes from the auth context. */
+/** The user-groups screen's transport. */
 const mockAuthApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockAuthApiClient, user: { id: 3, tenant_id: 1 } }),
 }));
 
+/** Which of the two the typed client forwards to; each describe picks its own. */
+let mockTransport: jest.Mock = mockApiClient;
+
 const mockApiPatch = jest.fn();
-jest.mock('@/lib/api/client', () => ({
-  api: { PATCH: (...args: unknown[]) => mockApiPatch(...args) },
-}));
+jest.mock('@/lib/api/client', () => {
+  const via = jest.requireActual('./helpers/client-via-mock').clientVia(() => mockTransport);
+  return { ...via, api: { ...via.api, PATCH: (...args: unknown[]) => mockApiPatch(...args) } };
+});
 
 // The heavy children of the users page. None of them is under test here and
 // each fetches on its own, which would put unrelated URLs in the transport log
@@ -151,6 +152,7 @@ describe('Users list asks the server to page, sort and search (#1102)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     hasPermission.mockReturnValue(true);
+    mockTransport = mockApiClient;
     stubUsers();
     mockApiPatch.mockResolvedValue({
       data: { data: { ...USERS[0], accountStatus: 'inactive' } },
@@ -450,6 +452,7 @@ describe('User groups list asks the server to page, sort and search (#1102)', ()
   beforeEach(() => {
     jest.clearAllMocks();
     hasPermission.mockReturnValue(true);
+    mockTransport = mockAuthApiClient;
     stubUserGroups();
   });
 

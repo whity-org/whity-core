@@ -53,8 +53,22 @@ jest.mock('@/lib/plugin-features-context', () => ({
 }));
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
+// Every request lands on `mockApiClient`: the typed client's `GET` (the demo
+// adapter) is mapped to `{ data, error, response }`, and `apiFetch` (a plugin's
+// own collection, a run-time path) answers the Response directly.
+jest.mock('@/lib/api/client', () => ({
+  api: {
+    GET: async (...args: unknown[]) => {
+      const res = (await mockApiClient(...args)) as Response;
+      const body: unknown = await res.json();
+      return {
+        data: res.ok ? body : undefined,
+        error: res.ok ? undefined : body,
+        response: { ok: res.ok, status: res.status },
+      };
+    },
+  },
+  apiFetch: (...args: unknown[]) => mockApiClient(...args),
 }));
 
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast: jest.fn() }) }));

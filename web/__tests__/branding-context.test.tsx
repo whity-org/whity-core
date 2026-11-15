@@ -15,6 +15,23 @@ jest.mock('@/lib/auth-context', () => ({
   useAuth: () => mockAuth,
 }));
 
+// The typed client, over a fetch-shaped fake: the tests queue `{ ok, json }`
+// answers on `mockFetch`, and this maps each to `{ data, error, response }`.
+const mockFetch = jest.fn();
+jest.mock('@/lib/api/client', () => ({
+  api: {
+    GET: async (path: string, init?: object) => {
+      const res = (await mockFetch(path, init)) as Response;
+      const body: unknown = await res.json();
+      return {
+        data: res.ok ? body : undefined,
+        error: res.ok ? undefined : body,
+        response: { ok: res.ok, status: res.ok ? 200 : 500 },
+      };
+    },
+  },
+}));
+
 import {
   BrandingProvider,
   BrandingSync,
@@ -170,16 +187,14 @@ async function refreshFromTest(): Promise<void> {
 }
 
 describe('BrandingProvider — main colour theme (#1716)', () => {
-  const fetchMock = jest.fn();
 
   beforeEach(() => {
-    fetchMock.mockReset();
-    global.fetch = fetchMock as unknown as typeof fetch;
+    mockFetch.mockReset();
     mockAuth = { user: null, isLoading: false };
   });
 
   it('renders the server CSS until a refresh, then the signed-in tenant light and dark sets', async () => {
-    fetchMock.mockReturnValue(jsonResponse(themeBody('Example Bakery', '#00792f', '#56b669', '/logo.png')));
+    mockFetch.mockReturnValue(jsonResponse(themeBody('Example Bakery', '#00792f', '#56b669', '/logo.png')));
     const { container } = render(
       <BrandingProvider initial={NONE} initialThemeCss=":root{--primary:#b74c05;}">
         <RefreshGrabber />
@@ -190,7 +205,7 @@ describe('BrandingProvider — main colour theme (#1716)', () => {
 
     await refreshFromTest();
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/branding', { credentials: 'include', cache: 'no-store' });
+    expect(mockFetch).toHaveBeenCalledWith('/api/v1/branding', { cache: 'no-store' });
     const css = brandStyle(container);
     expect(css).toContain(':root{--primary:#00792f;--brand:#00792f;--plane-rest:-3px 3px 0 0 #00792f;}');
     expect(css).toContain('.dark{--primary:#56b669;--brand:#56b669;}');
@@ -200,7 +215,7 @@ describe('BrandingProvider — main colour theme (#1716)', () => {
   });
 
   it('drops the brand style when the refreshed answer has no main colour (reset)', async () => {
-    fetchMock.mockReturnValue(jsonResponse({ data: { ...NONE, mainColor: null, theme: null } }));
+    mockFetch.mockReturnValue(jsonResponse({ data: { ...NONE, mainColor: null, theme: null } }));
     const { container } = render(
       <BrandingProvider initial={NONE} initialThemeCss=":root{--primary:#b74c05;}">
         <RefreshGrabber />
@@ -213,7 +228,7 @@ describe('BrandingProvider — main colour theme (#1716)', () => {
   });
 
   it('keeps the current theme when the refresh fails', async () => {
-    fetchMock.mockReturnValue(jsonResponse({ error: 'nope' }, false));
+    mockFetch.mockReturnValue(jsonResponse({ error: 'nope' }, false));
     const { container } = render(
       <BrandingProvider initial={NONE} initialThemeCss=":root{--primary:#b74c05;}">
         <RefreshGrabber />
@@ -227,7 +242,7 @@ describe('BrandingProvider — main colour theme (#1716)', () => {
 
   it('lets only the latest of two overlapping refreshes land (saving twice quickly)', async () => {
     let releaseFirst: (v: Response) => void = () => {};
-    fetchMock
+    mockFetch
       .mockReturnValueOnce(new Promise<Response>((resolve) => { releaseFirst = resolve; }))
       .mockReturnValueOnce(jsonResponse(themeBody('Whity', '#643b9a', '#ae86ec')));
     const { container } = render(
@@ -257,7 +272,7 @@ describe('BrandingProvider — main colour theme (#1716)', () => {
   });
 
   it('BrandingSync re-reads branding once auth settles and again on a tenant switch', async () => {
-    fetchMock.mockImplementation(() => jsonResponse(themeBody('Whity', '#00792f', '#56b669')));
+    mockFetch.mockImplementation(() => jsonResponse(themeBody('Whity', '#00792f', '#56b669')));
     mockAuth = { user: null, isLoading: true };
     const tree = () => (
       <BrandingProvider initial={NONE}>
@@ -265,17 +280,17 @@ describe('BrandingProvider — main colour theme (#1716)', () => {
       </BrandingProvider>
     );
     const { rerender, container } = render(tree());
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
 
     mockAuth = { user: { id: 3, tenant_id: 1 }, isLoading: false };
     rerender(tree());
     await waitFor(() => expect(brandStyle(container)).toContain('#00792f'));
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
 
-    fetchMock.mockImplementation(() => jsonResponse(themeBody('Whity', '#643b9a', '#ae86ec')));
+    mockFetch.mockImplementation(() => jsonResponse(themeBody('Whity', '#643b9a', '#ae86ec')));
     mockAuth = { user: { id: 3, tenant_id: 4 }, isLoading: false };
     rerender(tree());
     await waitFor(() => expect(brandStyle(container)).toContain('#643b9a'));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });

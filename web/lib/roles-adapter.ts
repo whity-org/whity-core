@@ -1,7 +1,7 @@
 /**
  * web/'s RolesAdapter implementation (Path B feature-extraction pilot) — wires
  * the data-source-agnostic `RolesScreen` (@whity/features/roles) to the
- * REST API via web's own cookie-authenticated `apiClient` (silent token refresh
+ * REST API via web's own cookie-authenticated `apiFetch` (silent token refresh
  * on 401, same as every other authenticated fetch in this app).
  *
  * A desktop/Tauri client implements the exact same `RolesAdapter` against its
@@ -13,7 +13,7 @@
  * passed to the same shape. Direct sibling of `web/lib/demo-catalog-adapter.ts`.
  */
 
-import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api/client';
 import type {
   Permission,
   Role,
@@ -309,12 +309,12 @@ export function createRolesAdapter(transport: Transport): RolesAdapter {
 
 /**
  * The web transport: maps a `fetch` `Response` (via the cookie-authenticated
- * `apiClient`) into the `{ status, body }` seam. JSON is read once; a body-less
+ * `apiFetch`) into the `{ status, body }` seam. JSON is read once; a body-less
  * or non-JSON response yields `body: null` (the factory tolerates it).
  */
 const webTransport: Transport = {
   async request(method: string, path: string, body?: unknown) {
-    const response = await apiClient(path, {
+    const response = await apiFetch(path, {
       method,
       ...(body !== undefined
         ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }

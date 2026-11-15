@@ -24,7 +24,7 @@ import { Textarea } from '@whity/ui/textarea';
 import { AreaError } from '@whity/ui/page-states';
 import { useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { MESSAGES_MANAGE } from '@/lib/capabilities';
@@ -39,7 +39,6 @@ interface Draft {
 
 export default function MessagesSettingsPage() {
   const t = useTranslation('admin');
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const { has, loading: capsLoading } = useCapabilities();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -48,10 +47,10 @@ export default function MessagesSettingsPage() {
   const [confirmRotate, setConfirmRotate] = useState(false);
 
   const settings = useFetch<MessagingSettings>(async () => {
-    const response = await apiClient('/api/v1/messages/settings');
+    const { data, response } = await api.GET('/api/v1/messages/settings');
     if (!response.ok) throw new Error(t('settings.messages.error.load', 'The Messages settings could not be loaded.'));
-    return ((await response.json()) as { data: MessagingSettings }).data;
-  }, [apiClient]);
+    return (data as unknown as { data: MessagingSettings }).data;
+  }, []);
 
   if (!capsLoading && !has(MESSAGES_MANAGE)) {
     return (
@@ -88,17 +87,15 @@ export default function MessagesSettingsPage() {
     if (!current) return;
     setSaving(true);
     try {
-      const response = await apiClient('/api/v1/messages/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { response, error } = await api.PUT('/api/v1/messages/settings', {
+        body: {
           webchat_enabled: current.webchat_enabled,
           webchat_greeting: current.webchat_greeting.trim() === '' ? null : current.webchat_greeting.trim(),
           inbound_email_address: current.inbound_email_address.trim() === '' ? null : current.inbound_email_address.trim(),
-        }),
+        },
       });
       if (!response.ok) {
-        addToast(await errorText(response, t('settings.messages.error.save', 'Your changes were not saved.')), 'error');
+        addToast(await errorText(new Response(JSON.stringify(error ?? null), { status: response.status }), t('settings.messages.error.save', 'Your changes were not saved.')), 'error');
         return;
       }
       setDraft(null);
@@ -110,12 +107,12 @@ export default function MessagesSettingsPage() {
   };
 
   const makeSecret = async (): Promise<void> => {
-    const response = await apiClient('/api/v1/messages/settings/inbound-secret', { method: 'POST' });
+    const { data, response } = await api.POST('/api/v1/messages/settings/inbound-secret');
     if (!response.ok) {
       addToast(t('settings.messages.error.secret', 'A new secret could not be made.'), 'error');
       return;
     }
-    setSecret(((await response.json()) as { data: { secret: string } }).data.secret);
+    setSecret((data as unknown as { data: { secret: string } }).data.secret);
     settings.refetch();
   };
 

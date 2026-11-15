@@ -23,12 +23,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import type { Block } from '@/lib/plugin-features';
-import { apiClient } from '@/lib/api-client';
 import { ToastProvider } from '@/lib/toast-context';
 import { DateDisplayProvider } from '@whity/features/datetime';
 
-jest.mock('@/lib/api-client', () => ({ apiClient: jest.fn() }));
-const mockApiClient = apiClient as jest.MockedFunction<typeof apiClient>;
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
+const mockApiClient: jest.Mock = jest.fn();
 
 interface Call {
   url: string;

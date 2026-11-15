@@ -19,11 +19,15 @@ jest.mock('@/lib/toast-context', () => ({
   useToast: () => ({ addToast }),
 }));
 
+const mockPost = jest.fn();
+jest.mock('@/lib/api/client', () => ({
+  api: { POST: (...a: unknown[]) => mockPost(...a) },
+}));
+
 import ForgotPasswordPage from '@/app/forgot-password/page';
 
 beforeEach(() => {
   jest.clearAllMocks();
-  global.fetch = jest.fn();
 });
 
 function submitEmail(email: string) {
@@ -32,20 +36,20 @@ function submitEmail(email: string) {
 }
 
 test('shows the generic confirmation after a successful submission', async () => {
-  (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true, status: 202, json: async () => ({}) });
+  mockPost.mockResolvedValueOnce({ data: undefined, error: undefined, response: new Response(null, { status: 202 }) });
 
   render(<ForgotPasswordPage />);
   submitEmail('someone@example.com');
 
   await waitFor(() => expect(screen.getByTestId('forgot-password-sent')).toBeInTheDocument());
-  expect(global.fetch).toHaveBeenCalledWith(
+  expect(mockPost).toHaveBeenCalledWith(
     '/api/v1/auth/password/forgot',
-    expect.objectContaining({ method: 'POST', credentials: 'include' })
+    expect.objectContaining({ body: { email: 'someone@example.com' } })
   );
 });
 
 test('shows the SAME generic confirmation whether or not the account exists (no enumeration observable client-side)', async () => {
-  (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true, status: 202, json: async () => ({}) });
+  mockPost.mockResolvedValueOnce({ data: undefined, error: undefined, response: new Response(null, { status: 202 }) });
   render(<ForgotPasswordPage />);
   submitEmail('known@example.com');
   await waitFor(() => expect(screen.getByTestId('forgot-password-sent')).toBeInTheDocument());
@@ -53,7 +57,7 @@ test('shows the SAME generic confirmation whether or not the account exists (no 
 });
 
 test('surfaces a 422 as a field error, not the generic confirmation', async () => {
-  (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 422, json: async () => ({}) });
+  mockPost.mockResolvedValueOnce({ data: undefined, error: {}, response: new Response(null, { status: 422 }) });
 
   render(<ForgotPasswordPage />);
   // A value that satisfies the <input type="email"> client-side constraint
@@ -67,7 +71,7 @@ test('surfaces a 422 as a field error, not the generic confirmation', async () =
 });
 
 test('surfaces a 429 as a rate-limit message', async () => {
-  (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({}) });
+  mockPost.mockResolvedValueOnce({ data: undefined, error: {}, response: new Response(null, { status: 429 }) });
 
   render(<ForgotPasswordPage />);
   submitEmail('flood@example.com');
@@ -80,5 +84,5 @@ test('requires a non-empty email before submitting', () => {
   fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
 
   expect(screen.getByText('Email is required')).toBeInTheDocument();
-  expect(global.fetch).not.toHaveBeenCalled();
+  expect(mockPost).not.toHaveBeenCalled();
 });

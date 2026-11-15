@@ -6,7 +6,7 @@
  * the generated client because this screen is a core admin page: the typed
  * client is generated from the DYNAMIC /api/openapi.json, which describes
  * plugin routes, so it cannot type a core resource (the same reason the
- * tag-groups and roles pages fetch through `apiClient`).
+ * tag-groups and roles pages cast the typed client's bodies).
  */
 
 /**

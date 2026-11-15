@@ -19,11 +19,8 @@ jest.mock('@/lib/api/client', () => ({
     POST: (...args: unknown[]) => mockPost(...args),
   },
 }));
+jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ user: { id: 1 } }) }));
 jest.mock('@/app/(protected)/admin/delegations/create-modal', () => ({ CreateDelegationModal: () => null }));
-// OR.1: the page also reads the caller's own "I'm away" and everyone's away periods.
-const mockApiClient = jest.fn(async () => ({ ok: true, status: 200, json: async () => ({ data: mockAway }) }));
-const mockAway: unknown = null;
-jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient: mockApiClient, user: { id: 1 } }) }));
 
 const row = {
   id: 7,
@@ -48,8 +45,12 @@ const ended = { ...row, id: 8, status: 'expired', expiresAt: '2026-10-02 00:00:0
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGet.mockImplementation(async (_path: string, options: { params: { query: { includeRevoked?: boolean } } }) => ({
-    data: { data: options.params.query.includeRevoked ? [row, ended] : [row] },
+  // OR.1: the page also reads everyone's away periods.
+  mockGet.mockImplementation(async (path: string, options?: { params?: { query?: { includeRevoked?: boolean } } }) => ({
+    data: {
+      data:
+        path === '/api/v1/away-periods' ? [] : path === '/api/v1/me/away' ? null : options?.params?.query?.includeRevoked ? [row, ended] : [row],
+    },
     response: { status: 200, ok: true },
   }));
   mockDelete.mockResolvedValue({ error: undefined, response: { ok: true, status: 200 } });

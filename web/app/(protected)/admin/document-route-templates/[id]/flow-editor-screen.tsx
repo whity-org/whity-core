@@ -53,7 +53,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useDirection } from '@/lib/direction-context';
@@ -158,28 +158,29 @@ export function RouteFlowEditorScreen({
   templateId: number;
   canWrite: boolean;
 }) {
-  const { apiClient } = useAuth();
   const t = useTranslation('admin');
   // Under 640px the route is read as sentences instead of a canvas (PwBuilders).
   // Not measured yet counts as wide, as it does for every gate on this hook.
   const phone = useViewportAtLeast(640) === false;
 
   const templateResult = useFetch(async () => {
-    const response = await apiClient(`/api/v1/document-route-templates/${templateId}`);
+    const { data, response } = await api.GET('/api/v1/document-route-templates/{id}', {
+      params: { path: { id: templateId } },
+    });
     if (!response.ok) {
       throw new Error(t('routeTemplates.error.loadOne', 'This route template could not be loaded'));
     }
-    const body = (await response.json()) as { data: RouteTemplateGraphWire };
+    const body = data as unknown as { data: RouteTemplateGraphWire };
     return body.data;
-  }, [apiClient, templateId]);
+  }, [templateId]);
 
   /** The kinds a stage may name, from the server's own registry. */
   const rulesResult = useFetch(async () => {
-    const response = await apiClient('/api/v1/routing-rules');
+    const { data, response } = await api.GET('/api/v1/routing-rules');
     if (!response.ok) return [] as RoutingRule[];
-    const body = await response.json();
+    const body = data as unknown as { data?: RoutingRule[] };
     return (body.data ?? []) as RoutingRule[];
-  }, [apiClient]);
+  }, []);
 
   /**
    * Roles and groups for the two core config shapes.
@@ -190,29 +191,31 @@ export function RouteFlowEditorScreen({
    * picker.
    */
   const rolesResult = useFetch(async () => {
-    const response = await apiClient('/api/v1/roles?per_page=100');
+    const { data, response } = await api.GET('/api/v1/roles', { params: { query: { per_page: 100 } } });
     if (!response.ok) return [] as RoleOption[];
-    const body = await response.json();
+    const body = data as unknown as { data?: RoleOption[] };
     return ((body.data ?? []) as RoleOption[]).map((r) => ({ id: r.id, name: r.name }));
-  }, [apiClient]);
+  }, []);
 
   const groupsResult = useFetch(async () => {
-    const response = await apiClient('/api/v1/user-groups?per_page=100');
+    const { data, response } = await api.GET('/api/v1/user-groups', { params: { query: { per_page: 100 } } });
     if (!response.ok) return [] as GroupOption[];
-    const body = await response.json();
+    const body = data as unknown as { data?: GroupOption[] };
     return ((body.data ?? []) as GroupOption[]).map((g) => ({ id: g.id, name: g.name }));
-  }, [apiClient]);
+  }, []);
 
   // WHIT-921: the published templates a final document stage may render with.
   // Soft on a 403 like the pickers above: the stage can still use the form's.
   const finalTemplatesResult = useFetch(async () => {
-    const response = await apiClient('/api/v1/document-sources?kind=template');
+    const { data, response } = await api.GET('/api/v1/document-sources', {
+      params: { query: { kind: 'template' } },
+    });
     if (!response.ok) return [] as FinalTemplateOption[];
-    const body = await response.json();
-    return ((body.data ?? []) as Array<{ id: number; title: string; published_version: number | null }>)
+    const body = data as unknown as { data?: Array<{ id: number; title: string; published_version: number | null }> };
+    return (body.data ?? [])
       .filter((row) => row.published_version !== null)
       .map((row) => ({ id: row.id, title: row.title }));
-  }, [apiClient]);
+  }, []);
 
   if (templateResult.error !== null) {
     return <p className="text-sm text-destructive">{templateResult.error}</p>;
@@ -271,7 +274,6 @@ function RouteFlowBody({
   groups: GroupOption[];
   finalTemplates: FinalTemplateOption[];
 }) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const { dir } = useDirection();
   const t = useTranslation('admin');
@@ -325,7 +327,8 @@ function RouteFlowBody({
       inFlight.current.add(key);
       void (async () => {
         try {
-          const response = await apiClient(request.url, request.init);
+          // The preview address depends on the rule's kind (see `audiencePreviewRequest`).
+          const response = await apiFetch(request.url, request.init);
 
           if (!response.ok) {
             const body = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -355,7 +358,7 @@ function RouteFlowBody({
         }
       })();
     }
-  }, [apiClient, audienceKey, audiences, graph, t]);
+  }, [audienceKey, audiences, graph, t]);
 
   const audienceFor = useCallback(
     (step: RouteFlowStep): RouteFlowAudience | undefined => audiences[audienceKey(step)],
@@ -468,29 +471,27 @@ function RouteFlowBody({
     setSaving(true);
     try {
       if (name.trim() !== '' && name !== savedName) {
-        const renamed = await apiClient(`/api/v1/document-route-templates/${templateId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim() }),
+        const { error: renameError, response: renamed } = await api.PATCH('/api/v1/document-route-templates/{id}', {
+          params: { path: { id: templateId } },
+          body: { name: name.trim() },
         });
         if (!renamed.ok) {
-          const body = (await renamed.json().catch(() => null)) as { error?: string } | null;
+          const body = (renameError ?? null) as { error?: string } | null;
           addToast(body?.error ?? t('routeTemplates.error.rename', 'The route could not be renamed'), 'error');
           return;
         }
         setSavedName(name);
       }
-      const response = await apiClient(`/api/v1/document-route-templates/${templateId}/graph`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(toGraphRequest(graph)),
+      const { data, error, response } = await api.PUT('/api/v1/document-route-templates/{id}/graph', {
+        params: { path: { id: templateId } },
+        body: toGraphRequest(graph),
       });
 
       if (!response.ok) {
         // The server's 422 names the stage and the reason ("Step 3: the 'group'
         // rule needs a 'group_id' ..."), which is exactly what an author needs
         // to act. Shown verbatim rather than replaced.
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        const body = (error ?? null) as { error?: string } | null;
         addToast(
           body?.error ?? t('routeTemplates.error.save', 'The flow could not be saved'),
           'error'
@@ -498,14 +499,14 @@ function RouteFlowBody({
         return;
       }
 
-      const body = (await response.json()) as { data: RouteTemplateGraphWire };
+      const body = data as unknown as { data: RouteTemplateGraphWire };
       setGraph(toFlowGraph(body.data));
       setDirty(false);
       addToast(t('routeTemplates.saved', 'Route saved'), 'success');
     } finally {
       setSaving(false);
     }
-  }, [addToast, apiClient, graph, name, savedName, t, templateId]);
+  }, [addToast, graph, name, savedName, t, templateId]);
 
   const selectedStep = useMemo(
     () => graph.steps.find((s) => s.position === selected) ?? null,

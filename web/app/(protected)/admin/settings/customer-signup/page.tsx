@@ -15,7 +15,7 @@
  */
 
 import { useMemo, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { SIGNUP_MANAGE } from '@/lib/capabilities';
@@ -153,9 +153,9 @@ function codeText(t: TranslateFn, details: Record<string, unknown>): string | nu
   }
 }
 
-async function readError(res: Response, fallback: string, t: TranslateFn): Promise<string> {
+function readError(parsed: unknown, fallback: string, t: TranslateFn): string {
   try {
-    const body = (await res.json()) as { error?: unknown; details?: Record<string, unknown> };
+    const body = (parsed ?? {}) as { error?: unknown; details?: Record<string, unknown> };
     if (body.details) {
       const translated = codeText(t, body.details);
       if (translated !== null) return translated;
@@ -182,11 +182,11 @@ export default function CustomerSignupSettingsPage() {
     error: loadError,
     refetch,
   } = useFetch<SignupSettings>(async () => {
-    const res = await apiClient('/api/v1/signup/settings');
+    const { data, response: res, error } = await api.GET('/api/v1/signup/settings');
     if (!res.ok) {
-      throw new Error(await readError(res, t('settings.customerSignup.loadFailed', 'Sign-up settings could not be loaded'), t));
+      throw new Error(readError(error, t('settings.customerSignup.loadFailed', 'Sign-up settings could not be loaded'), t));
     }
-    return ((await res.json()) as { data: SignupSettings }).data;
+    return (data as unknown as { data: SignupSettings }).data;
   }, []);
 
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -224,21 +224,19 @@ export default function CustomerSignupSettingsPage() {
     if (current === null) return;
     setSaving(true);
     setSaveError(null);
-    const res = await apiClient('/api/v1/signup/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const { response: res, error } = await api.PUT('/api/v1/signup/settings', {
+      body: {
         mode: current.mode,
         role_id: current.roleId === '' ? null : Number(current.roleId),
         allowed_domains: splitDomains(current.domains),
         customer_invites: current.customerInvites,
         // Empty is no limit (0); anything else the server checks is a whole number.
         invites_per_customer: current.perCustomer.trim() === '' ? 0 : Number(current.perCustomer.trim()),
-      }),
+      },
     });
     setSaving(false);
     if (!res.ok) {
-      setSaveError(await readError(res, t('settings.customerSignup.saveFailed', 'The settings could not be saved'), t));
+      setSaveError(readError(error, t('settings.customerSignup.saveFailed', 'The settings could not be saved'), t));
       return;
     }
     setDraft(null);
@@ -529,23 +527,26 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
   const [rejecting, setRejecting] = useState<SignupRequest | null>(null);
 
   const { data, error, refetch } = useFetch<SignupRequest[]>(async () => {
-    const res = await apiClient(`/api/v1/signup/requests?status=${status}&per_page=100`);
+    const { data, response: res, error } = await api.GET('/api/v1/signup/requests', {
+      params: { query: { status, per_page: 100 } },
+    });
     if (!res.ok) {
-      throw new Error(await readError(res, t('settings.customerSignup.queue.loadFailed', 'The requests could not be loaded'), t));
+      throw new Error(readError(error, t('settings.customerSignup.queue.loadFailed', 'The requests could not be loaded'), t));
     }
-    return ((await res.json()) as { data: SignupRequest[] }).data;
+    return (data as unknown as { data: SignupRequest[] }).data;
   }, [pendingCount, status]);
 
   const rows = useMemo(() => data ?? [], [data]);
 
   const decide = async (request: SignupRequest, approve: boolean) => {
     setBusy(request.id);
-    const res = await apiClient(`/api/v1/signup/requests/${request.id}/${approve ? 'approve' : 'reject'}`, {
-      method: 'POST',
-    });
+    const options = { params: { path: { id: request.id } } };
+    const { response: res, error } = approve
+      ? await api.POST('/api/v1/signup/requests/{id}/approve', options)
+      : await api.POST('/api/v1/signup/requests/{id}/reject', options);
     setBusy(null);
     if (!res.ok) {
-      addToast(await readError(res, t('settings.customerSignup.queue.failed', 'The request could not be updated'), t), 'error');
+      addToast(readError(error, t('settings.customerSignup.queue.failed', 'The request could not be updated'), t), 'error');
       return;
     }
     addToast(

@@ -27,6 +27,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 // ---------------------------------------------------------------------------
 
 const addToast = jest.fn();
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 jest.mock('@/lib/toast-context', () => ({
   useToast: () => ({ addToast }),
 }));

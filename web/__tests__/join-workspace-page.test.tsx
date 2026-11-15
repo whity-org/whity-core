@@ -28,6 +28,8 @@ jest.mock('@/components/auth/turnstile-widget', () => ({
   TurnstileWidget: () => <div data-testid="signup-bot-check" />,
 }));
 
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
+
 import JoinWorkspacePage from '@/app/join/[workspace]/page';
 import JoinConfirmPage from '@/app/join/confirm/page';
 

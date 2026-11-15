@@ -66,7 +66,7 @@ import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import {
   routingMeta,
@@ -83,7 +83,6 @@ const DOCUMENT_ROUTING_SOURCE = 'document_routing';
 export default function InboxPage() {
   const t = useTranslation('documents');
   const dates = useDateDisplay();
-  const { apiClient } = useAuth();
   const router = useRouter();
 
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
@@ -91,13 +90,13 @@ export default function InboxPage() {
   const [page, setPage] = useState(1);
 
   const sources = useFetch<InboxSourcesResponse>(async () => {
-    const response = await apiClient('/api/v1/me/inbox/sources');
+    const { data, error, response } = await api.GET('/api/v1/me/inbox/sources');
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (error ?? null) as { error?: string } | null;
       throw new Error(body?.error ?? t('inbox.error.sources', 'Your inbox sources could not be loaded.'));
     }
-    return (await response.json()) as InboxSourcesResponse;
-  }, [apiClient]);
+    return data as unknown as InboxSourcesResponse;
+  }, []);
 
   const sourceList = useMemo<InboxSource[]>(() => sources.data?.data ?? [], [sources.data]);
 
@@ -115,17 +114,17 @@ export default function InboxPage() {
   const items = useFetch<InboxListResponse | null>(async () => {
     if (activeSource === null) return null;
 
-    const params = new URLSearchParams({ source: activeSource, page: String(page) });
-    if (!openOnly) params.set('open', '0');
-
-    const response = await apiClient(`/api/v1/me/inbox?${params.toString()}`);
+    const { data, error, response } = await api.GET('/api/v1/me/inbox', {
+      params: { query: { source: activeSource, page, // `0`, as before: the server reads 0 and false alike, and the wire stays the same.
+        ...(openOnly ? {} : { open: 0 as unknown as boolean }) } },
+    });
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (error ?? null) as { error?: string } | null;
       // Verbatim: a 422 names the registered source keys, which makes it fixable.
       throw new Error(body?.error ?? t('inbox.error.list', 'Your inbox could not be loaded.'));
     }
-    return (await response.json()) as InboxListResponse;
-  }, [apiClient, activeSource, openOnly, page]);
+    return data as unknown as InboxListResponse;
+  }, [activeSource, openOnly, page]);
 
   const rows = items.data?.data ?? [];
   const pagination = items.data?.pagination ?? null;

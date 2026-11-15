@@ -13,6 +13,7 @@
  * seconds and the list every 15, and nothing while the tab is hidden.
  */
 
+import { apiFetch } from '@/lib/api/client';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Avatar } from '@whity/ui/avatar';
@@ -58,12 +59,12 @@ function usePoll(fn: () => void, ms: number, active: boolean) {
 
 export function ChatScreen() {
   const t = useTranslation('chat');
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
   const selected = Number(params.get('c') ?? '') || null;
   const myId = Number((user as { profile_id?: number; id?: number } | null)?.profile_id ?? (user as { id?: number } | null)?.id ?? 0);
-  const api = useMemo(() => chatApi(apiClient), [apiClient]);
+  const api = useMemo(() => chatApi(apiFetch), []);
 
   const [chats, setChats] = useState<ChatSummary[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);

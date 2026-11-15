@@ -42,6 +42,7 @@ import {
   setWorkspaceTheme,
   type CompanyLines,
 } from './api';
+import { apiFetch } from '@/lib/api/client';
 import { DocumentsTab } from './documents-tab';
 import { FormPrintoutsTab } from './form-printouts-tab';
 import {
@@ -69,7 +70,8 @@ const STANDARD_NAMES = { name: 'Whity standard', name_ar: 'نسق Whity القي
 
 export default function DocumentThemesPage() {
   const t = useTranslation('documents');
-  const { apiClient, user, memberships } = useAuth();
+  const { user, memberships } = useAuth();
+  const apiClient = apiFetch;
   const { addToast } = useToast();
   const { hasPermission, loading: capabilitiesLoading } = useCapabilities();
   const ar = useLanguageCode() === 'ar';

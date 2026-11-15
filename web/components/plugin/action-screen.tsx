@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api/client';
 import type { PluginFeature } from '@/lib/plugin-features';
 import {
   type ActionIssue,
@@ -141,13 +141,13 @@ export function ActionScreen({ feature }: { feature: PluginFeature }) {
     setIssues(null);
     try {
       const response = hasFileField
-        ? await apiClient(submitAction.path, {
+        ? await apiFetch(submitAction.path, {
             method: submitAction.method,
             // No explicit Content-Type: the browser sets the multipart
             // boundary itself from the FormData body.
             body: buildFormData(),
           })
-        : await apiClient(submitAction.path, {
+        : await apiFetch(submitAction.path, {
             method: submitAction.method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(buildJsonPayload()),

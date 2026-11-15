@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { meterPercent, overBy, shownRows, stateOf, type PlanLimit } from '@/lib/billing/plan-limits';
 import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
@@ -30,19 +30,18 @@ import { useTranslation } from '@whity/features/i18n';
 const NUMBER = new Intl.NumberFormat('en-US');
 
 export function PlanLimits() {
-  const { apiClient } = useAuth();
   const t = useTranslation('admin');
   const dates = useDateDisplay();
 
   // Quiet on failure: this section is advice beside the bill, and a workspace
   // that cannot read it has lost nothing it needs to pay or work.
   const { data } = useFetch(async () => {
-    const res = await apiClient('/api/v1/billing/limits');
-    if (!res.ok) {
+    const { data: body, response } = await api.GET('/api/v1/billing/limits');
+    if (!response.ok) {
       return [] as PlanLimit[];
     }
-    return ((await res.json()).data ?? []) as PlanLimit[];
-  }, [apiClient]);
+    return ((body as { data?: PlanLimit[] } | undefined)?.data ?? []) as PlanLimit[];
+  }, []);
 
   const label = (key: string): string => {
     switch (key) {

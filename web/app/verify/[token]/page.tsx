@@ -42,6 +42,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Button } from '@whity/ui/button';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
+import { api } from '@/lib/api/client';
 
 /** The wire shape of `GET /api/v1/document-verifications/{token}`. */
 type Verification = {
@@ -154,10 +155,11 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
     // reader and a stranger, and sending a cookie would make the response
     // depend on who is asking on a surface whose whole design is that it does
     // not.
-    fetch(`/api/v1/document-verifications/${encodeURIComponent(token)}`, {
-      headers: { Accept: 'application/json' },
+    api.GET('/api/v1/document-verifications/{token}', {
+      params: { path: { token } },
+      credentials: 'omit',
     })
-      .then(async (response) => {
+      .then(({ data: verification, response }) => {
         if (cancelled) return;
         if (response.status === 429) {
           setPhase({ kind: 'throttled' });
@@ -167,7 +169,7 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
           setPhase({ kind: 'error' });
           return;
         }
-        const body = (await response.json()) as { data?: Verification };
+        const body = (verification ?? {}) as unknown as { data?: Verification };
         setPhase(body.data ? { kind: 'ready', data: body.data } : { kind: 'error' });
       })
       .catch(() => {
@@ -187,13 +189,10 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
     // 401/403 for one with no session at all, and every one of those outcomes
     // lands in the same silent branch. Failing quietly is correct here — the
     // absence of the button is not an error, it is the answer.
-    fetch(`/api/v1/documents/by-verification/${encodeURIComponent(token)}`, {
-      credentials: 'include',
-      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-    })
-      .then(async (response) => {
+    api.GET('/api/v1/documents/by-verification/{token}', { params: { path: { token } } })
+      .then(({ data: record, response }) => {
         if (cancelled || !response.ok) return;
-        const body = (await response.json()) as { data?: { id?: number; document_withdrawn?: boolean } };
+        const body = (record ?? {}) as unknown as { data?: { id?: number; document_withdrawn?: boolean } };
         if (typeof body.data?.id === 'number') setRecordId(body.data.id);
         setRecordWithdrawn(body.data?.document_withdrawn === true);
       })

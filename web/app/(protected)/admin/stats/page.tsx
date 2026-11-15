@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@whity/ui/card";
-import { useAuth } from "@/lib/auth-context";
+import { api } from "@/lib/api/client";
 import {
   IconUsers,
   IconUserShield,
@@ -115,7 +115,6 @@ const STATS_FETCH_TIMEOUT_MS = 15_000;
 const PLATFORM_FETCH_TIMEOUT_MS = 10_000;
 
 export default function AdminStats() {
-  const { apiClient } = useAuth();
   const t = useTranslation("admin");
   const dates = useDateDisplay();
 
@@ -160,13 +159,12 @@ export default function AdminStats() {
       setLoading(true);
       setError(false);
       try {
-        const response = await apiClient("/api/v1/admin/stats", {
+        const { data, response } = await api.GET("/api/v1/admin/stats", {
           signal: controller.signal,
         });
         if (cancelled) return;
         if (response.ok) {
-          const data = await response.json();
-          if (!cancelled) setStats(data.stats);
+          if (!cancelled) setStats((data as unknown as { stats: StatsData }).stats);
         } else if (response.status === 403) {
           setDenied(true);
         } else {
@@ -187,7 +185,7 @@ export default function AdminStats() {
       clearTimeout(hangGuard);
       controller.abort();
     };
-  }, [apiClient, retryKey]);
+  }, [retryKey]);
 
   /**
    * Platform versions — a SEPARATE request, and a separate failure story.
@@ -221,12 +219,11 @@ export default function AdminStats() {
 
     async function fetchPlatformVersion() {
       try {
-        const response = await apiClient("/api/v1/platform/version", {
+        const { data, response } = await api.GET("/api/v1/platform/version", {
           signal: controller.signal,
         });
         if (cancelled || !response.ok) return;
-        const data: PlatformVersion = await response.json();
-        if (!cancelled) setPlatform(data);
+        if (!cancelled) setPlatform(data as unknown as PlatformVersion);
       } catch {
         // Intentionally empty: absence IS the degraded rendering.
       } finally {
@@ -237,11 +234,11 @@ export default function AdminStats() {
     // The renderer line (WHIT-1001): same gate, same silence on refusal.
     async function fetchRenderer() {
       try {
-        const response = await apiClient("/api/v1/platform/renderer", {
+        const { data: body, response } = await api.GET("/api/v1/platform/renderer", {
           signal: controller.signal,
         });
         if (cancelled || !response.ok) return;
-        const data = (await response.json()) as Partial<PlatformRenderer> | null;
+        const data = (body ?? null) as Partial<PlatformRenderer> | null;
         // Shown only when it is the answer this line expects.
         if (!cancelled && data && typeof data.state === 'string' && typeof data.ready === 'boolean') {
           setRenderer(data as PlatformRenderer);
@@ -258,7 +255,7 @@ export default function AdminStats() {
       clearTimeout(hangGuard);
       controller.abort();
     };
-  }, [apiClient, retryKey]);
+  }, [retryKey]);
 
   const statCards = [
     {

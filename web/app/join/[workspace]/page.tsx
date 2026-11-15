@@ -25,6 +25,7 @@ import { useThemeMode } from '@/lib/theme-mode-context';
 import { PublicShell } from '@/components/auth/public-shell';
 import { TurnstileWidget } from '@/components/auth/turnstile-widget';
 import { ProviderIcon } from '@/components/sso-login-buttons';
+import { api } from '@/lib/api/client';
 
 interface JoinProvider {
   provider_key: string;
@@ -82,10 +83,8 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
     let cancelled = false;
     const returned = new URLSearchParams(window.location.search).get('sso');
     const outcome = SSO_OUTCOMES.find((o) => o === returned) ?? null;
-    fetch(`/api/v1/public/signup/workspaces/${encodeURIComponent(workspace)}`, {
-      headers: { Accept: 'application/json' },
-    })
-      .then(async (res) => {
+    api.GET('/api/v1/public/signup/workspaces/{workspace}', { params: { path: { workspace } } })
+      .then(({ data: infoBody, response: res }) => {
         if (cancelled) return;
         if (res.status === 404) {
           setPhase('closed');
@@ -95,7 +94,7 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
           setPhase('error');
           return;
         }
-        const body = (await res.json()) as {
+        const body = (infoBody as unknown) as {
           data: {
             workspace_name: string;
             approval_required: boolean;
@@ -158,10 +157,9 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/v1/public/signup/workspaces/${encodeURIComponent(workspace)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        body: JSON.stringify({ email: email.trim(), display_name: name.trim(), bot_token: botToken ?? '' }),
+      const { error: refusal, response: res } = await api.POST('/api/v1/public/signup/workspaces/{workspace}', {
+        params: { path: { workspace } },
+        body: { email: email.trim(), display_name: name.trim(), bot_token: botToken ?? '' } as never,
       });
 
       if (res.status === 202) {
@@ -187,7 +185,7 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
         return;
       }
       if (res.status === 422) {
-        const body = (await res.json().catch(() => ({}))) as { details?: Record<string, string> };
+        const body = ((refusal ?? {}) as unknown) as { details?: Record<string, string> };
         const field = body.details ? Object.keys(body.details)[0] : undefined;
         if (field === 'email' && body.details?.email === 'domain') {
           setError(t('join.error.domain', 'This workspace only accepts sign-ups from the email domains listed above.'));

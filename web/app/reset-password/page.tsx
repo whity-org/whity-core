@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@whity/ui/textarea';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useTranslation } from '@whity/features/i18n';
+import { api } from '@/lib/api/client';
 
 /**
  * Password-reset landing page (WC-password-reset-2fa-recovery). This is where
@@ -57,28 +58,22 @@ function ResetPasswordInner() {
 
     setSubmitting(true);
     try {
-      const response = await fetch('/api/v1/auth/password/reset', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // CSRF defense (WC-160): required on state-changing POSTs.
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ token, password, ...(reason.trim() !== '' ? { reason: reason.trim() } : {}) }),
-        credentials: 'include',
+      // The client sends the CSRF header (WC-160) on state-changing requests.
+      const { data: resetBody, error: resetError, response } = await api.POST('/api/v1/auth/password/reset', {
+        body: { token, password, ...(reason.trim() !== '' ? { reason: reason.trim() } : {}) } as never,
       });
 
       if (response.status === 200) {
-        const data = await response.json().catch(() => ({}));
-        const resultStatus = data?.data?.status as string | undefined;
+        const data = ((resetBody ?? {}) as unknown) as { data?: { status?: string } };
+        const resultStatus = data?.data?.status;
         setStatus(resultStatus === 'awaiting_approval' ? 'awaiting_approval' : 'applied');
         return;
       }
       if (response.status === 422) {
-        const data = await response.json().catch(() => ({}));
+        const data = ((resetError ?? {}) as unknown) as { error?: unknown };
         setError(
           typeof data?.error === 'string'
-            ? data.error
+            ? (data.error as string)
             : t('resetPassword.error.weak', 'Please choose a stronger password')
         );
         return;

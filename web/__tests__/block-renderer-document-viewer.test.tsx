@@ -18,12 +18,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import type { Block } from '@/lib/plugin-features';
-import { apiClient } from '@/lib/api-client';
 import { ToastProvider } from '@/lib/toast-context';
 
-jest.mock('@/lib/api-client', () => ({ apiClient: jest.fn() }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 
-const mockApiClient = apiClient as jest.MockedFunction<typeof apiClient>;
+const mockApiClient: jest.Mock = jest.fn();
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {
@@ -177,7 +176,7 @@ describe('a document with one artifact', () => {
       return el as HTMLIFrameElement;
     });
     expect(frame.getAttribute('src')).toMatch(/^blob:test\//);
-    expect(mockApiClient).toHaveBeenCalledWith('/api/v1/documents/7', expect.anything());
+    expect(mockApiClient).toHaveBeenCalledWith('/api/v1/documents/7');
     expect(mockApiClient).toHaveBeenCalledWith(
       '/api/v1/documents/7/artifacts/100/content',
       expect.anything()

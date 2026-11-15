@@ -55,7 +55,6 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { BlockRenderer as WebBlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import type { Block as WebBlock } from '@/lib/plugin-features';
-import { apiClient } from '@/lib/api-client';
 import { ToastProvider } from '@/lib/toast-context';
 import { BlockRenderer as DesktopBlockRenderer } from '../../templates/tauri-desktop/src/plugin-blocks/block-renderer';
 import type {
@@ -63,11 +62,11 @@ import type {
   PluginFeature,
 } from '../../templates/tauri-desktop/src/plugin-blocks/types';
 
-jest.mock('@/lib/api-client', () => ({ apiClient: jest.fn() }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }));
 
 const mockInvoke = jest.requireMock('@tauri-apps/api/core').invoke as jest.Mock;
-const mockApiClient = apiClient as jest.MockedFunction<typeof apiClient>;
+const mockApiClient: jest.Mock = jest.fn();
 
 /** The row both renderers open, with a value of every seedable shape. */
 const ROW = {
@@ -165,7 +164,7 @@ async function webPayload(edit?: (name: HTMLElement) => Promise<void>): Promise<
   mockApiClient.mockClear();
   await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-  const isWrite = (call: Parameters<typeof apiClient>) => call[1]?.method !== 'GET';
+  const isWrite = (call: Parameters<typeof mockApiClient>) => call[1]?.method !== 'GET';
   await waitFor(() => expect(mockApiClient.mock.calls.some(isWrite)).toBe(true));
   const body = mockApiClient.mock.calls.find(isWrite)![1]?.body;
   return JSON.parse(String(body)) as Payload;

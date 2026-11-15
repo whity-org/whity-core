@@ -18,8 +18,7 @@ const mockAddToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast: mockAddToast }) }));
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({ apiClient: (...args: unknown[]) => mockApiClient(...args) }));
-jest.mock('@/lib/api/client', () => ({ api: { PATCH: jest.fn() } }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('@/app/(protected)/admin/users/create-modal', () => ({ CreateUserModal: () => null }));
 jest.mock('@/app/(protected)/admin/users/delete-modal', () => ({ DeleteUserModal: () => null }));
 jest.mock('@/app/(protected)/admin/users/invitations-panel', () => ({ InvitationsPanel: () => null }));

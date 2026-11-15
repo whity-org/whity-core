@@ -4,7 +4,7 @@
  * Hand-written rather than taken from `@whity/api-client`: the page
  * reads two fields the generated client does not have yet (`starter_key`,
  * `legacy_template_id`, added in editor M4c), and it fetches through
- * `apiClient` like the rest of `admin/*`. Once the client is regenerated these
+ * the typed client and casts the body. Once the client is regenerated these
  * can narrow to `components['schemas']['DocumentSource']`.
  */
 

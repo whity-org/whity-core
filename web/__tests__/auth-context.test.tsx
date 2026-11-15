@@ -1,15 +1,31 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
-import * as apiClientModule from '@/lib/api-client';
 
-// Mock the api-client module
-jest.mock('@/lib/api-client', () => ({
-  apiClient: jest.fn(),
+// The typed client, over a fetch-shaped fake: each test queues the old-style
+// `{ ok, status, json }` answers on `mockFetch`, and this maps one to the
+// `{ data, error, response }` the client resolves to.
+const mockFetch = jest.fn();
+async function mockTyped(method: string, path: string, init?: { body?: unknown }) {
+  const res = (await mockFetch(path, { method, body: init?.body })) as {
+    ok: boolean;
+    status?: number;
+    json?: () => Promise<unknown>;
+  };
+  const parsed: unknown = res.json ? await res.json().catch(() => undefined) : undefined;
+  return {
+    data: res.ok ? parsed : undefined,
+    error: res.ok ? undefined : parsed,
+    response: { ok: res.ok, status: res.status ?? (res.ok ? 200 : 500) },
+  };
+}
+jest.mock('@/lib/api/client', () => ({
+  SESSION_EXPIRED_EVENT: 'whity:session-expired',
+  api: {
+    GET: (path: string, init?: object) => mockTyped('GET', path, init),
+    POST: (path: string, init?: object) => mockTyped('POST', path, init),
+  },
 }));
-
-// Mock global fetch
-global.fetch = jest.fn();
 
 const mockUser = {
   id: 1,
@@ -37,12 +53,12 @@ describe('AuthContext', () => {
     jest.clearAllMocks();
     // Default: fetch returns 401 so any unexpected call (e.g. the silent-refresh
     // attempt when /api/v1/me returns 401) fails gracefully without throwing.
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 401 });
+    mockFetch.mockResolvedValue({ ok: false, status: 401 });
   });
 
   // Test 1: Initialize with /api/me on mount
   test('testAuthProviderInitializesWithApiMe', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ user: mockUser }),
     });
@@ -57,15 +73,15 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('loading')).toHaveTextContent('Ready');
     });
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/v1/me'),
-      expect.objectContaining({ credentials: 'include' })
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/me',
+      expect.objectContaining({ method: 'GET' })
     );
   });
 
   // Test 2: Set user from /api/me response
   test('testSetUserFromMeResponse', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ user: mockUser }),
     });
@@ -83,7 +99,7 @@ describe('AuthContext', () => {
 
   // Test 3: Set user to null if /api/me returns 401
   test('testSetUserNullIf401OnInit', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
     });
@@ -105,7 +121,7 @@ describe('AuthContext', () => {
   // Test 4: Login updates user from response
   test('testLoginUpdatesUserFromResponse', async () => {
     // Mock initial /api/me call
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
     });
@@ -121,7 +137,7 @@ describe('AuthContext', () => {
     });
 
     // Mock login response
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ user: mockUser }),
     });
@@ -136,7 +152,7 @@ describe('AuthContext', () => {
 
   // Test 5: Login does NOT store token in context
   test('testLoginStoresNoToken', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
     });
@@ -151,7 +167,7 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('loading')).toHaveTextContent('Ready');
     });
 
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         user: mockUser,
@@ -177,7 +193,7 @@ describe('AuthContext', () => {
 
   // Test 6: Logout calls /api/auth/logout endpoint
   test('testLogoutCallsLogoutEndpoint', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ user: mockUser }),
     });
@@ -193,7 +209,7 @@ describe('AuthContext', () => {
     });
 
     // Mock logout response
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
     });
 
@@ -201,19 +217,16 @@ describe('AuthContext', () => {
     logoutButton.click();
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/auth/logout'),
-        expect.objectContaining({
-          method: 'POST',
-          credentials: 'include',
-        })
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/v1/auth/logout',
+        expect.objectContaining({ method: 'POST' })
       );
     });
   });
 
   // Test 7: Logout clears user state
   test('testLogoutClearsUserState', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ user: mockUser }),
     });
@@ -229,7 +242,7 @@ describe('AuthContext', () => {
     });
 
     // Mock logout response
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
     });
 
@@ -244,7 +257,7 @@ describe('AuthContext', () => {
 
   // Test 8: Verify token field does NOT exist in context
   test('testNoTokenFieldInContext', () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ user: mockUser }),
     });
@@ -270,55 +283,9 @@ describe('AuthContext', () => {
     });
   });
 
-  // Test 9: apiClient delegates to api-client.ts
-  test('testApiClientDelegates', async () => {
-    const mockApiClient = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: 'test' }),
-    });
-
-    jest.spyOn(apiClientModule, 'apiClient').mockImplementation(mockApiClient);
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-    });
-
-    const captured: { apiClient: ReturnType<typeof useAuth>['apiClient'] | null } = {
-      apiClient: null,
-    };
-
-    function CaptureApiClient() {
-      const auth = useAuth();
-      React.useEffect(() => {
-        captured.apiClient = auth.apiClient;
-      }, [auth]);
-      return null;
-    }
-
-    render(
-      <AuthProvider>
-        <CaptureApiClient />
-      </AuthProvider>
-    );
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/me'),
-        expect.any(Object)
-      );
-    });
-
-    // Call apiClient and verify it delegates.
-    if (captured.apiClient) {
-      await captured.apiClient('/api/test');
-      expect(mockApiClient).toHaveBeenCalledWith('/api/test', undefined);
-    }
-  });
-
   // Test 10: isAuthenticated depends only on user
   test('testIsAuthenticatedDependsOnlyOnUser', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
     });
@@ -337,7 +304,7 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('user')).toHaveTextContent('No user');
 
     // Mock successful login to set user
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ user: mockUser }),
     });
@@ -352,7 +319,7 @@ describe('AuthContext', () => {
 
   // Test 11: Boot sequence handles network errors gracefully
   test('testBootSequenceHandlesNetworkErrors', async () => {
-    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+    mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
     render(
       <AuthProvider>
@@ -389,7 +356,7 @@ describe('AuthContext', () => {
   }
 
   async function loginWithTokenOnly(token: string) {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
     });
@@ -406,7 +373,7 @@ describe('AuthContext', () => {
 
     // Login response carries only a token (no user object) so the decode
     // fallback populates the profile state.
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ token }),
     });
@@ -468,9 +435,9 @@ describe('AuthContext', () => {
     });
   });
 
-  // Test 12: Login includes credentials for cookie handling
+  // Test 12: Login goes through the typed client, which sends the session cookie
   test('testLoginIncludesCredentialsForCookies', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
     });
@@ -485,7 +452,7 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('loading')).toHaveTextContent('Ready');
     });
 
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ user: mockUser }),
     });
@@ -494,11 +461,9 @@ describe('AuthContext', () => {
     loginButton.click();
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v1/login'),
-        expect.objectContaining({
-          credentials: 'include',
-        })
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/v1/login',
+        expect.objectContaining({ method: 'POST' })
       );
     });
   });

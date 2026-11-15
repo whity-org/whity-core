@@ -21,7 +21,7 @@ import { EmptyState } from '@whity/ui/empty-state';
 import { Icon } from '@whity/ui/icon';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
-import { useAuth } from '@/lib/auth-context';
+import { apiFetch } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import {
@@ -44,19 +44,18 @@ export function AgentGrantScreen({ subject, backHref, backLabel }: { subject: Gr
   const t = useTranslation('admin');
   const language = useFormattingLocale();
   const arabic = language === 'ar';
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const path = grantPath(subject);
   const [saved, setSaved] = useState<AgentGrant | null>(null);
   const [saving, setSaving] = useState(false);
 
   const loaded = useFetch<AgentGrant>(async () => {
-    const response = await apiClient(path);
+    const response = await apiFetch(path);
     if (response.status === 404) throw new Error(NOT_YOURS);
     if (!response.ok) throw new Error(t('agentGrant.error.load', "This agent's permissions could not be loaded."));
     const body = (await response.json()) as { data: GrantResponse };
     return readGrant(body.data, arabic);
-  }, [apiClient, path, arabic]);
+  }, [path, arabic]);
 
   const grant = saved ?? loaded.data;
 
@@ -109,7 +108,7 @@ export function AgentGrantScreen({ subject, backHref, backLabel }: { subject: Gr
   const change = async (permission: string, mode: ScopeGrantMode) => {
     setSaving(true);
     try {
-      const response = await apiClient(path, {
+      const response = await apiFetch(path, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [permission]: mode }),

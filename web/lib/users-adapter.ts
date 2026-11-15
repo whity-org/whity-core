@@ -1,7 +1,7 @@
 /**
  * web/'s `UsersAdapter` implementation (#882) — wires the data-source-agnostic
  * `UserRecordScreen` (@whity/features/users) to the REST API via web's own
- * cookie-authenticated `apiClient` (silent token refresh on 401, like every
+ * cookie-authenticated `apiFetch` (silent token refresh on 401, like every
  * other authenticated fetch in this app).
  *
  * Direct sibling of `web/lib/roles-adapter.ts`, and deliberately the same shape:
@@ -12,7 +12,7 @@
  * transport and gets the same adapter.
  */
 
-import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api/client';
 import type {
   OuOption,
   OuOptionsResult,
@@ -292,12 +292,12 @@ export function createUsersAdapter(transport: Transport): UsersAdapter {
 
 /**
  * The web transport: maps a `fetch` `Response` (via the cookie-authenticated
- * `apiClient`) into the `{ status, body }` seam. JSON is read once; a body-less
+ * `apiFetch`) into the `{ status, body }` seam. JSON is read once; a body-less
  * or non-JSON response yields `body: null` (the factory tolerates it).
  */
 const webTransport: Transport = {
   async request(method: string, path: string, body?: unknown) {
-    const response = await apiClient(path, {
+    const response = await apiFetch(path, {
       method,
       ...(body !== undefined
         ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }

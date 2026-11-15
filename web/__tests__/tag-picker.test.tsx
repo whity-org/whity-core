@@ -13,6 +13,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 // useCallback, so a fresh wrapper each render would refetch on every render
 // (see EmailAddressesSettings test). Pass the jest.fn() itself.
 const mockApiClient = jest.fn();
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockApiClient }),
 }));
@@ -88,7 +89,6 @@ describe('TagPicker', () => {
     await waitFor(() =>
       expect(mockApiClient).toHaveBeenCalledWith('/api/v1/entity-tags', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entity_type: 'invoice', entity_id: 42, tag_id: 1 }),
       })
     );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   Sheet,
@@ -54,7 +54,6 @@ export function PersonDetailDrawer({
   onChanged,
   canManage,
 }: PersonDetailDrawerProps) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const dates = useDateDisplay();
@@ -71,16 +70,18 @@ export function PersonDetailDrawer({
     }
     setIsLoading(true);
     try {
-      const res = await apiClient(`/api/v1/persons/${personId}/relations`);
+      const { data, response: res } = await api.GET('/api/v1/persons/{id}/relations', {
+        params: { path: { id: personId } },
+      });
       if (res.ok) {
-        setRelations(((await res.json()).data ?? []) as RelationView[]);
+        setRelations(((data as { data?: unknown[] } | undefined)?.data ?? []) as RelationView[]);
       }
     } catch {
       addToast(t('relations.detail.loadError', 'Failed to load relations'), 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [apiClient, personId, addToast, t]);
+  }, [personId, addToast, t]);
 
   useEffect(() => {
     if (personId !== null) {
@@ -96,11 +97,12 @@ export function PersonDetailDrawer({
   const handleRemoveRelation = async (relationId: number) => {
     setIsMutating(true);
     try {
-      const res = await apiClient(`/api/v1/relations/${relationId}`, { method: 'DELETE' });
+      const { response: res, error: body } = await api.DELETE('/api/v1/relations/{id}', {
+        params: { path: { id: relationId } },
+      });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         throw new Error(
-          body.error || t('relations.detail.removeError', 'Failed to remove relation')
+          (body as { error?: string } | undefined)?.error || t('relations.detail.removeError', 'Failed to remove relation')
         );
       }
       addToast(t('relations.detail.removeSuccess', 'Relation removed'), 'success');

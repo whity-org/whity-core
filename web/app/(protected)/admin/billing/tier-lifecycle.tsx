@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useTranslation } from '@whity/features/i18n';
@@ -76,7 +76,6 @@ export function TierLifecycle({
   allPlans: TierRef[];
   onChanged: () => void;
 }) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
 
@@ -85,12 +84,14 @@ export function TierLifecycle({
   const [busy, setBusy] = useState(false);
 
   const { data: usage, refetch } = useFetch(async () => {
-    const res = await apiClient(`/api/v1/plans/${plan.id}/usage`);
+    const { data: body, response: res } = await api.GET('/api/v1/plans/{id}/usage', {
+      params: { path: { id: plan.id } },
+    });
     if (!res.ok) {
       return null;
     }
-    return (await res.json()).data as Usage;
-  }, [apiClient, plan.id]);
+    return (body as unknown as { data: Usage }).data;
+  }, [plan.id]);
 
   if (usage === null || usage === undefined) {
     return null;
@@ -104,13 +105,13 @@ export function TierLifecycle({
   const remove = async () => {
     setBusy(true);
     try {
-      const res = await apiClient(`/api/v1/plans/${plan.id}`, { method: 'DELETE' });
+      const { error: failure, response: res } = await api.DELETE('/api/v1/plans/{id}', {
+        params: { path: { id: plan.id } },
+      });
       if (!res.ok) {
         // The server's own words. It names the counts and the remedy, and no
         // rewording here would be more accurate than that.
-        const body = (await res.json().catch(() => null)) as
-          | { error?: string; details?: Record<string, string> }
-          | null;
+        const body = (failure ?? null) as { error?: string; details?: Record<string, string> } | null;
         addToast(
           Object.values(body?.details ?? {})[0] ??
             body?.error ??
@@ -129,10 +130,9 @@ export function TierLifecycle({
   const retire = async () => {
     setBusy(true);
     try {
-      const res = await apiClient(`/api/v1/plans/${plan.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: false }),
+      const { response: res } = await api.PATCH('/api/v1/plans/{id}', {
+        params: { path: { id: plan.id } },
+        body: { is_active: false },
       });
       addToast(
         res.ok
@@ -154,15 +154,12 @@ export function TierLifecycle({
     }
     setBusy(true);
     try {
-      const res = await apiClient(`/api/v1/plans/${plan.id}/move-subscribers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to_plan_id: Number(destination) }),
+      const { data: moveBody, error: failure, response: res } = await api.POST('/api/v1/plans/{id}/move-subscribers', {
+        params: { path: { id: plan.id } },
+        body: { to_plan_id: Number(destination) },
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as
-          | { error?: string; details?: Record<string, string> }
-          | null;
+        const body = (failure ?? null) as { error?: string; details?: Record<string, string> } | null;
         addToast(
           Object.values(body?.details ?? {})[0] ??
             body?.error ??
@@ -171,7 +168,7 @@ export function TierLifecycle({
         );
         return;
       }
-      const moved = ((await res.json()).data?.moved ?? 0) as number;
+      const moved = ((moveBody as unknown as { data?: { moved?: number } } | undefined)?.data?.moved ?? 0) as number;
       addToast(
         t('tier.moved', '{count} workspace(s) moved.', { count: String(moved) }),
         'success'

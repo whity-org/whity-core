@@ -22,6 +22,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import type { DateDisplay } from '@whity/features/datetime';
+import { apiFetch } from '@/lib/api/client';
 
 type ComponentStatus = 'operational' | 'degraded' | 'down' | 'unknown';
 
@@ -151,7 +152,8 @@ export default function StatusPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/status', { headers: { Accept: 'application/json' } });
+      // Not in the OpenAPI spec, so it goes through apiFetch.
+      const res = await apiFetch('/api/v1/status', { headers: { Accept: 'application/json' } });
       if (!res.ok) throw new Error(String(res.status));
       setData((await res.json()) as StatusPayload);
       setUnreachable(false);

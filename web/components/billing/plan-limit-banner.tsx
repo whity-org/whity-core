@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import {
   BANNER_HIDE_DAYS,
   bannerHidden,
@@ -27,7 +28,7 @@ const PLAN_PERMISSION = 'billing:pay';
  */
 export function PlanLimitBanner() {
   const t = useTranslation('admin');
-  const { apiClient, user, memberships } = useAuth();
+  const { user, memberships } = useAuth();
   const { hasPermission, loading } = useCapabilities();
   const allowed = !loading && hasPermission(PLAN_PERMISSION);
   const tenantId = user?.tenant_id ?? null;
@@ -49,8 +50,9 @@ export function PlanLimitBanner() {
   useEffect(() => {
     if (!allowed) return;
     let live = true;
-    apiClient('/api/v1/billing/limits')
-      .then(async (res) => (res.ok ? (((await res.json()) as { data?: PlanLimit[] }).data ?? []) : []))
+    api
+      .GET('/api/v1/billing/limits')
+      .then(({ data, response }) => (response.ok ? ((data as { data?: PlanLimit[] } | undefined)?.data ?? []) : []))
       .then((rows) => {
         if (live) setOver(shownRows(rows).filter((row) => row.over));
       })
@@ -60,7 +62,7 @@ export function PlanLimitBanner() {
     return () => {
       live = false;
     };
-  }, [allowed, apiClient, tenantId]);
+  }, [allowed, tenantId]);
 
   if (!allowed || hidden || !over || over.length === 0) return null;
 

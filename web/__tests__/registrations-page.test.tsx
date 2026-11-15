@@ -18,6 +18,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 // it. The arrow reads it at call time, so tests set it before render.
 let mockTenantId = 0;
 const mockReplace = jest.fn();
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));

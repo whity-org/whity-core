@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { copyTemplate, type ApiClient } from './api';
+import { copyTemplate } from './api';
 import type { TemplateRow } from './types';
 
 /**
@@ -26,14 +26,12 @@ import type { TemplateRow } from './types';
 export function CopyDialog({
   row,
   name,
-  apiClient,
   onClose,
   onCopied,
 }: {
   row: TemplateRow;
   /** The row's title as the page shows it ("Untitled" for an empty one). */
   name: string;
-  apiClient: ApiClient;
   onClose: () => void;
   onCopied: (id: number) => void;
 }) {
@@ -51,7 +49,7 @@ export function CopyDialog({
     setError(null);
     setSubmitting(true);
     try {
-      const id = await copyTemplate(apiClient, row.id, title, t('documentTemplates.copy.failed', 'The copy wasn’t made. Try again.'));
+      const id = await copyTemplate(row.id, title, t('documentTemplates.copy.failed', 'The copy wasn’t made. Try again.'));
       onCopied(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('documentTemplates.copy.failed', 'The copy wasn’t made. Try again.'));

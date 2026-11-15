@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useTranslation } from '@whity/features/i18n';
@@ -43,17 +43,27 @@ function startOfDayDaysAgo(days: number): string {
   return day.toISOString();
 }
 
-function queryOf(filters: AuditLogFilters): URLSearchParams {
-  const params = new URLSearchParams();
-  if (filters.action) params.set('action', filters.action);
-  if (filters.targetType) params.set('target_type', filters.targetType);
-  if (filters.actor) params.set('actor', filters.actor);
-  if (filters.agent) params.set('agent', filters.agent);
-  if (filters.area) params.set('area', filters.area);
+interface AuditQuery {
+  action?: string;
+  target_type?: string;
+  actor?: number;
+  agent?: string;
+  area?: string;
+  from?: string;
+  to?: string;
+}
+
+function queryOf(filters: AuditLogFilters): AuditQuery {
+  const query: AuditQuery = {};
+  if (filters.action) query.action = filters.action;
+  if (filters.targetType) query.target_type = filters.targetType;
+  if (filters.actor) query.actor = Number(filters.actor);
+  if (filters.agent) query.agent = filters.agent;
+  if (filters.area) query.area = filters.area;
   const from = filters.when in WHEN_DAYS ? startOfDayDaysAgo(WHEN_DAYS[filters.when]) : filters.from;
-  if (from) params.set('from', from);
-  if (filters.to) params.set('to', filters.to);
-  return params;
+  if (from) query.from = from;
+  if (filters.to) query.to = filters.to;
+  return query;
 }
 
 /**
@@ -64,7 +74,6 @@ function queryOf(filters: AuditLogFilters): URLSearchParams {
  * the system tenant sees all. Codes, ids and addresses need Show technical details.
  */
 export default function AuditLogsPage() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const { showTechnicalDetails } = useDisplayPreferences();
@@ -92,23 +101,21 @@ export default function AuditLogsPage() {
   const [total, setTotal] = useState(0);
 
   const { data: facets } = useFetch<AuditLogFacets | null>(async () => {
-    const response = await apiClient('/api/v1/audit-logs/facets');
+    const { data, response } = await api.GET('/api/v1/audit-logs/facets');
     if (!response.ok) return null;
-    return ((await response.json()) as { data: AuditLogFacets }).data;
+    return (data as unknown as { data: AuditLogFacets }).data;
   }, []);
 
   const fetchEntries = useCallback(async () => {
     setIsLoading(true);
-    const params = queryOf(filters);
-    params.set('page', String(page));
-    params.set('per_page', String(PER_PAGE));
+    const query = { ...queryOf(filters), page, per_page: PER_PAGE };
     try {
-      const response = await apiClient(`/api/v1/audit-logs?${params.toString()}`);
+      const { data: body, response } = await api.GET('/api/v1/audit-logs', { params: { query } });
       if (!response.ok) {
         setLoadFailed(response.status === 403 ? 'denied' : 'failed');
         return;
       }
-      const data: AuditLogResponse = await response.json();
+      const data = body as unknown as AuditLogResponse;
       setLoadFailed(null);
       setEntries(data.data ?? []);
       setTotal(data.pagination?.total ?? 0);
@@ -117,7 +124,7 @@ export default function AuditLogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [apiClient, filters, page]);
+  }, [filters, page]);
 
   useEffect(() => {
     // Deferred so the loading state isn't set synchronously inside the effect.
@@ -144,10 +151,12 @@ export default function AuditLogsPage() {
 
   const exportCsv = async () => {
     setExporting(true);
-    const params = queryOf(filters);
-    if (showTechnicalDetails) params.set('technical', '1');
+    const query = { ...queryOf(filters), ...(showTechnicalDetails ? { technical: '1' } : {}) };
     try {
-      const response = await apiClient(`/api/v1/audit-logs/export?${params.toString()}`);
+      const { data: csv, response } = await api.GET('/api/v1/audit-logs/export', {
+        params: { query },
+        parseAs: 'blob',
+      });
       if (response.status === 422) {
         addToast(t('auditLogs.export.tooMany', 'That is too many entries to export at once. Choose a shorter period.'), 'error');
         return;
@@ -156,7 +165,7 @@ export default function AuditLogsPage() {
         addToast(t('auditLogs.export.failed', 'The export did not work. Try again.'), 'error');
         return;
       }
-      const url = URL.createObjectURL(await response.blob());
+      const url = URL.createObjectURL(csv as unknown as Blob);
       const link = window.document.createElement('a');
       link.href = url;
       link.download = 'audit-log.csv';

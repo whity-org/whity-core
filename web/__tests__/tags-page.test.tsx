@@ -7,6 +7,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }));
 
 const mockApiClient = jest.fn();

@@ -10,6 +10,7 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 const hasPermission = jest.fn<boolean, [string]>();
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ user: { tenant_id: 3 } }),
 }));
@@ -70,7 +71,7 @@ describe('PasswordResetApprovalsPage — list and actions', () => {
     expect(screen.getByText('requester@acme.test')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/v1/password-resets/pending?page=1&per_page=25',
-      expect.objectContaining({ credentials: 'include' })
+      expect.objectContaining({ method: 'GET' })
     );
   });
 

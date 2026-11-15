@@ -6,7 +6,7 @@ import { Icon } from '@whity/ui/icon';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { useTranslation } from '@whity/features/i18n';
 import { useFetch } from '@/hooks/useFetch';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 
 const KINDS = ['wiki', 'note', 'template'];
 
@@ -27,17 +27,16 @@ export function MayReadPicker({
   onChange: (ids: number[]) => void;
 }) {
   const t = useTranslation('admin');
-  const { apiClient } = useAuth();
 
   const sources = useFetch<{ id: number; title: string }[]>(async () => {
     const lists = await Promise.all(
       KINDS.map(async (kind) => {
-        const response = await apiClient(`/api/v1/document-sources?kind=${kind}`);
-        return response.ok ? ((await response.json()) as { data?: { id: number; title: string }[] }).data ?? [] : [];
+        const { data, response } = await api.GET('/api/v1/document-sources', { params: { query: { kind } as never } });
+        return response.ok ? ((data ?? {}) as { data?: { id: number; title: string }[] }).data ?? [] : [];
       }),
     );
     return lists.flat();
-  }, [apiClient]);
+  }, []);
 
   const titles = useMemo(() => {
     const map = new Map<number, string>();

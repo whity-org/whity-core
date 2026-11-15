@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useTranslation } from '@whity/features/i18n';
+import { apiFetch } from '@/lib/api/client';
 
 /**
  * Email verification landing page (WC-235). This is where the verification link
@@ -71,7 +72,8 @@ function VerifyEmailInner() {
 
     void (async () => {
       try {
-        const response = await fetch('/api/v1/email/verify', {
+        // Not in the OpenAPI spec, so it goes through apiFetch.
+        const response = await apiFetch('/api/v1/email/verify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -111,7 +113,8 @@ function VerifyEmailInner() {
 
     setResendSubmitting(true);
     try {
-      const response = await fetch('/api/v1/email/request-verification', {
+      // Not in the OpenAPI spec, so it goes through apiFetch.
+      const response = await apiFetch('/api/v1/email/request-verification', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

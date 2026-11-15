@@ -6,12 +6,14 @@ import React, { Suspense } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import PreviewFormPage from '@/app/(protected)/forms/[id]/preview/page';
-import { apiClient } from '@/lib/api-client';
 
-jest.mock('@/lib/api-client', () => ({ apiClient: jest.fn() }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/fetch-like-api').fetchLikeClient());
 jest.mock('@/lib/direction-context', () => ({ useDirection: () => ({ dir: 'ltr' }) }));
 
-const client = apiClient as unknown as jest.Mock;
+const client = jest.fn();
+beforeEach(() => {
+  global.fetch = client as unknown as typeof fetch;
+});
 
 const preview = {
   form: { name: { en: 'Supplier request' }, description: null, submit_label: null },

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { parsePermissions } from '@/lib/capabilities';
 
 /**
@@ -65,7 +66,7 @@ const CapabilitiesContext = createContext<CapabilitiesContextValue | undefined>(
  * which follow the same auth-aware refetch shape for their own resources).
  */
 export function CapabilitiesProvider({ children }: { children: React.ReactNode }) {
-  const { user, isLoading: isAuthLoading, apiClient } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -106,12 +107,11 @@ export function CapabilitiesProvider({ children }: { children: React.ReactNode }
       }
 
       try {
-        const response = await apiClient('/api/v1/me/capabilities');
+        const { data: body, response } = await api.GET('/api/v1/me/capabilities');
         if (!response.ok) {
           // Fail closed: a non-ok response keeps the already-reset empty set.
           return;
         }
-        const body: unknown = await response.json();
         if (!cancelled) {
           setPermissions(parsePermissions(body));
         }
@@ -129,7 +129,7 @@ export function CapabilitiesProvider({ children }: { children: React.ReactNode }
     return () => {
       cancelled = true;
     };
-  }, [userId, tenantId, isAuthLoading, apiClient]);
+  }, [userId, tenantId, isAuthLoading]);
 
   const has = useCallback(
     (capability: string): boolean => {

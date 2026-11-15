@@ -1,11 +1,21 @@
 import { fetchPluginFeatures, type PluginFeature } from '@/lib/plugin-features';
-import { apiClient } from '@/lib/api-client';
 
-jest.mock('@/lib/api-client', () => ({
-  apiClient: jest.fn(),
+// The typed client, over a fetch-shaped fake: the tests queue Response-shaped
+// answers on `apiClientMock`, and this maps each to `{ data, error, response }`.
+const apiClientMock = jest.fn<Promise<Response>, [string, RequestInit?]>();
+jest.mock('@/lib/api/client', () => ({
+  api: {
+    GET: async (path: string, init?: RequestInit) => {
+      const res = await apiClientMock(path, init);
+      const body: unknown = await res.json();
+      return {
+        data: res.ok ? body : undefined,
+        error: res.ok ? undefined : body,
+        response: { ok: res.ok, status: res.status },
+      };
+    },
+  },
 }));
-
-const apiClientMock = apiClient as jest.MockedFunction<typeof apiClient>;
 
 /** Build a minimal Response-shaped stub without pulling in real fetch. */
 function stubResponse(ok: boolean, status: number, body: unknown): Response {

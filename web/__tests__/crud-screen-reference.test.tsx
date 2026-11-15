@@ -15,8 +15,8 @@ import type { PluginFeature } from '@/lib/plugin-features';
 const mockApiClient = jest.fn();
 // Lazy wrapper: the factory is hoisted above the const, so reference
 // mockApiClient only when apiClient is CALLED (not at module-eval time).
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
+jest.mock('@/lib/api/client', () => ({
+  apiFetch: (...args: unknown[]) => mockApiClient(...args),
 }));
 
 // #948: the Edit row action is a navigation now, so the screen calls

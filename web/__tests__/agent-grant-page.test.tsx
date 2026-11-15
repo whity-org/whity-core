@@ -13,6 +13,7 @@ import { render, screen, waitFor, within, fireEvent } from '@testing-library/rea
 import { grantPath, readGrant, shownMode, type GrantRow } from '@/components/agents/agent-grant';
 
 const mockApiClient = jest.fn();
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient: mockApiClient }) }));
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
