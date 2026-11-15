@@ -1007,7 +1007,7 @@ final class ChatService
         [$message] = $this->ownMessage($tenantId, $viewer, $messageId);
         $body = trim($body);
         if ($body === '') {
-            throw new ChatException('The message is empty. To take it back, delete it.');
+            throw new ChatException('The message is empty. To take it back, remove the message instead.');
         }
         if (mb_strlen($body) > self::MAX_BODY) {
             throw new ChatException('The message is too long (' . self::MAX_BODY . ' characters at most).');
@@ -1056,7 +1056,7 @@ final class ChatService
         $this->personOnly($viewer);
         $emoji = trim($emoji);
         // One emoji (a few code points with skin tones and joiners), never words or markup.
-        if ($emoji === '' || mb_strlen($emoji) > 8 || strlen($emoji) > 32 || preg_match('/[\p{L}\p{N}<>&"\'\s]/u', $emoji) === 1) {
+        if ($emoji === '' || mb_strlen($emoji) > 8 || strlen($emoji) > 32 || preg_match('/[\p{L}\p{N}<>&"\x27\s]/u', $emoji) === 1) {
             throw new ChatException('Pick an emoji to react with.');
         }
         $message = $this->messageInChat($tenantId, $viewer, $messageId);

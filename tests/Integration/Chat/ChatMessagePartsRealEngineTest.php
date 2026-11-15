@@ -16,7 +16,7 @@ use Whity\Core\Tenant\TenantContext;
 
 /**
  * The parts of a chat message on the real schema (design 3.5, UC.6–UC.12,
- * WHIT-1094; migration 279): replies quote what they answer, thread replies
+ * WHIT-1094; migration 282): replies quote what they answer, thread replies
  * stay out of the chat unless also sent there, reactions toggle per person,
  * pins are the chat's, only your own message can be edited or deleted and
  * deleting keeps "This message was deleted", search stays in the chat, seen
