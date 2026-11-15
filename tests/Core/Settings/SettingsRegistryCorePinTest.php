@@ -310,7 +310,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             // an operator is not registered to collect is a worse failure than
             // not charging it, and a default correct for one jurisdiction and
             // wrong for every other gets shipped unnoticed.
-            'billing.default_currency' => 'JOD',
+            'billing.default_currency' => 'USD',
             'billing.default_plan' => '',
             'billing.tax_rate_bp' => '0',
             'billing.tax_label' => '',

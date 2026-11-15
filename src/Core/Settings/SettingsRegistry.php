@@ -259,6 +259,12 @@ final class SettingsRegistry
     // invariant holds; this only decides how a price is decomposed.
     //
     // The seller an invoice is from is the workspace's company (COMPANY_*).
+    //
+    // `default_currency` is THE WORKSPACE'S CURRENCY (CU.4): what new prices,
+    // services and documents start in, and what Money shows when a screen has
+    // no row of its own. USD since design 3.5.1; workspaces that existed before
+    // were pinned to the currency they had (migration 277), and every stored
+    // amount keeps its own row's currency whatever this says.
     public const BILLING_DEFAULT_CURRENCY = 'billing.default_currency';
     // The plan_key a new workspace is put on. Empty means none, which is every
     // install that does not sell plans. Global-only: a workspace does not get to
@@ -1185,7 +1191,7 @@ final class SettingsRegistry
         self::SEATS_COUNT_INVITED => 'true',
         self::METERS_ENFORCEMENT => 'block',
         // Zero tax until an operator says otherwise — see the constant.
-        self::BILLING_DEFAULT_CURRENCY => 'JOD',
+        self::BILLING_DEFAULT_CURRENCY => 'USD',
         self::BILLING_DEFAULT_PLAN => '',
         self::BILLING_TAX_RATE_BP => '0',
         self::BILLING_TAX_LABEL => '',
@@ -2120,7 +2126,7 @@ final class SettingsRegistry
     {
         return preg_match('/^[A-Z]{3}$/', strtoupper(trim($value))) === 1
             ? null
-            : 'must be a three-letter ISO 4217 currency code, such as JOD';
+            : 'must be a three-letter ISO 4217 currency code, such as USD';
     }
 
     /**
