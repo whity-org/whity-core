@@ -58,8 +58,12 @@ jest.mock('@/lib/theme-mode-context', () => ({
 }));
 
 const mockSetLanguage = jest.fn();
+let mockNavItems: { id: string; href: string; label: string; group?: string }[] = [];
+jest.mock('@/lib/navigation-context', () => ({ useNavigation: () => ({ items: mockNavItems }) }));
+
 jest.mock('@whity/features/i18n', () => ({
   useTranslation: () => (_key: string, fallback: string) => fallback,
+  useLanguageCode: () => 'en',
   useI18nEnabled: () => true,
   useCurrentLanguage: () => ({
     currentLanguage: 'en',
@@ -79,6 +83,7 @@ import MorePage from '@/app/(protected)/more/page';
 beforeEach(() => {
   mockPathname = '/dashboard';
   mockNav = { ...NAV };
+  mockNavItems = [];
 });
 
 describe('PhoneNav', () => {
@@ -138,7 +143,33 @@ describe('More', () => {
     render(<MorePage />);
     const row = screen.getByTestId('more-notifications');
     expect(row.textContent).toContain('Notifications');
-    expect(row.getAttribute('href')).toBe('/settings?tab=preferences#notifications');
+    expect(row.getAttribute('href')).toBe('/settings/notifications');
+  });
+
+  it('puts every personal setting one row from More, labelled, and the name card says what it opens (WHIT-1083)', () => {
+    render(<MorePage />);
+    const mine = screen.getByTestId('more-my-settings');
+    expect(within(mine).getByRole('heading', { name: /My settings/ })).toBeInTheDocument();
+    // Notifications and sessions belong to one workspace: those rows name it.
+    expect(screen.getByTestId('more-notifications').textContent).toContain('Example Bakery');
+    expect(screen.getByTestId('more-signed-in').textContent).toContain('Example Bakery');
+    expect(screen.getByTestId('more-account')).toHaveAttribute('href', '/settings/profile');
+    expect(screen.getByTestId('more-account').textContent).toContain('Profile');
+    expect(screen.getByTestId('more-display')).toHaveAttribute('href', '/settings/display');
+    expect(screen.getByTestId('more-password')).toHaveAttribute('href', '/settings/security');
+    expect(screen.getByTestId('more-signed-in')).toHaveAttribute('href', '/settings/signed-in');
+  });
+
+  it('shows Workspace settings only to someone who can change any', () => {
+    const { unmount } = render(<MorePage />);
+    expect(screen.queryByTestId('more-workspace-settings')).toBeNull();
+    unmount();
+
+    mockNavItems = [{ id: 'website-settings', href: '/admin/settings', label: 'Workspace settings', group: 'settings' }];
+    render(<MorePage />);
+    const row = screen.getByTestId('more-workspace-settings');
+    expect(row).toHaveAttribute('href', '/settings#workspace-settings');
+    expect(row.textContent).toContain('Example Bakery');
   });
 
   it('keeps appearance and signing out reachable on a phone (WHIT-827)', async () => {

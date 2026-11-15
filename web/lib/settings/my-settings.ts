@@ -27,6 +27,10 @@ export interface MySettingsPage {
 /** The Settings area's own root: the menu on a phone, Profile on a computer. */
 export const SETTINGS_HOME_HREF = '/settings';
 
+/** The phone's settings menu, scrolled to the workspace's part (More links here). */
+export const WORKSPACE_SETTINGS_ANCHOR = 'workspace-settings';
+export const WORKSPACE_SETTINGS_MENU_HREF = `${SETTINGS_HOME_HREF}#${WORKSPACE_SETTINGS_ANCHOR}`;
+
 export const MY_SETTINGS_PAGES: readonly MySettingsPage[] = [
   { id: 'profile', href: '/settings/profile', group: 'mine' },
   { id: 'password', href: '/settings/security', group: 'mine' },

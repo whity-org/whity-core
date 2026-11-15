@@ -30,7 +30,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { LICENSING_VIEW } from '@/lib/capabilities';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import type { components } from '@whity/api-client';
-import { MY_SETTINGS_PAGES, SETTINGS_HOME_HREF } from '@/lib/settings/my-settings';
+import { MY_SETTINGS_PAGES, SETTINGS_HOME_HREF, WORKSPACE_SETTINGS_ANCHOR } from '@/lib/settings/my-settings';
 import { useNavItemLabels } from '@/lib/nav-item-labels';
 import { useBranding } from '@/lib/branding-context';
 import { TenantLogo } from '@whity/ui/tenant-logo';
@@ -342,7 +342,13 @@ export function SettingsArea({ children }: { children: ReactNode }) {
   }, [onMenu, current]);
 
   useEffect(() => {
-    if (onMenu && lastOpened) lastRef.current?.scrollIntoView?.({ block: 'center' });
+    if (!onMenu) return;
+    // More's "Workspace settings" row lands on the workspace's part of the menu.
+    if (window.location.hash === `#${WORKSPACE_SETTINGS_ANCHOR}`) {
+      document.getElementById(WORKSPACE_SETTINGS_ANCHOR)?.scrollIntoView?.({ block: 'start' });
+      return;
+    }
+    if (lastOpened) lastRef.current?.scrollIntoView?.({ block: 'center' });
   }, [onMenu, lastOpened, groups]);
 
   const needle = query.trim().toLowerCase();
@@ -429,7 +435,11 @@ export function SettingsArea({ children }: { children: ReactNode }) {
           {menuGroups.map((group) => (
             <section key={group.id} aria-label={group.label}>
               {group.id === firstWorkspaceMenuGroup && (
-                <p data-settings-section className="mb-3 border-t border-border px-1 pt-4 text-base font-semibold">
+                <p
+                  id={WORKSPACE_SETTINGS_ANCHOR}
+                  data-settings-section
+                  className="mb-3 scroll-mt-4 border-t border-border px-1 pt-4 text-base font-semibold"
+                >
                   {workspaceSectionLabel}
                 </p>
               )}
