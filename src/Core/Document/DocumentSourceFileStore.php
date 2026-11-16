@@ -49,23 +49,17 @@ final class DocumentSourceFileStore
     {
         // The one file store (WHIT-1159).
         $stored = StoredFiles::store($this->storage, $tenantId, self::STORAGE_SEGMENT, (string) $sourceId, $bytes, $contentType, FormUploadPolicy::extensionFor($contentType));
-        $key = $stored['storage_key'];
         $filename = StoredFiles::safeFilename($clientFilename);
         $checksum = $stored['checksum_sha256'];
         $storedFileId = StoredFiles::remember($this->db, $tenantId, StoredFiles::DOCUMENT_SOURCE, $stored, $filename, $uploaderProfileId);
         $stmt = $this->db->prepare(
             'INSERT INTO document_source_files
-                 (tenant_id, source_id, storage_key, content_type, byte_size, checksum_sha256, filename, uploaded_by_profile_id, stored_file_id, created_at)
-             VALUES (:tenant_id, :source_id, :storage_key, :content_type, :byte_size, :checksum_sha256, :filename, :uploaded_by, :stored_file_id, CURRENT_TIMESTAMP)'
+                 (tenant_id, source_id, uploaded_by_profile_id, stored_file_id, created_at)
+             VALUES (:tenant_id, :source_id, :uploaded_by, :stored_file_id, CURRENT_TIMESTAMP)'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
             ':source_id' => $sourceId,
-            ':storage_key' => $key,
-            ':content_type' => $contentType,
-            ':byte_size' => strlen($bytes),
-            ':checksum_sha256' => $checksum,
-            ':filename' => $filename,
             ':uploaded_by' => $uploaderProfileId,
             ':stored_file_id' => $storedFileId,
         ]);
@@ -89,9 +83,10 @@ final class DocumentSourceFileStore
     public function find(int $fileId, int $sourceId, int $tenantId): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, storage_key, content_type, byte_size, checksum_sha256, filename
-               FROM document_source_files
-              WHERE id = :id AND source_id = :source_id AND tenant_id = :tenant_id'
+            'SELECT s.id, f.storage_key, f.content_type, f.byte_size, f.checksum_sha256, f.filename
+               FROM document_source_files s
+               JOIN stored_files f ON f.id = s.stored_file_id AND f.tenant_id = s.tenant_id
+              WHERE s.id = :id AND s.source_id = :source_id AND s.tenant_id = :tenant_id'
         );
         $stmt->execute([':id' => $fileId, ':source_id' => $sourceId, ':tenant_id' => $tenantId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);

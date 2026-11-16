@@ -819,8 +819,9 @@ final class DocumentDemoSeederRealEngineTest extends TestCase
         $storage = new \Whity\Storage\LocalStorageDriver($this->storageRoot);
 
         $stmt = $this->pdo->prepare(
-            'SELECT storage_key, content_type, byte_size, checksum_sha256 FROM document_artifacts
-              WHERE tenant_id = :tenant_id'
+            'SELECT f.storage_key, f.content_type, f.byte_size, f.checksum_sha256 FROM document_artifacts a
+               JOIN stored_files f ON f.id = a.stored_file_id AND f.tenant_id = a.tenant_id
+              WHERE a.tenant_id = :tenant_id'
         );
         $stmt->execute([':tenant_id' => self::TENANT]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);

@@ -67,19 +67,12 @@ final class FormUploadRepository
         );
         $stmt = $this->db->prepare(
             'INSERT INTO form_uploads
-                 (tenant_id, form_id, storage_key, content_type, byte_size,
-                  checksum_sha256, client_filename, uploaded_by_profile_id, stored_file_id, created_at)
-             VALUES (:tenant_id, :form_id, :storage_key, :content_type, :byte_size,
-                     :checksum_sha256, :client_filename, :uploaded_by_profile_id, :stored_file_id, NOW())'
+                 (tenant_id, form_id, uploaded_by_profile_id, stored_file_id, created_at)
+             VALUES (:tenant_id, :form_id, :uploaded_by_profile_id, :stored_file_id, NOW())'
         );
         $stmt->execute([
             ':tenant_id'              => $tenantId,
             ':form_id'                => $rec['form_id'],
-            ':storage_key'            => $rec['storage_key'],
-            ':content_type'           => $rec['content_type'],
-            ':byte_size'              => $rec['byte_size'],
-            ':checksum_sha256'        => $rec['checksum_sha256'],
-            ':client_filename'        => $rec['client_filename'] ?? null,
             ':uploaded_by_profile_id' => $rec['uploaded_by_profile_id'] ?? null,
             ':stored_file_id'         => $storedFileId,
         ]);
@@ -97,10 +90,11 @@ final class FormUploadRepository
     public function forSubmission(int $tenantId, int $submissionId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, storage_key, content_type, byte_size, client_filename
-               FROM form_uploads
-              WHERE tenant_id = :tenant_id AND submission_id = :submission_id
-              ORDER BY id'
+            'SELECT u.id, f.storage_key, f.content_type, f.byte_size, f.filename AS client_filename
+               FROM form_uploads u
+               JOIN stored_files f ON f.id = u.stored_file_id AND f.tenant_id = u.tenant_id
+              WHERE u.tenant_id = :tenant_id AND u.submission_id = :submission_id
+              ORDER BY u.id'
         );
         $stmt->execute([':tenant_id' => $tenantId, ':submission_id' => $submissionId]);
 
@@ -149,11 +143,21 @@ final class FormUploadRepository
             ? 'uploaded_by_profile_id IS NULL'
             : 'uploaded_by_profile_id = :uploaded_by';
 
+        // The key names a file in the one file store (WHIT-1159); the upload
+        // points at that file. No file, no upload to claim.
+        $file = $this->db->prepare('SELECT id FROM stored_files WHERE tenant_id = :tenant_id AND storage_key = :storage_key');
+        $file->execute([':tenant_id' => $tenantId, ':storage_key' => $storageKey]);
+        $storedFileId = $file->fetchColumn();
+        $file->closeCursor();
+        if ($storedFileId === false) {
+            return null;
+        }
+
         $params = [
-            ':tenant_id'     => $tenantId,
-            ':form_id'       => $formId,
-            ':storage_key'   => $storageKey,
-            ':submission_id' => $submissionId,
+            ':tenant_id'      => $tenantId,
+            ':form_id'        => $formId,
+            ':stored_file_id' => (int) $storedFileId,
+            ':submission_id'  => $submissionId,
         ];
         if ($uploaderProfileId !== null) {
             $params[':uploaded_by'] = $uploaderProfileId;
@@ -164,7 +168,7 @@ final class FormUploadRepository
                 SET claimed_at = NOW(), submission_id = :submission_id
               WHERE tenant_id = :tenant_id
                 AND form_id = :form_id
-                AND storage_key = :storage_key
+                AND stored_file_id = :stored_file_id
                 AND ' . $uploaderPredicate . '
                 AND claimed_at IS NULL'
         );
@@ -181,11 +185,12 @@ final class FormUploadRepository
         // checksum is that it was computed by the server over the bytes it
         // actually stored.
         $read = $this->db->prepare(
-            'SELECT id, storage_key, content_type, byte_size, checksum_sha256, client_filename
-               FROM form_uploads
-              WHERE tenant_id = :tenant_id AND storage_key = :storage_key'
+            'SELECT u.id, f.storage_key, f.content_type, f.byte_size, f.checksum_sha256, f.filename AS client_filename
+               FROM form_uploads u
+               JOIN stored_files f ON f.id = u.stored_file_id AND f.tenant_id = u.tenant_id
+              WHERE u.tenant_id = :tenant_id AND u.stored_file_id = :stored_file_id'
         );
-        $read->execute([':tenant_id' => $tenantId, ':storage_key' => $storageKey]);
+        $read->execute([':tenant_id' => $tenantId, ':stored_file_id' => (int) $storedFileId]);
         $row = $read->fetch(PDO::FETCH_ASSOC);
 
         if ($row === false) {
@@ -242,18 +247,13 @@ final class FormUploadRepository
         // created_at < cutoff` selects an upload nobody submitted, from before
         // the TTL: unreachable by construction, because the only path that could
         // ever reference it is claim(), which refuses a claimed row and cannot
-        // resurrect a deleted one.
-        //
-        // The tag sits at the END of this block on purpose. Only the line
-        // carrying it counts as annotated, and the scanner looks at most three
-        // lines above the statement — so a long reason written tag-first puts
-        // the tag out of range and the suppression silently does nothing.
-        // @tenant-guard-ignore: retention sweep, no tenant context; safe by the
-        // claimed_at/created_at predicate reasoned above.
+        // resurrect a deleted one. (No guard tag: the stored_files join matches
+        // on tenant_id, which the scanner counts; the sweep is still cross-tenant.)
         $select = $this->db->prepare(
-            'SELECT id, tenant_id, storage_key FROM form_uploads
-              WHERE claimed_at IS NULL AND created_at < :cutoff
-              ORDER BY created_at ASC
+            'SELECT u.id, u.tenant_id, f.storage_key FROM form_uploads u
+               JOIN stored_files f ON f.id = u.stored_file_id AND f.tenant_id = u.tenant_id
+              WHERE u.claimed_at IS NULL AND u.created_at < :cutoff
+              ORDER BY u.created_at ASC
               LIMIT ' . max(1, $limit)
         );
         $select->execute([':cutoff' => $cutoff]);

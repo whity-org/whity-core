@@ -1023,7 +1023,9 @@ final class FormUploadsApiRealEngineTest extends TestCase
      */
     private function uploadRow(string $storageKey): array
     {
-        $statement = $this->pdo->prepare('SELECT * FROM form_uploads WHERE storage_key = :key');
+        $statement = $this->pdo->prepare('SELECT u.*, f.storage_key, f.content_type, f.byte_size, f.checksum_sha256, f.filename AS client_filename
+               FROM form_uploads u JOIN stored_files f ON f.id = u.stored_file_id AND f.tenant_id = u.tenant_id
+              WHERE f.storage_key = :key');
         $statement->execute([':key' => $storageKey]);
         $row = $statement->fetch(PDO::FETCH_ASSOC);
         self::assertIsArray($row);
