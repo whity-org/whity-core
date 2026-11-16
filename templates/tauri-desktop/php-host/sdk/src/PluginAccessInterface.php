@@ -12,7 +12,7 @@ namespace Whity\Sdk;
  *
  * A paid plugin returns:
  * - `entitlement`: a boolean entitlement the plugin also declares through
- *   {@see PluginEntitlementsInterface}, named `<plugin slug>.access`. A
+ *   {@see PluginEntitlementsInterface}, such as `front_office.access`. A
  *   workspace whose plan or add-on grants it may turn the plugin on.
  * - `product`: what the workspace buys, `plugin.<store slug>`. Whity Pay sells
  *   it as an add-on plan keyed `plugin.<store slug>.<plan>`.

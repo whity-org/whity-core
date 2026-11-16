@@ -620,8 +620,11 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             $entitlement = $declared['entitlement'] ?? '';
             $product = $declared['product'] ?? '';
             $trialDays = $declared['trialDays'] ?? 0;
+            // The entitlement must be a boolean key of the plugin's own shape
+            // (`front_office.access`); pointing at someone else's only gives
+            // the plugin away, so the shape is all that is checked here.
             // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
-            if (!is_string($entitlement) || !str_starts_with($entitlement, $slug . '.') || !is_string($product) || preg_match('/^plugin\.[a-z0-9][a-z0-9._-]{0,127}$/', $product) !== 1 || !is_int($trialDays) || $trialDays < 0 || $trialDays > 90) {
+            if (!is_string($entitlement) || preg_match('/^[a-z][a-z0-9_-]*\.[a-z0-9._-]+$/', $entitlement) !== 1 || !is_string($product) || preg_match('/^plugin\.[a-z0-9][a-z0-9._-]{0,127}$/', $product) !== 1 || !is_int($trialDays) || $trialDays < 0 || $trialDays > 90) {
                 $this->logWarning("[Plugin:{$pluginKey}] getAccess(): the declaration is malformed; the plugin is paid with no way in but 'free for every workspace'.");
                 // No entitlement can grant it and no trial: only the operator's switch.
                 $paid[$name] = ['entitlement' => '', 'product' => 'plugin.' . $slug, 'trialDays' => 0];
@@ -2038,7 +2041,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                 continue;
             }
             foreach ($descriptors as $descriptor) {
-                $refused = is_array($descriptor) // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                $refused = is_array($descriptor) // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     ? $registry->register($descriptor, $plugin->getName())
                     : 'getMcpResources() returned a non-array descriptor';
                 if ($refused !== null) {
@@ -2104,7 +2107,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             }
 
             foreach ($descriptors as $descriptor) {
-                if (!is_array($descriptor)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                if (!is_array($descriptor)) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     $this->logWarning("[Plugin:{$pluginKey}] getMcpTools() returned a non-array descriptor — skipped.");
                     continue;
                 }
@@ -2537,7 +2540,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // Migrations cannot be queried without a PDO, so report what is declared.
         $declaredMigrations = [];
         foreach ($plugin->getMigrations() as $fqcn) {
-            if (is_string($fqcn)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+            if (is_string($fqcn)) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                 $short = substr((string) strrchr('\\' . $fqcn, '\\'), 1);
                 $declaredMigrations[] = 'plugin:' . $plugin->getName() . ':' . $short;
             }
@@ -3430,7 +3433,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                 ? $this->permissionRegistry->getBySource($plugin->getName())
                 : $plugin->getPermissions();
             foreach ($source as $permission) {
-                if (is_string($permission)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                if (is_string($permission)) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     $declared[] = $permission;
                 }
             }
@@ -3444,7 +3447,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         try {
             if ($plugin instanceof \Whity\Sdk\PluginCustomerPermissionsInterface) {
                 foreach ($plugin->getCustomerPermissions() as $slug) {
-                    if (!is_string($slug)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                    if (!is_string($slug)) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                         continue;
                     }
                     if (($this->claimedPermissions[$slug] ?? null) !== $pluginKey) {
@@ -3656,7 +3659,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             $requiredPermission = $route['requiredPermission'] ?? null;
             if (
                 $requiredPermission !== null
-                && (!is_string($requiredPermission) || preg_match(self::PERMISSION_PATTERN, $requiredPermission) !== 1) // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                && (!is_string($requiredPermission) || preg_match(self::PERMISSION_PATTERN, $requiredPermission) !== 1) // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
             ) {
                 $this->logWarning(
                     "Plugin {$pluginKey} route {$method} {$path} declares an invalid requiredPermission; "
@@ -3733,7 +3736,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                 }
             }
 
-            if (is_callable($handler)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+            if (is_callable($handler)) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                 // The optional 'schema' key (WC-166) carries the route's typed
                 // OpenAPI declaration through to the router/generator.
                 $schema = isset($route['schema']) && is_array($route['schema']) ? $route['schema'] : null;
@@ -4181,7 +4184,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         //     and the registry are untouched.
         try {
             foreach ($plugin->getPermissions() as $permission) {
-                if (is_string($permission) && !isset($this->claimedPermissions[$permission])) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                if (is_string($permission) && !isset($this->claimedPermissions[$permission])) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     $this->claimedPermissions[$permission] = $pluginKey;
                 }
             }
