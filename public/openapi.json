@@ -9116,6 +9116,284 @@
                 ]
             }
         },
+        "/api/v1/calendar/events/{id}/answer": {
+            "post": {
+                "operationId": "post_api_v1_calendar_events_id_answer",
+                "summary": "Say whether you'll come to an event you are invited to",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarEventAnswerRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The event",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarEvent"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such event, or you are not invited",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "An unknown answer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/items": {
+            "get": {
+                "operationId": "get_api_v1_calendar_items",
+                "summary": "Everything on the calendar in a range, in one list",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "Bookings, events, meetings, time off and synced events with one shape (ADR 0018). `can` says what you may do with each. Someone else's time off reads \"Away\" and their synced events \"Busy\".",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": true,
+                        "description": "Start of the range, ISO 8601 with an offset, such as `2026-11-16T00:00:00+03:00`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": true,
+                        "description": "End of the range (exclusive), with an offset. At most 62 days after `from`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "people",
+                        "in": "query",
+                        "required": false,
+                        "description": "Whose calendars, as comma-separated profile ids (people invited count). All when omitted.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "kinds",
+                        "in": "query",
+                        "required": false,
+                        "description": "Which kinds, comma-separated: booking, event, meeting, time_off, external. All when omitted.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "cancelled",
+                        "in": "query",
+                        "required": false,
+                        "description": "1 to include cancelled bookings.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "unit_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only bookings in this branch.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The items, oldest start first",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarItem"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A bad range, id list or kind",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/my-view": {
             "get": {
                 "operationId": "get_api_v1_calendar_my_view",
@@ -77004,6 +77282,34 @@
                     "external_ref": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "event",
+                            "meeting",
+                            "time_off",
+                            "external"
+                        ],
+                        "description": "A team event or everyday meeting, a formal meeting, time off, or one synced from an outside calendar."
+                    },
+                    "room_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "location": {
+                        "type": "string"
+                    },
+                    "meeting_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "people": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarEventPerson"
+                        },
+                        "description": "Who is invited besides the organiser (profile_id)."
                     }
                 },
                 "required": [
@@ -77014,7 +77320,55 @@
                     "ends_at",
                     "all_day",
                     "busy",
-                    "status"
+                    "status",
+                    "kind",
+                    "people"
+                ]
+            },
+            "CalendarEventAnswerRequest": {
+                "type": "object",
+                "properties": {
+                    "response": {
+                        "type": "string",
+                        "enum": [
+                            "accepted",
+                            "declined",
+                            "tentative"
+                        ],
+                        "description": "Whether you'll come. Declining frees your time."
+                    }
+                },
+                "required": [
+                    "response"
+                ]
+            },
+            "CalendarEventPerson": {
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "integer"
+                    },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "required",
+                            "optional"
+                        ]
+                    },
+                    "response": {
+                        "type": "string",
+                        "enum": [
+                            "invited",
+                            "accepted",
+                            "declined",
+                            "tentative"
+                        ]
+                    }
+                },
+                "required": [
+                    "profile_id",
+                    "role",
+                    "response"
                 ]
             },
             "CalendarEventRequest": {
@@ -77049,6 +77403,24 @@
                     "busy": {
                         "type": "boolean",
                         "description": "Blocks bookings. Default true."
+                    },
+                    "people": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "maxItems": 200,
+                        "description": "Staff invited besides the organiser; they are busy for it unless they decline. Sending it replaces the list."
+                    },
+                    "room_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The room it is held in, which it blocks."
+                    },
+                    "location": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "description": "Where, in words: a place or a video link."
                     }
                 }
             },
@@ -77108,6 +77480,144 @@
                 },
                 "required": [
                     "hours"
+                ]
+            },
+            "CalendarItem": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "The kind and the record: \"booking:7\", \"event:12\", \"time_off:5\"."
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "booking",
+                            "event",
+                            "meeting",
+                            "time_off",
+                            "external"
+                        ]
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "What it is. Someone else's time off reads \"Away\" and their synced events \"Busy\"."
+                    },
+                    "starts_at": {
+                        "type": "string"
+                    },
+                    "ends_at": {
+                        "type": "string"
+                    },
+                    "all_day": {
+                        "type": "boolean"
+                    },
+                    "busy": {
+                        "type": "boolean"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "organiser_id": {
+                        "type": "integer",
+                        "description": "Whose calendar it is on: the booked person, or the event's organiser."
+                    },
+                    "people": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarEventPerson"
+                        }
+                    },
+                    "room_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "location": {
+                        "type": "string"
+                    },
+                    "booking": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/CalendarBooking"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "The booking, for kind booking."
+                    },
+                    "event": {
+                        "oneOf": [
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "integer"
+                                    },
+                                    "notes": {
+                                        "type": "string"
+                                    },
+                                    "meeting_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "external_ref": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "required": [
+                                    "id",
+                                    "notes",
+                                    "meeting_id",
+                                    "external_ref"
+                                ]
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "can": {
+                        "type": "object",
+                        "properties": {
+                            "open": {
+                                "type": "boolean"
+                            },
+                            "move": {
+                                "type": "boolean"
+                            },
+                            "resize": {
+                                "type": "boolean"
+                            },
+                            "cancel": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "open",
+                            "move",
+                            "resize",
+                            "cancel"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind",
+                    "title",
+                    "starts_at",
+                    "ends_at",
+                    "all_day",
+                    "busy",
+                    "status",
+                    "organiser_id",
+                    "people",
+                    "room_id",
+                    "location",
+                    "booking",
+                    "event",
+                    "can"
                 ]
             },
             "CalendarRoom": {
@@ -77682,7 +78192,9 @@
                             "enum": [
                                 "team_events",
                                 "time_off",
-                                "cancelled"
+                                "cancelled",
+                                "meetings",
+                                "tasks_due"
                             ]
                         },
                         "description": "What else the calendar shows besides bookings."

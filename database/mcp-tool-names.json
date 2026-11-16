@@ -319,6 +319,10 @@
     "en": "List calendar events",
     "ar": "عرض أحداث التقويم"
   },
+  "get_api_calendar_items": {
+    "en": "List everything on the calendar",
+    "ar": "عرض كل ما في التقويم"
+  },
   "get_api_calendar_my_view": {
     "en": "Read your own calendar choices",
     "ar": "عرض اختياراتك في التقويم"
@@ -1244,6 +1248,10 @@
   "post_api_calendar_events": {
     "en": "Add a calendar event",
     "ar": "إضافة حدث إلى التقويم"
+  },
+  "post_api_calendar_events_id_answer": {
+    "en": "Answer an event invitation",
+    "ar": "الرد على دعوة إلى حدث"
   },
   "post_api_calendar_rooms": {
     "en": "Add a room",

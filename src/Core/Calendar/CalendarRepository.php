@@ -16,6 +16,18 @@ use Whity\Core\Db\DbBool;
  */
 final class CalendarRepository
 {
+    /** What an event is (ADR 0018). Bookings are kind `booking` in the read model only. */
+    public const KIND_EVENT = 'event';
+    public const KIND_MEETING = 'meeting';
+    public const KIND_TIME_OFF = 'time_off';
+    public const KIND_EXTERNAL = 'external';
+    public const KINDS = [self::KIND_EVENT, self::KIND_MEETING, self::KIND_TIME_OFF, self::KIND_EXTERNAL];
+
+    /** An invited person's answer. */
+    public const RESPONSES = ['invited', 'accepted', 'declined', 'tentative'];
+
+    private const EVENT_COLUMNS = 'id, profile_id, title, notes, starts_at, ends_at, all_day, busy, status, external_ref, kind, room_id, location, meeting_id';
+
     public function __construct(private readonly PDO $db)
     {
     }
@@ -273,10 +285,14 @@ final class CalendarRepository
         }
 
         $events = $this->db->prepare(
-            "SELECT starts_at AS s, ends_at AS e FROM calendar_events
-              WHERE tenant_id = :tenant_id AND profile_id = :profile_id
-                AND starts_at < :to AND ends_at > :from
-                AND busy = :busy AND status = 'confirmed'"
+            "SELECT e.starts_at AS s, e.ends_at AS e FROM calendar_events e
+              WHERE e.tenant_id = :tenant_id
+                AND e.starts_at < :to AND e.ends_at > :from
+                AND e.busy = :busy AND e.status = 'confirmed'
+                AND (e.profile_id = :profile_id OR EXISTS (
+                      SELECT 1 FROM calendar_event_people p
+                       WHERE p.event_id = e.id AND p.tenant_id = e.tenant_id
+                         AND p.profile_id = :profile_id AND p.response <> 'declined'))"
         );
         $events->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
         $events->bindValue(':profile_id', $profileId, PDO::PARAM_INT);
@@ -299,7 +315,7 @@ final class CalendarRepository
      */
     public function listEvents(int $tenantId, array $profileIds, DateTimeImmutable $from, DateTimeImmutable $to): array
     {
-        $sql = "SELECT id, profile_id, title, notes, starts_at, ends_at, all_day, busy, status, external_ref
+        $sql = 'SELECT ' . self::EVENT_COLUMNS . "
                   FROM calendar_events
                  WHERE tenant_id = :tenant_id AND starts_at < :to AND ends_at > :from AND status = 'confirmed'";
         $params = [':tenant_id' => $tenantId, ':from' => Interval::toDb($from), ':to' => Interval::toDb($to)];
@@ -309,12 +325,15 @@ final class CalendarRepository
                 $in[] = ':p' . $i;
                 $params[':p' . $i] = $id;
             }
-            $sql .= ' AND profile_id IN (' . implode(', ', $in) . ')';
+            // The organiser, or anyone invited (ADR 0018).
+            $list = implode(', ', $in);
+            $sql .= " AND (profile_id IN ({$list}) OR id IN (
+                          SELECT event_id FROM calendar_event_people WHERE tenant_id = :tenant_id AND profile_id IN ({$list})))";
         }
         $stmt = $this->db->prepare($sql . ' ORDER BY starts_at, id');
         $stmt->execute($params);
 
-        return array_values(array_map([self::class, 'eventToApi'], $stmt->fetchAll(PDO::FETCH_ASSOC)));
+        return $this->withPeople($tenantId, array_values(array_map([self::class, 'eventToApi'], $stmt->fetchAll(PDO::FETCH_ASSOC))));
     }
 
     /** The event a sync plugin wrote under its own reference, or null. */
@@ -335,22 +354,26 @@ final class CalendarRepository
     public function findEvent(int $tenantId, int $id): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, profile_id, title, notes, starts_at, ends_at, all_day, busy, status, external_ref
-               FROM calendar_events WHERE tenant_id = :tenant_id AND id = :id'
+            'SELECT ' . self::EVENT_COLUMNS . ' FROM calendar_events WHERE tenant_id = :tenant_id AND id = :id'
         );
         $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        return is_array($row) ? self::eventToApi($row) : null;
+        return is_array($row) ? $this->withPeople($tenantId, [self::eventToApi($row)])[0] : null;
     }
 
-    public function insertEvent(int $tenantId, int $profileId, string $title, string $notes, Interval $when, bool $allDay, bool $busy, ?string $externalRef, ?int $actor): int
+    public function insertEvent(int $tenantId, int $profileId, string $title, string $notes, Interval $when, bool $allDay, bool $busy, ?string $externalRef, ?int $actor, ?EventPlace $place = null, ?string $kind = null): int
     {
+        $place ??= new EventPlace();
+        $kind ??= $externalRef !== null ? self::KIND_EXTERNAL : self::KIND_EVENT;
         $stmt = $this->db->prepare(
-            'INSERT INTO calendar_events (tenant_id, profile_id, title, notes, starts_at, ends_at, all_day, busy, external_ref, created_by_profile_id)
-             VALUES (:tenant_id, :profile_id, :title, :notes, :starts_at, :ends_at, :all_day, :busy, :external_ref, :actor)
+            'INSERT INTO calendar_events (tenant_id, profile_id, title, notes, starts_at, ends_at, all_day, busy, external_ref, created_by_profile_id, kind, room_id, location)
+             VALUES (:tenant_id, :profile_id, :title, :notes, :starts_at, :ends_at, :all_day, :busy, :external_ref, :actor, :kind, :room_id, :location)
              RETURNING id'
         );
+        $stmt->bindValue(':kind', $kind);
+        $stmt->bindValue(':room_id', $place->roomId, $place->roomId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->bindValue(':location', $place->location);
         $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
         $stmt->bindValue(':profile_id', $profileId, PDO::PARAM_INT);
         $stmt->bindValue(':title', $title);
@@ -366,14 +389,19 @@ final class CalendarRepository
         return (int) $stmt->fetchColumn();
     }
 
-    public function updateEvent(int $tenantId, int $id, string $title, string $notes, Interval $when, bool $allDay, bool $busy): void
+    public function updateEvent(int $tenantId, int $id, string $title, string $notes, Interval $when, bool $allDay, bool $busy, ?EventPlace $place = null): void
     {
+        $setPlace = $place !== null ? ', room_id = :room_id, location = :location' : '';
         $stmt = $this->db->prepare(
-            'UPDATE calendar_events
+            "UPDATE calendar_events
                 SET title = :title, notes = :notes, starts_at = :starts_at, ends_at = :ends_at,
-                    all_day = :all_day, busy = :busy, updated_at = :now
-              WHERE tenant_id = :tenant_id AND id = :id'
+                    all_day = :all_day, busy = :busy, updated_at = :now{$setPlace}
+              WHERE tenant_id = :tenant_id AND id = :id"
         );
+        if ($place !== null) {
+            $stmt->bindValue(':room_id', $place->roomId, $place->roomId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+            $stmt->bindValue(':location', $place->location);
+        }
         $stmt->bindValue(':title', $title);
         $stmt->bindValue(':notes', $notes);
         $stmt->bindValue(':starts_at', Interval::toDb($when->start));
@@ -410,6 +438,108 @@ final class CalendarRepository
             'busy' => DbBool::of($r['busy']),
             'status' => (string) $r['status'],
             'external_ref' => $r['external_ref'] !== null ? (string) $r['external_ref'] : null,
+            'kind' => (string) ($r['kind'] ?? self::KIND_EVENT),
+            'room_id' => isset($r['room_id']) ? (int) $r['room_id'] : null,
+            'location' => (string) ($r['location'] ?? ''),
+            'meeting_id' => isset($r['meeting_id']) ? (int) $r['meeting_id'] : null,
+            'people' => [],
         ];
+    }
+
+    /**
+     * Who is invited to an event, replacing the list (ADR 0018). The organiser
+     * is never listed among them. Answers already given are kept for people
+     * who stay invited.
+     *
+     * @param list<int> $profileIds
+     */
+    public function setEventPeople(int $tenantId, int $eventId, array $profileIds, int $organiserId): void
+    {
+        $wanted = array_values(array_unique(array_filter($profileIds, static fn (int $id): bool => $id > 0 && $id !== $organiserId)));
+        $current = array_map('intval', array_column($this->peopleOf($tenantId, [$eventId])[$eventId] ?? [], 'profile_id'));
+
+        $remove = array_values(array_diff($current, $wanted));
+        if ($remove !== []) {
+            $params = [':tenant_id' => $tenantId, ':event_id' => $eventId];
+            $in = [];
+            foreach ($remove as $i => $id) {
+                $in[] = ':r' . $i;
+                $params[':r' . $i] = $id;
+            }
+            $this->db->prepare('DELETE FROM calendar_event_people WHERE tenant_id = :tenant_id AND event_id = :event_id AND profile_id IN (' . implode(', ', $in) . ')')
+                ->execute($params);
+        }
+        $insert = $this->db->prepare(
+            'INSERT INTO calendar_event_people (tenant_id, event_id, profile_id) VALUES (:tenant_id, :event_id, :profile_id)'
+        );
+        foreach (array_diff($wanted, $current) as $id) {
+            $insert->execute([':tenant_id' => $tenantId, ':event_id' => $eventId, ':profile_id' => $id]);
+        }
+    }
+
+    /** An invited person's answer. False when they are not invited. */
+    public function answerEvent(int $tenantId, int $eventId, int $profileId, string $response): bool
+    {
+        if (!in_array($response, self::RESPONSES, true)) {
+            throw new \InvalidArgumentException('Unknown answer: ' . $response);
+        }
+        $stmt = $this->db->prepare(
+            'UPDATE calendar_event_people SET response = :response, responded_at = :now
+              WHERE tenant_id = :tenant_id AND event_id = :event_id AND profile_id = :profile_id'
+        );
+        $stmt->execute([
+            ':response' => $response,
+            ':now' => Interval::toDb(new DateTimeImmutable()),
+            ':tenant_id' => $tenantId,
+            ':event_id' => $eventId,
+            ':profile_id' => $profileId,
+        ]);
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * People invited to each event.
+     *
+     * @param list<int> $eventIds
+     * @return array<int, list<array{profile_id: int, role: string, response: string}>>
+     */
+    public function peopleOf(int $tenantId, array $eventIds): array
+    {
+        if ($eventIds === []) {
+            return [];
+        }
+        $params = [':tenant_id' => $tenantId];
+        $in = [];
+        foreach ($eventIds as $i => $id) {
+            $in[] = ':e' . $i;
+            $params[':e' . $i] = $id;
+        }
+        $stmt = $this->db->prepare(
+            'SELECT event_id, profile_id, role, response FROM calendar_event_people
+              WHERE tenant_id = :tenant_id AND event_id IN (' . implode(', ', $in) . ')
+              ORDER BY event_id, id'
+        );
+        $stmt->execute($params);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $out[(int) $r['event_id']][] = ['profile_id' => (int) $r['profile_id'], 'role' => (string) $r['role'], 'response' => (string) $r['response']];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $events as {@see eventToApi()} gives them
+     * @return list<array<string, mixed>>
+     */
+    private function withPeople(int $tenantId, array $events): array
+    {
+        $people = $this->peopleOf($tenantId, array_map(static fn (array $e): int => (int) $e['id'], $events));
+        foreach ($events as $i => $event) {
+            $events[$i]['people'] = $people[(int) $event['id']] ?? [];
+        }
+
+        return $events;
     }
 }

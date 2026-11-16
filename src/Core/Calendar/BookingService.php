@@ -460,24 +460,41 @@ final class BookingService
      * the same moment sees them; an event may sit over an existing booking
      * (it is the person's own choice) and the answer lists those bookings.
      *
+     * People invited (ADR 0018) see it on their calendar and are busy for it
+     * unless they decline; a room it is held in is blocked for it.
+     *
+     * @param list<int>|null $people who is invited besides the organiser
      * @return array{event: array<string, mixed>, overlapping_bookings: list<int>}
      */
-    public function createEvent(int $tenantId, int $profileId, string $title, string $notes, Interval $when, bool $allDay, bool $busy, ?int $actor, ?string $externalRef = null): array
+    public function createEvent(int $tenantId, int $profileId, string $title, string $notes, Interval $when, bool $allDay, bool $busy, ?int $actor, ?string $externalRef = null, ?EventPlace $place = null, ?array $people = null, ?string $kind = null): array
     {
-        $id = $this->underLock([[$tenantId, $profileId]], fn (): int => $this->calendar->insertEvent($tenantId, $profileId, $title, $notes, $when, $allDay, $busy, $externalRef, $actor));
+        $id = $this->underLock([[$tenantId, $profileId]], function () use ($tenantId, $profileId, $title, $notes, $when, $allDay, $busy, $externalRef, $actor, $place, $people, $kind): int {
+            $id = $this->calendar->insertEvent($tenantId, $profileId, $title, $notes, $when, $allDay, $busy, $externalRef, $actor, $place, $kind);
+            if ($people !== null) {
+                $this->calendar->setEventPeople($tenantId, $id, $people, $profileId);
+            }
+
+            return $id;
+        });
         $event = $this->calendar->findEvent($tenantId, $id) ?? throw CalendarRejectedException::notFound('Event');
         $this->announce(CalendarEventNames::EVENT_CREATED, ['id' => $id, 'tenant_id' => $tenantId, 'profile_id' => $profileId]);
 
         return ['event' => $event, 'overlapping_bookings' => $this->overlapping($tenantId, $profileId, $when)];
     }
 
-    /** @return array{event: array<string, mixed>, overlapping_bookings: list<int>} */
-    public function updateEvent(int $tenantId, int $eventId, string $title, string $notes, Interval $when, bool $allDay, bool $busy): array
+    /**
+     * @param list<int>|null $people who is invited besides the organiser; null keeps the list
+     * @return array{event: array<string, mixed>, overlapping_bookings: list<int>}
+     */
+    public function updateEvent(int $tenantId, int $eventId, string $title, string $notes, Interval $when, bool $allDay, bool $busy, ?EventPlace $place = null, ?array $people = null): array
     {
         $existing = $this->calendar->findEvent($tenantId, $eventId) ?? throw CalendarRejectedException::notFound('Event');
         $profileId = (int) $existing['profile_id'];
-        $this->underLock([[$tenantId, $profileId]], function () use ($tenantId, $eventId, $title, $notes, $when, $allDay, $busy): bool {
-            $this->calendar->updateEvent($tenantId, $eventId, $title, $notes, $when, $allDay, $busy);
+        $this->underLock([[$tenantId, $profileId]], function () use ($tenantId, $eventId, $title, $notes, $when, $allDay, $busy, $place, $people, $profileId): bool {
+            $this->calendar->updateEvent($tenantId, $eventId, $title, $notes, $when, $allDay, $busy, $place);
+            if ($people !== null) {
+                $this->calendar->setEventPeople($tenantId, $eventId, $people, $profileId);
+            }
 
             return true;
         });

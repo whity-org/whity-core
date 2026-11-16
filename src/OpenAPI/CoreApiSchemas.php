@@ -10727,7 +10727,7 @@ final class CoreApiSchemas
                 'hidden_people' => ['type' => 'array', 'items' => self::int(), 'description' => 'Staff profile ids unticked in the panel.'],
                 'hidden_rooms' => ['type' => 'array', 'items' => self::int(), 'description' => 'Room ids unticked in the panel.'],
                 'hidden_services' => ['type' => 'array', 'items' => self::int(), 'description' => 'Service ids unticked in the panel.'],
-                'also_show' => ['type' => 'array', 'items' => self::str() + ['enum' => ['team_events', 'time_off', 'cancelled']], 'description' => 'What else the calendar shows besides bookings.'],
+                'also_show' => ['type' => 'array', 'items' => self::str() + ['enum' => ['team_events', 'time_off', 'cancelled', 'meetings', 'tasks_due']], 'description' => 'What else the calendar shows besides bookings.'],
                 'sidebar_open' => self::bool() + ['description' => 'The person opened the app\'s sidebar on the calendar, so it stays open there.'],
             ], []),
             'CalendarBookingCancelRequest' => self::object([
@@ -10744,7 +10744,48 @@ final class CoreApiSchemas
                 'busy' => self::bool(),
                 'status' => self::str(),
                 'external_ref' => self::str(true),
-            ], ['id', 'profile_id', 'title', 'starts_at', 'ends_at', 'all_day', 'busy', 'status']),
+                // ADR 0018: one events table.
+                'kind' => self::str() + ['enum' => ['event', 'meeting', 'time_off', 'external'], 'description' => 'A team event or everyday meeting, a formal meeting, time off, or one synced from an outside calendar.'],
+                'room_id' => self::int(true),
+                'location' => self::str(),
+                'meeting_id' => self::int(true),
+                'people' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarEventPerson'), 'description' => 'Who is invited besides the organiser (profile_id).'],
+            ], ['id', 'profile_id', 'title', 'starts_at', 'ends_at', 'all_day', 'busy', 'status', 'kind', 'people']),
+            'CalendarEventPerson' => self::object([
+                'profile_id' => self::int(),
+                'role' => self::str() + ['enum' => ['required', 'optional']],
+                'response' => self::str() + ['enum' => ['invited', 'accepted', 'declined', 'tentative']],
+            ], ['profile_id', 'role', 'response']),
+            'CalendarEventAnswerRequest' => self::object([
+                'response' => self::str() + ['enum' => ['accepted', 'declined', 'tentative'], 'description' => 'Whether you\'ll come. Declining frees your time.'],
+            ], ['response']),
+            'CalendarItem' => self::object([
+                'id' => self::str() + ['description' => 'The kind and the record: "booking:7", "event:12", "time_off:5".'],
+                'kind' => self::str() + ['enum' => ['booking', 'event', 'meeting', 'time_off', 'external']],
+                'title' => self::str() + ['description' => 'What it is. Someone else\'s time off reads "Away" and their synced events "Busy".'],
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'all_day' => self::bool(),
+                'busy' => self::bool(),
+                'status' => self::str(),
+                'organiser_id' => self::int() + ['description' => 'Whose calendar it is on: the booked person, or the event\'s organiser.'],
+                'people' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarEventPerson')],
+                'room_id' => self::int(true),
+                'location' => self::str(),
+                'booking' => ['oneOf' => [SchemaBuilder::ref('CalendarBooking'), ['type' => 'null']], 'description' => 'The booking, for kind booking.'],
+                'event' => ['oneOf' => [self::object([
+                    'id' => self::int(),
+                    'notes' => self::str(),
+                    'meeting_id' => self::int(true),
+                    'external_ref' => self::str(true),
+                ], ['id', 'notes', 'meeting_id', 'external_ref']), ['type' => 'null']]],
+                'can' => self::object([
+                    'open' => self::bool(),
+                    'move' => self::bool(),
+                    'resize' => self::bool(),
+                    'cancel' => self::bool(),
+                ], ['open', 'move', 'resize', 'cancel']),
+            ], ['id', 'kind', 'title', 'starts_at', 'ends_at', 'all_day', 'busy', 'status', 'organiser_id', 'people', 'room_id', 'location', 'booking', 'event', 'can']),
             'CalendarEventRequest' => self::object([
                 'profile_id' => self::int() + ['description' => 'Whose calendar. Default: yours.'],
                 'title' => self::str() + ['maxLength' => 200, 'description' => 'What it is.'],
@@ -10753,6 +10794,9 @@ final class CoreApiSchemas
                 'ends_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
                 'all_day' => self::bool() + ['description' => 'Shown as an all-day event.'],
                 'busy' => self::bool() + ['description' => 'Blocks bookings. Default true.'],
+                'people' => ['type' => 'array', 'items' => self::int(), 'maxItems' => 200, 'description' => 'Staff invited besides the organiser; they are busy for it unless they decline. Sending it replaces the list.'],
+                'room_id' => self::int(true) + ['description' => 'The room it is held in, which it blocks.'],
+                'location' => self::str() + ['maxLength' => 255, 'description' => 'Where, in words: a place or a video link.'],
             ], []),
             'CalendarEventResponse' => self::object([
                 'data' => SchemaBuilder::ref('CalendarEvent'),
@@ -18954,6 +18998,31 @@ final class CoreApiSchemas
                 'responses' => [
                     200 => self::jsonResponse('The room', self::dataEnvelope(SchemaBuilder::ref('CalendarRoom'))),
                     404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/items', 'calendar:read', [
+                'summary' => 'Everything on the calendar in a range, in one list',
+                'description' => 'Bookings, events, meetings, time off and synced events with one shape (ADR 0018). `can` says what you may do with each. Someone else\'s time off reads "Away" and their synced events "Busy".',
+                'tags' => ['calendar'],
+                'parameters' => array_merge($range, [
+                    self::queryParam('people', 'string', 'Whose calendars, as comma-separated profile ids (people invited count). All when omitted.'),
+                    self::queryParam('kinds', 'string', 'Which kinds, comma-separated: booking, event, meeting, time_off, external. All when omitted.'),
+                    self::queryParam('cancelled', 'string', '1 to include cancelled bookings.'),
+                    self::queryParam('unit_id', 'integer', 'Only bookings in this branch.'),
+                ]),
+                'responses' => [
+                    200 => self::jsonResponse('The items, oldest start first', self::listEnvelope('CalendarItem')),
+                    422 => self::errorResponse('A bad range, id list or kind'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/events/{id:\d+}/answer', 'calendar:read', [
+                'summary' => 'Say whether you\'ll come to an event you are invited to',
+                'tags' => ['calendar'],
+                'request' => 'CalendarEventAnswerRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The event', self::dataEnvelope(SchemaBuilder::ref('CalendarEvent'))),
+                    404 => self::errorResponse('No such event, or you are not invited'),
+                    422 => self::errorResponse('An unknown answer'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/calendar/events', 'calendar:read', [
