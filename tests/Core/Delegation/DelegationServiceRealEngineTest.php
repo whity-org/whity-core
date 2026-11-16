@@ -66,7 +66,7 @@ final class DelegationServiceRealEngineTest extends TestCase
 
         $this->expectException(PermissionNotDelegableException::class);
         try {
-            $service->delegate(1, $grantorId, DelegationRepository::GRANTEE_USER, $this->seedUser('g@e.com', 'user', 1), ['users:read'], null);
+            $service->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $this->seedUser('g@e.com', 'user', 1), ['users:read'], null);
         } finally {
             // Nothing was written.
             $this->assertSame(
@@ -90,7 +90,7 @@ final class DelegationServiceRealEngineTest extends TestCase
         $service->delegate(
             1,
             $grantorId,
-            DelegationRepository::GRANTEE_USER,
+            DelegationRepository::GRANTEE_PROFILE,
             $granteeId,
             ['users:read', 'roles:read'],
             null
@@ -106,7 +106,7 @@ final class DelegationServiceRealEngineTest extends TestCase
         $ids = $this->service()->delegate(
             1,
             $grantorId,
-            DelegationRepository::GRANTEE_USER,
+            DelegationRepository::GRANTEE_PROFILE,
             $granteeId,
             ['users:read'],
             null
@@ -132,7 +132,7 @@ final class DelegationServiceRealEngineTest extends TestCase
         // Before: the grantee (plain user) lacks the permission.
         $this->assertFalse($checker->hasPermissionForProfile($granteeId, 'users:read', 1));
 
-        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_USER, $granteeId, ['users:read'], null);
+        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $granteeId, ['users:read'], null);
         RoleChecker::clearCache();
 
         // After: the live delegation grants it.
@@ -171,7 +171,7 @@ final class DelegationServiceRealEngineTest extends TestCase
         $service = $this->service();
         $checker = $this->delegationAwareChecker();
 
-        $ids = $service->delegate(1, $grantorId, DelegationRepository::GRANTEE_USER, $granteeId, ['users:read'], null);
+        $ids = $service->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $granteeId, ['users:read'], null);
         RoleChecker::clearCache();
         $this->assertTrue($checker->hasPermissionForProfile($granteeId, 'users:read', 1));
 
@@ -198,7 +198,7 @@ final class DelegationServiceRealEngineTest extends TestCase
         $granteeId = $this->seedUser('grantee@example.com', 'user', 1);
         $checker = $this->delegationAwareChecker();
 
-        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_USER, $granteeId, ['users:read'], null);
+        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $granteeId, ['users:read'], null);
         RoleChecker::clearCache();
         $this->assertTrue($checker->hasPermissionForProfile($granteeId, 'users:read', 1));
 
@@ -248,8 +248,8 @@ final class DelegationServiceRealEngineTest extends TestCase
         $checker = $this->delegationAwareChecker();
         $service = $this->service();
 
-        $service->delegate(1, $first, DelegationRepository::GRANTEE_USER, $granteeId, ['users:read'], null);
-        $service->delegate(1, $second, DelegationRepository::GRANTEE_USER, $granteeId, ['users:read'], null);
+        $service->delegate(1, $first, DelegationRepository::GRANTEE_PROFILE, $granteeId, ['users:read'], null);
+        $service->delegate(1, $second, DelegationRepository::GRANTEE_PROFILE, $granteeId, ['users:read'], null);
 
         $this->pdo->prepare("UPDATE memberships SET status = 'suspended' WHERE profile_id = ? AND tenant_id = 1")
             ->execute([$first]);
@@ -278,7 +278,7 @@ final class DelegationServiceRealEngineTest extends TestCase
         $granteeT1 = $this->seedUser('grantee1@example.com', 'user', 1);
         $granteeT2 = $this->seedUser('grantee2@example.com', 'user', 2);
 
-        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_USER, $granteeT1, ['users:read'], null);
+        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $granteeT1, ['users:read'], null);
         RoleChecker::clearCache();
 
         $checker = $this->delegationAwareChecker();
@@ -300,11 +300,11 @@ final class DelegationServiceRealEngineTest extends TestCase
         $grantorId = $this->seedUser('admin@example.com', 'admin', 1);
         $granteeId = $this->seedUser('grantee@example.com', 'user', 1);
 
-        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_USER, $granteeId, ['users:read'], null);
+        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $granteeId, ['users:read'], null);
 
         $repo = new DelegationRepository($this->pdo);
-        $t1 = $repo->livePermissionsForGrantee(1, DelegationRepository::GRANTEE_USER, $granteeId, []);
-        $t2 = $repo->livePermissionsForGrantee(2, DelegationRepository::GRANTEE_USER, $granteeId, []);
+        $t1 = $repo->livePermissionsForGrantee(1, DelegationRepository::GRANTEE_PROFILE, $granteeId, []);
+        $t2 = $repo->livePermissionsForGrantee(2, DelegationRepository::GRANTEE_PROFILE, $granteeId, []);
 
         $this->assertSame(['users:read'], $t1);
         $this->assertSame([], $t2, 'Resolution under another tenant must return nothing.');

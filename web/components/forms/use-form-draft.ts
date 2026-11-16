@@ -25,32 +25,6 @@ export interface LoadedDraft {
   step: number;
 }
 
-function legacyKey(id: string): string {
-  return `whity:form-draft:${id}`;
-}
-
-function readLegacy(id: string): Answers | null {
-  try {
-    const raw = window.localStorage.getItem(legacyKey(id));
-    if (raw === null) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-
-    return Object.keys(parsed).length > 0 ? (parsed as Answers) : null;
-  } catch {
-    // Private windows and browsers that block storage land here.
-    return null;
-  }
-}
-
-function dropLegacy(id: string): void {
-  try {
-    window.localStorage.removeItem(legacyKey(id));
-  } catch {
-    // Nothing to do.
-  }
-}
-
 export function useFormDraft(id: string) {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -85,7 +59,6 @@ export function useFormDraft(id: string) {
           setFailed(!response.ok);
           if (response.ok) {
             setSavedAt(new Date().toISOString());
-            dropLegacy(id);
           }
         })
         .catch(() => setFailed(true))
@@ -105,13 +78,11 @@ export function useFormDraft(id: string) {
   /** What they had, or null when this is a fresh start. */
   const load = useCallback(async (): Promise<LoadedDraft | null> => {
     let server: { data?: unknown; step?: unknown } | null = null;
-    let reachable = false;
     try {
       const { data, response } = await api.GET('/api/v1/me/forms/{id}/draft', {
         params: { path: { id: id as never } },
         headers: { Accept: 'application/json' },
       });
-      reachable = response.ok;
       if (response.ok) {
         const body = (data ?? {}) as { data?: { data?: unknown; step?: unknown } | null };
         server = body.data ?? null;
@@ -121,7 +92,6 @@ export function useFormDraft(id: string) {
     }
 
     if (server !== null) {
-      dropLegacy(id);
       const answers = server.data;
       const hasAnswers = answers !== null && typeof answers === 'object' && !Array.isArray(answers);
 
@@ -131,15 +101,8 @@ export function useFormDraft(id: string) {
       };
     }
 
-    const legacy = readLegacy(id);
-    if (legacy === null) return null;
-    if (reachable) {
-      waiting.current = { data: legacy, step: 0 };
-      void send();
-    }
-
-    return { answers: legacy, step: 0 };
-  }, [id, send]);
+    return null;
+  }, [id]);
 
   const schedule = useCallback(
     (data: Answers, step: number) => {
@@ -168,7 +131,6 @@ export function useFormDraft(id: string) {
   const forget = useCallback(() => {
     clearTimer();
     waiting.current = null;
-    dropLegacy(id);
     setSavedAt(null);
   }, [clearTimer, id]);
 
@@ -177,7 +139,6 @@ export function useFormDraft(id: string) {
     clearTimer();
     waiting.current = null;
     await inFlight.current;
-    dropLegacy(id);
     setSavedAt(null);
     setFailed(false);
     await api
