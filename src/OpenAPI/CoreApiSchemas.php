@@ -10568,6 +10568,7 @@ final class CoreApiSchemas
                 'time_zone' => self::str(),
             ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
             'CalendarSettings' => self::object([
+                'booking_page_url' => self::str(true) + ['description' => 'The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only.'],
                 'time_zone' => self::str() + ['description' => 'The workspace time zone (IANA).'],
                 'booking_page_enabled' => self::bool(),
                 'min_notice_minutes' => self::int(),
