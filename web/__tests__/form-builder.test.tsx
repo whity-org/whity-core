@@ -12,6 +12,9 @@ import { FormBuilderScreen, FormsListScreen } from '@whity/features/forms';
 import { ResponsesTab } from '../../packages/features/src/forms/responses-tab';
 import type { FormsScreenEnv } from '@whity/features/forms';
 import {
+  canControl,
+  conditionOperator,
+  controllersFor,
   reorder,
   problemsOf,
   snapshot,
@@ -123,6 +126,21 @@ describe('builder model', () => {
     const copy = duplicateField(fields, 0);
     expect(copy[1].id).toBeUndefined();
     expect(copy[1].field_key).toBe('imports_copy');
+  });
+
+  it('offers every earlier question to a rule, and compares values only on choice questions', () => {
+    const fields = [
+      draft('imports', { field_type: 'checkbox' }),
+      draft('staff', { field_type: 'repeating' }),
+      draft('notes'),
+      draft('customs'),
+    ];
+    expect(controllersFor(fields, 3).map((f) => f.field_key)).toEqual(['imports', 'staff', 'notes']);
+    expect(controllersFor(fields, 3).filter(canControl).map((f) => f.field_key)).toEqual(['imports']);
+    expect(conditionOperator({ field: 'imports', equals: true })).toBe('equals');
+    expect(conditionOperator({ field: 'kind', in: ['a'] })).toBe('equals');
+    expect(conditionOperator({ field: 'imports', notEquals: true })).toBe('notEquals');
+    expect(conditionOperator({ field: 'staff', answered: true })).toBe('answered');
   });
 
   it('compares objects by their contents, because the server returns labels in another order', () => {

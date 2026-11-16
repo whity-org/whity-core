@@ -177,7 +177,17 @@ export function BuilderCanvas({
       const option = controller?.options.find((o) => o.value === String(raw))
       return (option && localizedText(option.label, currentLanguage)) || String(raw)
     }
-    return rule.equals !== undefined ? words(rule.equals) : (rule.in ?? []).map(words).join(", ")
+    if (rule.equals !== undefined) return words(rule.equals)
+    if (rule.notEquals !== undefined) return words(rule.notEquals)
+    return (rule.in ?? []).map(words).join(", ")
+  }
+  const rulePill = (rule: FieldCondition): string => {
+    const question = labelOf(rule.field)
+    if (rule.answered === true) return t("builder.pill.onlyIfAnswered", "Only if “{question}” is answered", { question })
+    if (rule.notEquals !== undefined) {
+      return t("builder.pill.onlyIfNot", "Only if “{question}” is not {answer}", { question, answer: answerWords(rule) })
+    }
+    return t("builder.pill.onlyIfQuestion", "Only if “{question}” is {answer}", { question, answer: answerWords(rule) })
   }
   // A form with no questions still needs somewhere to add the first one.
   const shown = groups.length === 0 ? [{ key: null as string | null, items: [] }] : groups
@@ -295,12 +305,7 @@ export function BuilderCanvas({
                     </span>
                     <Badge variant="outline">{kindLabel(field.field_type)}</Badge>
                     {field.visible_when !== null && (
-                      <Badge variant="info">
-                        {t("builder.pill.onlyIfQuestion", "Only if “{question}” is {answer}", {
-                          question: labelOf(field.visible_when.field),
-                          answer: answerWords(field.visible_when),
-                        })}
-                      </Badge>
+                      <Badge variant="info">{rulePill(field.visible_when)}</Badge>
                     )}
                     {invalid.has(index) && <Badge variant="destructive">{t("builder.pill.needsAttention", "Needs attention")}</Badge>}
                     {field.audience === "staff" && <Badge variant="warning">{t("builder.pill.staff", "Staff answer")}</Badge>}
