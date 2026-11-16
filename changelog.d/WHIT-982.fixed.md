@@ -1,1 +1,0 @@
-- **Migration numbers 254, 255, 256 and 259 are recorded as never used.** Later migrations pass the schema check.

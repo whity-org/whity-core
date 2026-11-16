@@ -1,5 +1,17 @@
 # @whity/features
 
+## 0.4.0
+
+### Minor Changes
+
+- acf1a4e: Add `@whity/features/expressions`: `validateExpression()` and `evaluateExpression()` for the manifest expression language (WHIT-759), the TypeScript twin of `Whity\Sdk\Expression\Expression` in the plugin SDK. Forms can check a manifest rule as someone types and get the same answer the server gives on save. Both evaluators pass the same fixtures, `sdk/resources/expression-fixtures.json`.
+- 5965fad: Add `local` to the MCP client specs in `@whity/features/mcp` (WHIT-823): for each app, the executables and per-OS config files that show it is installed, whether a URL-only entry makes it sign in by itself (`signsInItself`, distinct from `requiresSignIn`) or it needs a local command bridge (`stdio`), and its own command to add a server (`addCommand`). Never a token. Marked `verified: false` until whity-agent's detectors are checked against each vendor's docs.
+
+### Patch Changes
+
+- Updated dependencies [f6841a5]
+  - @whity/ui@1.0.0
+
 ## 0.3.0
 
 ### Minor Changes
