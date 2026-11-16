@@ -860,6 +860,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/cash-payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a workspace's cash payments
+         * @description Operator only. ?workspace=<id>.
+         */
+        get: operations["get_api_v1_billing_cash_payments"];
+        put?: never;
+        /**
+         * Record a cash payment for a paid plugin plan
+         * @description Operator only. Covers the workspace from the date paid, or the end of its current cash cover if later, for the plan's period.
+         */
+        post: operations["post_api_v1_billing_cash_payments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/cash-payments/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Void a cash payment, saying why */
+        post: operations["post_api_v1_billing_cash_payments_id_void"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/change-plan": {
         parameters: {
             query?: never;
@@ -11713,6 +11754,17 @@ export interface components {
             currency: string;
             paid_at?: string | null;
             issued_at?: string | null;
+            /**
+             * @description cash: recorded by the operator, not paid through a provider
+             * @enum {string}
+             */
+            source?: "cash";
+            /** @description Cash only: the plugin plan paid for */
+            plan_key?: string;
+            /** @description Cash only: how many seats */
+            quantity?: number;
+            /** @description Cash only: the end of what it pays for */
+            covers_until?: string;
         };
         BillingReceiptListResponse: {
             data: components["schemas"]["BillingReceipt"][];
@@ -12170,6 +12222,51 @@ export interface components {
             code: "no-resource" | "no-route" | "forbidden";
             reason: string;
             detail: string | null;
+        };
+        CashPayment: {
+            id: number;
+            tenant_id: number;
+            plan_key: string;
+            quantity: number;
+            amount_minor: number;
+            currency: string;
+            receipt_number: string;
+            note?: string | null;
+            paid_on: string;
+            period_start: string;
+            period_end: string;
+            recorded_by?: string | null;
+            recorded_at?: string;
+            voided_at?: string | null;
+            void_reason?: string | null;
+        };
+        CashPaymentCreateRequest: {
+            /** @description The workspace that paid */
+            workspace: number;
+            /** @description A paid plugin plan, such as plugin.salons.monthly */
+            planKey: string;
+            /** @description How many seats (chairs); 1 when the plugin is not sold per seat */
+            quantity?: number;
+            /** @description The amount paid, as written: 15 or 15.000 */
+            amount: string;
+            /** @description Three letters; JOD when left out */
+            currency?: string;
+            /** @description The paper receipt's number; once per workspace */
+            receiptNumber: string;
+            /** @description Anything worth keeping */
+            note?: string;
+            /** @description The date paid, like 2026-11-16 */
+            paidOn: string;
+        };
+        CashPaymentListResponse: {
+            data: components["schemas"]["CashPayment"][];
+        };
+        CashPaymentResponse: {
+            data: components["schemas"]["CashPayment"];
+        };
+        CashPaymentVoidRequest: {
+            /** @description Why it is voided */
+            reason: string;
         };
         Chat: {
             id: number;
@@ -20135,7 +20232,7 @@ export interface components {
              */
             state: "on" | "read_only" | "off";
             /** @enum {string|null} */
-            reason?: "free_for_all" | "entitled" | "trial" | "grace" | "lapsed" | "installation_unlicensed" | "installation_grace" | null;
+            reason?: "free_for_all" | "entitled" | "cash" | "trial" | "grace" | "lapsed" | "installation_unlicensed" | "installation_grace" | null;
             graceUntil?: string | null;
             trialEndsAt?: string | null;
             paid: boolean;
@@ -24436,6 +24533,251 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_billing_cash_payments: {
+        parameters: {
+            query?: {
+                /** @description The workspace. */
+                workspace?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Its cash payments, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashPaymentListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_billing_cash_payments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashPaymentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashPaymentResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Something is missing or wrong; the message says what */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_billing_cash_payments_id_void: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The cash payment. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashPaymentVoidRequest"];
+            };
+        };
+        responses: {
+            /** @description Voided */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashPaymentResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No reason, no such payment, or already voided */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

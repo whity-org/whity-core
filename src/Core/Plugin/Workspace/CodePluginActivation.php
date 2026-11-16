@@ -73,6 +73,20 @@ final class CodePluginActivation
     /** @var (\Closure(string): ?string)|null */
     private ?\Closure $installLicence = null;
 
+    /** @var (\Closure(int, string): ?array{active: bool, until: string})|null */
+    private ?\Closure $cashCover = null;
+
+    /**
+     * Cash payments the operator recorded (WHIT-1153): (workspace, product) =>
+     * whether one covers now, and until when the last one reaches.
+     *
+     * @param \Closure(int, string): ?array{active: bool, until: string} $cashCover
+     */
+    public function useCashCover(\Closure $cashCover): void
+    {
+        $this->cashCover = $cashCover;
+    }
+
     /** @var \Closure(): int */
     private \Closure $clock;
 
@@ -138,7 +152,8 @@ final class CodePluginActivation
      * The plugin's state for a workspace, with why and until when.
      *
      * `reason` is one of: null (free or plain on), `free_for_all`, `entitled`,
-     * `trial`, `grace`, `lapsed`, `installation_unlicensed`, `installation_grace`.
+     * `cash`, `trial`, `grace`, `lapsed`, `installation_unlicensed`,
+     * `installation_grace`.
      *
      * @return array{state: string, reason: ?string, graceUntil: ?string, trialEndsAt: ?string}
      */
@@ -184,13 +199,21 @@ final class CodePluginActivation
         if ($this->entitled !== null && ($this->entitled)($tenantId, $paid['entitlement'])) {
             return self::state(self::STATE_ON, $licence === 'grace' ? 'installation_grace' : 'entitled');
         }
+        $cash = $this->cashCover !== null ? ($this->cashCover)($tenantId, $paid['product']) : null;
+        if ($cash !== null && $cash['active']) {
+            return self::state(self::STATE_ON, 'cash', null, null);
+        }
         if ($trialEndsAt !== null && strtotime($trialEndsAt) > $now) {
             return self::state(self::STATE_ON, 'trial', null, $trialEndsAt);
         }
 
         // Access has gone. Grace runs from when it was seen gone: the add-on's
-        // end as the billing plugin reported it, or the trial's end.
+        // end as the billing plugin reported it, the trial's end, or the end of
+        // the last cash payment, whichever came last.
         $lapsedAt = $row['access_lapsed_at'] ?? $trialEndsAt;
+        if ($cash !== null && ($lapsedAt === null || strtotime($cash['until']) > strtotime($lapsedAt))) {
+            $lapsedAt = $cash['until'];
+        }
         if ($lapsedAt !== null) {
             $graceUntil = strtotime($lapsedAt) + self::GRACE_DAYS * 86400;
             $until = gmdate('Y-m-d H:i:s', $graceUntil);
@@ -215,6 +238,9 @@ final class CodePluginActivation
             return true;
         }
         if ($this->entitled !== null && ($this->entitled)($tenantId, $paid['entitlement'])) {
+            return true;
+        }
+        if ($this->cashCover !== null && (($this->cashCover)($tenantId, $paid['product'])['active'] ?? false)) {
             return true;
         }
         $trialEndsAt = $this->rowsFor($tenantId)[$pluginName]['trial_ends_at'] ?? null;

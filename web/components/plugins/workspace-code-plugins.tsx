@@ -163,6 +163,8 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
         return t('plugins.paid.unlicensed', 'Read-only: your platform’s licence for this plugin has ended. Ask your platform operator.');
       case 'installation_grace':
         return t('plugins.paid.licenceGrace', 'Your platform’s licence for this plugin needs renewing soon.');
+      case 'cash':
+        return t('plugins.paid.cash', 'Paid in cash');
       case 'entitled':
         return t('plugins.paid.included', 'Included in your plan or bought for this workspace');
       case 'free_for_all':

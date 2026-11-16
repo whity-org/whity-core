@@ -227,6 +227,8 @@ final class CoreTables
         'chat_blocked_senders' => '283_create_chat_bots_and_blocking.php',
         // Code plugins switched on per workspace (WHIT-1122).
         'tenant_code_plugins' => '287_create_tenant_code_plugins.php',
+        // Cash payments for paid plugin plans (WHIT-1153).
+        'plugin_cash_payments' => '296_create_plugin_cash_payments.php',
         'code_plugin_access' => '288_create_code_plugin_access.php',
         'tenant_settings' => '025_create_tenant_settings.php',
         'tenant_storage_config' => '053_create_tenant_storage_config.php',

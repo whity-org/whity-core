@@ -1,6 +1,7 @@
 'use client';
 
 import { Affiliates } from './affiliates';
+import { CashPayments } from './cash-payments';
 import { TierFeatures } from './tier-features';
 import { TierLifecycle } from './tier-lifecycle';
 import { useState } from 'react';
@@ -333,6 +334,11 @@ export default function BillingPage() {
         question: what this instance sells, and what it costs to sell it.
       */}
       {!loading && !error && canManage && <Affiliates />}
+
+      {/* WHIT-1153: customers who pay for a plugin in cash. */}
+      {!loading && !error && canManage && (
+        <CashPayments addonPlanKeys={(data ?? []).map((entry) => entry.plan.plan_key)} />
+      )}
 
       {creatingPlan && (
         <CreatePlanDialog

@@ -5246,6 +5246,324 @@
                 ]
             }
         },
+        "/api/v1/billing/cash-payments": {
+            "get": {
+                "operationId": "get_api_v1_billing_cash_payments",
+                "summary": "List a workspace's cash payments",
+                "tags": [
+                    "billing"
+                ],
+                "description": "Operator only. ?workspace=<id>.",
+                "parameters": [
+                    {
+                        "name": "workspace",
+                        "in": "query",
+                        "required": false,
+                        "description": "The workspace.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Its cash payments, newest first",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CashPaymentListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_billing_cash_payments",
+                "summary": "Record a cash payment for a paid plugin plan",
+                "tags": [
+                    "billing"
+                ],
+                "description": "Operator only. Covers the workspace from the date paid, or the end of its current cash cover if later, for the plan's period.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CashPaymentCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Recorded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CashPaymentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Something is missing or wrong; the message says what",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/billing/cash-payments/{id}/void": {
+            "post": {
+                "operationId": "post_api_v1_billing_cash_payments_id_void",
+                "summary": "Void a cash payment, saying why",
+                "tags": [
+                    "billing"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "The cash payment.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CashPaymentVoidRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Voided",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CashPaymentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No reason, no such payment, or already voided",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/billing/change-plan": {
             "post": {
                 "operationId": "post_api_v1_billing_change_plan",
@@ -77783,6 +78101,25 @@
                     "issued_at": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "cash"
+                        ],
+                        "description": "cash: recorded by the operator, not paid through a provider"
+                    },
+                    "plan_key": {
+                        "type": "string",
+                        "description": "Cash only: the plugin plan paid for"
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "description": "Cash only: how many seats"
+                    },
+                    "covers_until": {
+                        "type": "string",
+                        "description": "Cash only: the end of what it pays for"
                     }
                 },
                 "required": [
@@ -79264,6 +79601,153 @@
                     "code",
                     "reason",
                     "detail"
+                ]
+            },
+            "CashPayment": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "tenant_id": {
+                        "type": "integer"
+                    },
+                    "plan_key": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "integer"
+                    },
+                    "amount_minor": {
+                        "type": "integer"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "receipt_number": {
+                        "type": "string"
+                    },
+                    "note": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "paid_on": {
+                        "type": "string"
+                    },
+                    "period_start": {
+                        "type": "string"
+                    },
+                    "period_end": {
+                        "type": "string"
+                    },
+                    "recorded_by": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "recorded_at": {
+                        "type": "string"
+                    },
+                    "voided_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "void_reason": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "tenant_id",
+                    "plan_key",
+                    "quantity",
+                    "amount_minor",
+                    "currency",
+                    "receipt_number",
+                    "paid_on",
+                    "period_start",
+                    "period_end"
+                ]
+            },
+            "CashPaymentCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "workspace": {
+                        "type": "integer",
+                        "description": "The workspace that paid"
+                    },
+                    "planKey": {
+                        "type": "string",
+                        "description": "A paid plugin plan, such as plugin.salons.monthly"
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "description": "How many seats (chairs); 1 when the plugin is not sold per seat"
+                    },
+                    "amount": {
+                        "type": "string",
+                        "description": "The amount paid, as written: 15 or 15.000"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "Three letters; JOD when left out"
+                    },
+                    "receiptNumber": {
+                        "type": "string",
+                        "description": "The paper receipt's number; once per workspace"
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "Anything worth keeping"
+                    },
+                    "paidOn": {
+                        "type": "string",
+                        "description": "The date paid, like 2026-11-16"
+                    }
+                },
+                "required": [
+                    "workspace",
+                    "planKey",
+                    "amount",
+                    "receiptNumber",
+                    "paidOn"
+                ]
+            },
+            "CashPaymentListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CashPayment"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "CashPaymentResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/CashPayment"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "CashPaymentVoidRequest": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "description": "Why it is voided"
+                    }
+                },
+                "required": [
+                    "reason"
                 ]
             },
             "Chat": {
@@ -107574,6 +108058,7 @@
                         "enum": [
                             "free_for_all",
                             "entitled",
+                            "cash",
                             "trial",
                             "grace",
                             "lapsed",

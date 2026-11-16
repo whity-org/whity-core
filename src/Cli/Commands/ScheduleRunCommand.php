@@ -202,6 +202,15 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // WHIT-1153: cash payments about to end, once an hour; each payment's
+        // reminder goes out once.
+        if ((int) $now->format('i') === 0) {
+            $this->queue->dispatch(\Whity\Core\Billing\Cash\CashRemindersJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'billing-cash-reminders-' . $bucket,
+            ]);
+        }
+
         // EM.1: the agents' daily summary, once an hour; the job sends only
         // where it is 18:00, and at most once a day per person.
         if ((int) $now->format('i') === 0) {
