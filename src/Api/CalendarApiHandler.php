@@ -137,7 +137,7 @@ final class CalendarApiHandler
     public function getSettings(Request $request): Response
     {
         return $this->run($request, 'settings', function (int $tenantId): Response {
-            return Response::json(['data' => $this->booking->settingsFor($tenantId)->toApi()]);
+            return Response::json(['data' => $this->settingsOut($tenantId)]);
         });
     }
 
@@ -179,7 +179,7 @@ final class CalendarApiHandler
                 $this->settings->setTenant($tenantId, $key, $value);
             }
 
-            return Response::json(['data' => $this->booking->settingsFor($tenantId)->toApi()]);
+            return Response::json(['data' => $this->settingsOut($tenantId)]);
         });
     }
 
@@ -838,6 +838,24 @@ final class CalendarApiHandler
             'book_anyway' => !$isAgent && ($body['book_anyway'] ?? false) === true,
             'within_hours' => ($body['within_hours'] ?? false) === true,
         ];
+    }
+
+    /**
+     * The settings, and the public booking page's address so staff can share
+     * it (WHIT-1117): `{app}/book/{workspace}`, the same link the booking
+     * emails use for "Book again". Null when the workspace has no slug or no
+     * app address is configured.
+     *
+     * @return array<string, mixed>
+     */
+    private function settingsOut(int $tenantId): array
+    {
+        $out = $this->booking->settingsFor($tenantId)->toApi();
+        $slug = (new \Whity\Core\Branding\TenantHostRepository($this->calendar->db()))->findSlugById($tenantId);
+        $base = rtrim($this->feedUrlBase, '/');
+        $out['booking_page_url'] = $slug !== null && $slug !== '' && $base !== '' ? $base . '/book/' . rawurlencode($slug) : null;
+
+        return $out;
     }
 
     private static function isAgent(Request $request): bool

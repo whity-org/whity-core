@@ -124,6 +124,10 @@ final class ExternalBillingApiHandler
         // not paid" is a double charge and the cost of a wrong "they have" is a
         // retry.
         $isAddon = $this->planIsAddon($planKey);
+        // A PAID PLUGIN (`plugin.<slug>.<plan>`, WHIT-1127) is its own product:
+        // a Free workspace may buy one, and it never touches the tier. What
+        // must not happen is buying the same plugin twice.
+        $isPluginAddon = $isAddon && str_starts_with(trim($planKey), 'plugin.');
 
         try {
             $hasAccess = $this->portal->accessFor(BillingSubject::forTenant($tenantId))->hasAccess;
@@ -131,11 +135,15 @@ final class ExternalBillingApiHandler
             return $this->portalFailure($e, 'check an existing subscription', ['tenant_id' => $tenantId]);
         }
 
+        if ($isPluginAddon && $this->holdsPluginProduct($tenantId, trim($planKey))) {
+            return Response::error('This workspace already has this plugin.', 409);
+        }
+
         if (!$isAddon && $hasAccess) {
             return Response::error('This workspace already has an active subscription.', 409);
         }
 
-        if ($isAddon && !$hasAccess) {
+        if ($isAddon && !$isPluginAddon && !$hasAccess) {
             return Response::error(
                 'This workspace needs an active subscription before it can buy add-ons.',
                 409
@@ -994,6 +1002,28 @@ final class ExternalBillingApiHandler
      * moment later by the price lookup, and guessing "add-on" here would give
      * the caller a different error about a plan that is not there.
      */
+    /**
+     * Does the workspace already hold an add-on of the same plugin product
+     * (any plan of `plugin.<slug>`)?
+     */
+    private function holdsPluginProduct(int $tenantId, string $planKey): bool
+    {
+        $cut = strrpos($planKey, '.');
+        $product = $cut === false ? $planKey : substr($planKey, 0, $cut);
+        $statement = $this->pdo->prepare(
+            'SELECT p.plan_key FROM tenant_plan_addons ta JOIN plans p ON p.id = ta.plan_id WHERE ta.tenant_id = :tenant_id'
+        );
+        $statement->bindValue(':tenant_id', $tenantId, \PDO::PARAM_INT);
+        $statement->execute();
+        foreach ($statement->fetchAll(\PDO::FETCH_COLUMN) as $held) {
+            if (is_string($held) && str_starts_with($held, $product . '.')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function planIsAddon(string $planKey): bool
     {
         $statement = $this->pdo->prepare('SELECT is_addon FROM plans WHERE plan_key = :plan_key');

@@ -1785,6 +1785,10 @@
     "en": "Turn an installed plugin on for this workspace",
     "ar": "تشغيل إضافة مثبتة لمساحة العمل"
   },
+  "post_api_workspace_code_plugins_plugin_trial": {
+    "en": "Start this workspace's free trial of a paid plugin",
+    "ar": "بدء الفترة التجريبية المجانية لإضافة مدفوعة في مساحة العمل"
+  },
   "post_api_workspace_plugins": {
     "ar": "نشر إصدار من إضافة مساحة العمل"
   },

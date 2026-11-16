@@ -206,6 +206,10 @@ final class SettingsRegistryCorePinTest extends TestCase
             'signup.customer_invites',
             // WHIT-1043: how many people one customer may invite.
             'signup.invites_per_customer',
+            // Migration 294: Messages settings, moved from messaging_settings.
+            'messaging.webchat_enabled',
+            'messaging.webchat_greeting',
+            'messaging.inbound_email_address',
         ];
     }
 
@@ -433,6 +437,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             'signup.allowed_domains' => '[]',
             'signup.customer_invites' => 'false',
             'signup.invites_per_customer' => '0',
+            'messaging.webchat_enabled' => 'false',
+            'messaging.webchat_greeting' => '',
+            'messaging.inbound_email_address' => '',
         ];
     }
 

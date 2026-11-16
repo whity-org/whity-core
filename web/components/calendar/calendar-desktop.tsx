@@ -54,6 +54,7 @@ import { BookingDialog } from './booking-dialog';
 import { BookingSheet } from './booking-sheet';
 import { EventDialog } from './event-dialog';
 import { RequestsCard } from './appointments-side';
+import { BookingLinkCard } from './booking-link';
 import { TimeGrid, hoursToDraw, type CalItem } from './time-grid';
 import { QuickBooking, useGridEditing } from './calendar-editing';
 import { useCalendarAccess, type CalendarBasics } from './use-calendar-basics';
@@ -93,6 +94,11 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
   const setView = useCallback((next: CalendarView) => update({ view: next }), [update]);
   const setAnchor = useCallback((next: CalendarDate) => update({ date: dateKey(next) }), [update]);
 
+  // The booking link (WHIT-1117): shown while the booking page is on, and offered
+  // to managers when it is off. `?share=booking-link` (Ctrl+K) opens Share.
+  const [bookingOn, setBookingOn] = useState(settings.booking_page_enabled);
+  const shareOnOpen = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('share') === 'booking-link';
+  const showLink = (settings.booking_page_url ?? null) !== null && (bookingOn || access.canManage);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<CalItem | null>(null);
   const [sheet, setSheet] = useState<{ booking: CalendarBooking; startWith: 'move' | 'cancel' | null; suggest: boolean } | null>(null);
@@ -332,17 +338,29 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
         canBook={access.canWrite && services.length > 0}
         onNewBooking={() => setNewBooking(true)}
         footer={
-          (requests.data ?? []).length > 0 ? (
-            <RequestsCard
-              requests={requests.data ?? []}
-              services={services}
-              staff={staff}
-              timeZone={timeZone}
-              canChange={access.canWrite}
-              onSuggest={(request) => setSheet({ booking: request, startWith: null, suggest: true })}
-              onChanged={refetch}
-            />
-          ) : null
+          <>
+            {(requests.data ?? []).length > 0 && (
+              <RequestsCard
+                requests={requests.data ?? []}
+                services={services}
+                staff={staff}
+                timeZone={timeZone}
+                canChange={access.canWrite}
+                onSuggest={(request) => setSheet({ booking: request, startWith: null, suggest: true })}
+                onChanged={refetch}
+              />
+            )}
+            {showLink && (
+              <BookingLinkCard
+                compact
+                link={settings.booking_page_url ?? null}
+                enabled={bookingOn}
+                canManage={access.canManage}
+                onEnabled={() => setBookingOn(true)}
+                shareOnOpen={shareOnOpen}
+              />
+            )}
+          </>
         }
       />
       <div className="grid min-w-0 gap-3">

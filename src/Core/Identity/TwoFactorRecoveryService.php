@@ -6,6 +6,7 @@ namespace Whity\Core\Identity;
 
 use PDO;
 use Whity\Auth\BackupCodesService;
+use Whity\Core\Security\PublicToken;
 
 /**
  * "I lost my 2FA device" recovery-request lifecycle
@@ -18,7 +19,7 @@ use Whity\Auth\BackupCodesService;
  * always lands in an admin approval queue.
  *
  * Two-step token lifecycle (mirrors {@see EmailVerificationService} /
- * {@see PasswordResetService}'s shape, `bin2hex(random_bytes(32))`, only
+ * {@see PasswordResetService}'s shape, `PublicToken::make(32)`, only
  * `sha256()` hash persisted, single-use):
  *   1. {@see self::issue()} — the user submitted their email; a token is
  *      minted proving nothing yet except that an email was sent. Any prior
@@ -84,8 +85,8 @@ final class TwoFactorRecoveryService
      */
     public function issue(int $profileId, int $ttlSeconds = self::DEFAULT_TTL_SECONDS, ?string $requestedFrom = null): string
     {
-        $rawToken  = bin2hex(random_bytes(self::TOKEN_BYTES));
-        $tokenHash = hash('sha256', $rawToken);
+        $rawToken  = PublicToken::make(self::TOKEN_BYTES);
+        $tokenHash = PublicToken::hash($rawToken);
         $expiresAt = gmdate('Y-m-d H:i:s', time() + $ttlSeconds);
 
         $ownTx = !$this->db->inTransaction();
@@ -134,7 +135,7 @@ final class TwoFactorRecoveryService
             return null;
         }
 
-        $tokenHash = hash('sha256', $rawToken);
+        $tokenHash = PublicToken::hash($rawToken);
         $now       = gmdate('Y-m-d H:i:s');
 
         $ownTx = !$this->db->inTransaction();
@@ -598,7 +599,7 @@ final class TwoFactorRecoveryService
             )->execute([
                 ':pid'        => $targetProfileId,
                 // No link is ever sent for this row; the hash only fills the column.
-                ':hash'       => hash('sha256', bin2hex(random_bytes(self::TOKEN_BYTES))),
+                ':hash'       => PublicToken::hash(PublicToken::make(self::TOKEN_BYTES)),
                 ':reason'     => $reason !== null && trim($reason) !== '' ? mb_substr(trim($reason), 0, 500) : null,
                 ':approver'   => $approverProfileId,
                 ':tenant_id'  => $tenantId,

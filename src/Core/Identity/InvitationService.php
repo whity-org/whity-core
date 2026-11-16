@@ -6,6 +6,7 @@ namespace Whity\Core\Identity;
 
 use PDO;
 use Whity\Core\Hooks\HookManager;
+use Whity\Core\Security\PublicToken;
 
 /**
  * Issues and consumes tenant invitations (WHIT-417 / #797 item 3) — the path by
@@ -13,7 +14,7 @@ use Whity\Core\Hooks\HookManager;
  * password into a form.
  *
  * Token handling is {@see PasswordResetService}'s, unchanged:
- * `bin2hex(random_bytes(32))` (256-bit), only the `sha256()` digest persisted,
+ * `PublicToken::make(32)` (256-bit), only the `sha256()` digest persisted,
  * lookup by an indexed equality on that digest under `UNIQUE(token_hash)` — so
  * the raw token is never compared in PHP and there is no comparison to time.
  * Single use is a status-guarded UPDATE whose `rowCount()` decides the winner
@@ -137,7 +138,7 @@ final class InvitationService
         ?int $invitedByProfileId = null,
         int $ttlDays = self::DEFAULT_TTL_DAYS,
     ): array {
-        $rawToken = bin2hex(random_bytes(self::TOKEN_BYTES));
+        $rawToken = PublicToken::make(self::TOKEN_BYTES);
         $expiresAt = gmdate('Y-m-d H:i:s', time() + $this->clampTtlDays($ttlDays) * 86400);
 
         $ownTx = !$this->db->inTransaction();
@@ -168,7 +169,7 @@ final class InvitationService
                 ':email' => $email,
                 ':role_id' => $roleId,
                 ':ou_id' => $ouId,
-                ':hash' => hash('sha256', $rawToken),
+                ':hash' => PublicToken::hash($rawToken),
                 ':status' => self::STATUS_PENDING,
                 ':invited_by' => $invitedByProfileId,
                 ':expires_at' => $expiresAt,
@@ -216,7 +217,7 @@ final class InvitationService
         int $ttlDays = self::DEFAULT_TTL_DAYS,
     ): array {
         $notSent = ['result' => self::INVITE_NOT_SENT, 'id' => 0, 'token' => ''];
-        $rawToken = bin2hex(random_bytes(self::TOKEN_BYTES));
+        $rawToken = PublicToken::make(self::TOKEN_BYTES);
         $expiresAt = gmdate('Y-m-d H:i:s', time() + $this->clampTtlDays($ttlDays) * 86400);
 
         $ownTx = !$this->db->inTransaction();
@@ -270,7 +271,7 @@ final class InvitationService
                 ':tenant_id' => $tenantId,
                 ':email' => $email,
                 ':role_id' => $roleId,
-                ':hash' => hash('sha256', $rawToken),
+                ':hash' => PublicToken::hash($rawToken),
                 ':status' => self::STATUS_PENDING,
                 ':invited_by' => $inviterProfileId,
                 ':kind' => self::KIND_CUSTOMER,
@@ -399,14 +400,14 @@ final class InvitationService
                 return null;
             }
 
-            $rawToken = bin2hex(random_bytes(self::TOKEN_BYTES));
+            $rawToken = PublicToken::make(self::TOKEN_BYTES);
             $update = $this->db->prepare(
                 'UPDATE invitations
                     SET token_hash = :hash, expires_at = :expires_at, updated_at = NOW()
                   WHERE id = :id AND tenant_id = :tenant_id AND status = :status'
             );
             $update->execute([
-                ':hash' => hash('sha256', $rawToken),
+                ':hash' => PublicToken::hash($rawToken),
                 ':expires_at' => gmdate('Y-m-d H:i:s', time() + $this->clampTtlDays($ttlDays) * 86400),
                 ':id' => $invitationId,
                 ':tenant_id' => $tenantId,
@@ -775,7 +776,7 @@ final class InvitationService
               LIMIT 1'
         );
         $stmt->execute([
-            ':hash' => hash('sha256', $rawToken),
+            ':hash' => PublicToken::hash($rawToken),
             ':pending' => self::STATUS_PENDING,
             ':now' => gmdate('Y-m-d H:i:s'),
         ]);
@@ -816,7 +817,7 @@ final class InvitationService
             ':tenant_id' => $tenantId,
             ':email' => $email,
             ':role_id' => $roleId,
-            ':hash' => hash('sha256', bin2hex(random_bytes(self::TOKEN_BYTES))),
+            ':hash' => PublicToken::hash(PublicToken::make(self::TOKEN_BYTES)),
             ':status' => self::STATUS_NOT_SENT,
             ':invited_by' => $inviterProfileId,
             ':kind' => self::KIND_CUSTOMER,

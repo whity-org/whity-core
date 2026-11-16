@@ -184,6 +184,6 @@ final class ChatBotsAndBlockingRealEngineTest extends TestCase
             $pdo->exec("INSERT INTO memberships (profile_id, tenant_id, role_id, status, kind, created_at) VALUES ({$id}, " . self::A . ", {$role}, 'active', '{$kind}', CURRENT_TIMESTAMP)");
         }
         // Web chat is on, so the bots' replies can go out on it.
-        $pdo->exec('INSERT INTO messaging_settings (tenant_id, webchat_enabled, updated_at) VALUES (' . self::A . ', TRUE, CURRENT_TIMESTAMP)');
+        $pdo->exec("INSERT INTO tenant_settings (tenant_id, setting_key, value, updated_at) VALUES (" . self::A . ", 'messaging.webchat_enabled', 'true', CURRENT_TIMESTAMP)");
     }
 }
