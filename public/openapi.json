@@ -77289,9 +77289,10 @@
                             "event",
                             "meeting",
                             "time_off",
-                            "external"
+                            "external",
+                            "open_hours"
                         ],
-                        "description": "A team event or everyday meeting, a formal meeting, time off, or one synced from an outside calendar."
+                        "description": "A team event or everyday meeting, a formal meeting, time off, one synced from an outside calendar, or extra working hours (never shown on the calendar)."
                     },
                     "room_id": {
                         "type": "integer",

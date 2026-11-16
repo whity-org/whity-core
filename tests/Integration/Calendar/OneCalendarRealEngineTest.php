@@ -198,6 +198,60 @@ final class OneCalendarRealEngineTest extends TestCase
         self::assertTrue($asManager['event:' . $team]['move']);
     }
 
+    public function testTimeOffIsAnEventThatBlocksAndTheTimeOffApiStillReadsIt(): void
+    {
+        $id = $this->calendar->addException(1, 11, 'off', $this->when('2026-11-16T10:00:00+03:00', '2026-11-16T11:00:00+03:00'), 'Doctor', 11);
+
+        self::assertSame('time_off', $this->calendar->findEvent(1, $id)['kind'] ?? null);
+        self::assertSame([], $this->free(11), 'time off blocks bookings');
+        $listed = $this->calendar->exceptions(1, 11, $this->at('2026-11-16T00:00:00+03:00'), $this->at('2026-11-17T00:00:00+03:00'));
+        self::assertSame([['id' => $id, 'kind' => 'off', 'note' => 'Doctor']], array_map(static fn (array $r): array => ['id' => $r['id'], 'kind' => $r['kind'], 'note' => $r['note']], $listed));
+        self::assertSame(['time_off:' . $id], array_column($this->items(viewer: 11), 'id'));
+
+        // The events list keeps its old meaning: no time off there.
+        self::assertSame([], $this->calendar->listEvents(1, [11], $this->at('2026-11-16T00:00:00+03:00'), $this->at('2026-11-17T00:00:00+03:00'), [CalendarRepository::KIND_EVENT, CalendarRepository::KIND_EXTERNAL, CalendarRepository::KIND_MEETING]));
+
+        $this->calendar->deleteException(1, $id);
+        self::assertSame(['2026-11-16T07:00:00Z', '2026-11-16T07:30:00Z'], $this->free(11), 'removing it frees the time');
+        self::assertNull($this->calendar->findException(1, $id));
+    }
+
+    public function testExtraHoursWidenTheDayAndNeverShowOnTheCalendar(): void
+    {
+        // Friday 20 November is not a working day.
+        $friday = fn (): array => array_column($this->service->availability(1, $this->cake, 11, $this->at('2026-11-20T00:00:00+03:00'), $this->at('2026-11-21T00:00:00+03:00')), 'starts_at');
+        self::assertSame([], $friday());
+
+        $this->calendar->addException(1, 11, 'open', $this->when('2026-11-20T10:00:00+03:00', '2026-11-20T11:00:00+03:00'), '', 11);
+
+        self::assertSame(['2026-11-20T07:00:00Z', '2026-11-20T07:30:00Z'], $friday());
+        self::assertSame([], (new CalendarItems($this->bookings, $this->calendar))->between(1, 11, $this->at('2026-11-20T00:00:00+03:00'), $this->at('2026-11-21T00:00:00+03:00')));
+    }
+
+    public function testOldTimeOffRowsAreCopiedOnceAndKeepTheirMeaning(): void
+    {
+        $this->pdo->exec(
+            "INSERT INTO calendar_availability_exceptions (id, tenant_id, profile_id, kind, starts_at, ends_at, note, created_by_profile_id)
+             VALUES (701, 1, 11, 'off', '2026-11-16 07:00:00', '2026-11-16 08:00:00', '', 11),
+                    (702, 1, 12, 'open', '2026-11-20 07:00:00', '2026-11-20 09:00:00', 'Market day', 12),
+                    (703, 2, 21, 'off', '2026-11-16 07:00:00', '2026-11-16 08:00:00', 'Holiday', 21)"
+        );
+        $db = \Whity\Database\Database::withFactory(fn (): PDO => $this->pdo, 86400, 86400);
+        $db->forceConnect();
+        require_once dirname(__DIR__, 3) . '/database/migrations/285_move_time_off_into_calendar_events.php';
+        \Database\Migrations\MoveTimeOffIntoCalendarEvents::up($db);
+        \Database\Migrations\MoveTimeOffIntoCalendarEvents::up($db);
+
+        $rows = $this->pdo->query("SELECT tenant_id, profile_id, kind, title, busy, legacy_ref FROM calendar_events WHERE legacy_ref IS NOT NULL ORDER BY legacy_ref");
+        self::assertNotFalse($rows);
+        self::assertSame([
+            ['1', '11', 'time_off', 'Time off', 'exception:701'],
+            ['1', '12', 'open_hours', 'Market day', 'exception:702'],
+            ['2', '21', 'time_off', 'Holiday', 'exception:703'],
+        ], array_map(static fn (array $r): array => [(string) $r['tenant_id'], (string) $r['profile_id'], $r['kind'], $r['title'], $r['legacy_ref']], $rows->fetchAll(PDO::FETCH_ASSOC)), 'copied once, each in its own workspace');
+        self::assertSame([], $this->free(11), 'the copied time off blocks');
+    }
+
     public function testAnotherWorkspaceSeesNothing(): void
     {
         $this->event(13, 'Menu tasting', '2026-11-16T10:00:00+03:00', '2026-11-16T11:00:00+03:00', people: [11]);

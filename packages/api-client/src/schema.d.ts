@@ -11696,10 +11696,10 @@ export interface components {
             status: string;
             external_ref?: string | null;
             /**
-             * @description A team event or everyday meeting, a formal meeting, time off, or one synced from an outside calendar.
+             * @description A team event or everyday meeting, a formal meeting, time off, one synced from an outside calendar, or extra working hours (never shown on the calendar).
              * @enum {string}
              */
-            kind: "event" | "meeting" | "time_off" | "external";
+            kind: "event" | "meeting" | "time_off" | "external" | "open_hours";
             room_id?: number | null;
             location?: string;
             meeting_id?: number | null;

@@ -620,7 +620,10 @@ final class CalendarApiHandler
             [$from, $to] = $this->range($request);
             $profileId = $this->optionalInt($request, 'profile_id');
 
-            return Response::json(['data' => $this->calendar->listEvents($tenantId, $profileId !== null ? [$profileId] : [], $from, $to)]);
+            // Time off and extra hours have their own route; meetings arrive with T4.
+            return Response::json(['data' => $this->calendar->listEvents($tenantId, $profileId !== null ? [$profileId] : [], $from, $to, [
+                CalendarRepository::KIND_EVENT, CalendarRepository::KIND_EXTERNAL, CalendarRepository::KIND_MEETING,
+            ])]);
         });
     }
 

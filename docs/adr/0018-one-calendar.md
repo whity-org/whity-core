@@ -44,7 +44,7 @@ As a result, meetings did not block bookings (#1933). Meeting guests got no cale
    - colleagues see the titles of what they can open;
    - someone else's time off reads "Away" and their synced events "Busy", without notes or place.
 6. **Formal meetings keep their record.** Body, number, agenda, decisions (routed and signed), attendance and quorum stay in Convening. A meeting's date, place and guests live on its event (`calendar_events.meeting_id`). Meetings with only a start last 60 minutes by default (owner).
-7. **Time off is an event** of kind `time_off`, recorded and not approved (owner). `calendar_availability_exceptions` keeps only `open` rows, the extra working hours.
+7. **Time off is an event** of kind `time_off`, recorded and not approved (owner). Extra working hours become kind `open_hours`: not busy, never shown on the calendar, and only widening the person's hours. Days off and extra hours then share one table and one id space, so the time-off API (`/api/calendar/time-off`) answers as before. `calendar_availability_exceptions` is no longer read and is dropped in T8.
 8. **One invite and reminder path.** Every event with people sends:
    - an in-app notice;
    - an email with an `.ics` (one UID for the event's life, a SEQUENCE, CANCEL when it is cancelled);
@@ -60,7 +60,7 @@ As a result, meetings did not block bookings (#1933). Meeting guests got no cale
 | --- | --- | --- | --- |
 | T1 | WHIT-1108 | This ADR | - |
 | T2 | WHIT-1109 | Kinds, event people, rooms and places on events, `/api/calendar/items`, free/busy for people invited and rooms held, answering an invitation | 284 |
-| T3 | WHIT-1110 | Time off becomes events (copy keyed by `legacy_ref`) | 285 |
+| T3 | WHIT-1110 | Time off and extra hours become events (copy keyed by `legacy_ref`) | 285 |
 | T4 | WHIT-1112 | Meetings scheduled as events; `MeetingBusySource` retires | 286 |
 | T5 | WHIT-1113 | One invite path and one reminder job | - |
 | T6 | WHIT-1114 | Task due dates and SDK `CalendarSource` | - |
