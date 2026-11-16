@@ -43,9 +43,30 @@ final class EntitlementService
 
     private TenantEntitlementRepository $repo;
 
+    /**
+     * WHIT-1156: packs a paid plugin's add-on plan gives while the plugin is on
+     * (trial, cash, grace), as {@see \Whity\Core\Plugin\Workspace\PluginLimitPacks}.
+     *
+     * @var (\Closure(int): list<array{quantity: int, values: array<string, string>}>)|null
+     */
+    private ?\Closure $pluginPacks = null;
+
+    /** Working out a plugin's state reads entitlements again: that read sees no plugin packs. */
+    private bool $resolvingPluginPacks = false;
+
     public function __construct(TenantEntitlementRepository $repo)
     {
         $this->repo = $repo;
+    }
+
+    /**
+     * Stack the limits of paid plugins that are on in a workspace (WHIT-1156).
+     *
+     * @param \Closure(int): list<array{quantity: int, values: array<string, string>}> $packs
+     */
+    public function usePluginPacks(\Closure $packs): void
+    {
+        $this->pluginPacks = $packs;
     }
 
     /**
@@ -66,6 +87,20 @@ final class EntitlementService
         $overrides = $this->repo->allForTenant($tenantId);
         $plan = $this->repo->planBundleFor($tenantId);
         $packs = $this->repo->addonBundlesFor($tenantId);
+        if ($this->pluginPacks !== null && !$this->resolvingPluginPacks) {
+            $this->resolvingPluginPacks = true;
+            try {
+                foreach (($this->pluginPacks)($tenantId) as $pack) {
+                    $packs[] = $pack;
+                }
+            } catch (\Throwable $e) {
+                // A plugin's lift is a bonus; failing to read it must not break
+                // the workspace's own plan.
+                error_log('[entitlements] plugin limits for tenant ' . $tenantId . ' unreadable: ' . $e->getMessage());
+            } finally {
+                $this->resolvingPluginPacks = false;
+            }
+        }
 
         $effective = [];
         foreach (EntitlementRegistry::keys() as $key) {
