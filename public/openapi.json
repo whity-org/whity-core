@@ -91333,10 +91333,19 @@
                                 "type": "string",
                                 "enum": [
                                     "totp",
-                                    "email_code"
+                                    "email_code",
+                                    "fresh_sign_in"
                                 ]
                             },
                             "email_hint": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "provider_key": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "purpose": {
                                 "type": "string",
                                 "nullable": true
                             }
