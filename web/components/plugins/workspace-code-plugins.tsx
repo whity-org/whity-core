@@ -12,7 +12,7 @@ import { navigateExternal } from '@/lib/external-navigate';
 import { formatMoney } from '@whity/ui/money/currency';
 import { useToast } from '@/lib/toast-context';
 import { useNavigation } from '@/lib/navigation-context';
-import { useTranslation } from '@whity/features/i18n';
+import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
@@ -66,6 +66,7 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
 
   // WHIT-1127: what a paid plugin costs, from the deployment's add-on plans.
   const { hasPermission } = useCapabilities();
+  const language = useLanguageCode();
   const canPay = hasPermission(BILLING_PAY);
   const [buying, setBuying] = useState<string | null>(null);
   const { data: addonPrices } = useFetch(async () => {
@@ -83,8 +84,20 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
       .sort((a, b) => (PERIOD_ORDER[a.billing_period] ?? 9) - (PERIOD_ORDER[b.billing_period] ?? 9));
   };
   const priceFor = (product: string | null | undefined): AddonPrice | null => pricesFor(product)[0] ?? null;
-  const periodPrice = (plan: AddonPrice): string => {
-    const amount = formatMoney(plan.unit_amount, plan.currency);
+  // SDK 1.110: sold per seat (Whity for Salons per chair) reads
+  // "3 chairs × JOD 15.000 = JOD 45.000 a month".
+  const locale: 'en' | 'ar' = language === 'ar' ? 'ar' : 'en';
+  const periodPrice = (plan: AddonPrice, seats?: WorkspaceCodePlugin['seats']): string => {
+    const count = seats?.count ?? 1;
+    const each = formatMoney(plan.unit_amount, plan.currency);
+    const amount = seats
+      ? t('plugins.paid.seats', '{count} {units} × {each} = {total}', {
+          count,
+          units: count === 1 ? (seats.unit?.[locale] ?? seats.unit?.en ?? '') : (seats.units?.[locale] ?? seats.units?.en ?? ''),
+          each,
+          total: formatMoney(plan.unit_amount * count, plan.currency),
+        })
+      : each;
     switch (plan.billing_period) {
       case 'year':
         return t('plugins.paid.perYear', '{price} a year', { price: amount });
@@ -256,7 +269,7 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
                   ) : null}
                   {needsPurchase && prices.length > 0 ? (
                     <p className="text-muted-foreground">
-                      {t('plugins.paid.prices', 'For this workspace: {prices}', { prices: prices.map(periodPrice).join(' · ') })}
+                      {t('plugins.paid.prices', 'For this workspace: {prices}', { prices: prices.map((option) => periodPrice(option, plugin.seats)).join(' · ') })}
                     </p>
                   ) : null}
                   {change ? <p className="text-muted-foreground">{change}</p> : null}
@@ -292,7 +305,7 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
                       <DropdownMenuContent align="end">
                         {prices.map((option) => (
                           <DropdownMenuItem key={option.plan_key + option.billing_period} onClick={() => void buy(plugin, option)}>
-                            {periodPrice(option)}
+                            {periodPrice(option, plugin.seats)}
                           </DropdownMenuItem>
                         ))}
                       </DropdownMenuContent>

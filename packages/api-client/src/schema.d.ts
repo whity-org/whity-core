@@ -20173,6 +20173,12 @@ export interface components {
             onboarding?: boolean;
             /** @description Plugins turned on with it in this workspace */
             dependsOn?: string[];
+            /** @description Sold per seat (SDK 1.110): how many this workspace has, and what one is called */
+            seats?: {
+                count?: number;
+                unit?: components["schemas"]["LocalizedLabel"];
+                units?: components["schemas"]["LocalizedLabel"];
+            } | null;
         };
         WorkspaceCodePluginHistoryResponse: {
             data: {

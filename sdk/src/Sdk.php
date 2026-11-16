@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.109).
+ * SDK identity (v1.110).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1315,12 +1315,20 @@ namespace Whity\Sdk;
  * turned on with it in a workspace (WHIT-1148).
  *
  * Purely additive.)
+ *
+ * 1.110 (SOLD PER SEAT: a paid plugin's {@see PluginAccessInterface::getAccess()} may add `seats`,
+ * one of its own integer settings counting what the workspace has (Whity for Salons: chairs). The
+ * host buys that many, and changes the subscription's quantity when the count changes.
+ * {@see Billing\QuantityCheckout} is the optional portal interface for a checkout of several of
+ * one price (WHIT-1152).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.109.0';
+    public const VERSION = '1.110.0';
 
     /**
      * Static identity only — never instantiated.

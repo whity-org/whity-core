@@ -780,6 +780,11 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                 continue;
             }
             $paid[$name] = ['entitlement' => $entitlement, 'product' => $product, 'trialDays' => $trialDays];
+            // SDK 1.110: sold per seat, counted by one of its own settings.
+            $seats = self::seatsDeclaration($declared['seats'] ?? null);
+            if ($seats !== null) {
+                $paid[$name]['seats'] = $seats;
+            }
         }
 
         return $this->paidAccess = $paid;
@@ -826,6 +831,21 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         }
 
         return $dependents;
+    }
+
+    /**
+     * A plugin's `seats` declaration (SDK 1.110), read untyped: the plugin's
+     * array is runtime data whatever its documented shape.
+     *
+     * @return array{setting: string, unit: mixed, units: mixed}|null
+     */
+    private static function seatsDeclaration(mixed $seats): ?array
+    {
+        if (!is_array($seats) || !is_string($seats['setting'] ?? null) || preg_match('/^[a-z][a-z0-9_]*$/', $seats['setting']) !== 1) {
+            return null;
+        }
+
+        return ['setting' => $seats['setting'], 'unit' => $seats['unit'] ?? null, 'units' => $seats['units'] ?? null];
     }
 
     /**

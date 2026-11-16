@@ -578,6 +578,7 @@ describe('PluginsPage rejected screens (#953)', () => {
             name: 'Salons', version: '0.1.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null,
             state: 'off', reason: null, graceUntil: null, trialEndsAt: null, paid: true, product: 'plugin.salons',
             trialDays: 14, trialAvailable: false, mayTurnOn: false, onboarding: true, dependsOn: [],
+            seats: { count: 3, unit: { en: 'chair', ar: 'كرسي' }, units: { en: 'chairs', ar: 'كراسي' } },
           },
         ],
         [
@@ -591,6 +592,7 @@ describe('PluginsPage rejected screens (#953)', () => {
       render(<PluginsPage />);
       await screen.findByText('Salons');
       expect(await screen.findByText(/a month · .*every 6 months · .*a year/)).toBeInTheDocument();
+      expect(screen.getByText(/3 chairs × JOD 15\.000 = JOD 45\.000 a month/)).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: 'Buy' }));
       await user.click(await screen.findByRole('menuitem', { name: /every 6 months/ }));
