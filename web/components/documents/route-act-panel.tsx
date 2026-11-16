@@ -116,6 +116,7 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
 import { Textarea } from '@whity/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { IconCheck, IconX } from '@tabler/icons-react';
 import { useLanguageDirection, useTranslation } from '@whity/features/i18n';
 import { api, apiFetch } from '@/lib/api/client';
@@ -735,7 +736,24 @@ export function RouteActPanel({
                   <span className="ms-1 text-muted-foreground">{t('routing.act.values.optional', '(optional)')}</span>
                 )}
               </label>
-              {input.type === 'person' ? (
+              {input.type === 'choice' ? (
+                // WHIT-1163: one of the stage's options, such as the decision.
+                <Select
+                  value={values[input.key] ?? ''}
+                  onValueChange={(value) => setValues((current) => ({ ...current, [input.key]: value }))}
+                >
+                  <SelectTrigger id={`route-value-${route.id}-${input.key}`} aria-required={input.required}>
+                    <SelectValue placeholder={t('routing.act.values.choose', 'Choose one')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(input.options ?? []).map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {(dir === 'rtl' && option.label_ar) || option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : input.type === 'person' ? (
                 <RoutePersonValue
                   id={`route-value-${route.id}-${input.key}`}
                   value={values[input.key] ?? ''}

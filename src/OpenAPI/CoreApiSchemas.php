@@ -6547,6 +6547,12 @@ final class CoreApiSchemas
                 'label_ar' => self::str(true) + ['description' => 'The label in Arabic, when it differs.'],
                 'required' => self::bool() + ['description' => 'Whether approving needs it. True when absent.'],
                 'max_length' => self::int() + ['description' => 'Longest value, 1 to 200. 100 when absent.'],
+                'type' => ['type' => 'string', 'enum' => ['text', 'person', 'choice'], 'description' => 'A line of text (the default), a person in the workspace (their user id), or one of `options` (WHIT-1163).'],
+                'options' => ['type' => 'array', 'maxItems' => 12, 'description' => 'For a choice: 2 to 12 options. The value is stored; the label prints.', 'items' => self::object([
+                    'value' => self::str() + ['description' => 'Small letters, digits and _, up to 40 characters.'],
+                    'label' => self::str() + ['description' => 'At most 80 characters.'],
+                    'label_ar' => self::str(true),
+                ], ['value', 'label'])],
             ], ['key', 'label']),
             // WHIT-1016: a value entered on a route.
             'RouteStepValue' => self::object([
@@ -9456,15 +9462,19 @@ final class CoreApiSchemas
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
             ], ['id', 'tenant_id', 'form_id', 'field_key', 'field_type', 'label', 'is_required', 'position']),
-            // Null means always shown. Exactly one of `equals` and `in` is set.
-            // A hidden question is not required and an answer to it is not stored.
+            // Null means always shown. Exactly one of `equals`, `notEquals`, `in`
+            // and `answered` is set. A hidden question is not required and an
+            // answer to it is not stored. An unanswered controller hides the
+            // question under `equals`, `notEquals` and `in` alike.
             'FormFieldCondition' => [
                 'type' => 'object',
                 'nullable' => true,
                 'properties' => [
                     'field' => self::str(),
                     'equals' => ['description' => 'Text, a number, or true or false, compared with the answer.'],
+                    'notEquals' => ['description' => 'Text, a number, or true or false. Shown when the question is answered with anything else; an unanswered question hides it.'],
                     'in' => ['type' => 'array', 'items' => self::str(), 'maxItems' => 100],
+                    'answered' => ['type' => 'boolean', 'enum' => [true], 'description' => 'Shown when the question has any answer: a ticked checkbox, a non-empty list, a table with a row.'],
                 ],
                 'required' => ['field'],
                 'additionalProperties' => false,

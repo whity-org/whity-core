@@ -2,7 +2,7 @@
     "openapi": "3.0.0",
     "info": {
         "title": "Whity Core API",
-        "version": "0.2.28",
+        "version": "0.2.29",
         "description": "Request bodies are declared, not implied: where an operation accepts one, it is described here. An operation with no `requestBody` accepts none \u2014 a reviewed contract, not a gap in this document. The exception is an operation marked `x-whity-undocumented: true`: that one carries no authored contract at all, its summary and responses are generated defaults, and it may well take a body. Every CORE operation in the published `public/openapi.json` is authored, so the marker appears there only on plugin routes that declare no schema of their own; a document served live by a running instance may mark core routes too."
     },
     "servers": [
@@ -90029,12 +90029,22 @@
                     "equals": {
                         "description": "Text, a number, or true or false, compared with the answer."
                     },
+                    "notEquals": {
+                        "description": "Text, a number, or true or false. Shown when the question is answered with anything else; an unanswered question hides it."
+                    },
                     "in": {
                         "type": "array",
                         "items": {
                             "type": "string"
                         },
                         "maxItems": 100
+                    },
+                    "answered": {
+                        "type": "boolean",
+                        "enum": [
+                            true
+                        ],
+                        "description": "Shown when the question has any answer: a ticked checkbox, a non-empty list, a table with a row."
                     }
                 },
                 "required": [
@@ -101108,6 +101118,41 @@
                     "max_length": {
                         "type": "integer",
                         "description": "Longest value, 1 to 200. 100 when absent."
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "text",
+                            "person",
+                            "choice"
+                        ],
+                        "description": "A line of text (the default), a person in the workspace (their user id), or one of `options` (WHIT-1163)."
+                    },
+                    "options": {
+                        "type": "array",
+                        "maxItems": 12,
+                        "description": "For a choice: 2 to 12 options. The value is stored; the label prints.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "value": {
+                                    "type": "string",
+                                    "description": "Small letters, digits and _, up to 40 characters."
+                                },
+                                "label": {
+                                    "type": "string",
+                                    "description": "At most 80 characters."
+                                },
+                                "label_ar": {
+                                    "type": "string",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "value",
+                                "label"
+                            ]
+                        }
                     }
                 },
                 "required": [

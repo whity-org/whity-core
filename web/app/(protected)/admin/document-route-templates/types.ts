@@ -81,7 +81,9 @@ export interface RouteTemplateStepInputWire {
   label_ar?: string | null;
   required?: boolean;
   max_length?: number;
-  type?: 'text' | 'person';
+  type?: 'text' | 'person' | 'choice';
+  /** WHIT-1163: a choice's options. */
+  options?: { value: string; label: string; label_ar?: string | null }[];
 }
 
 export interface RouteTemplateEdgeWire {
@@ -134,7 +136,10 @@ export function toFlowGraph(wire: RouteTemplateGraphWire): RouteFlowGraph {
           labelAr: input.label_ar ?? null,
           required: input.required !== false,
           maxLength: input.max_length ?? 100,
-          type: input.type === 'person' ? 'person' : 'text',
+          type: input.type === 'person' || input.type === 'choice' ? input.type : 'text',
+          ...(input.type === 'choice'
+            ? { options: (input.options ?? []).map((o) => ({ value: o.value, label: o.label, labelAr: o.label_ar ?? null })) }
+            : {}),
         })),
         excludeNamedIn: s.exclude_named_in ?? [],
         canvasX: s.canvas_x,
@@ -187,8 +192,18 @@ export function toGraphRequest(graph: RouteFlowGraph): {
               label_ar: input.labelAr?.trim() ? input.labelAr.trim() : null,
               required: input.required,
               max_length: input.maxLength,
-              // Only a person is said: a value with no type is text.
+              // Only a person or a choice is said: a value with no type is text.
               ...(input.type === 'person' ? { type: 'person' as const } : {}),
+              ...(input.type === 'choice'
+                ? {
+                    type: 'choice' as const,
+                    options: (input.options ?? []).map((o) => ({
+                      value: o.value,
+                      label: o.label.trim(),
+                      label_ar: o.labelAr?.trim() ? o.labelAr.trim() : null,
+                    })),
+                  }
+                : {}),
             })),
       // WHIT-1018: always sent, so a save never stops leaving people out.
       exclude_named_in: s.kind === 'finalise' ? [] : (s.excludeNamedIn ?? []),

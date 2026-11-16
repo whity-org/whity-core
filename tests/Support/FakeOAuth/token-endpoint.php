@@ -10,6 +10,14 @@ declare(strict_types=1);
  */
 
 $dir = (string) getenv('FAKE_OAUTH_DIR');
+
+// Which test this server belongs to (WHIT-1161): the test waits for its own
+// directory's name here, so it never talks to another test's server that took
+// the port first. Not logged, so request counts stay exact.
+if (($_SERVER['REQUEST_URI'] ?? '') === '/__whoami') {
+    echo basename($dir);
+    return;
+}
 $scenario = json_decode((string) file_get_contents($dir . '/scenario.json'), true);
 
 parse_str((string) file_get_contents('php://input'), $form);

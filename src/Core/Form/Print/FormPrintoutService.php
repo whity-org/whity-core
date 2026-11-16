@@ -114,7 +114,7 @@ final class FormPrintoutService
                 'fields' => $fields,
             ],
             'answers' => $answers,
-            'office' => $routeId === null ? [] : $this->office($tenantId, $routeId),
+            'office' => $routeId === null ? [] : $this->office($tenantId, $routeId, (string) $lang),
             'submission' => [
                 'reference' => isset($submission['reference']) ? (string) $submission['reference'] : null,
                 'submittedAt' => isset($submission['submitted_at']) ? (string) $submission['submitted_at'] : null,
@@ -189,7 +189,7 @@ final class FormPrintoutService
      *
      * @return list<array{label: array<string, string>, value: string, by: ?string, at: ?string}>
      */
-    private function office(int $tenantId, int $routeId): array
+    private function office(int $tenantId, int $routeId, string $lang = 'en'): array
     {
         $labels = $this->stepInputs($tenantId, $routeId);
         $out = [];
@@ -201,6 +201,8 @@ final class FormPrintoutService
             $value = $entry['value'];
             if (($input['type'] ?? RouteStepInputs::TYPE_TEXT) === RouteStepInputs::TYPE_PERSON && ctype_digit($value)) {
                 $value = $this->name($tenantId, 'profile', (int) $value) ?? '—';
+            } elseif ($input !== null) {
+                $value = RouteStepInputs::display($input, $value, $lang);
             }
             $out[] = [
                 'label' => array_filter(['en' => (string) ($input['label'] ?? $key), 'ar' => (string) ($input['label_ar'] ?? '')], static fn (string $l): bool => $l !== ''),
