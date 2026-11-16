@@ -27,6 +27,7 @@ import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { cn } from '@/lib/utils';
 import type { ChatLayout, ChatMention, ChatMessage, ChatReadMark } from '@/lib/chat-wire';
+import { MessageAttachments, attachmentsLine } from './attachments';
 
 /** The words here are Chat's: the `t` passed in is `useTranslation('chat')`, as this hook gives. */
 export function useChatText(): TranslateFn {
@@ -98,7 +99,7 @@ function Quote({ t, message, onOpen }: { t: TranslateFn; message: ChatMessage; o
     >
       <span className="truncate font-medium text-primary">{q.author_name}</span>
       <span dir="auto" className="truncate text-start text-muted-foreground">
-        {q.deleted ? t('msg.deleted', 'This message was deleted') : q.body}
+        {q.deleted ? t('msg.deleted', 'This message was deleted') : q.body || t('file.attachment', 'Photo or file')}
       </span>
     </button>
   );
@@ -327,7 +328,8 @@ export function MessageItem({
   ) : (
     <>
       <Quote t={t} message={message} onOpen={actions.onQuote} />
-      {children ?? <MessageBody text={message.body} mentions={message.mentions} highlight={highlight} />}
+      <MessageAttachments t={t} attachments={message.attachments ?? []} />
+      {children ?? (message.body !== '' ? <MessageBody text={message.body} mentions={message.mentions} highlight={highlight} /> : null)}
     </>
   );
 
@@ -467,7 +469,7 @@ export function PinnedBar({ t, pinned, onOpen }: { t: TranslateFn; pinned: ChatM
       <Icon name="star" size={14} />
       <b className="font-semibold">{t('pinned.label', 'Pinned')}</b>
       <span dir="auto" className="min-w-0 flex-1 truncate text-start">
-        {top.body}
+        {top.body || attachmentsLine(t, top.attachments)}
       </span>
       {pinned.length > 1 && <span className="shrink-0 text-muted-foreground">{t('pinned.more', '{count} more', { count: String(pinned.length - 1) })}</span>}
     </button>

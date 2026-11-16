@@ -3,7 +3,7 @@
  * messages: the server's own sentence for a refusal, ours otherwise.
  */
 
-import type { ChatDetail, ChatDirectory, ChatInbox, ChatLayout, ChatMessage, ChatMode, ChatReads, ChatState, ChatSummary, ChatLink } from '@/lib/chat-wire';
+import type { ChatAttachment, ChatDetail, ChatDirectory, ChatInbox, ChatLayout, ChatMessage, ChatMode, ChatReads, ChatState, ChatSummary, ChatLink } from '@/lib/chat-wire';
 
 type ApiClient = (path: string, init?: RequestInit) => Promise<Response>;
 
@@ -53,7 +53,7 @@ export function chatApi(api: ApiClient) {
       id: number,
       body: string,
       mentions: { type: 'person' | 'agent' | 'everyone'; id: number }[],
-      extra: { reply_to?: number; thread_root?: number; also_to_chat?: boolean } = {}
+      extra: { reply_to?: number; thread_root?: number; also_to_chat?: boolean; attachments?: number[] } = {}
     ) => call<ChatMessage>(api, `/api/v1/chat/chats/${id}/messages`, json('POST', { body, mentions, ...extra })),
     // The parts of a message (UC.6–UC.12).
     state: (id: number, after: number, since: string | null) =>
@@ -65,6 +65,11 @@ export function chatApi(api: ApiClient) {
     thread: (messageId: number) => call<{ root: ChatMessage; replies: ChatMessage[] }>(api, `/api/v1/chat/messages/${messageId}/thread`),
     search: (id: number, q: string, from: number | null) =>
       call<ChatMessage[]>(api, `/api/v1/chat/chats/${id}/search?q=${encodeURIComponent(q)}${from ? `&from=${from}` : ''}`),
+    // Files, photos and voice (UC.10).
+    transcribe: (attachmentId: number, transcript: string) =>
+      call<unknown>(api, `/api/v1/chat/attachments/${attachmentId}`, json('PATCH', { transcript })),
+    media: (id: number, kind: 'photos' | 'files' | null) =>
+      call<ChatAttachment[]>(api, `/api/v1/chat/chats/${id}/media${kind ? `?kind=${kind}` : ''}`),
     typing: (id: number) => call<unknown>(api, `/api/v1/chat/chats/${id}/typing`, { method: 'POST' }),
     layout: () => call<{ layout: ChatLayout }>(api, '/api/v1/chat/preferences'),
     setLayout: (layout: ChatLayout) => call<{ layout: ChatLayout }>(api, '/api/v1/chat/preferences', json('PUT', { layout })),
@@ -104,6 +109,47 @@ export function chatApi(api: ApiClient) {
 }
 
 export type ChatApi = ReturnType<typeof chatApi>;
+
+/**
+ * Upload one file to a chat with progress (UC.11: progress on the message).
+ * XMLHttpRequest, because fetch reports no upload progress; it goes through
+ * the same origin and cookie as every other call.
+ */
+export function uploadToChat(
+  chatId: number,
+  file: Blob,
+  name: string,
+  meta: { duration_ms?: number; width?: number; height?: number },
+  onProgress: (fraction: number) => void
+): Promise<ChatAttachment> {
+  return new Promise((resolve, reject) => {
+    const query = Object.entries(meta)
+      .filter(([, v]) => typeof v === 'number' && v > 0)
+      .map(([k, v]) => `${k}=${Math.round(v as number)}`)
+      .join('&');
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/api/v1/chat/chats/${chatId}/attachments${query ? `?${query}` : ''}`);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      let body: { data?: ChatAttachment; error?: string } | null = null;
+      try {
+        body = JSON.parse(xhr.responseText) as { data?: ChatAttachment; error?: string };
+      } catch {
+        body = null;
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && body?.data) resolve(body.data);
+      else reject(new ChatError(xhr.status >= 400 && xhr.status < 500 && body?.error ? body.error : '', xhr.status));
+    };
+    xhr.onerror = () => reject(new ChatError('', 0));
+    const form = new FormData();
+    form.append('file', file, name);
+    xhr.send(form);
+  });
+}
 
 /** The words to show for a failed call: the server's own sentence, or the generic one. */
 export function chatErrorText(e: unknown, generic: string): string {

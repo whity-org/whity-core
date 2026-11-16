@@ -43,6 +43,7 @@ function message(over: Partial<ChatMessage> = {}): ChatMessage {
     in_chat: true,
     thread: null,
     reactions: [],
+    attachments: [],
     pinned: false,
     edited: false,
     deleted: false,
