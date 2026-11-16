@@ -5740,7 +5740,7 @@ $chatService = new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core
     new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
     $chatStore,
     $logger,
-), $chatStore, new \Whity\Core\Chat\ChatAttachments($db->getPdo(), $storageDriver));
+), $chatStore, new \Whity\Core\Chat\ChatAttachments($db->getPdo(), $storageDriver), new \Whity\Core\Chat\ChatBlocks($db->getPdo()));
 // One chat (UC.1, WHIT-1093): team chats and, for people with messages.read,
 // the customer conversations, in one list with each person's pins.
 $chatHandler = new \Whity\Api\ChatApiHandler(
@@ -5775,6 +5775,9 @@ $router->register('GET',    '/api/chat/messages/{id:\d+}/thread',               
 $router->register('GET',    '/api/chat/chats/{id:\d+}/search',                  [$chatHandler, 'search'],        null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}/state',                   [$chatHandler, 'state'],         null);
 $router->register('POST',   '/api/chat/chats/{id:\d+}/typing',                  [$chatHandler, 'typing'],        null);
+// Blocks inside messages (UC.5, WHIT-1096): polls and Whity records.
+$router->register('POST',   '/api/chat/messages/{id:\d+}/vote',                 [$chatHandler, 'vote'],          null);
+$router->register('GET',    '/api/chat/records',                                [$chatHandler, 'records'],       null);
 // Files, photos and voice (UC.10, WHIT-1095): upload to a chat, then send.
 $router->register('POST',   '/api/chat/chats/{id:\d+}/attachments',             [$chatHandler, 'upload'],        null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}/media',                   [$chatHandler, 'media'],         null);

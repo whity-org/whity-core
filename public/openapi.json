@@ -14038,6 +14038,117 @@
                 }
             }
         },
+        "/api/v1/chat/messages/{id}/vote": {
+            "post": {
+                "operationId": "post_api_v1_chat_messages_id_vote",
+                "summary": "Vote in a poll, or change your vote",
+                "tags": [
+                    "chat"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChatVoteRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The message",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatMessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Chat not found, or you are not in it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Closed, or more answers than the poll takes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/chat/preferences": {
             "get": {
                 "operationId": "get_api_v1_chat_preferences",
@@ -14141,6 +14252,97 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/chat/records": {
+            "get": {
+                "operationId": "get_api_v1_chat_records",
+                "summary": "Find a booking or a document to put in a message",
+                "tags": [
+                    "chat"
+                ],
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "required": false,
+                        "description": "booking or document",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": false,
+                        "description": "Words in its name",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Records",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatRecordsResponse"
                                 }
                             }
                         }
@@ -76788,6 +76990,11 @@
                     "name"
                 ]
             },
+            "ChatBlock": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "type poll: question, options [{text, votes, mine, people}], multiple, voters, closes_at, closed. type record: record (booking or document), id, title, status, href, and its times or number; missing when it no longer exists."
+            },
             "ChatCreateRequest": {
                 "type": "object",
                 "properties": {
@@ -77422,6 +77629,17 @@
                         },
                         "description": "Photos (an album when several), videos, files and voice (UC.10)."
                     },
+                    "block": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/ChatBlock"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "A poll, or a Whity record with its live status (UC.5)."
+                    },
                     "pinned": {
                         "type": "boolean"
                     },
@@ -77652,6 +77870,11 @@
                             "type": "integer"
                         },
                         "description": "Files you uploaded to this chat and have not sent yet; the body may then be empty."
+                    },
+                    "block": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "A poll ({type: poll, question, options[2-10], multiple, closes_at}) or a record ({type: record, record: booking|document, id}); the body may then be empty."
                     }
                 },
                 "required": [
@@ -77718,6 +77941,20 @@
                 },
                 "required": [
                     "message_id"
+                ]
+            },
+            "ChatRecordsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ChatBlock"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "ChatShareProposalRequest": {
@@ -77894,6 +78131,21 @@
                         "description": "What the chat is about, or null to remove the link."
                     }
                 }
+            },
+            "ChatVoteRequest": {
+                "type": "object",
+                "properties": {
+                    "choices": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "The answers you pick, by position; empty takes your vote back."
+                    }
+                },
+                "required": [
+                    "choices"
+                ]
             },
             "CheckoutStartRequest": {
                 "type": "object",

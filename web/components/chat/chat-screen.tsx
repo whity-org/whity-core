@@ -32,6 +32,7 @@ import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/utils';
 import type { ChatAttachment, ChatAgentMember, ChatDetail, ChatInboxItem, ChatLayout, ChatMember, ChatMention, ChatMessage, ChatMode, ChatReadMark, ChatSummary } from '@/lib/chat-wire';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@whity/ui/dropdown-menu';
+import { PollDialog, RecordDialog } from './blocks';
 import { PendingFiles, VoiceRecorder, attachmentsLine, fileSize, type PendingFile } from './attachments';
 import { ComposerBanner, MessageBody, MessageItem, NewLine, PinnedBar, TypingLine, type MessageActions } from './message-parts';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -604,6 +605,10 @@ function ListRow({ item, active, onOpen, t }: { item: ChatInboxItem; active: boo
 function preview(c: ChatSummary, t: TranslateFn): string {
   const m = c.last_message;
   if (!m) return '';
+  if (m.body === '' && m.block) {
+    const line = m.block.type === 'poll' ? t('poll.line', 'Poll: {question}', { question: m.block.question }) : m.block.title;
+    return !m.author || c.type === 'direct' ? line : `${m.author.name.split(' ')[0]}: ${line}`;
+  }
   if (m.body === '' && (m.attachments?.length ?? 0) > 0) {
     const line = attachmentsLine(t, m.attachments);
     return !m.author || c.type === 'direct' ? line : `${m.author.name.split(' ')[0]}: ${line}`;
@@ -814,6 +819,9 @@ function OpenChat({
       },
       onDelete: (m) => {
         api.deleteMessage(m.id).then(replace, (e: unknown) => setNotice(chatErrorText(e, '')));
+      },
+      onVote: (m, choices) => {
+        api.vote(m.id, choices).then(replace, (e: unknown) => setNotice(chatErrorText(e, '')));
       },
       onQuote: (id) => void goTo(id),
     }),
@@ -1380,6 +1388,22 @@ function Composer({
   // UC.10: files on their way, and the voice recorder.
   const [pending, setPending] = useState<PendingFile[]>([]);
   const [recording, setRecording] = useState(false);
+  // UC.5: a poll or a Whity record to send.
+  const [blockDialog, setBlockDialog] = useState<'poll' | 'record' | null>(null);
+  const sendBlock = async (block: Record<string, unknown>) => {
+    try {
+      onSent(
+        await api.post(chat.id, '', [], {
+          block,
+          ...(replyTo ? { reply_to: replyTo.id } : {}),
+          ...(threadRoot ? { thread_root: threadRoot, also_to_chat: alsoToChat } : {}),
+        })
+      );
+      setBlockDialog(null);
+    } catch (e) {
+      onError(chatErrorText(e, ''));
+    }
+  };
   const photoInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -1616,6 +1640,17 @@ function Composer({
                   <Icon name="document" size={16} />
                   {t('attach.file', 'File')}
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setBlockDialog('record')}>
+                  <Icon name="invoice" size={16} />
+                  <span className="grid">
+                    {t('attach.record', 'A Whity record')}
+                    <small className="text-xs text-muted-foreground">{t('attach.recordHint', 'Booking or document')}</small>
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setBlockDialog('poll')}>
+                  <Icon name="list-bullet" size={16} />
+                  {t('attach.poll', 'Poll')}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </>
@@ -1709,6 +1744,10 @@ function Composer({
           <Icon name={editing ? 'check' : 'send'} size={16} />
         </Button>
       </div>
+      )}
+      <PollDialog t={t} open={blockDialog === 'poll'} onOpenChange={(o) => setBlockDialog(o ? 'poll' : null)} onSend={(block) => sendBlock(block)} />
+      {blockDialog === 'record' && (
+        <RecordDialog t={t} api={api} open onOpenChange={(o) => setBlockDialog(o ? 'record' : null)} onPick={(block) => sendBlock(block)} />
       )}
       {threadRoot !== undefined && alsoLabel && (
         <label className="flex items-center gap-2 text-sm">

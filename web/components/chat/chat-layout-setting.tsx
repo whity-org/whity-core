@@ -47,6 +47,7 @@ function sample(id: number, author: { profile_id: number; name: string }, body: 
     thread: null,
     reactions: [],
     attachments: [],
+    block: null,
     pinned: false,
     edited: false,
     deleted: false,

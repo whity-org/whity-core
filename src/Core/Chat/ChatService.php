@@ -53,6 +53,8 @@ final class ChatService
         private readonly ?SharedStoreInterface $store = null,
         // UC.10: files, photos and voice. Null: messages carry words only.
         private readonly ?ChatAttachments $attachments = null,
+        // UC.5: polls and Whity records inside messages. Null: no blocks.
+        private readonly ?ChatBlocks $blocks = null,
     ) {
     }
 
@@ -438,6 +440,7 @@ final class ChatService
         ?int $threadRoot = null,
         bool $alsoToChat = false,
         array $attachmentIds = [],
+        mixed $block = null,
     ): array {
         [$chat, $members, $me] = $this->open($tenantId, $viewer, $chatId);
         $attachmentIds = array_values(array_unique(array_filter(array_map('intval', $attachmentIds), static fn (int $id): bool => $id > 0)));
@@ -457,14 +460,21 @@ final class ChatService
         }
         $quoted = $replyTo !== null ? $this->target($tenantId, $viewer, $chatId, $replyTo, 'reply to') : null;
         $body = trim($body);
-        if ($body === '' && $attachmentIds === []) {
+        $stored = null;
+        if ($block !== null) {
+            if ($viewer->isAgent() || $this->blocks === null) {
+                throw new ChatException('Only people add polls and records to a chat.', 403);
+            }
+            $stored = $this->blocks->normalise($tenantId, $block);
+        }
+        if ($body === '' && $attachmentIds === [] && $stored === null) {
             throw new ChatException('The message is empty.');
         }
         if (mb_strlen($body) > self::MAX_BODY) {
             throw new ChatException('The message is too long (' . self::MAX_BODY . ' characters at most).');
         }
 
-        $meta = [];
+        $meta = $stored !== null ? ['block' => $stored] : [];
         $kept = self::mentions($mentions, $members, (string) $chat['type'] === 'group');
         if ($kept !== []) {
             $meta['mentions'] = $kept;
@@ -509,7 +519,7 @@ final class ChatService
         }
         // A held line reaches people only once it is approved (decideHeld).
         if (!isset($meta['held'])) {
-            $this->pushLine($tenantId, $chatId, $id, $viewer->isAgent() ? null : $viewer->profileId, $viewer->isAgent() ? $viewer->agentName : $this->who($viewer->profileId)['name'], $body !== '' ? $body : $this->filesLine($tenantId, $id), $kept);
+            $this->pushLine($tenantId, $chatId, $id, $viewer->isAgent() ? null : $viewer->profileId, $viewer->isAgent() ? $viewer->agentName : $this->who($viewer->profileId)['name'], $body !== '' ? $body : ($stored !== null ? self::blockLine($stored) : $this->filesLine($tenantId, $id)), $kept);
         }
 
         return $this->presented($tenantId, $id, $viewer);
@@ -713,8 +723,15 @@ final class ChatService
         $threads = $this->repo->threadSummaries($tenantId, $ids, 0);
         $reactions = $this->repo->reactions($tenantId, $ids);
         $files = $this->attachments?->forMessages($tenantId, $ids) ?? [];
+        $stored = [];
+        foreach ($rows as $r) {
+            if (is_array($r['chat_meta']['block'] ?? null) && ($r['deleted_at'] ?? null) === null) {
+                $stored[(int) $r['id']] = $r['chat_meta']['block'];
+            }
+        }
+        $blocks = $this->blocks?->present($tenantId, $stored, $viewer->isAgent() ? 0 : $viewer->profileId) ?? [];
 
-        return array_map(function (array $r) use ($proposals, $viewer, $quoted, $threads, $reactions, $files): array {
+        return array_map(function (array $r) use ($proposals, $viewer, $quoted, $threads, $reactions, $files, $blocks): array {
             $meta = $r['chat_meta'];
             $source = (string) $r['source'];
             $kind = match (true) {
@@ -781,6 +798,7 @@ final class ChatService
                 ],
                 'reactions' => array_values($grouped),
                 'attachments' => $deleted ? [] : ($files[$id] ?? []),
+                'block' => $blocks[$id] ?? null,
                 'pinned' => ($r['pinned_at'] ?? null) !== null,
                 'edited' => ($r['edited_at'] ?? null) !== null,
                 'deleted' => $deleted,
@@ -1175,6 +1193,49 @@ final class ChatService
             'pinned' => $this->presentMessages($tenantId, $this->repo->pinnedMessages($tenantId, $chatId, $floor), $viewer),
             'now' => self::iso($now),
         ];
+    }
+
+    // ── Blocks inside messages (UC.5) ────────────────────────────────────────
+
+    /**
+     * Vote in a poll, or change your vote.
+     *
+     * @param list<int> $choices
+     * @return array<string, mixed> the message with its poll
+     */
+    public function vote(int $tenantId, ChatViewer $viewer, int $messageId, array $choices): array
+    {
+        $this->personOnly($viewer);
+        $message = $this->messageInChat($tenantId, $viewer, $messageId);
+        if ($message['deleted_at'] !== null || $this->blocks === null) {
+            throw new ChatException('This message was deleted.');
+        }
+        $this->blocks->vote($tenantId, $messageId, $viewer->profileId, is_array($message['chat_meta']['block'] ?? null) ? $message['chat_meta']['block'] : [], $choices);
+        $this->repo->touch($tenantId, $messageId);
+
+        return $this->presented($tenantId, $messageId, $viewer);
+    }
+
+    /**
+     * Bookings and documents to put in a message.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findRecords(int $tenantId, ChatViewer $viewer, string $kind, string $q): array
+    {
+        $this->personOnly($viewer);
+
+        return $this->blocks?->find($tenantId, $kind, $q) ?? [];
+    }
+
+    /**
+     * What a push says for a message that is only a block.
+     *
+     * @param array<string, mixed> $block
+     */
+    private static function blockLine(array $block): string
+    {
+        return ($block['type'] ?? null) === 'poll' ? 'Poll: ' . (string) ($block['question'] ?? '') : 'Shared a record';
     }
 
     // ── Files, photos and voice (UC.10) ──────────────────────────────────────
