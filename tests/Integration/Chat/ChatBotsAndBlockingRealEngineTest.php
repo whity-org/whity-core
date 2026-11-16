@@ -21,7 +21,7 @@ use Whity\Sdk\Messaging\InboundMessage;
 
 /**
  * Bots and blocking on the real schema (design 3.5, UC.4, UC.12, WHIT-1097;
- * migration 285): a blocked sender's message is dropped and past messages
+ * migration 283): a blocked sender's message is dropped and past messages
  * stay; the welcome bot answers a first message, the away bot answers outside
  * hours once a day, and hand-over gives new conversations to people in turn,
  * only people who work here.
