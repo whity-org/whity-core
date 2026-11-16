@@ -56,12 +56,21 @@ final class FormUploadRepository
      */
     public function record(int $tenantId, array $rec): int
     {
+        // WHIT-1159: the file's own row in the one file store.
+        $storedFileId = \Whity\Core\Storage\StoredFiles::remember(
+            $this->db,
+            $tenantId,
+            \Whity\Core\Storage\StoredFiles::FORM_UPLOAD,
+            $rec,
+            $rec['client_filename'] ?? null,
+            $rec['uploaded_by_profile_id'] ?? null,
+        );
         $stmt = $this->db->prepare(
             'INSERT INTO form_uploads
                  (tenant_id, form_id, storage_key, content_type, byte_size,
-                  checksum_sha256, client_filename, uploaded_by_profile_id, created_at)
+                  checksum_sha256, client_filename, uploaded_by_profile_id, stored_file_id, created_at)
              VALUES (:tenant_id, :form_id, :storage_key, :content_type, :byte_size,
-                     :checksum_sha256, :client_filename, :uploaded_by_profile_id, NOW())'
+                     :checksum_sha256, :client_filename, :uploaded_by_profile_id, :stored_file_id, NOW())'
         );
         $stmt->execute([
             ':tenant_id'              => $tenantId,
@@ -72,6 +81,7 @@ final class FormUploadRepository
             ':checksum_sha256'        => $rec['checksum_sha256'],
             ':client_filename'        => $rec['client_filename'] ?? null,
             ':uploaded_by_profile_id' => $rec['uploaded_by_profile_id'] ?? null,
+            ':stored_file_id'         => $storedFileId,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -241,7 +251,7 @@ final class FormUploadRepository
         // @tenant-guard-ignore: retention sweep, no tenant context; safe by the
         // claimed_at/created_at predicate reasoned above.
         $select = $this->db->prepare(
-            'SELECT id, storage_key FROM form_uploads
+            'SELECT id, tenant_id, storage_key FROM form_uploads
               WHERE claimed_at IS NULL AND created_at < :cutoff
               ORDER BY created_at ASC
               LIMIT ' . max(1, $limit)
@@ -265,6 +275,9 @@ final class FormUploadRepository
             $delete->execute([':id' => (int) $row['id']]);
             if ($delete->rowCount() === 1) {
                 $deleted[] = (string) $row['storage_key'];
+                // WHIT-1159: an unclaimed upload's file goes from the one store
+                // too. Nothing else shares its key: claiming is what would.
+                \Whity\Core\Storage\StoredFiles::forget($this->db, (int) $row['tenant_id'], (string) $row['storage_key']);
             }
         }
 

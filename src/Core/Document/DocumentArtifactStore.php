@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Document;
 
+use Whity\Core\Storage\StoredFiles;
 use Whity\Storage\StorageDriverInterface;
 use Whity\Storage\StorageException;
 use Whity\Storage\StorageKey;
@@ -57,8 +58,6 @@ final class DocumentArtifactStore
     public const STORAGE_SEGMENT = 'documents';
 
     /** Bytes of randomness in an artifact's file name (32 hex characters). */
-    private const KEY_ENTROPY_BYTES = 16;
-
     private StorageDriverInterface $storage;
 
     public function __construct(StorageDriverInterface $storage)
@@ -83,28 +82,15 @@ final class DocumentArtifactStore
         string $contentType,
         string $extension = 'pdf',
     ): StoredArtifact {
-        $key = $this->mintKey($tenantId, $documentId, $extension);
-
-        if ($this->storage->exists($key)) {
-            // Unreachable short of a broken random source, and deliberately loud
-            // rather than a silent overwrite: a stored artifact is evidence, and
-            // quietly replacing one is the single outcome this class exists to
-            // rule out.
-            throw new StorageException(
-                'Refusing to overwrite an existing document artifact; a stored artifact is immutable.'
-            );
-        }
-
-        // ContentType must be supplied at WRITE time: S3StorageDriver::put()
-        // otherwise stores application/octet-stream permanently on the object,
-        // and no read-time lookup can repair that (see {@see \Whity\Storage\MimeTypes}).
-        $this->storage->put($key, $bytes, ['ContentType' => $contentType]);
+        // The one file store (WHIT-1159): a stored artifact is evidence, so the
+        // key is fresh and an existing object is never overwritten.
+        $stored = StoredFiles::store($this->storage, $tenantId, self::STORAGE_SEGMENT, (string) $documentId, $bytes, $contentType, $extension);
 
         return new StoredArtifact(
-            storageKey: $key,
+            storageKey: $stored['storage_key'],
             contentType: $contentType,
-            byteSize: strlen($bytes),
-            checksumSha256: hash('sha256', $bytes),
+            byteSize: $stored['byte_size'],
+            checksumSha256: $stored['checksum_sha256'],
         );
     }
 
@@ -129,11 +115,4 @@ final class DocumentArtifactStore
      * operator (or a retention sweep) can see a document's whole history in one
      * place on a local backend and under one prefix on an object store.
      */
-    private function mintKey(int $tenantId, int $documentId, string $extension): string
-    {
-        $suffix = preg_replace('/[^a-z0-9]/', '', strtolower($extension)) ?? '';
-        $name = bin2hex(random_bytes(self::KEY_ENTROPY_BYTES)) . ($suffix !== '' ? '.' . $suffix : '');
-
-        return StorageKey::build($tenantId, self::STORAGE_SEGMENT . '/' . $documentId, $name);
-    }
 }

@@ -7,6 +7,7 @@ namespace Whity\Core\Document;
 use PDO;
 use Whity\Core\Form\FormUploadPolicy;
 use Whity\Storage\StorageDriverInterface;
+use Whity\Core\Storage\StoredFiles;
 use Whity\Storage\StorageException;
 use Whity\Storage\StorageKey;
 
@@ -31,8 +32,6 @@ use Whity\Storage\StorageKey;
 final class DocumentSourceFileStore
 {
     public const STORAGE_SEGMENT = 'document-sources';
-    private const KEY_ENTROPY_BYTES = 16;
-
     public function __construct(
         private readonly StorageDriverInterface $storage,
         private readonly PDO $db,
@@ -48,21 +47,16 @@ final class DocumentSourceFileStore
      */
     public function put(int $tenantId, int $sourceId, string $bytes, string $contentType, ?string $clientFilename, ?int $uploaderProfileId): array
     {
-        $suffix = preg_replace('/[^a-z0-9]/', '', strtolower(FormUploadPolicy::extensionFor($contentType))) ?? '';
-        $name = bin2hex(random_bytes(self::KEY_ENTROPY_BYTES)) . ($suffix !== '' ? '.' . $suffix : '');
-        $key = StorageKey::build($tenantId, self::STORAGE_SEGMENT . '/' . $sourceId, $name);
-
-        if ($this->storage->exists($key)) {
-            throw new StorageException('Refusing to overwrite an existing document file; a stored file is immutable.');
-        }
-        $this->storage->put($key, $bytes, ['ContentType' => $contentType]);
-
-        $filename = self::safeFilename($clientFilename);
-        $checksum = hash('sha256', $bytes);
+        // The one file store (WHIT-1159).
+        $stored = StoredFiles::store($this->storage, $tenantId, self::STORAGE_SEGMENT, (string) $sourceId, $bytes, $contentType, FormUploadPolicy::extensionFor($contentType));
+        $key = $stored['storage_key'];
+        $filename = StoredFiles::safeFilename($clientFilename);
+        $checksum = $stored['checksum_sha256'];
+        $storedFileId = StoredFiles::remember($this->db, $tenantId, StoredFiles::DOCUMENT_SOURCE, $stored, $filename, $uploaderProfileId);
         $stmt = $this->db->prepare(
             'INSERT INTO document_source_files
-                 (tenant_id, source_id, storage_key, content_type, byte_size, checksum_sha256, filename, uploaded_by_profile_id, created_at)
-             VALUES (:tenant_id, :source_id, :storage_key, :content_type, :byte_size, :checksum_sha256, :filename, :uploaded_by, CURRENT_TIMESTAMP)'
+                 (tenant_id, source_id, storage_key, content_type, byte_size, checksum_sha256, filename, uploaded_by_profile_id, stored_file_id, created_at)
+             VALUES (:tenant_id, :source_id, :storage_key, :content_type, :byte_size, :checksum_sha256, :filename, :uploaded_by, :stored_file_id, CURRENT_TIMESTAMP)'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
@@ -73,6 +67,7 @@ final class DocumentSourceFileStore
             ':checksum_sha256' => $checksum,
             ':filename' => $filename,
             ':uploaded_by' => $uploaderProfileId,
+            ':stored_file_id' => $storedFileId,
         ]);
 
         return [
@@ -110,16 +105,5 @@ final class DocumentSourceFileStore
     public function bytes(string $storageKey): string
     {
         return $this->storage->get($storageKey);
-    }
-
-    /** The client's name reduced to a safe basename, or null; it never reaches the key. */
-    private static function safeFilename(?string $raw): ?string
-    {
-        if ($raw === null) {
-            return null;
-        }
-        $name = trim(preg_replace('/[\x00-\x1f\x7f]/', '', basename(str_replace('\\', '/', $raw))) ?? '');
-
-        return $name === '' || $name === '.' || $name === '..' ? null : mb_substr($name, 0, 255);
     }
 }
