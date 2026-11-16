@@ -334,6 +334,7 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
             onSelect={openItem}
             onPickDay={(date) => update({ date: dateKey(date), view: 'day' })}
             canDrag={edits.canDrag}
+            canResize={edits.canResize}
             onCreate={access.canWrite ? edits.onCreate : undefined}
             onChange={edits.onChange}
             preview={edits.preview}

@@ -41,10 +41,6 @@ use Whity\Core\Settings\SettingsService;
  */
 final class BookingService
 {
-    /** The shortest and longest a booking may be made by hand (CV.9). */
-    public const MIN_MINUTES = 5;
-    public const MAX_MINUTES = 1440;
-
     /** @var list<ExternalBusySource> */
     private array $busySources = [];
 
@@ -158,18 +154,18 @@ final class BookingService
      *   customer_profile_id: ?int, customer_name: string, customer_email: string,
      *   customer_phone: string, customer_note: string, source: string,
      *   created_by_profile_id: ?int, enforce_hours: bool, public: bool,
-     *   duration_minutes?: ?int, book_anyway?: bool, within_hours?: bool, notify?: bool
+     *   book_anyway?: bool, within_hours?: bool, notify?: bool
      * } $request
      * @return array<string, mixed> the booking
      */
     public function book(int $tenantId, array $request): array
     {
         $service = $this->service($tenantId, $request['service_id'], $request['public']);
-        // Staff only: a length of their own, Book anyway, keep to the hours,
-        // and whether the customer is emailed (CV.8, CV.9). A public booking
-        // always takes the service as it is.
+        // Staff only: Book anyway, keep to the hours, and whether the customer
+        // is emailed (CV.8, CV.9). A booking's length is always its service's:
+        // the length goes with the price, so staff change the service instead
+        // (owner, Q35.7).
         $staffOnly = !$request['public'];
-        $service = self::withLength($service, $staffOnly ? ($request['duration_minutes'] ?? null) : null);
         $bookAnyway = $staffOnly && ($request['book_anyway'] ?? false);
         $checkHours = $request['enforce_hours'] || ($staffOnly && ($request['within_hours'] ?? false));
         $notify = !$staffOnly || ($request['notify'] ?? true);
@@ -262,17 +258,17 @@ final class BookingService
     /**
      * Move a booking to a new start, and optionally to another person.
      *
-     * Design 3.5 (CV.9): staff may also change its length (`durationMinutes`,
-     * pulling the bottom edge), choose Book anyway when the person is busy,
-     * keep it inside the person's hours (`withinHours`, a drag on the grid),
-     * and untick "Email the new time" (`notify` false).
+     * Design 3.5 (CV.9): staff may also choose Book anyway when the person is
+     * busy, keep it inside the person's hours (`withinHours`, a drag on the
+     * grid), and untick "Email the new time" (`notify` false). Its length
+     * stays its service's (owner, Q35.7).
      *
      * @return array<string, mixed>
      */
-    public function move(int $tenantId, int $bookingId, DateTimeImmutable $start, ?int $profileId, bool $enforceHours, ?int $durationMinutes = null, bool $notify = true, bool $bookAnyway = false, bool $withinHours = false): array
+    public function move(int $tenantId, int $bookingId, DateTimeImmutable $start, ?int $profileId, bool $enforceHours, bool $notify = true, bool $bookAnyway = false, bool $withinHours = false): array
     {
         $before = $this->bookings->find($tenantId, $bookingId);
-        $booking = $this->moveUnderLock($tenantId, $bookingId, $start, $profileId, $enforceHours, $durationMinutes, $bookAnyway, $withinHours);
+        $booking = $this->moveUnderLock($tenantId, $bookingId, $start, $profileId, $enforceHours, $bookAnyway, $withinHours);
         // E2 `booking-moved`: the email says what the time was.
         $booking['previous_starts_at'] = is_string($before['starts_at'] ?? null) ? Interval::toApi(Interval::fromDb($before['starts_at'])) : null;
         if ($booking['status'] === BookingRepository::STATUS_REQUESTED) {
@@ -389,7 +385,7 @@ final class BookingService
      *
      * @return array<string, mixed>
      */
-    private function moveUnderLock(int $tenantId, int $bookingId, DateTimeImmutable $start, ?int $profileId, bool $enforceHours, ?int $durationMinutes = null, bool $bookAnyway = false, bool $withinHours = false): array
+    private function moveUnderLock(int $tenantId, int $bookingId, DateTimeImmutable $start, ?int $profileId, bool $enforceHours, bool $bookAnyway = false, bool $withinHours = false): array
     {
         $current = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
         if (!in_array($current['status'], BookingRepository::LIVE, true)) {
@@ -397,10 +393,10 @@ final class BookingService
         }
         $isRequest = $current['status'] === BookingRepository::STATUS_REQUESTED;
         $service = $this->service($tenantId, (int) $current['service_id'], false);
-        // A move keeps the booking's own length (it may have been resized);
-        // a resize gives a new one.
+        // A move keeps the booking's own length, so one made before the
+        // service's length changed keeps the time it was booked for.
         $kept = (int) round((Interval::fromDb((string) $current['ends_at'])->getTimestamp() - Interval::fromDb((string) $current['starts_at'])->getTimestamp()) / 60);
-        $service = self::withLength($service, $durationMinutes ?? ($kept > 0 && $kept !== $service['duration_minutes'] ? $kept : null));
+        $service = self::withLength($service, $kept > 0 && $kept !== $service['duration_minutes'] ? $kept : null);
         $settings = $this->settingsFor($tenantId);
         $now = $this->now();
         $from = (int) $current['profile_id'];
@@ -795,8 +791,8 @@ final class BookingService
     }
 
     /**
-     * The service as this booking uses it: its own length unless staff gave
-     * another (pulling the bottom edge, or dragging across a time; CV.8, CV.9).
+     * The service as this booking uses it: the length it was booked for, when
+     * that differs from the service's today.
      *
      * @param array<string, mixed> $service
      * @return array<string, mixed>
@@ -805,9 +801,6 @@ final class BookingService
     {
         if ($minutes === null) {
             return $service;
-        }
-        if ($minutes < self::MIN_MINUTES || $minutes > self::MAX_MINUTES) {
-            throw new CalendarRejectedException('A booking lasts from 5 minutes to 24 hours.', 422);
         }
         $service['duration_minutes'] = $minutes;
 

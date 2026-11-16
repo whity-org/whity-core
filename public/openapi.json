@@ -76838,12 +76838,6 @@
                         "type": "boolean",
                         "description": "Refuse a time outside working hours. Always on for agents."
                     },
-                    "duration_minutes": {
-                        "type": "integer",
-                        "minimum": 5,
-                        "maximum": 1440,
-                        "description": "Staff only: a length other than the service's, such as a time dragged across on the grid."
-                    },
                     "notify": {
                         "type": "boolean",
                         "description": "Email the customer a confirmation. Default true."
@@ -76902,12 +76896,6 @@
                     "keep_to_hours": {
                         "type": "boolean",
                         "description": "Refuse a time outside working hours. Always on for agents."
-                    },
-                    "duration_minutes": {
-                        "type": "integer",
-                        "minimum": 5,
-                        "maximum": 1440,
-                        "description": "A new length, such as pulling the bottom edge on the grid. Default: keep the booking's length."
                     },
                     "notify": {
                         "type": "boolean",
