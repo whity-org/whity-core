@@ -6,10 +6,11 @@
 #
 # is the same as
 #
-#   npm install -g whity
+#   npm install -g @whity/cli
 #   whity install
 #
-# It checks for Node.js 20 or newer and npm, installs the `whity` command from npm,
+# It checks for Node.js 20 or newer and npm, installs (or updates) the `whity` command
+# from npm's @whity/cli,
 # then runs `whity install` with the terminal attached, so its two questions (the
 # web address and your email) can be answered even under `curl | sh`. Options are
 # passed through: `sh -s -- --domain office.example.jo --email you@example.jo`.
@@ -55,20 +56,21 @@ if [ "$NODE_MAJOR" -lt 20 ] 2>/dev/null; then
     "https://nodejs.org/en/download"
 fi
 
-if ! command -v whity >/dev/null 2>&1; then
+# Always the current release: a `whity` from an older @whity/cli can't do the server install.
+{
   LOG="${TMPDIR:-/tmp}/whity-npm.$$.log"
-  if ! npm install -g --no-audit --no-fund whity >"$LOG" 2>&1; then
+  if ! npm install -g --no-audit --no-fund @whity/cli@latest >"$LOG" 2>&1; then
     if grep -q 'EACCES' "$LOG" 2>/dev/null; then
       stop "$(m "The whity command couldn't be installed" 'تعذّر تثبيت الأمر whity')" \
         "$(m 'npm can’t write to its global folder as this user. Run the two lines as root, or set an npm prefix you own:' 'لا يستطيع npm الكتابة في مجلده العام بهذا المستخدم. شغّل السطرين بصلاحية root، أو اضبط مجلد npm تملكه:')" \
-        "sudo npm install -g whity && whity install"
+        "sudo npm install -g @whity/cli && whity install"
     fi
     stop "$(m "The whity command couldn't be installed" 'تعذّر تثبيت الأمر whity')" \
       "$(m "npm said why in $LOG. Check this server can reach registry.npmjs.org, then run this again." "سبب npm في $LOG. تأكد أن هذا الخادم يصل إلى registry.npmjs.org ثم شغّل هذا مرة أخرى.")"
   fi
   rm -f "$LOG"
   printf '%s✓%s %s   %s\n' "$GREEN" "$OFF" "$(m 'Installed the whity command' 'ثُبّت الأمر whity')" "$(whity --version 2>/dev/null)"
-fi
+}
 
 # The questions read the terminal, not the pipe this script came through.
 if (: </dev/tty) 2>/dev/null; then
