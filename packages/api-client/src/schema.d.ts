@@ -12017,6 +12017,8 @@ export interface components {
             needs_approval?: boolean;
         };
         CalendarSettings: {
+            /** @description The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only. */
+            booking_page_url?: string | null;
             /** @description The workspace time zone (IANA). */
             time_zone: string;
             booking_page_enabled: boolean;

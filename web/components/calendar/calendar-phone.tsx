@@ -55,6 +55,7 @@ import {
   type CalendarView,
 } from '@/lib/calendar/layout';
 import { BookingDetails } from './booking-details';
+import { BookingLinkCard, BookingLinkShare } from './booking-link';
 import { BookingDialog } from './booking-dialog';
 import { BookingSheet } from './booking-sheet';
 import { EventDialog } from './event-dialog';
@@ -97,6 +98,12 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
   const hiddenRooms = useMemo(() => new Set(choices.hidden_rooms ?? []), [choices.hidden_rooms]);
 
   const setAnchor = useCallback((date: CalendarDate) => update({ date: dateKey(date) }), [update]);
+  // The booking link (WHIT-1117): shown while the booking page is on, and offered
+  // to managers when it is off. `?share=booking-link` (Ctrl+K) opens Share.
+  const [bookingOn, setBookingOn] = useState(settings.booking_page_enabled);
+  const shareOnOpen = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('share') === 'booking-link';
+  const showLink = (settings.booking_page_url ?? null) !== null && (bookingOn || access.canManage);
+  const [sharingLink, setSharingLink] = useState(shareOnOpen);
   const [drawer, setDrawer] = useState(false);
   const [picker, setPicker] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -387,6 +394,15 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
               ))}
             </Group>
           )}
+          {showLink && (
+            <BookingLinkCard
+              compact
+              link={settings.booking_page_url ?? null}
+              enabled={bookingOn}
+              canManage={access.canManage}
+              onEnabled={() => setBookingOn(true)}
+            />
+          )}
           <p className="m-0 text-sm text-muted-foreground">{t('phone.setUpOnComputer', 'Services, hours and settings are set up on a computer.')}</p>
         </SheetContent>
       </Sheet>
@@ -496,6 +512,9 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
       </Sheet>
 
       {edits.dialogs}
+      {settings.booking_page_url && bookingOn && (
+        <BookingLinkShare open={sharingLink} onOpenChange={setSharingLink} link={settings.booking_page_url} />
+      )}
 
       <BookingDialog
         open={fullForm !== null}
