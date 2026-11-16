@@ -125,6 +125,54 @@ describe('Approvals page', () => {
     expect(screen.getByText('1 of 1 waiting · oldest first')).toBeInTheDocument();
   });
 
+  it('asks a Needs verifying proposal to confirm it is them, and sends the code with the approval (AG.1)', async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    let tries = 0;
+    serve([proposal(1, { tier: 3, permissions: ['roles:manage'] })], (url, init) => {
+      calls.push({ url, body: init.body ? JSON.parse(String(init.body)) : null });
+      if (url === '/api/v1/me/agent-proposals/1/identity-check') {
+        return jsonResponse(200, { data: { method: 'email_code', email_hint: 'a•••@examplebakery.test' } });
+      }
+      tries += 1;
+      return tries === 1
+        ? jsonResponse(403, { error: 'Confirm it is you first: that code is not correct or has expired.', reason: 'identity_check_failed' })
+        : jsonResponse(200, { data: proposal(1, { tier: 3, status: 'approved' }) });
+    });
+    render(<ApprovalsPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/We sent a code to a•••@examplebakery.test/)).toBeInTheDocument();
+    expect(calls.map((c) => c.url)).toEqual(['/api/v1/me/agent-proposals/1/identity-check']);
+
+    const boxes = within(dialog).getAllByRole('textbox');
+    fireEvent.change(boxes[boxes.length - 1], { target: { value: '111111' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+    expect(await within(dialog).findByText('That code is not right or has expired.')).toBeInTheDocument();
+
+    const again = within(dialog).getAllByRole('textbox');
+    fireEvent.change(again[0], { target: { value: '123456' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('Approved: Create form 1', 'success', 10000, undefined));
+    expect(calls.filter((c) => c.url === '/api/v1/me/agent-proposals/1/approve').map((c) => c.body)).toEqual([
+      { code: '111111' },
+      { code: '123456' },
+    ]);
+  });
+
+  it('approves an ordinary proposal with no check', async () => {
+    const urls: string[] = [];
+    serve([proposal(1, { tier: 1, undoWindowSeconds: 1800 })], (url) => {
+      urls.push(url);
+      return jsonResponse(200, { data: proposal(1, { tier: 1, status: 'approved' }) });
+    });
+    render(<ApprovalsPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('Approved: Create form 1', 'success', 10000, undefined));
+    expect(urls).toEqual(['/api/v1/me/agent-proposals/1/approve']);
+  });
+
   it('keeps the card when the server refuses, and says why', async () => {
     serve([proposal(1)], () => jsonResponse(409, { error: 'Already decided' }));
     render(<ApprovalsPage />);

@@ -55,6 +55,12 @@ import { EditProposalDialog } from './edit-proposal-dialog';
 import { ApprovalsList } from './approvals-list';
 import { DecidedList } from './decided-list';
 import { useAuth } from '@/lib/auth-context';
+import {
+  ConfirmItsYouDialog,
+  isIdentityCheckFailure,
+  startProposalIdentityCheck,
+  type IdentityCheck,
+} from '@/components/security/confirm-its-you-dialog';
 
 export default function ApprovalsPage() {
   const t = useTranslation('admin');
@@ -75,6 +81,14 @@ export default function ApprovalsPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   // WHIT-1042: destructive impact plans the person ticked, by proposal id.
   const [acknowledged, setAcknowledged] = useState<ReadonlySet<number>>(() => new Set());
+  // AG.1: a Needs verifying proposal is approved only after "confirm it's you".
+  const [gated, setGated] = useState<{
+    proposal: AgentProposal;
+    args?: Record<string, unknown>;
+    extra: { acknowledgedDestructive?: boolean; reason?: string };
+    check: IdentityCheck;
+  } | null>(null);
+  const [gateError, setGateError] = useState<string | null>(null);
   const impactPlanCard = useImpactPlanCard();
 
   // The undo meters count down without a request: the window's end is known.
@@ -224,10 +238,20 @@ export default function ApprovalsPage() {
     proposal: AgentProposal,
     verdict: 'approve' | 'decline',
     args?: Record<string, unknown>,
-    extra: { acknowledgedDestructive?: boolean; reason?: string } = {},
+    extra: { acknowledgedDestructive?: boolean; reason?: string; code?: string } = {},
   ) => {
     setBusyId(proposal.id);
     try {
+      if (verdict === 'approve' && proposal.tier === 3 && extra.code === undefined) {
+        const started = await startProposalIdentityCheck(proposal.id);
+        if ('error' in started) {
+          addToast(started.error ?? t('twoStep.identity.failed', 'We could not start the check. Try again in a few minutes.'), 'error', 6000);
+          return;
+        }
+        setGateError(null);
+        setGated({ proposal, args, extra, check: started.check });
+        return;
+      }
       const path = { params: { path: { id: proposal.id } }, body: { ...(args ? { arguments: args } : {}), ...extra } as never };
       const { data, error, response } =
         verdict === 'approve'
@@ -236,6 +260,11 @@ export default function ApprovalsPage() {
       const body = ((data ?? error ?? null) as unknown) as
         | { data?: AgentProposal | null; error?: string }
         | null;
+      if (!response.ok && extra.code !== undefined && isIdentityCheckFailure(error)) {
+        setGateError(t('twoStep.identity.wrong', 'That code is not right or has expired.'));
+        return;
+      }
+      setGated(null);
       if (!response.ok) {
         addToast(
           body?.error ?? t('approvals.error.decide', 'That decision could not be saved. Try again.'),
@@ -552,6 +581,16 @@ export default function ApprovalsPage() {
           onApprove={(args) => void decide(editing, 'approve', args)}
         />
       )}
+      <ConfirmItsYouDialog
+        check={gated?.check ?? null}
+        busy={gated !== null && busyId === gated.proposal.id}
+        error={gateError}
+        onCancel={() => setGated(null)}
+        onClearError={() => setGateError(null)}
+        onConfirm={(code) => {
+          if (gated !== null) void decide(gated.proposal, 'approve', gated.args, { ...gated.extra, code });
+        }}
+      />
     </div>
   );
 }

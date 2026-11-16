@@ -1917,13 +1917,27 @@ $passwordResetHandler = new \Whity\Api\PasswordResetHandler(
 $router->register('POST', '/api/auth/password/forgot', [$passwordResetHandler, 'forgot'], null);
 $router->register('POST', '/api/auth/password/reset', [$passwordResetHandler, 'reset'], null);
 
+// AG.1: every gated approval (a password reset, a two-step reset, a Needs
+// verifying agent proposal) confirms the approver is who they say, through one
+// contract, right before it takes effect.
+$gatedApproval = new \Whity\Core\Security\GatedApproval(
+    new \Whity\Core\Security\IdentityCheck(
+        $db->getPdo(),
+        new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo()),
+        $totpService,
+        new \Whity\Core\Security\IdentityCheckMailer($brandedEmailSender),
+    )
+);
+
 $passwordResetApprovalsHandler = new \Whity\Api\PasswordResetApprovalsApiHandler(
     $passwordResetService,
     $roleChecker,
     $auditLogger,
-    $passwordResetMailer
+    $passwordResetMailer,
+    $gatedApproval
 );
 $router->register('GET',  '/api/password-resets/pending',      [$passwordResetApprovalsHandler, 'listPending'], null, null, CorePermissions::PASSWORD_RESETS_APPROVE);
+$router->register('POST', '/api/password-resets/identity-check',  [$passwordResetApprovalsHandler, 'identityCheck'], null, null, CorePermissions::PASSWORD_RESETS_APPROVE);
 $router->register('POST', '/api/password-resets/{id:\d+}/approve', [$passwordResetApprovalsHandler, 'approve'], null, null, CorePermissions::PASSWORD_RESETS_APPROVE);
 $router->register('POST', '/api/password-resets/{id:\d+}/reject',  [$passwordResetApprovalsHandler, 'reject'],  null, null, CorePermissions::PASSWORD_RESETS_APPROVE);
 
@@ -1972,12 +1986,7 @@ $twoFactorRecoveryApprovalsHandler = new \Whity\Api\TwoFactorRecoveryApprovalsAp
     $auditLogger,
     $passwordResetMailer,
     // AG.1: each approval confirms the admin is who they say first.
-    new \Whity\Core\Security\IdentityCheck(
-        $db->getPdo(),
-        new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo()),
-        $totpService,
-        new \Whity\Core\Security\IdentityCheckMailer($brandedEmailSender),
-    )
+    $gatedApproval
 );
 $router->register('GET',  '/api/2fa-recovery/pending',           [$twoFactorRecoveryApprovalsHandler, 'listPending'], null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
 $router->register('POST', '/api/2fa-recovery/{id:\d+}/approve',  [$twoFactorRecoveryApprovalsHandler, 'approve'],     null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
@@ -6255,8 +6264,9 @@ $mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker,
 // an agent must not be able to approve its own proposal.
 // WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
 $agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo(), $mcpConnectionEvents);
-$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue);
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue, $gatedApproval);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
+$router->register('POST', '/api/me/agent-proposals/{id:\d+}/identity-check', [$agentProposalsHandler, 'identityCheck'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
 $router->register('POST', '/api/me/agent-proposals/bulk-approve',        [$agentProposalsHandler, 'bulkApprove'], null);

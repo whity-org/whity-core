@@ -11,6 +11,8 @@ use Whity\Core\Identity\PasswordResetService;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Request;
 use Whity\Core\Response;
+use Whity\Core\Security\GatedApproval;
+use Whity\Http\JsonBody;
 use Whity\Http\PaginationParams;
 use Whity\Core\Tenant\TenantContext;
 
@@ -19,7 +21,8 @@ use Whity\Core\Tenant\TenantContext;
  * (WC-password-reset-2fa-recovery), the approval branch of
  * `auth.password_reset_approval_required`:
  *  - GET  /api/v1/password-resets/pending        — list pending requests
- *  - POST /api/v1/password-resets/{id}/approve    — apply the staged password
+ *  - POST /api/v1/password-resets/identity-check — start the approver's "confirm it's you" check
+ *  - POST /api/v1/password-resets/{id}/approve    — apply the staged password, with the check's code
  *  - POST /api/v1/password-resets/{id}/reject     — discard the staged password
  *
  * TENANT-SCOPED to the REQUESTING USER'S OWN tenant — unlike
@@ -47,6 +50,8 @@ final class PasswordResetApprovalsApiHandler
         private readonly RoleChecker $roleChecker,
         private readonly AuditLogger $audit,
         private readonly ?PasswordResetMailer $mailer = null,
+        // AG.1: applying someone's new password is a gated approval.
+        private readonly ?GatedApproval $gate = null,
     ) {}
 
     /**
@@ -76,7 +81,27 @@ final class PasswordResetApprovalsApiHandler
     }
 
     /**
-     * POST /api/v1/password-resets/{id}/approve — apply the staged password.
+     * POST /api/v1/password-resets/identity-check — `{ "request_id": <int> }`:
+     * what the approver confirms with, and for an emailed code, send it.
+     */
+    public function identityCheck(Request $request): Response
+    {
+        $ctx = $this->authorize($request);
+        if ($ctx instanceof Response) {
+            return $ctx;
+        }
+        $body = JsonBody::parsed($request);
+        $requestId = isset($body['request_id']) && is_numeric($body['request_id']) ? (int) $body['request_id'] : 0;
+        if ($requestId <= 0) {
+            return Response::error('A request_id is required', 422);
+        }
+
+        return GatedApprovalHttp::start($this->gate, $ctx['tenantId'], $ctx['userId'], GatedApproval::PASSWORD_RESET, (string) $requestId);
+    }
+
+    /**
+     * POST /api/v1/password-resets/{id}/approve — `{ "code": "<code>" }`:
+     * apply the staged password once the approver has confirmed it's them.
      *
      * @param array<string, mixed> $params
      */
@@ -92,6 +117,11 @@ final class PasswordResetApprovalsApiHandler
             return Response::error('A valid request id is required', 422);
         }
 
+        $method = GatedApprovalHttp::confirm($this->gate, $ctx['tenantId'], $ctx['userId'], GatedApproval::PASSWORD_RESET, (string) $requestId, JsonBody::parsed($request));
+        if ($method instanceof Response) {
+            return $method;
+        }
+
         try {
             $result = $this->service->approveForTenant($requestId, $ctx['tenantId']);
             if ($result === null) {
@@ -102,6 +132,7 @@ final class PasswordResetApprovalsApiHandler
                 'actor_user_id' => $ctx['userId'],
                 'target_type'   => 'profile',
                 'target_id'     => $result['profile_id'],
+                'metadata'      => ['identity_check' => $method],
             ]);
 
             if ($this->mailer !== null && $result['email'] !== '') {

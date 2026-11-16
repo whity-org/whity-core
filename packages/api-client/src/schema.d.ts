@@ -5512,6 +5512,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/agent-proposals/{id}/identity-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start "confirm it's you" before approving a Needs verifying proposal
+         * @description Names the check (an authenticator code, or a code sent by email) and sends the email code when that is the check. The code then goes with the approval.
+         */
+        post: operations["post_api_v1_me_agent_proposals_id_identity_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/agent-toolsets": {
         parameters: {
             query?: never;
@@ -7102,6 +7122,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/password-resets/identity-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start the approver's "confirm it's you" check for a password reset: names it, and sends a code by email when that is the check */
+        post: operations["post_api_v1_password_resets_identity_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/password-resets/pending": {
         parameters: {
             query?: never;
@@ -7128,7 +7165,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Apply the staged password (tenant-scoped) */
+        /** Apply the staged password once the approver has confirmed it is them (tenant-scoped) */
         post: operations["post_api_v1_password_resets_id_approve"];
         delete?: never;
         options?: never;
@@ -14899,6 +14936,10 @@ export interface components {
         FrontendFeatureListResponse: {
             data: components["schemas"]["FrontendFeature"][];
             dropped?: components["schemas"]["DroppedFrontendFeature"][];
+        };
+        GatedApprovalRequest: {
+            /** @description The code from the approver's authenticator, or the one emailed by the identity check */
+            code: string;
         };
         GenericMessageDataResponse: {
             data: {
@@ -48455,6 +48496,8 @@ export interface operations {
                     arguments?: {
                         [key: string]: unknown;
                     };
+                    /** @description For a Needs verifying (tier 3) proposal: the code from the person's authenticator, or the one emailed after identity-check. */
+                    code?: string;
                     /** @description Needed for a Whity Builder publish or roll back that stops showing data people entered: the person ticked that they understand what is lost. */
                     acknowledgedDestructive?: boolean;
                 };
@@ -48628,6 +48671,101 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_agent_proposals_id_identity_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the proposal. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The check to make */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityCheckResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such proposal made on your behalf */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This proposal needs no check */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many codes were sent lately */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Confirming it is you is not available */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -57021,6 +57159,114 @@ export interface operations {
             };
         };
     };
+    post_api_v1_password_resets_identity_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The password-reset request about to be approved */
+                    request_id: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The check to make */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityCheckResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A request_id is required */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many codes were sent lately */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Confirming it is you is not available */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_password_resets_pending: {
         parameters: {
             query?: never;
@@ -57095,7 +57341,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GatedApprovalRequest"];
+            };
+        };
         responses: {
             /** @description Approved */
             200: {
@@ -57104,6 +57354,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApprovalStatusResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Missing or invalid authentication */
@@ -57144,6 +57403,15 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Confirming it is you is not available */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
