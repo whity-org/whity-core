@@ -18,7 +18,7 @@ import { Input } from '@whity/ui/input';
 import { Switch } from '@whity/ui/switch';
 import { Textarea } from '@whity/ui/textarea';
 import { useTranslation } from '@whity/features/i18n';
-import { useDateDisplay } from '@whity/features/datetime';
+import { deviceTimeZone, useDateDisplay } from '@whity/features/datetime';
 import { apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { cn } from '@/lib/utils';
@@ -112,7 +112,15 @@ function BotRule({ bot, people, onSave }: { bot: ChatBot; people: ChatDirectory[
   const days = (settings.days as number[] | undefined) ?? [];
   const chosen = (settings.people as number[] | undefined) ?? [];
   const dayName = (d: number) =>
-    new Intl.DateTimeFormat(document.documentElement.lang || undefined, { weekday: 'short' }).format(new Date(Date.UTC(2026, 10, 15 + d)));
+    [
+      t('bots.day1', 'Mon'),
+      t('bots.day2', 'Tue'),
+      t('bots.day3', 'Wed'),
+      t('bots.day4', 'Thu'),
+      t('bots.day5', 'Fri'),
+      t('bots.day6', 'Sat'),
+      t('bots.day7', 'Sun'),
+    ][d - 1];
 
   return (
     <div className="grid gap-3 ps-12">
@@ -144,7 +152,7 @@ function BotRule({ bot, people, onSave }: { bot: ChatBot; people: ChatDirectory[
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => set('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone)}
+              onClick={() => set('timezone', deviceTimeZone() ?? 'UTC')}
             >
               {t('bots.zone', 'Time zone: {zone}', { zone: String(settings.timezone ?? 'UTC') })}
             </Button>
