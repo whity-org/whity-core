@@ -533,7 +533,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the tenant's audit entries (newest first, paginated) */
+        /**
+         * List the tenant's audit entries (newest first, paginated)
+         * @description Besides the audit log, the list reads what agents did with their tools (`agent.action.ran`) and the decisions people made on routes (`route.approved`, `route.rejected`, `route.signed`, `route.declined`, `route.sent_back`). A target filter, or `source=audit`, reads the audit log alone. The CSV export is the audit log.
+         */
         get: operations["get_api_v1_audit_logs"];
         put?: never;
         post?: never;
@@ -11468,6 +11471,11 @@ export interface components {
         };
         AuditLogEntry: {
             id: number;
+            /**
+             * @description audit (the audit log), agents (what an agent did with a tool) or routes (a decision on a route).
+             * @enum {string}
+             */
+            source?: "audit" | "agents" | "routes";
             tenantId: number;
             actorUserId: number | null;
             action: string;
@@ -22865,6 +22873,8 @@ export interface operations {
     get_api_v1_audit_logs: {
         parameters: {
             query?: {
+                /** @description `audit` for the audit log alone; otherwise everything */
+                source?: string;
                 /** @description Exact action match (e.g. users:create) */
                 action?: string;
                 /** @description Filter by actor user id */
