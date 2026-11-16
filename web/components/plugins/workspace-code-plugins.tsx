@@ -21,6 +21,7 @@ import { Checkbox } from '@whity/ui/checkbox';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@whity/ui/sheet';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@whity/ui/dropdown-menu';
 
 type WorkspaceCodePlugin = components['schemas']['WorkspaceCodePlugin'];
 
@@ -72,10 +73,30 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
     if (!res.ok) return [] as AddonPrice[];
     return (((body as { data?: AddonPrice[] } | undefined)?.data ?? []) as AddonPrice[]).filter((plan) => plan.is_addon);
   }, []);
-  const priceFor = (product: string | null | undefined): AddonPrice | null => {
-    if (!product) return null;
-    const prices = (addonPrices ?? []).filter((plan) => plan.plan_key.startsWith(`${product}.`));
-    return prices.find((plan) => plan.billing_period === 'month') ?? prices[0] ?? null;
+  // Every price of the plugin's add-on, shortest period first (WHIT-1149):
+  // month, six months, year.
+  const PERIOD_ORDER: Record<string, number> = { month: 1, quarter: 2, half_year: 3, year: 4, once: 5 };
+  const pricesFor = (product: string | null | undefined): AddonPrice[] => {
+    if (!product) return [];
+    return (addonPrices ?? [])
+      .filter((plan) => plan.plan_key.startsWith(`${product}.`))
+      .sort((a, b) => (PERIOD_ORDER[a.billing_period] ?? 9) - (PERIOD_ORDER[b.billing_period] ?? 9));
+  };
+  const priceFor = (product: string | null | undefined): AddonPrice | null => pricesFor(product)[0] ?? null;
+  const periodPrice = (plan: AddonPrice): string => {
+    const amount = formatMoney(plan.unit_amount, plan.currency);
+    switch (plan.billing_period) {
+      case 'year':
+        return t('plugins.paid.perYear', '{price} a year', { price: amount });
+      case 'half_year':
+        return t('plugins.paid.perHalfYear', '{price} every 6 months', { price: amount });
+      case 'quarter':
+        return t('plugins.paid.perQuarter', '{price} every 3 months', { price: amount });
+      case 'once':
+        return t('plugins.paid.once', '{price} once', { price: amount });
+      default:
+        return t('plugins.paid.perMonth', '{price} a month', { price: amount });
+    }
   };
 
   const startTrial = async (plugin: WorkspaceCodePlugin) => {
@@ -207,6 +228,7 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
             const change = lastChange(plugin);
             const status = statusLine(plugin);
             const price = priceFor(plugin.product);
+            const prices = pricesFor(plugin.product);
             // A paid plugin this workspace can't turn on yet offers a trial or Buy instead of the switch.
             const needsPurchase = plugin.paid && !plugin.mayTurnOn;
             const offerBuy =
@@ -232,9 +254,9 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
                       {status}
                     </p>
                   ) : null}
-                  {needsPurchase && price ? (
+                  {needsPurchase && prices.length > 0 ? (
                     <p className="text-muted-foreground">
-                      {t('plugins.paid.price', '{price} a month for this workspace', { price: formatMoney(price.unit_amount, price.currency) })}
+                      {t('plugins.paid.prices', 'For this workspace: {prices}', { prices: prices.map(periodPrice).join(' · ') })}
                     </p>
                   ) : null}
                   {change ? <p className="text-muted-foreground">{change}</p> : null}
@@ -255,10 +277,26 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
                       {t('plugins.paid.startTrial', 'Start {days}-day trial', { days: plugin.trialDays ?? 0 })}
                     </Button>
                   ) : null}
-                  {offerBuy && price ? (
+                  {offerBuy && price && prices.length === 1 ? (
                     <Button variant="outline" size="sm" disabled={buying === plugin.name} onClick={() => void buy(plugin, price)}>
                       {t('plugins.paid.buy', 'Buy')}
                     </Button>
+                  ) : null}
+                  {offerBuy && prices.length > 1 ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={buying === plugin.name}>
+                          {t('plugins.paid.buy', 'Buy')}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {prices.map((option) => (
+                          <DropdownMenuItem key={option.plan_key + option.billing_period} onClick={() => void buy(plugin, option)}>
+                            {periodPrice(option)}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   ) : null}
                   {plugin.canSwitch && !needsPurchase ? (
                     <Switch
