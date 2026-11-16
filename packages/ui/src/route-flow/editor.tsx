@@ -219,6 +219,8 @@ export interface RouteFlowEditorLabels {
   quorumAll: string;
   quorumAny: string;
   quorumMajority: string;
+  /** Optional so older callers keep working; falls back to the English. */
+  quorumFirst?: string;
   /** Shown when the graph is larger than the ceiling and has been cut. */
   tooManyNodes: string;
 }
@@ -737,6 +739,8 @@ export function RouteFlowEditor({
           return labels.quorumAny;
         case 'majority':
           return labels.quorumMajority;
+        case 'first':
+          return labels.quorumFirst ?? 'the first answer decides';
         default:
           return labels.quorumAll;
       }

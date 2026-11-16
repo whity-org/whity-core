@@ -843,6 +843,22 @@ final class SettingsRegistry
     //   - invites_per_customer: how many people one customer may invite (open,
     //     accepted and not sent count); 0 is no limit (WHIT-1043, SC.11).
     public const SIGNUP_INVITES_PER_CUSTOMER = 'signup.invites_per_customer';
+    //   - route_template_id: the route a join request travels on (merge map
+    //     A4); 0 is the default, one step for everyone with signup:manage.
+    public const SIGNUP_ROUTE_TEMPLATE_ID = 'signup.route_template_id';
+
+    // A workspace's Messages settings (ADR 0016 §4-5), kept in the
+    // messaging_settings table until migration 294 folded them in here (merge
+    // map, plumbing). Set on the workspace's own Messages screen, so these are
+    // OWN-SCREEN keys too. The inbound email secret is not a setting: it is
+    // kept encrypted under an unregistered key, so no settings read returns it
+    // ({@see \Whity\Core\Messaging\MessagingSettings}).
+    //   - webchat_enabled: whether the web chat bubble is on.
+    //   - webchat_greeting: the line it opens with; '' for none.
+    //   - inbound_email_address: where replies to email come back; '' for none.
+    public const MESSAGING_WEBCHAT_ENABLED = 'messaging.webchat_enabled';
+    public const MESSAGING_WEBCHAT_GREETING = 'messaging.webchat_greeting';
+    public const MESSAGING_INBOUND_EMAIL_ADDRESS = 'messaging.inbound_email_address';
 
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
@@ -858,6 +874,10 @@ final class SettingsRegistry
         self::SIGNUP_ALLOWED_DOMAINS,
         self::SIGNUP_CUSTOMER_INVITES,
         self::SIGNUP_INVITES_PER_CUSTOMER,
+        self::SIGNUP_ROUTE_TEMPLATE_ID,
+        self::MESSAGING_WEBCHAT_ENABLED,
+        self::MESSAGING_WEBCHAT_GREETING,
+        self::MESSAGING_INBOUND_EMAIL_ADDRESS,
     ];
 
     /**
@@ -969,6 +989,7 @@ final class SettingsRegistry
      */
     private const BOOL_KEYS = [
         self::SIGNUP_CUSTOMER_INVITES,
+        self::MESSAGING_WEBCHAT_ENABLED,
         self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_NOTIFY_ADMINS,
@@ -1347,6 +1368,10 @@ final class SettingsRegistry
         self::SIGNUP_CUSTOMER_INVITES => 'false',
         // No limit, as before the setting existed.
         self::SIGNUP_INVITES_PER_CUSTOMER => '0',
+        self::SIGNUP_ROUTE_TEMPLATE_ID => '0',
+        self::MESSAGING_WEBCHAT_ENABLED => 'false',
+        self::MESSAGING_WEBCHAT_GREETING => '',
+        self::MESSAGING_INBOUND_EMAIL_ADDRESS => '',
     ];
 
     /**
@@ -1833,6 +1858,16 @@ final class SettingsRegistry
             self::SIGNUP_ALLOWED_DOMAINS => self::validateSignupDomains($value),
             self::SIGNUP_CUSTOMER_INVITES => self::validateBoolean($value, self::SIGNUP_CUSTOMER_INVITES),
             self::SIGNUP_INVITES_PER_CUSTOMER => self::validateWholeNumberBetween($value, self::SIGNUP_INVITES_PER_CUSTOMER, 0, 1000),
+            self::SIGNUP_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+                ? null
+                : self::SIGNUP_ROUTE_TEMPLATE_ID . ' must be a route template id, or 0 for the default.',
+            self::MESSAGING_WEBCHAT_ENABLED => self::validateBoolean($value, self::MESSAGING_WEBCHAT_ENABLED),
+            self::MESSAGING_WEBCHAT_GREETING => mb_strlen($value) <= 500
+                ? null
+                : self::MESSAGING_WEBCHAT_GREETING . ' must be 500 characters or fewer.',
+            self::MESSAGING_INBOUND_EMAIL_ADDRESS => $value === '' || (strlen($value) <= 320 && filter_var($value, FILTER_VALIDATE_EMAIL) !== false)
+                ? null
+                : self::MESSAGING_INBOUND_EMAIL_ADDRESS . ' must be an email address, or empty for none.',
             default => "Unknown setting key: {$key}",
         };
     }

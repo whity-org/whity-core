@@ -21,7 +21,7 @@ final class MessageRepository
 
     private const COLUMNS = 'm.id, m.tenant_id, m.conversation_id, m.kind, m.author_profile_id, m.by_agent, m.source,
         m.body_text, m.body_html, m.external_id, m.in_reply_to, m.status, m.status_detail, m.attachments_not_shown,
-        m.send_after, m.sent_at, m.created_at, p.display_name AS author_name, m.chat_meta';
+        m.send_after, m.sent_at, m.created_at, p.display_name AS author_name, m.chat_meta, m.channel, m.channel_address';
 
     public function __construct(private readonly PDO $db)
     {
@@ -30,7 +30,8 @@ final class MessageRepository
     /**
      * @param array{kind: string, status: string, body_text: string, body_html?: ?string, author_profile_id?: ?int,
      *              by_agent?: bool, source?: ?string, external_id?: ?string, in_reply_to?: ?string,
-     *              attachments_not_shown?: int, send_after_seconds?: int, chat_meta?: array<string, mixed>} $m
+     *              attachments_not_shown?: int, send_after_seconds?: int, chat_meta?: array<string, mixed>,
+     *              channel?: ?string, channel_address?: ?string} $m
      */
     public function insert(int $tenantId, int $conversationId, array $m): int
     {
@@ -39,9 +40,9 @@ final class MessageRepository
 
         $stmt = $this->db->prepare(
             'INSERT INTO messages (tenant_id, conversation_id, kind, author_profile_id, by_agent, source, body_text, body_html,
-                                   external_id, in_reply_to, status, attachments_not_shown, send_after, chat_meta, created_at)
+                                   external_id, in_reply_to, status, attachments_not_shown, send_after, chat_meta, channel, channel_address, created_at)
              VALUES (:tid, :cid, :kind, :author, :by_agent, :source, :body, :html, :external, :reply_to, :status, :attachments,
-                     :send_after, :meta, NOW())
+                     :send_after, :meta, :channel, :channel_address, NOW())
              RETURNING id'
         );
         $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
@@ -62,9 +63,25 @@ final class MessageRepository
         $chatMeta = array_key_exists('chat_meta', $m) ? $m['chat_meta'] : [];
         $meta = $chatMeta !== [] ? json_encode($chatMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : false;
         $stmt->bindValue(':meta', $meta === false ? null : $meta, $meta === false ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        // C5: how this message came or went, so one conversation can span channels.
+        $stmt->bindValue(':channel', $m['channel'] ?? null);
+        $stmt->bindValue(':channel_address', isset($m['channel_address']) ? mb_substr((string) $m['channel_address'], 0, 320) : null);
         $stmt->execute();
 
         return (int) $stmt->fetchColumn();
+    }
+
+    /** When the customer last wrote on this channel in this conversation, or null. */
+    public function lastInboundAt(int $tenantId, int $conversationId, string $channel): ?string
+    {
+        $stmt = $this->db->prepare(
+            "SELECT MAX(created_at) FROM messages
+              WHERE tenant_id = :tid AND conversation_id = :cid AND kind = 'inbound' AND channel = :channel"
+        );
+        $stmt->execute([':tid' => $tenantId, ':cid' => $conversationId, ':channel' => $channel]);
+        $at = $stmt->fetchColumn();
+
+        return is_string($at) && $at !== '' ? $at : null;
     }
 
     /** @return array<string, mixed>|null */
@@ -146,14 +163,16 @@ final class MessageRepository
      *
      * @return list<string>
      */
-    public function threadIds(int $tenantId, int $conversationId): array
+    public function threadIds(int $tenantId, int $conversationId, ?string $channel = null): array
     {
+        // C5: an email thread is only the email messages of a conversation that spans channels.
+        $byChannel = $channel !== null ? ' AND (channel = :channel OR channel IS NULL)' : '';
         $stmt = $this->db->prepare(
             "SELECT external_id FROM messages
-              WHERE tenant_id = :tid AND conversation_id = :cid AND external_id IS NOT NULL AND kind <> 'note'
+              WHERE tenant_id = :tid AND conversation_id = :cid AND external_id IS NOT NULL AND kind <> 'note'{$byChannel}
               ORDER BY id ASC"
         );
-        $stmt->execute([':tid' => $tenantId, ':cid' => $conversationId]);
+        $stmt->execute([':tid' => $tenantId, ':cid' => $conversationId] + ($channel !== null ? [':channel' => $channel] : []));
 
         return array_values(array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN)));
     }

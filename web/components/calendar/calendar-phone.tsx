@@ -37,7 +37,8 @@ import { useToast } from '@/lib/toast-context';
 import { cn } from '@/lib/utils';
 import { calendarApi, type CalendarBooking, type CalendarEvent } from '@/lib/calendar/api';
 import { DEFAULT_ALSO_SHOW, useViewChoices, type AlsoShow } from '@/lib/calendar/choices';
-import { colourOf, NEUTRAL, palette, type ColourBy } from '@/lib/calendar/colours';
+import { kindsFor, toCalItems } from '@/lib/calendar/items';
+import { colourOf, palette, type ColourBy } from '@/lib/calendar/colours';
 import {
   dateKey,
   isoWeekday,
@@ -54,6 +55,7 @@ import {
   type CalendarView,
 } from '@/lib/calendar/layout';
 import { BookingDetails } from './booking-details';
+import { BookingLinkCard, BookingLinkShare } from './booking-link';
 import { BookingDialog } from './booking-dialog';
 import { BookingSheet } from './booking-sheet';
 import { EventDialog } from './event-dialog';
@@ -65,12 +67,8 @@ import { useCalendarAccess, type CalendarBasics } from './use-calendar-basics';
 import { useCalendarWords } from './use-calendar-words';
 
 export const PHONE_VIEWS: CalendarView[] = ['day', 'three_days', 'month'];
-const LIVE = 'confirmed,pending_payment,requested';
 const VIEW_ICON: Record<string, IconName> = { day: 'calendar', three_days: 'columns', month: 'grid' };
 
-function firstName(name: string): string {
-  return name.trim().split(/\s+/)[0] ?? name;
-}
 
 /** The computer's views on a phone: 4 days and Week become 3 days, Year becomes Month. */
 export function phoneView(stored: string | undefined): CalendarView {
@@ -100,6 +98,12 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
   const hiddenRooms = useMemo(() => new Set(choices.hidden_rooms ?? []), [choices.hidden_rooms]);
 
   const setAnchor = useCallback((date: CalendarDate) => update({ date: dateKey(date) }), [update]);
+  // The booking link (WHIT-1117): shown while the booking page is on, and offered
+  // to managers when it is off. `?share=booking-link` (Ctrl+K) opens Share.
+  const [bookingOn, setBookingOn] = useState(settings.booking_page_enabled);
+  const shareOnOpen = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('share') === 'booking-link';
+  const showLink = (settings.booking_page_url ?? null) !== null && (bookingOn || access.canManage);
+  const [sharingLink, setSharingLink] = useState(shareOnOpen);
   const [drawer, setDrawer] = useState(false);
   const [picker, setPicker] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -115,14 +119,12 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
 
   const range = viewRange(view, anchor, settings.week_start);
   const query = rangeQuery(range, timeZone);
-  const { data, loading, error, forbidden } = useFetch(async () => {
-    const [bookings, events, timeOff] = await Promise.all([
-      calendarApi.bookings({ ...query, status: alsoShow.includes('cancelled') ? `${LIVE},cancelled` : LIVE }),
-      alsoShow.includes('team_events') ? calendarApi.events(query) : Promise.resolve([]),
-      alsoShow.includes('time_off') ? calendarApi.timeOff(query).catch(() => []) : Promise.resolve([]),
-    ]);
-    return { bookings, events, timeOff };
-  }, [query.from, query.to, alsoShow.join(','), reloadKey]);
+  const kinds = kindsFor(alsoShow);
+  const { data, loading, error, forbidden } = useFetch(
+    () => calendarApi.items({ ...query, kinds, cancelled: alsoShow.includes('cancelled') }),
+    [query.from, query.to, kinds.join(','), alsoShow.includes('cancelled'), reloadKey]
+  );
+  const hiddenServices = useMemo(() => new Set(choices.hidden_services ?? []), [choices.hidden_services]);
 
   const openings = useFetch(async () => (await Promise.all(staff.map((s) => calendarApi.hours(s.profile_id).catch(() => [])))).flat(), [
     staff.map((s) => s.profile_id).join(','),
@@ -133,61 +135,34 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
   const serviceById = useMemo(() => new Map(services.map((s) => [s.id, s])), [services]);
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
 
-  const items: CalItem[] = useMemo(() => {
-    if (data === null) return [];
-    const out: CalItem[] = [];
-    for (const b of data.bookings) {
-      if (hiddenPeople.has(b.profile_id)) continue;
-      if (b.room_id !== null && b.room_id !== undefined && hiddenRooms.has(b.room_id)) continue;
-      const kind = b.status === 'cancelled' ? 'cancelled' : b.status === 'pending_payment' ? 'wait' : b.status === 'requested' ? 'request' : 'booking';
-      const room = b.room_name ? words.label(b.room_name) : b.room_id ? words.label(roomById.get(b.room_id)?.name) : '';
-      out.push({
-        key: `booking:${b.id}`,
-        kind,
-        starts_at: b.starts_at,
-        ends_at: b.ends_at,
-        allDay: false,
-        title: words.serviceName(serviceById.get(b.service_id)),
-        who: [b.customer.name ?? t('booking.noName', 'No name given'), firstName(staffName.get(b.profile_id) ?? '')].filter(Boolean).join(' · '),
-        where: [room, kind === 'wait' ? t('grid.waitingPayment', 'waiting for payment') : ''].filter(Boolean).join(' · '),
-        colour: colourOf(colourBy, colours, { profileId: b.profile_id, serviceId: b.service_id, roomId: b.room_id ?? null }),
-        booking: b,
-      });
-    }
-    for (const e of data.events) {
-      if (e.status === 'cancelled' || hiddenPeople.has(e.profile_id)) continue;
-      out.push({
-        key: `event:${e.id}`,
-        kind: 'event',
-        starts_at: e.starts_at,
-        ends_at: e.ends_at,
-        allDay: e.all_day,
-        title: e.title,
-        who: staffName.get(e.profile_id) ?? '',
-        where: '',
-        colour: colourBy === 'person' ? colourOf('person', colours, { profileId: e.profile_id }) : NEUTRAL,
-        event: e,
-      });
-    }
-    for (const off of data.timeOff) {
-      if (off.kind === 'open' || hiddenPeople.has(off.profile_id)) continue;
-      const span = new Date(off.ends_at).getTime() - new Date(off.starts_at).getTime();
-      out.push({
-        key: `time_off:${off.id}`,
-        kind: 'timeoff',
-        starts_at: off.starts_at,
-        ends_at: off.ends_at,
-        allDay: span >= 20 * 3_600_000,
-        title: t('grid.leave', '{name} · time off', { name: staffName.get(off.profile_id) ?? '' }),
-        who: off.note,
-        where: '',
-        colour: colourBy === 'person' ? colourOf('person', colours, { profileId: off.profile_id }) : NEUTRAL,
-        timeOff: off,
-      });
-    }
-    const needle = search.trim().toLowerCase();
-    return needle === '' ? out : out.filter((item) => `${item.title} ${item.who} ${item.where}`.toLowerCase().includes(needle));
-  }, [data, hiddenPeople, hiddenRooms, colourBy, colours, staffName, serviceById, roomById, search, t, words]);
+  const items: CalItem[] = useMemo(
+    () =>
+      data === null
+        ? []
+        : toCalItems(data.items, {
+            colourBy,
+            colours,
+            staffName,
+            services: serviceById,
+            rooms: roomById,
+            hiddenPeople,
+            hiddenRooms,
+            hiddenServices,
+            search,
+            serviceName: words.serviceName,
+            label: words.label,
+            words: {
+              noName: t('booking.noName', 'No name given'),
+              waitingPayment: t('grid.waitingPayment', 'waiting for payment'),
+              request: t('grid.requestShort', 'request'),
+              cancelled: t('grid.cancelledShort', 'cancelled'),
+              checkedIn: t('grid.checkedInShort', 'checked in'),
+              timeOff: (name) => t('grid.leave', '{name} · time off', { name }),
+              guests: (count) => (count === 1 ? t('grid.guestsOne', '1 guest') : t('grid.guestsMany', '{count} guests', { count })),
+            },
+          }),
+    [data, colourBy, colours, staffName, serviceById, roomById, hiddenPeople, hiddenRooms, hiddenServices, search, t, words]
+  );
 
   const edits = useGridEditing({
     items,
@@ -211,13 +186,26 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
   const monthTitle = dates.calendarLabel(labelInstant(anchor, timeZone), view === 'month' ? 'monthYear' : 'month') ?? '';
   const title = view === 'day' ? `${words.weekdayShort(isoWeekday(anchor))} ${anchor.day} ${dates.calendarLabel(labelInstant(anchor, timeZone), 'month') ?? ''}` : monthTitle;
 
+  // An invitation answered from the details (WHIT-1116).
+  const answer = async (item: CalItem, response: 'accepted' | 'declined' | 'tentative') => {
+    if (!item.event) return;
+    try {
+      await calendarApi.answerEvent(item.event.id, response);
+      addToast(t('details.answered', 'Answer saved'), 'success');
+      refetch();
+    } catch (error) {
+      addToast(words.errorText(error, t('details.answerFailed', 'Your answer could not be saved. Try again.')), 'error');
+    }
+  };
+  const nameOf = (profileId: number) => staffName.get(profileId) ?? '';
+  const editEvent = (item: CalItem) => {
+    if (!item.event) return;
+    setEditingEvent(item.event);
+    setEventOpen(true);
+  };
+
   const openItem = (item: CalItem | null) => {
     edits.setDraft(null);
-    if (item?.event) {
-      setEditingEvent(item.event);
-      setEventOpen(true);
-      return;
-    }
     setDetails(item);
   };
 
@@ -406,6 +394,15 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
               ))}
             </Group>
           )}
+          {showLink && (
+            <BookingLinkCard
+              compact
+              link={settings.booking_page_url ?? null}
+              enabled={bookingOn}
+              canManage={access.canManage}
+              onEnabled={() => setBookingOn(true)}
+            />
+          )}
           <p className="m-0 text-sm text-muted-foreground">{t('phone.setUpOnComputer', 'Services, hours and settings are set up on a computer.')}</p>
         </SheetContent>
       </Sheet>
@@ -470,6 +467,13 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
                 if (details.booking) setSheet({ booking: details.booking, startWith: null });
                 setDetails(null);
               }}
+              nameOf={nameOf}
+              me={access.me}
+              onAnswer={(response) => void answer(details, response)}
+              onEdit={() => {
+                editEvent(details);
+                setDetails(null);
+              }}
             />
           )}
         </SheetContent>
@@ -508,6 +512,9 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
       </Sheet>
 
       {edits.dialogs}
+      {settings.booking_page_url && bookingOn && (
+        <BookingLinkShare open={sharingLink} onOpenChange={setSharingLink} link={settings.booking_page_url} />
+      )}
 
       <BookingDialog
         open={fullForm !== null}
@@ -551,6 +558,7 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
         canChange={editingEvent === null ? access.canWrite : access.canChange(editingEvent.profile_id)}
         initialDate={anchor}
         onSaved={refetch}
+        rooms={rooms}
       />
     </div>
   );

@@ -8,6 +8,7 @@ use PDO;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\CustomerSafeRole;
 use Whity\Core\Identity\MembershipRepository;
+use Whity\Core\Security\PublicToken;
 
 /**
  * Workspace-controlled customer sign-up (WHIT-915).
@@ -83,6 +84,33 @@ final class CustomerSignupService
     ) {
     }
 
+    /** @var (\Closure(int, int): void)|null */
+    private ?\Closure $onPending = null;
+
+    /**
+     * Merge map A4: called with (tenant id, request id) once a request starts
+     * waiting for a decision, after it is saved, to put it on its route.
+     *
+     * @param \Closure(int, int): void $fn
+     */
+    public function whenPending(\Closure $fn): void
+    {
+        $this->onPending = $fn;
+    }
+
+    private function pending(int $tenantId, int $signupId): void
+    {
+        if ($this->onPending === null) {
+            return;
+        }
+        try {
+            ($this->onPending)($tenantId, $signupId);
+        } catch (\Throwable $e) {
+            // The request is saved and still decidable from Sign-up approvals.
+            error_log('[customer-signup] the request could not be put on its route: ' . $e->getMessage());
+        }
+    }
+
     /**
      * Record a sign-up request and return the raw token for the mail.
      *
@@ -94,7 +122,7 @@ final class CustomerSignupService
      */
     public function request(int $tenantId, string $email, string $displayName): string
     {
-        $token = bin2hex(random_bytes(self::TOKEN_BYTES));
+        $token = PublicToken::make(self::TOKEN_BYTES);
 
         $ownTx = !$this->db->inTransaction();
         if ($ownTx) {
@@ -119,7 +147,7 @@ final class CustomerSignupService
                 ':tid' => $tenantId,
                 ':email' => $email,
                 ':name' => $displayName,
-                ':hash' => hash('sha256', $token),
+                ':hash' => PublicToken::hash($token),
                 ':status' => self::STATUS_UNVERIFIED,
                 ':expires' => gmdate('Y-m-d H:i:s', time() + self::TTL_SECONDS),
             ]);
@@ -257,6 +285,7 @@ final class CustomerSignupService
                 return $none;
             }
 
+            $this->linkContact($tenantId, $signupId);
             $result = $this->finish($ownTx, ['result' => $outcome, 'tenant_id' => $tenantId, 'profile_id' => $profileId]);
         } catch (\Throwable $e) {
             if ($ownTx && $this->db->inTransaction()) {
@@ -267,6 +296,9 @@ final class CustomerSignupService
 
         if ($announce !== null) {
             $this->announce(self::HOOK_CUSTOMER_JOINED, $announce);
+        }
+        if ($newStatus === self::STATUS_PENDING) {
+            $this->pending($tenantId, $signupId);
         }
 
         return $result;
@@ -352,9 +384,14 @@ final class CustomerSignupService
                 ':status' => $approval ? self::STATUS_PENDING : self::STATUS_JOINED,
                 ':pid' => $profileId,
             ]);
+            $this->linkContact($tenantId, (int) $this->db->lastInsertId());
 
             if ($approval) {
-                return $this->finishJoin($ownTx, $out(self::CONFIRM_PENDING));
+                $signupId = (int) $this->db->lastInsertId();
+                $waiting = $this->finishJoin($ownTx, $out(self::CONFIRM_PENDING));
+                $this->pending($tenantId, $signupId);
+
+                return $waiting;
             }
 
             $membershipId = $this->grant($profileId, $tenantId, $roleId, 'customer_signup_open');
@@ -527,7 +564,7 @@ final class CustomerSignupService
               LIMIT 1'
         );
         $stmt->execute([
-            ':hash' => hash('sha256', $rawToken),
+            ':hash' => PublicToken::hash($rawToken),
             ':status' => self::STATUS_UNVERIFIED,
             ':now' => gmdate('Y-m-d H:i:s'),
         ]);
@@ -550,6 +587,28 @@ final class CustomerSignupService
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return is_array($row) && in_array((string) $row['status'], $statuses, true) ? $row : null;
+    }
+
+    /** Contacts is the one customer record: the request points at it. */
+    private function linkContact(int $tenantId, int $signupId): void
+    {
+        $stmt = $this->db->prepare('SELECT display_name, email, profile_id FROM customer_signups WHERE id = :id AND tenant_id = :tid');
+        $stmt->execute([':id' => $signupId, ':tid' => $tenantId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return;
+        }
+        $contactId = (new \Whity\Core\Contacts\CustomerContacts($this->db))->forCustomer(
+            $tenantId,
+            (string) $row['display_name'],
+            (string) $row['email'],
+            '',
+            $row['profile_id'] !== null ? (int) $row['profile_id'] : null,
+        );
+        if ($contactId !== null) {
+            $this->db->prepare('UPDATE customer_signups SET contact_id = :contact WHERE id = :id AND tenant_id = :tid')
+                ->execute([':contact' => $contactId, ':id' => $signupId, ':tid' => $tenantId]);
+        }
     }
 
     private function decide(int $signupId, int $tenantId, string $status, int $actorId): void

@@ -6,6 +6,7 @@ namespace Whity\Core\Chat;
 
 use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Db\DbBool;
+use Whity\Core\Mention\Mentions;
 use Whity\Core\Store\SharedStoreInterface;
 
 /**
@@ -222,6 +223,33 @@ final class ChatService
         $this->system($tenantId, $id, $viewer->profileId, ['event' => 'created', 'by' => $by, 'title' => $title], "{$by['name']} started {$title}.");
 
         return $id;
+    }
+
+    /**
+     * "Discuss in chat" from a board, a meeting or a record (merge map C2,
+     * WHIT-1135): the one group chat linked to it, started if new and named
+     * after it. The viewer joins it if they aren't in it yet, so everyone who
+     * opens the record's chat talks in the same place.
+     *
+     * @param array<string, mixed> $link
+     * @return array{id: int, created: bool}
+     */
+    public function discuss(int $tenantId, ChatViewer $viewer, array $link): array
+    {
+        $this->personOnly($viewer);
+        $link = self::link($link);
+        if ($link === null) {
+            throw new ChatException('A chat can be linked to a board, a meeting or a record, with its id and name.');
+        }
+        $existing = $this->repo->findLinked($tenantId, $link['type'], $link['id']);
+        if ($existing !== null) {
+            $this->rejoin($tenantId, $existing, $viewer->profileId);
+
+            return ['id' => $existing, 'created' => false];
+        }
+        $title = mb_substr($link['label'], 0, self::MAX_TITLE);
+
+        return ['id' => $this->createGroup($tenantId, $viewer, $title, [], $link), 'created' => true];
     }
 
     /** The direct chat between the viewer and another person, started if new. */
@@ -1002,17 +1030,19 @@ final class ChatService
     private static function mentions(array $mentions, array $members, bool $group = false): array
     {
         $kept = [];
-        foreach (array_slice($mentions, 0, 20) as $m) {
-            if (!is_array($m)) {
+        foreach (array_slice($mentions, 0, 20) as $raw) {
+            // N4: the shared mention shape; one that isn't a mention is skipped.
+            $m = Mentions::parse([$raw], 1)[0] ?? null;
+            if ($m === null) {
                 continue;
             }
-            $type = $m['type'] ?? null;
+            $type = $m['type'];
             // UC.10: @everyone tells every person in a group.
             if ($type === 'everyone' && $group) {
                 $kept['everyone'] = ['type' => 'everyone', 'id' => 0, 'name' => 'everyone'];
                 continue;
             }
-            $id = (int) ($m['id'] ?? 0);
+            $id = $m['id'];
             foreach ($members as $member) {
                 if ($type === 'person' && $member['profile_id'] !== null && (int) $member['profile_id'] === $id) {
                     $kept[$type . $id] = ['type' => 'person', 'id' => $id, 'name' => (string) $member['person_name']];

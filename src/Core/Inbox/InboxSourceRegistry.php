@@ -121,7 +121,22 @@ final class InboxSourceRegistry implements HostWiredService
      */
     public function get(string $key): ?InboxSource
     {
-        return $this->sources[$key] ?? null;
+        return $this->hidden($key) ? null : ($this->sources[$key] ?? null);
+    }
+
+    private ?\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $workspaceGate = null;
+
+    /** A plugin switched off for the current workspace has no sources there (WHIT-1123). */
+    public function setWorkspaceGate(\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $gate): void
+    {
+        $this->workspaceGate = $gate;
+    }
+
+    private function hidden(string $key): bool
+    {
+        $origin = $this->originByKey[$key] ?? self::CORE_SOURCE;
+
+        return $origin !== self::CORE_SOURCE && $this->workspaceGate?->isPluginOffForWorkspace($origin) === true;
     }
 
     /**
@@ -167,7 +182,7 @@ final class InboxSourceRegistry implements HostWiredService
 
     public function has(string $key): bool
     {
-        return array_key_exists($key, $this->sources);
+        return array_key_exists($key, $this->sources) && !$this->hidden($key);
     }
 
     /**
@@ -177,7 +192,7 @@ final class InboxSourceRegistry implements HostWiredService
      */
     public function keys(): array
     {
-        $keys = array_keys($this->sources);
+        $keys = array_values(array_filter(array_keys($this->sources), fn (string $key): bool => !$this->hidden($key)));
         sort($keys);
 
         return $keys;

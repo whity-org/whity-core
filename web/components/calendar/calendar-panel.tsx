@@ -283,9 +283,11 @@ export function CalendarPanel(props: CalendarPanelProps) {
         </Group>
       )}
       <Group title={t('panel.alsoShow', 'Also show')}>
+        {also('meetings', t('panel.meetings', 'Meetings'))}
         {also('team_events', t('panel.teamEvents', 'Team events'))}
         {also('time_off', t('panel.timeOff', 'Time off'))}
         {also('cancelled', t('panel.cancelled', 'Cancelled bookings'))}
+        {also('tasks_due', t('panel.tasksDue', 'Tasks due'))}
       </Group>
       <p className="m-0 text-xs text-muted-foreground" data-testid="calendar-zone">
         {t('toolbar.zone', 'Times in {zone}', { zone: zoneLabel(props.timeZone) })}

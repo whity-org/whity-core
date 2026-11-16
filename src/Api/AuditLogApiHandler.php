@@ -101,6 +101,48 @@ final class AuditLogApiHandler
         $this->db = $db;
         $this->roleChecker = $roleChecker;
         $this->presenter = new AuditPresenter($db, $labels);
+        $this->history = new \Whity\Core\Audit\AuditHistorySources($db);
+    }
+
+    /** Merge map plumbing: agents' actions and route decisions, read beside the log. */
+    private \Whity\Core\Audit\AuditHistorySources $history;
+
+    /**
+     * The log and the other history, newest first, one page of it. Each source
+     * is read up to the end of the page and the merge is cut to the page.
+     *
+     * @param array<string, mixed> $query
+     * @param array{agents: bool, routes: bool} $scope
+     * @param array<string, mixed> $params
+     */
+    private function mergedList(int $tenantId, array $query, array $scope, string $where, array $params, int $logTotal, PaginationParams $p): Response
+    {
+        $reach = $p->offset + $p->perPage;
+        // @tenant-guard-ignore: tenant_id predicate is appended to $where only for non-system tenants; system tenant (id 0) reads all audit rows by design
+        $stmt = $this->db->prepare(
+            'SELECT ' . self::COLUMNS . ' FROM audit_log' . $where . ' ORDER BY created_at DESC, id DESC LIMIT :limit'
+        );
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limit', $reach, PDO::PARAM_INT);
+        $stmt->execute();
+        /** @var list<array<string, mixed>> $rows */
+        $rows = array_map(static fn (array $r): array => $r + ['source' => 'audit'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+        $rows = array_merge($rows, $this->history->rows($tenantId, $query, $scope, $reach));
+        usort($rows, static fn (array $a, array $b): int => [(string) $b['created_at'], (int) $b['id']] <=> [(string) $a['created_at'], (int) $a['id']]);
+        $page = array_slice($rows, $p->offset, $p->perPage);
+
+        $entries = $this->toPublicEntries($page);
+        foreach ($entries as $i => $entry) {
+            // Which record it is, so a client keys rows by source and id.
+            $entries[$i]['source'] = (string) ($page[$i]['source'] ?? 'audit');
+        }
+
+        return Response::json([
+            'data' => $entries,
+            'pagination' => $p->meta($logTotal + $this->history->count($tenantId, $query, $scope)),
+        ], 200);
     }
 
     /**
@@ -140,6 +182,14 @@ final class AuditLogApiHandler
             $total = $countRow !== false ? (int) ($countRow['cnt'] ?? 0) : 0;
 
             $p = PaginationParams::fromQuery($query);
+
+            // Merge map plumbing: what agents did and the decisions on routes
+            // read in the same list, unless a filter only the log has asks for
+            // the log alone (`source=audit` asks for it outright).
+            $scope = $this->history->scope($query);
+            if ($scope['agents'] || $scope['routes']) {
+                return $this->mergedList($tenantId, $query, $scope, $where, $params, $total, $p);
+            }
 
             // Newest-first; bound LIMIT/OFFSET as integers (cast, not interpolated
             // arbitrary input — both are validated non-negative ints above).

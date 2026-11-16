@@ -169,6 +169,30 @@ export const calendarApi = {
       'Free times could not be loaded'
     ),
 
+  /**
+   * Everything on the calendar in one list (the one-calendar model, WHIT-1109):
+   * bookings, team events, meetings, time off, synced busy time and, when asked,
+   * tasks due. `unavailable` names the kinds that could not be read (Taskaat down).
+   */
+  items: async ({ from, to, kinds, cancelled }: { from: string; to: string; kinds: string[]; cancelled: boolean }) => {
+    const result = await api.GET('/api/v1/calendar/items', {
+      params: { query: query({ from, to, kinds: kinds.join(','), cancelled: cancelled ? '1' : null }) },
+    });
+    if (result.response.status === 403) throw new ForbiddenError();
+    if (!result.response.ok) {
+      throw new CalendarRequestError('The calendar could not be loaded', result.response.status, serverText(result.error));
+    }
+    const body = result.data as { data: Schemas['CalendarItem'][]; unavailable?: string[] };
+    return { items: body.data, unavailable: body.unavailable ?? [] };
+  },
+
+  /** Answer an invitation: accepted, declined or tentative. */
+  answerEvent: async (id: number, response: 'accepted' | 'declined' | 'tentative') =>
+    send<CalendarEvent>(
+      await api.POST('/api/v1/calendar/events/{id}/answer', { params: { path: { id } }, body: { response } }),
+      'Your answer could not be saved'
+    ),
+
   /** Live bookings a day by person, room and service, up to a year (design 3.5 Year view). */
   dayCounts: async ({ from, to }: RangeParams) =>
     read<Schemas['CalendarDayCount'][]>(

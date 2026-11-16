@@ -31,8 +31,8 @@ final class RouteStepInputsTest extends TestCase
         ]);
 
         self::assertSame([
-            ['key' => 'meeting_no', 'label' => 'Committee meeting number', 'label_ar' => 'رقم جلسة اللجنة', 'required' => true, 'max_length' => 100],
-            ['key' => 'file_no', 'label' => 'File number', 'label_ar' => null, 'required' => false, 'max_length' => 20],
+            ['key' => 'meeting_no', 'label' => 'Committee meeting number', 'label_ar' => 'رقم جلسة اللجنة', 'required' => true, 'max_length' => 100, 'type' => 'text'],
+            ['key' => 'file_no', 'label' => 'File number', 'label_ar' => null, 'required' => false, 'max_length' => 20, 'type' => 'text'],
         ], $inputs);
         self::assertSame([], RouteStepInputs::parse(null));
         self::assertSame([], RouteStepInputs::parse([]));
@@ -59,6 +59,7 @@ final class RouteStepInputsTest extends TestCase
         yield 'required as text' => [[['key' => 'meeting_no', 'label' => 'Meeting', 'required' => 'yes']]];
         yield 'a length of 0' => [[['key' => 'meeting_no', 'label' => 'Meeting', 'max_length' => 0]]];
         yield 'a length of 201' => [[['key' => 'meeting_no', 'label' => 'Meeting', 'max_length' => 201]]];
+        yield 'an unknown type' => [[['key' => 'meeting_no', 'label' => 'Meeting', 'type' => 'date']]];
         yield 'the same key twice' => [[['key' => 'a', 'label' => 'A'], ['key' => 'a', 'label' => 'B']]];
         yield 'six values' => [array_map(
             static fn (int $i): array => ['key' => 'v' . $i, 'label' => 'Value ' . $i],
@@ -114,6 +115,34 @@ final class RouteStepInputsTest extends TestCase
             } catch (InvalidArgumentException) {
             }
         }
+    }
+
+    public function testAPersonInputIsParsedWithItsType(): void
+    {
+        $inputs = RouteStepInputs::parse([['key' => 'supervisor', 'label' => 'Supervisor', 'type' => 'person']]);
+
+        self::assertSame([
+            ['key' => 'supervisor', 'label' => 'Supervisor', 'label_ar' => null, 'required' => true, 'max_length' => 100, 'type' => 'person'],
+        ], $inputs);
+        self::assertSame($inputs, RouteStepInputs::decode(RouteStepInputs::encode($inputs)));
+    }
+
+    public function testAnUnknownTypeIsRefusedInPlainWords(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("'type' is text or person.");
+        RouteStepInputs::parse([['key' => 'supervisor', 'label' => 'Supervisor', 'type' => 'date']]);
+    }
+
+    public function testAPersonValueIsTheirNumber(): void
+    {
+        $inputs = RouteStepInputs::parse([['key' => 'supervisor', 'label' => 'Supervisor', 'type' => 'person']]);
+
+        self::assertSame(['supervisor' => '42'], RouteStepInputs::accept($inputs, ['supervisor' => ' 42 ']));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Choose a person for “Supervisor”.');
+        RouteStepInputs::accept($inputs, ['supervisor' => 'Amro Saleh']);
     }
 
     public function testTheValuesObjectIsShapedAtTheBoundary(): void

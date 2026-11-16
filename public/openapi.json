@@ -3419,7 +3419,17 @@
                 "tags": [
                     "audit-logs"
                 ],
+                "description": "Besides the audit log, the list reads what agents did with their tools (`agent.action.ran`) and the decisions people made on routes (`route.approved`, `route.rejected`, `route.signed`, `route.declined`, `route.sent_back`). A target filter, or `source=audit`, reads the audit log alone. The CSV export is the audit log.",
                 "parameters": [
+                    {
+                        "name": "source",
+                        "in": "query",
+                        "required": false,
+                        "description": "`audit` for the audit log alone; otherwise everything",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "name": "action",
                         "in": "query",
@@ -5210,6 +5220,324 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/billing/cash-payments": {
+            "get": {
+                "operationId": "get_api_v1_billing_cash_payments",
+                "summary": "List a workspace's cash payments",
+                "tags": [
+                    "billing"
+                ],
+                "description": "Operator only. ?workspace=<id>.",
+                "parameters": [
+                    {
+                        "name": "workspace",
+                        "in": "query",
+                        "required": false,
+                        "description": "The workspace.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Its cash payments, newest first",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CashPaymentListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_billing_cash_payments",
+                "summary": "Record a cash payment for a paid plugin plan",
+                "tags": [
+                    "billing"
+                ],
+                "description": "Operator only. Covers the workspace from the date paid, or the end of its current cash cover if later, for the plan's period.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CashPaymentCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Recorded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CashPaymentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Something is missing or wrong; the message says what",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/billing/cash-payments/{id}/void": {
+            "post": {
+                "operationId": "post_api_v1_billing_cash_payments_id_void",
+                "summary": "Void a cash payment, saying why",
+                "tags": [
+                    "billing"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "The cash payment.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CashPaymentVoidRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Voided",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CashPaymentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No reason, no such payment, or already voided",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12262,6 +12590,118 @@
                 }
             }
         },
+        "/api/v1/chat/chats/discuss": {
+            "post": {
+                "operationId": "post_api_v1_chat_chats_discuss",
+                "summary": "Open the chat about a board, a meeting or a record, starting it if new",
+                "tags": [
+                    "chat"
+                ],
+                "description": "One group chat per linked board, meeting or record, named after it. You join it if you are not in it yet. 201 when the chat was started, 200 when it was already there; `created` says the same.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChatDiscussRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The chat it already had",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatDiscussResponse"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "The chat, just started",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatDiscussResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The link is not a board, a meeting or a record with an id and a name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/chat/chats/{id}": {
             "get": {
                 "operationId": "get_api_v1_chat_chats_id",
@@ -16918,6 +17358,247 @@
                     },
                     "422": {
                         "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/contacts/{id}/activity": {
+            "get": {
+                "operationId": "get_api_v1_contacts_id_activity",
+                "summary": "What a customer did here: their bookings, chats, forms and requests to join",
+                "tags": [
+                    "contacts"
+                ],
+                "description": "Newest first, up to 50 of each. A section shows only to someone who may read that kind of record (bookings: calendar:read; chats: messages:reply; forms: forms:read; join requests: signup:manage). A service's or form's name comes in both languages.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The activity",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "bookings": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "title": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "string"
+                                                                    },
+                                                                    {
+                                                                        "type": "object",
+                                                                        "additionalProperties": {
+                                                                            "type": "string"
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            },
+                                                            "at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "title",
+                                                            "status",
+                                                            "at"
+                                                        ]
+                                                    }
+                                                },
+                                                "chats": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "title": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "string"
+                                                                    },
+                                                                    {
+                                                                        "type": "object",
+                                                                        "additionalProperties": {
+                                                                            "type": "string"
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            },
+                                                            "at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "title",
+                                                            "status",
+                                                            "at"
+                                                        ]
+                                                    }
+                                                },
+                                                "forms": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "title": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "string"
+                                                                    },
+                                                                    {
+                                                                        "type": "object",
+                                                                        "additionalProperties": {
+                                                                            "type": "string"
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            },
+                                                            "at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "title",
+                                                            "status",
+                                                            "at"
+                                                        ]
+                                                    }
+                                                },
+                                                "join_requests": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "title": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "string"
+                                                                    },
+                                                                    {
+                                                                        "type": "object",
+                                                                        "additionalProperties": {
+                                                                            "type": "string"
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            },
+                                                            "at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "title",
+                                                            "status",
+                                                            "at"
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -32612,208 +33293,6 @@
                 ]
             }
         },
-        "/api/v1/form-submissions/{id}/review": {
-            "get": {
-                "operationId": "get_api_v1_form_submissions_id_review",
-                "summary": "What the office recorded about a submission",
-                "tags": [
-                    "forms"
-                ],
-                "description": "The current review, every earlier one, and the staff fields they answer. The applicant has no route to this.",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "The review and its history",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/FormSubmissionReviewDetailResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid authentication",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Insufficient permissions",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Submission not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "405": {
-                        "description": "Method not allowed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "post": {
-                "operationId": "post_api_v1_form_submissions_id_review",
-                "summary": "Record the office's decision on a submission",
-                "tags": [
-                    "forms"
-                ],
-                "description": "Checked against the form's staff fields as a submission is checked against its own, and sent whole. Each save is a new row and the newest is current, so changing a decision leaves the old one readable. The submission itself is never changed. Works on a closed form. `meta.ignored_keys` names answers that matched no staff field.",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/FormSubmissionCreateRequest"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "The recorded review",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/FormSubmissionReviewResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request body",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid authentication",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Insufficient permissions",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Submission not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "405": {
-                        "description": "Method not allowed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "The form has no staff fields, or an answer failed validation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/v1/forms": {
             "get": {
                 "operationId": "get_api_v1_forms",
@@ -43804,7 +44283,17 @@
                 "tags": [
                     "notifications"
                 ],
+                "description": "The Inbox's Mentions and Updates tabs (M.43): `tab=mentions` is someone naming you in a chat or a comment; `tab=updates` is every other notice except those whose item is already in Waiting for me (GET /api/me/waiting). Without a tab, every notice. `unread` counts each tab.",
                 "parameters": [
+                    {
+                        "name": "tab",
+                        "in": "query",
+                        "required": false,
+                        "description": "mentions or updates; every notice when omitted",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "name": "unread",
                         "in": "query",
@@ -44868,7 +45357,7 @@
                         "name": "limit",
                         "in": "query",
                         "required": false,
-                        "description": "How many rows (default 6, max 50)",
+                        "description": "How many rows (default 6, max 200: the Inbox reads the whole list)",
                         "schema": {
                             "type": "integer"
                         }
@@ -47303,7 +47792,7 @@
                 "tags": [
                     "messages"
                 ],
-                "description": "Sent on the conversation's channel from a background job. An agent's reply waits five minutes and can be cancelled in that time.",
+                "description": "Sent from a background job on the channel the customer last wrote on, or on `channel` when it names another they have (`send_by`). An agent's reply waits five minutes and can be cancelled in that time.",
                 "parameters": [
                     {
                         "name": "id",
@@ -47319,7 +47808,20 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/MessagingBodyRequest"
+                                "type": "object",
+                                "properties": {
+                                    "body": {
+                                        "type": "string",
+                                        "description": "The text, in plain words."
+                                    },
+                                    "channel": {
+                                        "type": "string",
+                                        "description": "Send by this channel (one from the conversation's send_by). Default: where the customer last wrote."
+                                    }
+                                },
+                                "required": [
+                                    "body"
+                                ]
                             }
                         }
                     }
@@ -54404,6 +54906,83 @@
                 ]
             }
         },
+        "/api/v1/plugins/workspace-access": {
+            "get": {
+                "operationId": "get_api_v1_plugins_workspace_access",
+                "summary": "List who can use each installed plugin",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Operator only (the system workspace).",
+                "responses": {
+                    "200": {
+                        "description": "Each active plugin and its workspace access",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CodePluginAccessListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/plugins/{id}/re-enable": {
             "post": {
                 "operationId": "post_api_v1_plugins_id_re_enable",
@@ -55186,6 +55765,132 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/{plugin}/workspace-access": {
+            "put": {
+                "operationId": "put_api_v1_plugins_plugin_workspace_access",
+                "summary": "Choose who can use an installed plugin",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Operator only. all: on for every workspace. choose: each workspace turns it on. operator: only the system workspace.",
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "description": "The installed plugin's name, as it gives it (FrontOffice).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CodePluginAccessRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The access as it now stands",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CodePluginAccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not an active plugin",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "access must be all, choose or operator",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -63047,7 +63752,7 @@
                 "tags": [
                     "signup"
                 ],
-                "description": "Creates the customer membership with the current starting role. A rejected request can be approved later.",
+                "description": "Creates the customer membership with the current starting role. A rejected request can be approved later. A request on its route is answered there: your step's approval, which decides it unless the workspace's route has more steps (202).",
                 "parameters": [
                     {
                         "name": "id",
@@ -63068,6 +63773,9 @@
                                 }
                             }
                         }
+                    },
+                    "202": {
+                        "description": "Your step is answered; the route has more to decide"
                     },
                     "401": {
                         "description": "Missing or invalid authentication",
@@ -63165,6 +63873,9 @@
                             }
                         }
                     },
+                    "202": {
+                        "description": "Your step is answered; the route has more to decide"
+                    },
                     "401": {
                         "description": "Missing or invalid authentication",
                         "content": {
@@ -63197,6 +63908,16 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The request's route refused the answer (for example, it is not your step)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -74303,6 +75024,583 @@
                     }
                 ]
             }
+        },
+        "/api/v1/workspace/code-plugins": {
+            "get": {
+                "operationId": "get_api_v1_workspace_code_plugins",
+                "summary": "List the installed plugins this workspace can use",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Plugins installed for the whole installation that the operator lets workspaces use, each with whether it is on here, whether this workspace can switch it, and the last change.",
+                "responses": {
+                    "200": {
+                        "description": "The plugins",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspaceCodePluginListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/workspace/code-plugins/{plugin}/disable": {
+            "post": {
+                "operationId": "post_api_v1_workspace_code_plugins_plugin_disable",
+                "summary": "Turn an installed plugin off for this workspace",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Its data is kept; turning it back on brings everything back.",
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "description": "The installed plugin's name, as it gives it (FrontOffice).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Turned off",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspaceCodePluginSwitchResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not a plugin this workspace can use",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The plugin is on for every workspace and has no switch",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/workspace/code-plugins/{plugin}/enable": {
+            "post": {
+                "operationId": "post_api_v1_workspace_code_plugins_plugin_enable",
+                "summary": "Turn an installed plugin on for this workspace",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "description": "The installed plugin's name, as it gives it (FrontOffice).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Turned on",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspaceCodePluginSwitchResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "402": {
+                        "description": "A paid plugin needs a plan that includes it, a purchase or a trial; details.reason is needs_purchase",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not a plugin this workspace can use",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The plugin is on for every workspace and has no switch",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/workspace/code-plugins/{plugin}/history": {
+            "get": {
+                "operationId": "get_api_v1_workspace_code_plugins_plugin_history",
+                "summary": "Who turned an installed plugin on or off in this workspace, and when",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Newest first, at most 50.",
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "description": "The installed plugin's name, as it gives it (FrontOffice).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The changes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspaceCodePluginHistoryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not a plugin this workspace can use",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/workspace/code-plugins/{plugin}/trial": {
+            "post": {
+                "operationId": "post_api_v1_workspace_code_plugins_plugin_trial",
+                "summary": "Start this workspace's free trial of a paid plugin",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Once per workspace and plugin. Turns the plugin on until the trial ends; then 7 days of grace, then read-only unless it was bought.",
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "description": "The installed plugin's name, as it gives it (FrontOffice).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The trial started",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspaceCodePluginTrialResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not a plugin this workspace can use",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already had its trial, or the plugin offers none",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/workspace/onboarding": {
+            "get": {
+                "operationId": "get_api_v1_workspace_onboarding",
+                "summary": "List the guided setups of the plugins on in this workspace",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Each plugin's step-by-step setup the caller may run, in the caller's language, with the plugin route that says which steps are done (SDK 1.109).",
+                "responses": {
+                    "200": {
+                        "description": "The guided setups",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspaceOnboardingListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -76116,6 +77414,15 @@
                     "id": {
                         "type": "integer"
                     },
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "audit",
+                            "agents",
+                            "routes"
+                        ],
+                        "description": "audit (the audit log), agents (what an agent did with a tool) or routes (a decision on a route)."
+                    },
                     "tenantId": {
                         "type": "integer"
                     },
@@ -76794,6 +78101,25 @@
                     "issued_at": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "cash"
+                        ],
+                        "description": "cash: recorded by the operator, not paid through a provider"
+                    },
+                    "plan_key": {
+                        "type": "string",
+                        "description": "Cash only: the plugin plan paid for"
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "description": "Cash only: how many seats"
+                    },
+                    "covers_until": {
+                        "type": "string",
+                        "description": "Cash only: the end of what it pays for"
                     }
                 },
                 "required": [
@@ -77878,6 +79204,11 @@
             "CalendarSettings": {
                 "type": "object",
                 "properties": {
+                    "booking_page_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only."
+                    },
                     "time_zone": {
                         "type": "string",
                         "description": "The workspace time zone (IANA)."
@@ -78270,6 +79601,153 @@
                     "code",
                     "reason",
                     "detail"
+                ]
+            },
+            "CashPayment": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "tenant_id": {
+                        "type": "integer"
+                    },
+                    "plan_key": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "integer"
+                    },
+                    "amount_minor": {
+                        "type": "integer"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "receipt_number": {
+                        "type": "string"
+                    },
+                    "note": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "paid_on": {
+                        "type": "string"
+                    },
+                    "period_start": {
+                        "type": "string"
+                    },
+                    "period_end": {
+                        "type": "string"
+                    },
+                    "recorded_by": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "recorded_at": {
+                        "type": "string"
+                    },
+                    "voided_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "void_reason": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "tenant_id",
+                    "plan_key",
+                    "quantity",
+                    "amount_minor",
+                    "currency",
+                    "receipt_number",
+                    "paid_on",
+                    "period_start",
+                    "period_end"
+                ]
+            },
+            "CashPaymentCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "workspace": {
+                        "type": "integer",
+                        "description": "The workspace that paid"
+                    },
+                    "planKey": {
+                        "type": "string",
+                        "description": "A paid plugin plan, such as plugin.salons.monthly"
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "description": "How many seats (chairs); 1 when the plugin is not sold per seat"
+                    },
+                    "amount": {
+                        "type": "string",
+                        "description": "The amount paid, as written: 15 or 15.000"
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "Three letters; JOD when left out"
+                    },
+                    "receiptNumber": {
+                        "type": "string",
+                        "description": "The paper receipt's number; once per workspace"
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "Anything worth keeping"
+                    },
+                    "paidOn": {
+                        "type": "string",
+                        "description": "The date paid, like 2026-11-16"
+                    }
+                },
+                "required": [
+                    "workspace",
+                    "planKey",
+                    "amount",
+                    "receiptNumber",
+                    "paidOn"
+                ]
+            },
+            "CashPaymentListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CashPayment"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "CashPaymentResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/CashPayment"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "CashPaymentVoidRequest": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "description": "Why it is voided"
+                    }
+                },
+                "required": [
+                    "reason"
                 ]
             },
             "Chat": {
@@ -78893,6 +80371,10 @@
                     },
                     "description": {
                         "type": "string"
+                    },
+                    "channel": {
+                        "type": "string",
+                        "description": "Send by this channel (one from the conversation's send_by). Default: where the customer last wrote."
                     }
                 },
                 "required": [
@@ -79007,6 +80489,67 @@
                         "required": [
                             "people",
                             "agents"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "ChatDiscussRequest": {
+                "type": "object",
+                "properties": {
+                    "link": {
+                        "$ref": "#/components/schemas/ChatLink"
+                    }
+                },
+                "required": [
+                    "link"
+                ]
+            },
+            "ChatDiscussResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Chat"
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "members": {
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#/components/schemas/ChatMember"
+                                        }
+                                    },
+                                    "messages": {
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#/components/schemas/ChatMessage"
+                                        }
+                                    },
+                                    "has_earlier": {
+                                        "type": "boolean"
+                                    },
+                                    "my_member_id": {
+                                        "type": "integer"
+                                    },
+                                    "last_read_message_id": {
+                                        "type": "integer"
+                                    },
+                                    "created": {
+                                        "type": "boolean",
+                                        "description": "True when this call started the chat."
+                                    }
+                                },
+                                "required": [
+                                    "members",
+                                    "messages",
+                                    "created"
+                                ]
+                            }
                         ]
                     }
                 },
@@ -80052,6 +81595,7 @@
                         "type": "string",
                         "enum": [
                             "month",
+                            "half_year",
                             "year",
                             "once"
                         ]
@@ -80074,6 +81618,80 @@
                         "required": [
                             "url"
                         ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "CodePluginAccess": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "string"
+                    },
+                    "access": {
+                        "type": "string",
+                        "enum": [
+                            "all",
+                            "choose",
+                            "operator"
+                        ]
+                    },
+                    "freeForAll": {
+                        "type": "boolean",
+                        "description": "A paid plugin is free for every workspace"
+                    }
+                },
+                "required": [
+                    "name",
+                    "access",
+                    "freeForAll"
+                ]
+            },
+            "CodePluginAccessListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CodePluginAccess"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "CodePluginAccessRequest": {
+                "type": "object",
+                "properties": {
+                    "access": {
+                        "type": "string",
+                        "enum": [
+                            "all",
+                            "choose",
+                            "operator"
+                        ],
+                        "description": "Who can use it: all (on for every workspace), choose (each workspace turns it on) or operator (the system workspace only)"
+                    },
+                    "freeForAll": {
+                        "type": "boolean",
+                        "description": "For a paid plugin: free for every workspace, with no plan, add-on or trial needed. Left out: unchanged."
+                    }
+                },
+                "required": [
+                    "access"
+                ]
+            },
+            "CodePluginAccessResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/CodePluginAccess"
                     }
                 },
                 "required": [
@@ -83186,10 +84804,34 @@
                     },
                     "mentions": {
                         "type": "array",
+                        "maxItems": 50,
                         "items": {
-                            "type": "integer"
+                            "oneOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "person",
+                                                "agent",
+                                                "everyone"
+                                            ]
+                                        },
+                                        "id": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "type"
+                                    ]
+                                }
+                            ]
                         },
-                        "description": "Profile ids @mentioned; members who can read the document are told in-app"
+                        "description": "The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox \u203a Mentions and a push"
                     }
                 },
                 "required": [
@@ -83292,10 +84934,34 @@
                     },
                     "mentions": {
                         "type": "array",
+                        "maxItems": 50,
                         "items": {
-                            "type": "integer"
+                            "oneOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "person",
+                                                "agent",
+                                                "everyone"
+                                            ]
+                                        },
+                                        "id": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "type"
+                                    ]
+                                }
+                            ]
                         },
-                        "description": "Profile ids @mentioned; members who can read the document are told in-app"
+                        "description": "The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox \u203a Mentions and a push"
                     }
                 },
                 "required": [
@@ -84245,7 +85911,8 @@
                         "enum": [
                             "all",
                             "any",
-                            "majority"
+                            "majority",
+                            "first"
                         ]
                     },
                     "values": {
@@ -84380,7 +86047,8 @@
                                     "enum": [
                                         "all",
                                         "any",
-                                        "majority"
+                                        "majority",
+                                        "first"
                                     ],
                                     "nullable": true
                                 },
@@ -84638,7 +86306,8 @@
                         "enum": [
                             "all",
                             "any",
-                            "majority"
+                            "majority",
+                            "first"
                         ],
                         "nullable": true
                     },
@@ -87225,6 +88894,10 @@
                     "occurred_at": {
                         "type": "string"
                     },
+                    "on_behalf_of_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
                     "prev_hash": {
                         "type": "string",
                         "nullable": true
@@ -88280,13 +89953,6 @@
                     "visible_when": {
                         "$ref": "#/components/schemas/FormFieldCondition"
                     },
-                    "audience": {
-                        "type": "string",
-                        "enum": [
-                            "applicant",
-                            "staff"
-                        ]
-                    },
                     "multi_valued": {
                         "type": "boolean"
                     },
@@ -88449,14 +90115,6 @@
                         "$ref": "#/components/schemas/FormFieldCondition",
                         "description": "Show this question only when another answer matches; null means always."
                     },
-                    "audience": {
-                        "type": "string",
-                        "enum": [
-                            "applicant",
-                            "staff"
-                        ],
-                        "description": "Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review."
-                    },
                     "position": {
                         "type": "integer",
                         "description": "Position in the form; omitted appends it at the end."
@@ -88602,14 +90260,6 @@
                     "visible_when": {
                         "$ref": "#/components/schemas/FormFieldCondition",
                         "description": "Show this question only when another answer matches; null means always."
-                    },
-                    "audience": {
-                        "type": "string",
-                        "enum": [
-                            "applicant",
-                            "staff"
-                        ],
-                        "description": "Who answers it. A staff field is never shown to the applicant."
                     },
                     "position": {
                         "type": "integer",
@@ -89421,90 +91071,6 @@
                     "meta"
                 ]
             },
-            "FormSubmissionReview": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer"
-                    },
-                    "submission_id": {
-                        "type": "integer"
-                    },
-                    "data": {
-                        "type": "object",
-                        "additionalProperties": true
-                    },
-                    "recorded_by_profile_id": {
-                        "type": "integer",
-                        "nullable": true
-                    },
-                    "recorded_at": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "id",
-                    "submission_id",
-                    "data",
-                    "recorded_at"
-                ]
-            },
-            "FormSubmissionReviewDetailResponse": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "type": "object",
-                        "properties": {
-                            "current": {
-                                "$ref": "#/components/schemas/FormSubmissionReview",
-                                "nullable": true
-                            },
-                            "history": {
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/components/schemas/FormSubmissionReview"
-                                }
-                            },
-                            "fields": {
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/components/schemas/FormField"
-                                }
-                            }
-                        },
-                        "required": [
-                            "current",
-                            "history",
-                            "fields"
-                        ]
-                    }
-                },
-                "required": [
-                    "data"
-                ]
-            },
-            "FormSubmissionReviewResponse": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "$ref": "#/components/schemas/FormSubmissionReview"
-                    },
-                    "meta": {
-                        "type": "object",
-                        "properties": {
-                            "ignored_keys": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
-                },
-                "required": [
-                    "data"
-                ]
-            },
             "FormSubmissionWithdrawnResponse": {
                 "type": "object",
                 "properties": {
@@ -89661,6 +91227,27 @@
                     },
                     "plugin": {
                         "type": "string"
+                    },
+                    "pluginAccess": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "on",
+                                    "read_only"
+                                ]
+                            },
+                            "reason": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "graceUntil": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        }
                     },
                     "label": {
                         "type": "string"
@@ -90304,10 +91891,19 @@
                                 "type": "string",
                                 "enum": [
                                     "totp",
-                                    "email_code"
+                                    "email_code",
+                                    "fresh_sign_in"
                                 ]
                             },
                             "email_hint": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "provider_key": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "purpose": {
                                 "type": "string",
                                 "nullable": true
                             }
@@ -93146,6 +94742,25 @@
                                         "items": {
                                             "$ref": "#/components/schemas/MessagingMessage"
                                         }
+                                    },
+                                    "send_by": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "channel": {
+                                                    "type": "string"
+                                                },
+                                                "address": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "channel",
+                                                "address"
+                                            ]
+                                        },
+                                        "description": "The channels a reply can go on (UC.3): those the customer wrote on, the last first."
                                     }
                                 },
                                 "required": [
@@ -93286,6 +94901,11 @@
                     },
                     "created_at": {
                         "type": "string"
+                    },
+                    "channel": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The channel this message came or went on; one conversation can span channels (C5)."
                     }
                 },
                 "required": [
@@ -93882,12 +95502,28 @@
                     },
                     "unread_count": {
                         "type": "integer"
+                    },
+                    "unread": {
+                        "type": "object",
+                        "properties": {
+                            "mentions": {
+                                "type": "integer"
+                            },
+                            "updates": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "mentions",
+                            "updates"
+                        ]
                     }
                 },
                 "required": [
                     "data",
                     "pagination",
-                    "unread_count"
+                    "unread_count",
+                    "unread"
                 ]
             },
             "NotificationMetrics": {
@@ -95684,6 +97320,7 @@
                         "type": "string",
                         "enum": [
                             "month",
+                            "half_year",
                             "year",
                             "once"
                         ]
@@ -95728,6 +97365,7 @@
                         "type": "string",
                         "enum": [
                             "month",
+                            "half_year",
                             "year",
                             "once"
                         ]
@@ -98094,6 +99732,7 @@
                         "type": "string",
                         "enum": [
                             "month",
+                            "half_year",
                             "year",
                             "once"
                         ]
@@ -101441,6 +103080,11 @@
                         "type": "integer",
                         "description": "How many people one customer may invite; 0 is no limit (WHIT-1043)."
                     },
+                    "route_template_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The route template join requests travel on; null is the default, one step for everyone who can manage sign-ups."
+                    },
                     "eligible_roles": {
                         "type": "array",
                         "items": {
@@ -101530,6 +103174,11 @@
                     "invites_per_customer": {
                         "type": "integer",
                         "description": "How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043)."
+                    },
+                    "route_template_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "One of this workspace's route templates for join requests to travel on, or null for the default: one step for everyone who can manage sign-ups."
                     }
                 }
             },
@@ -106347,6 +107996,313 @@
                             "received",
                             "settled"
                         ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspaceCodePlugin": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The plugin's name"
+                    },
+                    "version": {
+                        "type": "string"
+                    },
+                    "access": {
+                        "type": "string",
+                        "enum": [
+                            "all",
+                            "choose"
+                        ],
+                        "description": "all: on for every workspace; choose: this workspace decides"
+                    },
+                    "canSwitch": {
+                        "type": "boolean"
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "Whether it is on in this workspace"
+                    },
+                    "changedAt": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "changedBy": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "on",
+                            "read_only",
+                            "off"
+                        ],
+                        "description": "read_only: a paid plugin whose access ended; reads work, writes are refused"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "free_for_all",
+                            "entitled",
+                            "cash",
+                            "trial",
+                            "grace",
+                            "lapsed",
+                            "installation_unlicensed",
+                            "installation_grace",
+                            null
+                        ]
+                    },
+                    "graceUntil": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "trialEndsAt": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "paid": {
+                        "type": "boolean"
+                    },
+                    "product": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "What the workspace buys, plugin.<slug>"
+                    },
+                    "trialDays": {
+                        "type": "integer"
+                    },
+                    "trialAvailable": {
+                        "type": "boolean"
+                    },
+                    "mayTurnOn": {
+                        "type": "boolean",
+                        "description": "Free, included in the plan or an add-on, free for every workspace, or in a trial"
+                    },
+                    "onboarding": {
+                        "type": "boolean",
+                        "description": "It has a guided setup at /admin/setup/{plugin}"
+                    },
+                    "dependsOn": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Plugins turned on with it in this workspace"
+                    },
+                    "seats": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Sold per seat (SDK 1.110): how many this workspace has, and what one is called",
+                        "properties": {
+                            "count": {
+                                "type": "integer"
+                            },
+                            "unit": {
+                                "$ref": "#/components/schemas/LocalizedLabel"
+                            },
+                            "units": {
+                                "$ref": "#/components/schemas/LocalizedLabel"
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "name",
+                    "version",
+                    "access",
+                    "canSwitch",
+                    "enabled",
+                    "state",
+                    "paid",
+                    "trialAvailable",
+                    "mayTurnOn"
+                ]
+            },
+            "WorkspaceCodePluginHistoryResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "action": {
+                                    "type": "string",
+                                    "enum": [
+                                        "enabled",
+                                        "disabled",
+                                        "trial_started"
+                                    ]
+                                },
+                                "at": {
+                                    "type": "string"
+                                },
+                                "by": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            },
+                            "required": [
+                                "action",
+                                "at"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspaceCodePluginListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/WorkspaceCodePlugin"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspaceCodePluginSwitchResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "enabled"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspaceCodePluginTrialResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "trialEndsAt": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "enabled"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspaceOnboarding": {
+                "type": "object",
+                "properties": {
+                    "plugin": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "The plugin's GET route answering {data: {steps: {<id>: bool}}}"
+                    },
+                    "steps": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "title": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "blocks": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": true
+                                    }
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "blocks"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "plugin",
+                    "status",
+                    "steps"
+                ]
+            },
+            "WorkspaceOnboardingListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/WorkspaceOnboarding"
+                        }
                     }
                 },
                 "required": [

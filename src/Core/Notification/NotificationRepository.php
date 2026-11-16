@@ -76,17 +76,23 @@ final class NotificationRepository
      * only ever sees their OWN notifications; the tenant_id predicate lives in the
      * SQL literal (guard-visible) and the fixed unread filter is appended.
      *
+     * @param list<string>|null $onlyTypes   only these kinds (an Inbox tab)
+     * @param list<string>|null $exceptTypes not these kinds
      * @return list<array<string, mixed>>
      */
-    public function listForRecipient(int $tenantId, int $recipientProfileId, bool $unreadOnly, int $limit, int $offset): array
+    public function listForRecipient(int $tenantId, int $recipientProfileId, bool $unreadOnly, int $limit, int $offset, ?array $onlyTypes = null, ?array $exceptTypes = null): array
     {
-        $filter = $unreadOnly ? ' AND read_at IS NULL' : '';
+        [$types, $typeParams] = self::typeFilter($onlyTypes, $exceptTypes);
+        $filter = ($unreadOnly ? ' AND read_at IS NULL' : '') . $types;
         $stmt = $this->pdo->prepare(
             'SELECT * FROM notifications WHERE tenant_id = :tenant_id AND recipient_profile_id = :recipient' . $filter
             . ' ORDER BY id DESC LIMIT :limit OFFSET :offset'
         );
         $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
         $stmt->bindValue(':recipient', $recipientProfileId, PDO::PARAM_INT);
+        foreach ($typeParams as $name => $value) {
+            $stmt->bindValue($name, $value);
+        }
         $stmt->bindValue(':limit', max(0, $limit), PDO::PARAM_INT);
         $stmt->bindValue(':offset', max(0, $offset), PDO::PARAM_INT);
         $stmt->execute();
@@ -98,17 +104,52 @@ final class NotificationRepository
 
     /**
      * Count a recipient's inbox rows (pagination total), optionally unread-only.
+     *
+     * @param list<string>|null $onlyTypes   only these kinds (an Inbox tab)
+     * @param list<string>|null $exceptTypes not these kinds
      */
-    public function countForRecipient(int $tenantId, int $recipientProfileId, bool $unreadOnly): int
+    public function countForRecipient(int $tenantId, int $recipientProfileId, bool $unreadOnly, ?array $onlyTypes = null, ?array $exceptTypes = null): int
     {
-        $filter = $unreadOnly ? ' AND read_at IS NULL' : '';
+        [$types, $typeParams] = self::typeFilter($onlyTypes, $exceptTypes);
+        $filter = ($unreadOnly ? ' AND read_at IS NULL' : '') . $types;
         $stmt = $this->pdo->prepare(
             'SELECT COUNT(*) FROM notifications WHERE tenant_id = :tenant_id AND recipient_profile_id = :recipient' . $filter
         );
-        $stmt->execute([':tenant_id' => $tenantId, ':recipient' => $recipientProfileId]);
+        $stmt->execute([':tenant_id' => $tenantId, ':recipient' => $recipientProfileId] + $typeParams);
         $count = $stmt->fetchColumn();
 
         return $count === false ? 0 : (int) $count;
+    }
+
+    /**
+     * `AND type IN (...)` / `AND type NOT IN (...)` for the Inbox's tabs
+     * ({@see NotificationTabs}), with its parameters.
+     *
+     * @param list<string>|null $only
+     * @param list<string>|null $except
+     * @return array{0: string, 1: array<string, string>}
+     */
+    private static function typeFilter(?array $only, ?array $except): array
+    {
+        $sql = '';
+        $params = [];
+        foreach (['only' => [$only, 'IN'], 'except' => [$except, 'NOT IN']] as $name => [$types, $operator]) {
+            if ($types === null) {
+                continue;
+            }
+            if ($types === []) {
+                $sql .= $operator === 'IN' ? ' AND 1 = 0' : '';
+                continue;
+            }
+            $in = [];
+            foreach ($types as $i => $type) {
+                $in[] = ':' . $name . $i;
+                $params[':' . $name . $i] = $type;
+            }
+            $sql .= ' AND type ' . $operator . ' (' . implode(', ', $in) . ')';
+        }
+
+        return [$sql, $params];
     }
 
     /**
