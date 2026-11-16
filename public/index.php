@@ -5268,6 +5268,14 @@ $calendarInvites = \Whity\Core\Calendar\CalendarServices::invites(
     $frontendUrls,
     $logger,
 );
+// ADR 0018: a push 15 minutes before events and meetings (owner, 16 Nov 2026).
+$eventReminders = new \Whity\Core\Calendar\EventReminders(
+    $db->getPdo(),
+    new \Whity\Core\Calendar\CalendarRepository($db->getPdo()),
+    $queueService,
+    $notificationDispatcher,
+    $logger,
+);
 
 $meetingService = new \Whity\Core\Convening\MeetingService(
     $conveningBodyRepository,
@@ -5277,7 +5285,8 @@ $meetingService = new \Whity\Core\Convening\MeetingService(
     $meetingAttendanceRepository,
     // ADR 0018: a meeting's time, place and guests live on a calendar event.
     new \Whity\Core\Convening\MeetingCalendar($db->getPdo()),
-    $calendarInvites
+    $calendarInvites,
+    $eventReminders
 );
 
 $decisionRecorder = new \Whity\Core\Convening\DecisionRecorder(
@@ -5333,6 +5342,7 @@ $calendarBookingService = \Whity\Core\Calendar\CalendarServices::bookingService(
     $calendarPlugins,
     $calendarInvites,
 );
+$calendarBookingService->setReminders($eventReminders);
 // SDK 1.98: a payment step settles held bookings, a sync plugin keeps outside
 // events, through these host services.
 \Whity\register_service(\Whity\Sdk\Calendar\Bookings::class, new \Whity\Core\Calendar\HostBookings($calendarBookingService));
