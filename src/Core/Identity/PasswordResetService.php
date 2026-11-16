@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Whity\Core\Identity;
 
 use PDO;
+use Whity\Core\Security\PublicToken;
 
 /**
  * Issues and consumes self-service "forgot password" tokens
  * (WC-password-reset-2fa-recovery).
  *
- * Mirrors {@see EmailVerificationService} almost exactly — `bin2hex(random_bytes(32))`
+ * Mirrors {@see EmailVerificationService} almost exactly — `PublicToken::make(32)`
  * (256-bit token), only `sha256()` hash persisted (the raw token is returned
  * once from {@see self::issue()} and never stored), single-use via a
  * `consumed_at` marker, and issuing a new token supersedes/deletes any prior
@@ -102,8 +103,8 @@ final class PasswordResetService
             throw LocalPasswordRefusedException::forIdpBackedProfile($profileId);
         }
 
-        $rawToken  = bin2hex(random_bytes(self::TOKEN_BYTES));
-        $tokenHash = hash('sha256', $rawToken);
+        $rawToken  = PublicToken::make(self::TOKEN_BYTES);
+        $tokenHash = PublicToken::hash($rawToken);
         $expiresAt = gmdate('Y-m-d H:i:s', time() + $ttlSeconds);
 
         $ownTx = !$this->db->inTransaction();
@@ -165,7 +166,7 @@ final class PasswordResetService
             return null;
         }
 
-        $tokenHash = hash('sha256', $rawToken);
+        $tokenHash = PublicToken::hash($rawToken);
         $now       = gmdate('Y-m-d H:i:s');
 
         $ownTx = !$this->db->inTransaction();

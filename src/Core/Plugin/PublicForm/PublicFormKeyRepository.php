@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Plugin\PublicForm;
 
 use PDO;
+use Whity\Core\Security\PublicToken;
 
 /**
  * Keys that open a plugin's public form for one tenant (migration 217).
@@ -37,7 +38,7 @@ final class PublicFormKeyRepository
      */
     public function issue(int $tenantId, string $plugin, string $form, string $label, array $origins, ?int $createdBy): array
     {
-        $key = bin2hex(random_bytes(self::KEY_BYTES));
+        $key = PublicToken::make(self::KEY_BYTES);
         $stmt = $this->db->prepare(
             'INSERT INTO public_form_keys (tenant_id, plugin, form_name, key_hash, key_hint, label, allowed_origins, created_by, created_at)
              VALUES (:tenant_id, :plugin, :form_name, :key_hash, :key_hint, :label, :allowed_origins, :created_by, CURRENT_TIMESTAMP)
@@ -47,7 +48,7 @@ final class PublicFormKeyRepository
             ':tenant_id' => $tenantId,
             ':plugin' => $plugin,
             ':form_name' => $form,
-            ':key_hash' => hash('sha256', $key),
+            ':key_hash' => PublicToken::hash($key),
             ':key_hint' => substr($key, 0, 8),
             ':label' => $label,
             ':allowed_origins' => json_encode($origins, JSON_THROW_ON_ERROR),
@@ -75,7 +76,7 @@ final class PublicFormKeyRepository
         }
         // @tenant-guard-ignore: the anonymous public-form lookup — this read is what RESOLVES the tenant, from a 256-bit key under a global unique index (migration 217), on a path where the caller has no account. Everything afterwards binds the tenant_id it returns. Mirrors FormRepository::findByPublicSlug(); recorded against `public_form_keys` in TenantOwnedTables.
         $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM public_form_keys WHERE key_hash = :key_hash AND revoked_at IS NULL LIMIT 1');
-        $stmt->execute([':key_hash' => hash('sha256', $key)]);
+        $stmt->execute([':key_hash' => PublicToken::hash($key)]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row === false ? null : self::normalize($row);
