@@ -7068,6 +7068,22 @@ final class CoreApiSchemas
                 'agent_id' => self::int() + ['description' => 'For a direct chat with one of your agents.'],
                 'link' => SchemaBuilder::ref('ChatLink'),
             ], []),
+            'ChatDiscussRequest' => self::object([
+                'link' => SchemaBuilder::ref('ChatLink'),
+            ], ['link']),
+            'ChatDiscussResponse' => self::dataEnvelope([
+                'allOf' => [
+                    SchemaBuilder::ref('Chat'),
+                    self::object([
+                        'members' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMember')],
+                        'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMessage')],
+                        'has_earlier' => self::bool(),
+                        'my_member_id' => self::int(),
+                        'last_read_message_id' => self::int(),
+                        'created' => self::bool() + ['description' => 'True when this call started the chat.'],
+                    ], ['members', 'messages', 'created']),
+                ],
+            ]),
             'ChatUpdateRequest' => self::object([
                 'title' => self::str() + ['description' => 'A group\'s new name.'],
                 'link' => ['oneOf' => [SchemaBuilder::ref('ChatLink'), ['type' => 'null']], 'description' => 'What the chat is about, or null to remove the link.'],
@@ -13099,6 +13115,19 @@ final class CoreApiSchemas
                 'responses' => [
                     201 => self::jsonResponse('The chat', 'ChatDetailResponse'),
                     422 => self::errorResponse('No name, someone who is not in this workspace, or an agent that does not work for you'),
+                ] + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/chats/discuss', [
+                'mcp' => $personOnly,
+                'summary' => 'Open the chat about a board, a meeting or a record, starting it if new',
+                'description' => 'One group chat per linked board, meeting or record, named after it. You join it if you are not in it yet. '
+                    . '201 when the chat was started, 200 when it was already there; `created` says the same.',
+                'tags' => ['chat'],
+                'request' => 'ChatDiscussRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The chat it already had', 'ChatDiscussResponse'),
+                    201 => self::jsonResponse('The chat, just started', 'ChatDiscussResponse'),
+                    422 => self::errorResponse('The link is not a board, a meeting or a record with an id and a name'),
                 ] + self::authErrors(),
             ]),
             self::ungatedRoute('GET', '/api/chat/chats/{id:\d+}', [

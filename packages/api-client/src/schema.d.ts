@@ -1841,6 +1841,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/chats/discuss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open the chat about a board, a meeting or a record, starting it if new
+         * @description One group chat per linked board, meeting or record, named after it. You join it if you are not in it yet. 201 when the chat was started, 200 when it was already there; `created` says the same.
+         */
+        post: operations["post_api_v1_chat_chats_discuss"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat/chats/{id}": {
         parameters: {
             query?: never;
@@ -12330,6 +12350,20 @@ export interface components {
                     role?: string;
                     role_ar?: string;
                 }[];
+            };
+        };
+        ChatDiscussRequest: {
+            link: components["schemas"]["ChatLink"];
+        };
+        ChatDiscussResponse: {
+            data: components["schemas"]["Chat"] & {
+                members: components["schemas"]["ChatMember"][];
+                messages: components["schemas"]["ChatMessage"][];
+                has_earlier?: boolean;
+                my_member_id?: number;
+                last_read_message_id?: number;
+                /** @description True when this call started the chat. */
+                created: boolean;
             };
         };
         ChatDoneResponse: {
@@ -29737,6 +29771,102 @@ export interface operations {
                 };
             };
             /** @description No name, someone who is not in this workspace, or an agent that does not work for you */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_chats_discuss: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatDiscussRequest"];
+            };
+        };
+        responses: {
+            /** @description The chat it already had */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDiscussResponse"];
+                };
+            };
+            /** @description The chat, just started */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDiscussResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The link is not a board, a meeting or a record with an id and a name */
             422: {
                 headers: {
                     [name: string]: unknown;

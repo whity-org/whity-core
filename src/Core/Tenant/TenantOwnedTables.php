@@ -123,7 +123,6 @@ final class TenantOwnedTables
         // ignores that read the tenant from the row they find.
         'calendar_staff' => '247_create_calendar.php',
         'calendar_working_hours' => '247_create_calendar.php',
-        'calendar_availability_exceptions' => '247_create_calendar.php',
         'calendar_events' => '247_create_calendar.php',
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_service_staff' => '248_create_calendar_bookings.php',
