@@ -25,8 +25,11 @@ final class ChatAttachments
 {
     public const STORAGE_SEGMENT = 'chat';
 
-    private const COLUMNS = 'a.id, a.conversation_id, a.message_id, a.uploaded_by_profile_id, a.kind, a.storage_key, a.content_type,
-        a.byte_size, a.filename, a.width, a.height, a.duration_ms, a.transcript, a.created_at';
+    private const COLUMNS = 'a.id, a.conversation_id, a.message_id, a.uploaded_by_profile_id, a.kind, f.storage_key, f.content_type,
+        f.byte_size, f.filename, a.width, a.height, a.duration_ms, a.transcript, a.created_at';
+
+    /** The file's details live in `stored_files` (WHIT-1159, migration 299). */
+    private const FROM = 'chat_attachments a JOIN stored_files f ON f.id = a.stored_file_id AND f.tenant_id = a.tenant_id';
 
     public function __construct(
         private readonly PDO $db,
@@ -52,28 +55,34 @@ final class ChatAttachments
         }
         $transcript = isset($about['transcript']) ? trim(mb_substr((string) $about['transcript'], 0, 4000)) : null;
 
-        $key = StorageKey::build($tenantId, self::STORAGE_SEGMENT . '/' . $chatId, bin2hex(random_bytes(16)) . '.' . $checked['ext']);
-        if ($this->storage->exists($key)) {
+        // The one file store (WHIT-1159).
+        try {
+            $stored = \Whity\Core\Storage\StoredFiles::store($this->storage, $tenantId, self::STORAGE_SEGMENT, (string) $chatId, $bytes, $checked['content_type'], $checked['ext']);
+        } catch (\Whity\Storage\StorageException) {
             throw new ChatException('The file could not be stored. Please try again.', 503);
         }
-        $this->storage->put($key, $bytes, ['ContentType' => $checked['content_type']]);
+        $storedFileId = \Whity\Core\Storage\StoredFiles::remember(
+            $this->db,
+            $tenantId,
+            \Whity\Core\Storage\StoredFiles::CHAT_ATTACHMENT,
+            $stored,
+            self::safeFilename($filename, $checked['ext']),
+            $profileId,
+        );
 
-        $stmt = $this->db->prepare('INSERT INTO chat_attachments (tenant_id, conversation_id, uploaded_by_profile_id, kind, storage_key, content_type, byte_size,
-                filename, width, height, duration_ms, transcript, created_at)
-             VALUES (:tid, :cid, :pid, :kind, :key, :type, :size, :name, :w, :h, :ms, :text, NOW())
+        $stmt = $this->db->prepare('INSERT INTO chat_attachments (tenant_id, conversation_id, uploaded_by_profile_id, kind,
+                width, height, duration_ms, transcript, stored_file_id, created_at)
+             VALUES (:tid, :cid, :pid, :kind, :w, :h, :ms, :text, :stored, NOW())
              RETURNING id');
         $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
         $stmt->bindValue(':cid', $chatId, PDO::PARAM_INT);
         $stmt->bindValue(':pid', $profileId, PDO::PARAM_INT);
         $stmt->bindValue(':kind', $kind);
-        $stmt->bindValue(':key', $key);
-        $stmt->bindValue(':type', $checked['content_type']);
-        $stmt->bindValue(':size', strlen($bytes), PDO::PARAM_INT);
-        $stmt->bindValue(':name', self::safeFilename($filename, $checked['ext']));
         foreach ([':w' => $about['width'] ?? null, ':h' => $about['height'] ?? null, ':ms' => $kind === 'voice' || $kind === 'video' ? $duration : null] as $k => $v) {
             $stmt->bindValue($k, $v === null ? null : max(0, min((int) $v, 2_000_000_000)), $v === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
         }
         $stmt->bindValue(':text', $kind === 'voice' && $transcript !== '' ? $transcript : null, $kind === 'voice' && $transcript !== null && $transcript !== '' ? PDO::PARAM_STR : PDO::PARAM_NULL);
+        $stmt->bindValue(':stored', $storedFileId, PDO::PARAM_INT);
         $stmt->execute();
         $id = (int) $stmt->fetchColumn();
 
@@ -122,7 +131,7 @@ final class ChatAttachments
             return [];
         }
         $marks = implode(',', array_fill(0, count($messageIds), '?'));
-        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . " FROM chat_attachments a WHERE a.tenant_id = ? AND a.message_id IN ({$marks}) ORDER BY a.id");
+        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM ' . self::FROM . " WHERE a.tenant_id = ? AND a.message_id IN ({$marks}) ORDER BY a.id");
         $stmt->execute([$tenantId, ...$messageIds]);
         $out = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -139,7 +148,7 @@ final class ChatAttachments
      */
     public function media(int $tenantId, int $chatId, int $floorId, ?string $kind, int $limit = 60): array
     {
-        $sql = 'SELECT ' . self::COLUMNS . ' FROM chat_attachments a JOIN messages m ON m.id = a.message_id AND m.tenant_id = a.tenant_id
+        $sql = 'SELECT ' . self::COLUMNS . ' FROM ' . self::FROM . ' JOIN messages m ON m.id = a.message_id AND m.tenant_id = a.tenant_id
             WHERE a.tenant_id = :tid AND a.conversation_id = :cid AND a.message_id > :floor AND m.deleted_at IS NULL';
         $params = [':tid' => $tenantId, ':cid' => $chatId, ':floor' => $floorId];
         if ($kind === 'photos') {
@@ -164,7 +173,7 @@ final class ChatAttachments
      */
     public function row(int $tenantId, int $id): ?array
     {
-        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM chat_attachments a WHERE a.tenant_id = :tid AND a.id = :id');
+        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM ' . self::FROM . ' WHERE a.tenant_id = :tid AND a.id = :id');
         $stmt->execute([':tid' => $tenantId, ':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -220,7 +229,7 @@ final class ChatAttachments
      */
     public function deleteForMessage(int $tenantId, int $messageId): void
     {
-        $stmt = $this->db->prepare('SELECT storage_key FROM chat_attachments WHERE tenant_id = :tid AND message_id = :mid');
+        $stmt = $this->db->prepare('SELECT f.storage_key FROM ' . self::FROM . ' WHERE a.tenant_id = :tid AND a.message_id = :mid');
         $stmt->execute([':tid' => $tenantId, ':mid' => $messageId]);
         foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $key) {
             try {
@@ -228,6 +237,7 @@ final class ChatAttachments
             } catch (\Throwable) {
                 // The row goes either way; a stray object costs storage, not privacy (nothing points at it).
             }
+            \Whity\Core\Storage\StoredFiles::forget($this->db, $tenantId, (string) $key);
         }
         $this->db->prepare('DELETE FROM chat_attachments WHERE tenant_id = :tid AND message_id = :mid')
             ->execute([':tid' => $tenantId, ':mid' => $messageId]);

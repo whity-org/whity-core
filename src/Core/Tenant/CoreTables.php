@@ -220,6 +220,7 @@ final class CoreTables
         'chat_message_reactions' => '282_add_chat_message_parts.php',
         // Files, photos and voice sent in Chat (UC.10).
         'chat_attachments' => '279_create_chat_attachments.php',
+        'stored_files' => '298_create_stored_files.php',
         // Votes in chat polls (UC.5).
         'chat_poll_votes' => '280_create_chat_poll_votes.php',
         // Bots and blocked senders (UC.4, UC.12).

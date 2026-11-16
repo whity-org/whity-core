@@ -15,6 +15,9 @@ use Whity\Core\Messaging\MessagingSettings;
 use Whity\Core\Messaging\WebChat\WebChatChannel;
 use Whity\Core\Plugin\PublicForm\BotCheck;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimited;
+use Whity\Core\RateLimit\RateLimitRule;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
@@ -39,22 +42,13 @@ use Whity\Core\Security\PublicToken;
  * ABUSE. Before anything is written: per-address and per-workspace windows,
  * a hidden `website` field that people never fill, a body cap, the instance's
  * bot check (Turnstile) on starting a chat when one is set up, and at most
- * {@see MAX_OPEN_PER_IP} chats started from one address a day.
+ * {@see RateLimits::publicChatOpenPerAddress()} chats started from one address a day.
  */
 final class PublicChatApiHandler
 {
     private const SYSTEM_TENANT_ID = 0;
     private const NOT_FOUND = 'Chat is not available here';
 
-    private const WINDOW_START = 3600;
-    private const START_PER_IP = 5;
-    private const WINDOW_SEND = 600;
-    private const SEND_PER_TOKEN = 30;
-    private const WINDOW_WORKSPACE = 3600;
-    private const PER_WORKSPACE = 600;
-    private const WINDOW_POLL = 3600;
-    private const POLL_PER_TOKEN = 1500;
-    private const MAX_OPEN_PER_IP = 3;
     private const MAX_NAME = 120;
 
     public function __construct(
@@ -112,7 +106,7 @@ final class PublicChatApiHandler
     public function start(Request $request, array $params = []): Response
     {
         $ip = ClientIp::fromRequest($request);
-        if (($limited = $this->limit('chat:start:ip:', $ip, self::START_PER_IP, self::WINDOW_START)) !== null) {
+        if (($limited = $this->limit('chat:start:ip:', $ip, RateLimits::publicChatStartPerAddress())) !== null) {
             return $limited;
         }
         $workspace = $this->workspace($request, $params);
@@ -120,7 +114,7 @@ final class PublicChatApiHandler
             return Response::error(self::NOT_FOUND, 404);
         }
         $tenantId = $workspace['id'];
-        if (($limited = $this->limit('chat:ws:', (string) $tenantId, self::PER_WORKSPACE, self::WINDOW_WORKSPACE)) !== null) {
+        if (($limited = $this->limit('chat:ws:', (string) $tenantId, RateLimits::publicChatPerWorkspace())) !== null) {
             return $limited;
         }
 
@@ -141,8 +135,11 @@ final class PublicChatApiHandler
         }
 
         $ipHash = $ip !== null ? hash_hmac('sha256', $tenantId . '|' . $ip, $this->ipPepper) : null;
-        if ($ipHash !== null && $this->openFromAddress($tenantId, $ipHash) >= self::MAX_OPEN_PER_IP) {
-            return Response::error('Too many chats from this address today. Please try again tomorrow.', 429);
+        // Counted from the chats themselves over the last day, not a store key,
+        // so the wait is the whole window.
+        $openRule = RateLimits::publicChatOpenPerAddress();
+        if ($ipHash !== null && $this->openFromAddress($tenantId, $ipHash, $openRule->window) >= $openRule->limit) {
+            return RateLimited::response($openRule->window);
         }
 
         $name = trim((string) ($body['name'] ?? ''));
@@ -213,10 +210,10 @@ final class PublicChatApiHandler
         if ($visitor === null) {
             return Response::error('This chat has ended. Start a new one.', 401);
         }
-        if (($limited = $this->limit('chat:send:', (string) $visitor['id'], self::SEND_PER_TOKEN, self::WINDOW_SEND)) !== null) {
+        if (($limited = $this->limit('chat:send:', (string) $visitor['id'], RateLimits::publicChatSendPerVisitor())) !== null) {
             return $limited;
         }
-        if (($limited = $this->limit('chat:ws:', (string) $workspace['id'], self::PER_WORKSPACE, self::WINDOW_WORKSPACE)) !== null) {
+        if (($limited = $this->limit('chat:ws:', (string) $workspace['id'], RateLimits::publicChatPerWorkspace())) !== null) {
             return $limited;
         }
 
@@ -262,7 +259,7 @@ final class PublicChatApiHandler
         if ($visitor === null) {
             return Response::error('This chat has ended. Start a new one.', 401);
         }
-        if (($limited = $this->limit('chat:poll:', (string) $visitor['id'], self::POLL_PER_TOKEN, self::WINDOW_POLL)) !== null) {
+        if (($limited = $this->limit('chat:poll:', (string) $visitor['id'], RateLimits::publicChatPollPerVisitor())) !== null) {
             return $limited;
         }
 
@@ -342,12 +339,12 @@ final class PublicChatApiHandler
         ];
     }
 
-    private function openFromAddress(int $tenantId, string $ipHash): int
+    private function openFromAddress(int $tenantId, string $ipHash, int $windowSeconds): int
     {
         $stmt = $this->db->prepare(
             'SELECT COUNT(*) FROM webchat_visitors WHERE tenant_id = :tid AND ip_hash = :ip AND created_at > :since'
         );
-        $stmt->execute([':tid' => $tenantId, ':ip' => $ipHash, ':since' => gmdate('Y-m-d H:i:s', time() - 86400)]);
+        $stmt->execute([':tid' => $tenantId, ':ip' => $ipHash, ':since' => gmdate('Y-m-d H:i:s', time() - $windowSeconds)]);
 
         return (int) $stmt->fetchColumn();
     }
@@ -358,19 +355,13 @@ final class PublicChatApiHandler
         return isset($body['website']) && trim((string) $body['website']) !== '';
     }
 
-    private function limit(string $prefix, ?string $subject, int $max, int $window): ?Response
+    private function limit(string $prefix, ?string $subject, RateLimitRule $rule): ?Response
     {
         if ($subject === null || $subject === '') {
             return null;
         }
-        $key = $prefix . $subject;
-        if ($this->store->count($key) >= $max) {
-            return Response::error('Too many messages. Please wait a moment and try again.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
-        }
-        $this->store->increment($key, $window);
 
-        return null;
+        return $rule->take($this->store, $prefix . $subject);
     }
 
     private function rollBack(bool $own): void

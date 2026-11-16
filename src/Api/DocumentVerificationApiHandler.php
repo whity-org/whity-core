@@ -13,6 +13,7 @@ use Whity\Core\Document\Qr\DocumentQrService;
 use Whity\Core\Document\Qr\VerificationPresenter;
 use Whity\Core\Document\Routing\RouteEventRepository;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\SettingsService;
@@ -72,19 +73,6 @@ use Whity\Core\Store\SharedStoreInterface;
  */
 final class DocumentVerificationApiHandler
 {
-    /**
-     * Throttle: fixed window, per-IP, shared with nothing else.
-     *
-     * 60 an hour is generous for the real use — a person scanning documents at a
-     * counter — and useless for enumeration: at that rate, working through a
-     * 2^256 namespace is not a threat model, it is a joke. The limit is defence
-     * in DEPTH behind the token's entropy, exactly as it is on the invitation
-     * accept endpoint, and its real job is bounding the write and read work one
-     * address can commission.
-     */
-    private const WINDOW_SECONDS = 3600;
-    private const IP_MAX = 60;
-
     public function __construct(
         private readonly DocumentQrService $qr,
         private readonly DocumentRepository $documents,
@@ -306,7 +294,13 @@ final class DocumentVerificationApiHandler
     }
 
     /**
-     * Per-IP ceiling, counted before the token is examined.
+     * Per-IP ceiling, counted before the token is examined
+     * ({@see \Whity\Core\RateLimit\RateLimits::documentVerificationPerAddress()}).
+     *
+     * 60 an hour is generous for the real use, a person scanning documents at a
+     * counter, and useless for enumeration against a 2^256 namespace. The limit
+     * is defence in depth behind the token's entropy; its real job is bounding
+     * the work one address can commission.
      *
      * Counted first so the boundary carries no information about whether a token
      * was real — the same discipline, and the same shared-store counter shape,
@@ -325,14 +319,6 @@ final class DocumentVerificationApiHandler
             return null;
         }
 
-        $key = 'docqr:verify:ip:' . $ip;
-        if ($this->store->count($key) >= self::IP_MAX) {
-            return Response::error('Too many attempts. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
-        }
-
-        $this->store->increment($key, self::WINDOW_SECONDS);
-
-        return null;
+        return RateLimits::documentVerificationPerAddress()->take($this->store, 'docqr:verify:ip:' . $ip);
     }
 }

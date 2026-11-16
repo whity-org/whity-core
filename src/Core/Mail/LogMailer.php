@@ -8,7 +8,7 @@ use Psr\Log\LoggerInterface;
 
 /**
  * Logging mailer (WC-235) — writes each message to the PSR-3 logger instead of
- * delivering it. Selected with MAIL_TRANSPORT=log.
+ * delivering it. Selected with the `mail.transport` setting `log`.
  *
  * Intended for development and single-host self-service deployments without an
  * SMTP relay: an operator recovers a verification link from the application log.
