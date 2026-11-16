@@ -127,3 +127,45 @@ export interface ChatDirectory {
     role_ar: string;
   }[];
 }
+
+/**
+ * One chat (UC.1, WHIT-1093): an item of the one Chat list, `GET /api/v1/chat/inbox`.
+ * A team chat carries the {@link ChatSummary} fields; a customer conversation
+ * its channel, status, contact and assignee. Both kinds share the
+ * conversation id, so `/chat?c=<id>` opens either.
+ */
+export interface CustomerLastMessage {
+  from: 'customer' | 'team';
+  body: string;
+  by_agent: boolean;
+  author: ChatPerson | null;
+}
+
+export interface CustomerChatItem {
+  id: number;
+  kind: 'customer';
+  type: 'customer';
+  title: string | null;
+  channel: string;
+  status: 'open' | 'pending' | 'closed';
+  subject: string | null;
+  contact: { name: string | null; address: string };
+  customer: ChatPerson | null;
+  assignee: ChatPerson | null;
+  waiting_since: string | null;
+  unread: number;
+  pinned: boolean;
+  last_message: CustomerLastMessage | null;
+  last_message_at: string | null;
+  created_at: string | null;
+}
+
+export type TeamChatItem = ChatSummary & { kind: 'team'; pinned: boolean };
+
+export type ChatInboxItem = TeamChatItem | CustomerChatItem;
+
+export interface ChatInbox {
+  data: ChatInboxItem[];
+  /** Whether customer conversations are in the list (messages.read). */
+  customers: boolean;
+}

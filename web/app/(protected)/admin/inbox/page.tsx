@@ -310,7 +310,7 @@ export default function InboxPage() {
           onRowClick={(row) => {
             // Messages (ADR 0016): a conversation assigned to the caller.
             if (row.resource_type === 'conversation' && row.resource_id) {
-              router.push(`/admin/messages?c=${encodeURIComponent(row.resource_id)}`);
+              router.push(`/chat?c=${encodeURIComponent(row.resource_id)}&k=customer`);
               return;
             }
             const meta = routingMeta(row);

@@ -94,7 +94,7 @@ export function PhoneNav() {
       { id: 'booking', navId: 'calendar', icon: 'calendar', label: t('phoneNav.create.booking', 'New booking') },
       { id: 'contact', navId: 'contacts', icon: 'customer', label: t('phoneNav.create.contact', 'New contact') },
       { id: 'task', navId: 'tasks', icon: 'list-todo', label: t('phoneNav.create.task', 'New task') },
-      { id: 'message', navId: 'messages', icon: 'mail', label: t('phoneNav.create.message', 'New message') },
+      { id: 'message', navId: 'chat', icon: 'comment', label: t('phoneNav.create.message', 'New message') },
       { id: 'catalog', navId: 'forms-catalog', icon: 'form', label: t('phoneNav.create.form', 'Fill a form') },
     ],
     [t],

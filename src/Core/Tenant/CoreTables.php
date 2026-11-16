@@ -66,6 +66,7 @@ final class CoreTables
         'calendar_service_staff' => '248_create_calendar_bookings.php',
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_staff' => '247_create_calendar.php',
+        'calendar_view_preferences' => '278_create_calendar_view_preferences.php',
         'calendar_working_hours' => '247_create_calendar.php',
         'contact_import_changes' => '261_create_contacts.php',
         'contact_imports' => '261_create_contacts.php',
@@ -214,6 +215,8 @@ final class CoreTables
         'messaging_settings' => '245_create_webchat_and_messaging_settings.php',
         'chats' => '253_create_team_chat.php',
         'chat_members' => '253_create_team_chat.php',
+        // One chat (UC.1): each person's pins and read marks on any conversation.
+        'chat_person_state' => '281_create_chat_person_state.php',
         'tenant_settings' => '025_create_tenant_settings.php',
         'tenant_storage_config' => '053_create_tenant_storage_config.php',
         'tenants' => '001_create_users_roles.php',

@@ -1394,6 +1394,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/day-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count live bookings a day, by person, room and service, for up to a year
+         * @description For the Year view: each row is one day, person, room and service with its count. Days are the workspace's calendar dates.
+         */
+        get: operations["get_api_v1_calendar_day_counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/events": {
         parameters: {
             query?: never;
@@ -1431,6 +1451,27 @@ export interface paths {
         head?: never;
         /** Change an event; fields left out keep their value */
         patch: operations["patch_api_v1_calendar_events_id"];
+        trace?: never;
+    };
+    "/api/v1/calendar/my-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read your own calendar choices: view, Colour by, people and rooms shown */
+        get: operations["get_api_v1_calendar_my_view"];
+        /**
+         * Change your own calendar choices; fields left out keep their value, null forgets one
+         * @description Only changes what you see. Everyone else keeps their own choices.
+         */
+        put: operations["put_api_v1_calendar_my_view"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/calendar/rooms": {
@@ -1827,6 +1868,60 @@ export interface paths {
         get: operations["get_api_v1_chat_directory"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The one Chat list: your team chats and the workspace's customer conversations
+         * @description Customer conversations are included for people who may read them (messages.read): open and waiting ones, closed ones for 30 days, and any you pinned. Newest activity first.
+         */
+        get: operations["get_api_v1_chat_inbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox/{id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pin a chat or customer conversation to the top of your list, or unpin it */
+        post: operations["post_api_v1_chat_inbox_id_pin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a customer conversation read up to a message, for you */
+        post: operations["post_api_v1_chat_inbox_id_read"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11104,6 +11199,14 @@ export interface components {
             customer: components["schemas"]["CalendarBookingCustomer"];
             /** @description Refuse a time outside working hours. Always on for agents. */
             keep_to_hours?: boolean;
+            /** @description Staff only: a length other than the service's, such as a time dragged across on the grid. */
+            duration_minutes?: number;
+            /** @description Email the customer a confirmation. Default true. */
+            notify?: boolean;
+            /** @description Book even though the person is busy then (a taken room or closed hours still refuse). Never for agents. */
+            book_anyway?: boolean;
+            /** @description Refuse a time outside the person's working hours, without the booking window's notice rules. */
+            within_hours?: boolean;
         };
         CalendarBookingCustomer: {
             /** @description An existing customer or member of this workspace. */
@@ -11120,12 +11223,28 @@ export interface components {
             profile_id?: number;
             /** @description Refuse a time outside working hours. Always on for agents. */
             keep_to_hours?: boolean;
+            /** @description A new length, such as pulling the bottom edge on the grid. Default: keep the booking's length. */
+            duration_minutes?: number;
+            /** @description Email the customer the new time. Default true. */
+            notify?: boolean;
+            /** @description Move even though the person is busy then (a taken room or closed hours still refuse). Never for agents. */
+            book_anyway?: boolean;
+            /** @description Refuse a time outside the person's working hours, without the booking window's notice rules. */
+            within_hours?: boolean;
         };
         CalendarBookingSuggestRequest: {
             /** @description The time to suggest, ISO 8601 with an offset. */
             starts_at: string;
             /** @description Suggest another person. Default: the same one. */
             profile_id?: number;
+        };
+        CalendarDayCount: {
+            /** @description The workspace's calendar date, YYYY-MM-DD. */
+            date: string;
+            profile_id: number;
+            room_id: number | null;
+            service_id: number;
+            count: number;
         };
         CalendarEvent: {
             id: number;
@@ -11335,6 +11454,30 @@ export interface components {
             /** @description Reminders sent that day. */
             reminders_sent: number;
         };
+        CalendarViewChoices: {
+            /**
+             * @description The view last chosen: Day, 4 days, Week, Month, Year, or 3 days on a phone.
+             * @enum {string}
+             */
+            view?: "day" | "four_days" | "week" | "month" | "year" | "three_days";
+            /**
+             * @description What colours mean for this person: the person, the service, or the room or branch.
+             * @enum {string}
+             */
+            colour_by?: "person" | "service" | "room";
+            /** @description The date in view, YYYY-MM-DD. */
+            date?: string;
+            /** @description Staff profile ids unticked in the panel. */
+            hidden_people?: number[];
+            /** @description Room ids unticked in the panel. */
+            hidden_rooms?: number[];
+            /** @description Service ids unticked in the panel. */
+            hidden_services?: number[];
+            /** @description What else the calendar shows besides bookings. */
+            also_show?: ("team_events" | "time_off" | "cancelled")[];
+            /** @description The person opened the app's sidebar on the calendar, so it stays open there. */
+            sidebar_open?: boolean;
+        };
         CapabilityDenial: {
             /** @enum {string} */
             code: "no-resource" | "no-route" | "forbidden";
@@ -11433,6 +11576,44 @@ export interface components {
             /** @description True while the chat is open in a focused window; false when it stops. */
             focused?: boolean;
         };
+        ChatInboxItem: {
+            /** @description The conversation id; /chat?c=<id> opens it whatever its kind. */
+            id: number;
+            /** @enum {string} */
+            kind: "team" | "customer";
+            /** @enum {string} */
+            type: "group" | "direct" | "customer";
+            title?: string | null;
+            pinned: boolean;
+            unread: number;
+            with?: components["schemas"]["ChatMember"] | null;
+            people_count?: number;
+            agents_count?: number;
+            link?: components["schemas"]["ChatLink"] | null;
+            /** @description Customer conversations: email, webchat or a plugin channel. */
+            channel?: string;
+            /** @enum {string} */
+            status?: "open" | "pending" | "closed";
+            subject?: string | null;
+            contact?: {
+                name?: string | null;
+                address: string;
+            };
+            customer?: components["schemas"]["MessagingPerson"] | null;
+            assignee?: components["schemas"]["MessagingPerson"] | null;
+            /** @description The customer wrote last and nobody has answered since. */
+            waiting_since?: string | null;
+            last_message?: {
+                [key: string]: unknown;
+            } | null;
+            last_message_at?: string | null;
+            created_at?: string | null;
+        };
+        ChatInboxResponse: {
+            data: components["schemas"]["ChatInboxItem"][];
+            /** @description Whether the list includes customer conversations (messages.read). */
+            customers: boolean;
+        };
         ChatLink: {
             /** @enum {string} */
             type: "board" | "meeting" | "record";
@@ -11514,6 +11695,10 @@ export interface components {
         ChatPerson: {
             id: number;
             name: string;
+        };
+        ChatPinRequest: {
+            /** @description False unpins; true by default. */
+            pinned?: boolean;
         };
         ChatPostRequest: {
             /** @description The message, in plain words, at most 4000 characters. */
@@ -25672,7 +25857,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description That time was just taken */
+            /** @description That time was just taken; `reason` says why when known: person_busy (Book anyway is possible), room_taken or closed */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -25782,6 +25967,87 @@ export interface operations {
                 };
             };
             /** @description Not a request */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_day_counts: {
+        parameters: {
+            query: {
+                /** @description Start of the range, ISO 8601 with an offset, such as `2026-11-16T00:00:00+03:00`. */
+                from: string;
+                /** @description End of the range (exclusive), with an offset. At most 62 days after `from`. */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarDayCount"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A missing or reversed range, or more than a year */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -26047,6 +26313,153 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CalendarEventResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_my_view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your choices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarViewChoices"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_calendar_my_view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarViewChoices"];
+            };
+        };
+        responses: {
+            /** @description Your choices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarViewChoices"];
+                    };
                 };
             };
             /** @description Invalid request body */
@@ -28463,6 +28876,231 @@ export interface operations {
                 };
             };
             /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_inbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatInboxResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_inbox_id_pin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatPinRequest"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDoneResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_inbox_id_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDoneResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
             404: {
                 headers: {
                     [name: string]: unknown;

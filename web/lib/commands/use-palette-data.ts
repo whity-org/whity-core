@@ -83,7 +83,7 @@ export function toWaitingEntries(
         hint: row.item.subtitle ?? '',
         href:
           row.item.resource_type === 'conversation' && row.item.resource_id
-            ? `/admin/messages?c=${encodeURIComponent(row.item.resource_id)}`
+            ? `/chat?c=${encodeURIComponent(row.item.resource_id)}&k=customer`
             : meta === null
               ? null
               : routingHref(meta),

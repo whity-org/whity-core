@@ -24,7 +24,7 @@
  * sized for are over 50); Month shows a count per day that opens the day.
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { useLocalizedUnits } from '@/hooks/useLocalizedUnits';
 import Link from 'next/link';
 import { AdminHeader } from '@/components/admin/admin-header';
@@ -60,6 +60,7 @@ import { EventDialog } from './event-dialog';
 import { useCalendarAccess, useCalendarBasics } from './use-calendar-basics';
 import { useCalendarWords } from './use-calendar-words';
 import { useNewIntent } from '@/lib/commands/new-intent';
+import { CalendarDesktop } from './calendar-desktop';
 
 const EVERYONE = 'everyone';
 /** The workspace's first day, as the ISO weekday the calendar's words take. */
@@ -83,7 +84,7 @@ export function CalendarScreen() {
     return <NoAccess area={t('area', 'the calendar')} permission="calendar:read" />;
   }
 
-  if (!basics.error && basics.data !== null) return <CalendarBody basics={basics.data} />;
+  if (!basics.error && basics.data !== null) return <CalendarByWidth basics={basics.data} />;
 
   return (
     <div className="space-y-4">
@@ -107,6 +108,24 @@ export function CalendarScreen() {
       )}
     </div>
   );
+}
+
+const NARROW = '(max-width: 767px)';
+
+function subscribeNarrow(onChange: () => void): () => void {
+  if (typeof window.matchMedia !== 'function') return () => undefined;
+  const query = window.matchMedia(NARROW);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
+
+/**
+ * From 768px the calendar is design 3.5's (CV.1–CV.7, `CalendarDesktop`);
+ * narrower, the phone's layout (PwCalendar) until CV.11 is built (WHIT-1103).
+ */
+function CalendarByWidth({ basics }: { basics: NonNullable<ReturnType<typeof useCalendarBasics>['data']> }) {
+  const narrow = useSyncExternalStore(subscribeNarrow, isNarrow, () => false);
+  return narrow ? <CalendarBody basics={basics} /> : <CalendarDesktop basics={basics} />;
 }
 
 function CalendarBody({

@@ -130,6 +130,8 @@ final class TenantOwnedTables
         'calendar_bookings' => '248_create_calendar_bookings.php',
         // Design 3.3: rooms a service needs, filtered by branch.
         'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
+        // Design 3.5: each person's own calendar view choices (CV.2, CV.4).
+        'calendar_view_preferences' => '278_create_calendar_view_preferences.php',
 
         // WHIT-953 — contacts and their spreadsheet imports (design 3.3 A8).
         // Every query binds tenant_id.
@@ -151,6 +153,8 @@ final class TenantOwnedTables
         // Team chat (CH.1, CH.2): a team chat and its people and agents.
         'chats' => '253_create_team_chat.php',
         'chat_members' => '253_create_team_chat.php',
+        // One chat (UC.1): each person's pins and read marks on any conversation.
+        'chat_person_state' => '281_create_chat_person_state.php',
 
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says

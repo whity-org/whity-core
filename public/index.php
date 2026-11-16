@@ -1142,18 +1142,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // granting person may decide them, so there is nobody a permission
         // could usefully keep out.
     ];
-    $items[] = [
-        'id' => 'messages',
-        'label' => 'Messages',
-        'href' => '/admin/messages',
-        'icon' => 'messages',
-        'group' => 'overview',
-        'order' => 7,
-        // After Calendar (6).
-        // ADR 0016: conversations with customers. Gated like its routes: the list
-        // is the workspace's, not the caller's own.
-        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::MESSAGES_READ,
-    ];
+    // One chat (design 3.5, UC.1, WHIT-1093): customer conversations moved
+    // into Chat, so there is no Messages item; /admin/messages redirects there.
     $items[] = [
         'id' => 'my-messages',
         'label' => 'Messages',
@@ -1170,9 +1160,12 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'href' => '/chat',
         'icon' => 'comment',
         'group' => 'overview',
-        'order' => 9,
-        // Team chat (CH.1): the team's own chats, people and agents together.
-        // Ungated like its routes; shown to the people who work here, never to
+        // After Approvals (3) and the forms items (4, 5), where Messages (7)
+        // and Chat (9) stood: one item now, as the 3.5 cards draw it.
+        'order' => 6,
+        // One chat (UC.1): the team's chats, people and agents together, and
+        // for people who may read them the customer conversations. Ungated
+        // like its routes; shown to the people who work here, never to
         // customers.
         'visibleIf' => 'chat-for-staff',
     ];
@@ -5291,6 +5284,9 @@ $calendarHandler = new \Whity\Api\CalendarApiHandler(
 );
 $router->register('GET',    '/api/calendar/settings',                       [$calendarHandler, 'getSettings'],     null, null, CorePermissions::CALENDAR_READ);
 $router->register('PUT',    '/api/calendar/settings',                       [$calendarHandler, 'putSettings'],     null, null, CorePermissions::CALENDAR_MANAGE);
+// Design 3.5: each person's own calendar choices (view, Colour by, ticks).
+$router->register('GET',    '/api/calendar/my-view',                        [$calendarHandler, 'getMyView'],       null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/my-view',                        [$calendarHandler, 'putMyView'],       null, null, CorePermissions::CALENDAR_READ);
 $router->register('GET',    '/api/calendar/staff',                          [$calendarHandler, 'listStaff'],       null, null, CorePermissions::CALENDAR_READ);
 $router->register('PUT',    '/api/calendar/staff/{profileId:\d+}',          [$calendarHandler, 'putStaff'],        null, null, CorePermissions::CALENDAR_MANAGE);
 // A person's ICS feed URL: shown once when turned on; turning it on again
@@ -5310,6 +5306,8 @@ $router->register('GET',    '/api/calendar/availability',                   [$ca
 $router->register('GET',    '/api/calendar/bookings',                       [$calendarHandler, 'listBookings'],    null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/bookings',                       [$calendarHandler, 'createBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('GET',    '/api/calendar/bookings/{id:\d+}',              [$calendarHandler, 'showBooking'],     null, null, CorePermissions::CALENDAR_READ);
+// Design 3.5 Year view: live bookings a day, up to a year at a time.
+$router->register('GET',    '/api/calendar/day-counts',                     [$calendarHandler, 'dayCounts'],       null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/move',         [$calendarHandler, 'moveBooking'],     null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/cancel',       [$calendarHandler, 'cancelBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
 // Design 3.3: rooms, requests (Accept, Suggest another time), check-in, Today.
@@ -5735,13 +5733,23 @@ $router->register('POST',  '/api/messages/settings/inbound-secret',       [$mess
 $chatRepository = new \Whity\Core\Chat\ChatRepository($db->getPdo());
 // WHIT-1077: each chat line is pushed to the chat's other people who have a
 // device on and aren't looking at that chat.
-$chatHandler = new \Whity\Api\ChatApiHandler(new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core\Chat\ChatPushNotifier(
+$chatService = new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core\Chat\ChatPushNotifier(
     $notificationDispatcher,
     $chatRepository,
     new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
     new \Whity\Core\Store\DatabaseSharedStore($db->getPdo()),
     $logger,
-)));
+));
+// One chat (UC.1, WHIT-1093): team chats and, for people with messages.read,
+// the customer conversations, in one list with each person's pins.
+$chatHandler = new \Whity\Api\ChatApiHandler(
+    $chatService,
+    new \Whity\Core\Chat\ChatInbox($db->getPdo(), $chatService),
+    $permissionResolver,
+);
+$router->register('GET',    '/api/chat/inbox',                                  [$chatHandler, 'inbox'],         null);
+$router->register('POST',   '/api/chat/inbox/{id:\d+}/pin',                     [$chatHandler, 'pin'],           null);
+$router->register('POST',   '/api/chat/inbox/{id:\d+}/read',                    [$chatHandler, 'readCustomer'],  null);
 $router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null);
 $router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null);

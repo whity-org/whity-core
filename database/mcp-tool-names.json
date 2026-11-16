@@ -311,9 +311,17 @@
     "en": "Get a booking",
     "ar": "عرض حجز"
   },
+  "get_api_calendar_day_counts": {
+    "en": "Count bookings a day",
+    "ar": "عدّ الحجوزات في كل يوم"
+  },
   "get_api_calendar_events": {
     "en": "List calendar events",
     "ar": "عرض أحداث التقويم"
+  },
+  "get_api_calendar_my_view": {
+    "en": "Read your own calendar choices",
+    "ar": "عرض اختياراتك في التقويم"
   },
   "get_api_calendar_rooms": {
     "en": "List rooms",
@@ -1763,6 +1771,10 @@
   "post_api_workspace_plugins_validate": {
     "en": "Check a workspace plugin's definition",
     "ar": "التحقق من تعريف إضافة"
+  },
+  "put_api_calendar_my_view": {
+    "en": "Change your own calendar choices",
+    "ar": "تغيير اختياراتك في التقويم"
   },
   "put_api_calendar_settings": {
     "en": "Change the calendar settings",
