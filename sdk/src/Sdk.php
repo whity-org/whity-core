@@ -1320,7 +1320,8 @@ namespace Whity\Sdk;
  * one of its own integer settings counting what the workspace has (Whity for Salons: chairs). The
  * host buys that many, and changes the subscription's quantity when the count changes.
  * {@see Billing\QuantityCheckout} is the optional portal interface for a checkout of several of
- * one price (WHIT-1152).
+ * one price (WHIT-1152). {@see Setup\WorkspaceSetup} also reaches bookings (list, create, check in)
+ * and contacts (list, create), for a salon's walk-ins and commission (WHIT-1154).
  *
  * Purely additive.)
  * Breaking changes require a new major version.
