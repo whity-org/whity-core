@@ -43,7 +43,7 @@ final class EditorStartersUpgradeRealEngineTest extends TestCase
         $this->db->forceConnect();
     }
 
-    public function testUpgradingFrom0219SeedsTheStartersAndConvertsOldTemplates(): void
+    public function testUpgradingFrom0219SeedsTheStarters(): void
     {
         $classes = SchemaFromMigrations::migrationClassesFrom(self::FIRST_AFTER_0_2_19);
         foreach (array_reverse($classes) as $class) {
@@ -52,10 +52,6 @@ final class EditorStartersUpgradeRealEngineTest extends TestCase
         self::assertFalse($this->hasColumn('document_sources', 'theme'), 'the schema is back before migration 171');
 
         $this->pdo->exec("INSERT INTO tenants (id, name, slug) VALUES (1, 'Example Bakery', 'bakery'), (2, 'Example Clinic', 'clinic')");
-        $this->pdo->exec(
-            "INSERT INTO document_templates (tenant_id, name, data, scope, is_system, starter_key, created_at, updated_at)
-             VALUES (1, 'Delivery note', '{\"elements\":[]}', 'tenant', FALSE, NULL, '2026-01-10 09:00:00', '2026-01-11 09:00:00')"
-        );
 
         foreach ($classes as $class) {
             $class::up($this->db);
@@ -64,10 +60,28 @@ final class EditorStartersUpgradeRealEngineTest extends TestCase
         $expected = count((new DocumentSourceStarterSeeder(new DocumentSourceRepository($this->pdo)))->starters());
         self::assertSame($expected, $this->starters(1), "workspace 1 has every starter");
         self::assertSame($expected, $this->starters(2), "workspace 2 has every starter");
-        self::assertSame(1, (int) $this->scalar(
-            'SELECT COUNT(*) FROM document_sources WHERE tenant_id = 1 AND legacy_template_id IS NOT NULL'
-        ), 'the old template was converted');
         self::assertTrue($this->hasColumn('document_sources', 'theme'));
+    }
+
+    /**
+     * WHIT-1053: the old designer's converter is gone, so a database that still
+     * has old templates is refused, with the way through, before anything changes.
+     */
+    public function testADatabaseThatStillHasOldTemplatesIsToldToUpgradeThrough0229First(): void
+    {
+        $classes = SchemaFromMigrations::migrationClassesFrom(self::FIRST_AFTER_0_2_19);
+        foreach (array_reverse($classes) as $class) {
+            $class::down($this->db);
+        }
+        $this->pdo->exec("INSERT INTO tenants (id, name, slug) VALUES (1, 'Example Bakery', 'bakery')");
+        $this->pdo->exec(
+            "INSERT INTO document_templates (tenant_id, name, data, scope, is_system, starter_key, created_at, updated_at)
+             VALUES (1, 'Delivery note', '{\"elements\":[]}', 'tenant', FALSE, NULL, '2026-01-10 09:00:00', '2026-01-11 09:00:00')"
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Upgrade to Whity 0.2.29 first');
+        $classes[0]::up($this->db);
     }
 
     public function testTheRepairSeedsOnlyWorkspacesWithNoStarters(): void

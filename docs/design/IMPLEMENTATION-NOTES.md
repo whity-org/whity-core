@@ -1230,3 +1230,19 @@ The owner kept all five defaults ("Keep defaults"):
 | Typing and seen | The existing 5-second polling, no websocket. |
 
 Built as WHIT-1093 to WHIT-1099 (#2011, #2017, #2019, #2020, #2022, #2023), migrations 279 to 283; #2011 and #2017 merged first as 281 and 282 and ran on app.whity.dev before the final numbers were set, so they keep them. Still to build for A17's "done when": one conversation per customer across channels (a WhatsApp reply and an email reply in the same conversation), payment links, booking times and forms in customer chats, and Forward and Turn into a task.
+
+## Legacy code and when it goes (WHIT-1053, 16 Nov 2026)
+
+Every legacy path in core, and the condition that removes it. The owner said on 16 Nov there are no customers to carry, so a path whose condition is met goes now.
+
+**Removed (WHIT-1053):**
+- **The old Document designer converter** (`Document/Legacy`: `LegacyTemplateConverter`, `LegacyTemplateMigrator`, `ConversionLabels`, about 33 KB). Migration 165 used it once to convert old templates. Every install has run 165, and a new install has no old templates, so 165 now refuses, with the way through, a database that still has them: upgrade to 0.2.29 first.
+- **The form draft's localStorage fallback** (`whity:form-draft:<id>` in `use-form-draft.ts`). Drafts have been kept on the server since migration 210.
+- **`DelegationRepository::GRANTEE_USER`**, a deprecated alias with the same value as `GRANTEE_PROFILE`. Its callers now use `GRANTEE_PROFILE`.
+- **`MailerFactory::fromEnv()`** and the `MAIL_TRANSPORT` environment fallback. Nothing called it; the transport comes from the `mail.transport` setting.
+- **The TOTP re-encryptor's AES-256-CBC path** (WC-158). No two-step secret on app.whity.dev is in that scheme (none exist at all). A row in it is now counted as unreadable and left as it is. `whity-cli totp reencrypt` still moves secrets onto the current key after a rotation.
+
+**Kept, with the condition that removes it:**
+- **`capabilities-context`'s `hasPermission`**, a deprecated alias for `has`, used in 58 web files. Remove it in one mechanical PR that moves every caller to `has`, when no other change is touching those screens.
+- **SDK `DocumentRenderer::issue`, `SdkDocumentRenderer` and `DeferredSdkDocumentRenderer`**, deprecated since SDK 1.49 for removal in SDK 2.0.0. 2.0.0 needs a target release from the owner (asked 16 Nov).
+- **`document_sources.legacy_template_id` and `documents.document_template_id`.** These aren't code paths: they record which old template a document came from, for history.
