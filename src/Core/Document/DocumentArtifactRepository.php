@@ -53,10 +53,20 @@ final class DocumentArtifactRepository
      */
     public function create(int $tenantId, array $rec): int
     {
+        // WHIT-1159: the file's own row in the one file store (shared with the
+        // upload it came from, when it was claimed from a form).
+        $storedFileId = \Whity\Core\Storage\StoredFiles::remember(
+            $this->db,
+            $tenantId,
+            \Whity\Core\Storage\StoredFiles::DOCUMENT_ARTIFACT,
+            $rec,
+            null,
+            $rec['rendered_by'] ?? null,
+        );
         $stmt = $this->db->prepare(
             'INSERT INTO document_artifacts
-                 (tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, pages, rendered_at)
-             VALUES (:tenant_id, :document_id, :storage_key, :content_type, :byte_size, :checksum_sha256, :rendered_by, :pages, NOW())'
+                 (tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, pages, stored_file_id, rendered_at)
+             VALUES (:tenant_id, :document_id, :storage_key, :content_type, :byte_size, :checksum_sha256, :rendered_by, :pages, :stored_file_id, NOW())'
         );
         $stmt->execute([
             ':tenant_id'       => $tenantId,
@@ -67,6 +77,7 @@ final class DocumentArtifactRepository
             ':checksum_sha256' => $rec['checksum_sha256'],
             ':rendered_by'     => $rec['rendered_by'] ?? null,
             ':pages'           => $rec['pages'] ?? null,
+            ':stored_file_id'  => $storedFileId,
         ]);
 
         return (int) $this->db->lastInsertId();

@@ -52,15 +52,25 @@ final class ChatAttachments
         }
         $transcript = isset($about['transcript']) ? trim(mb_substr((string) $about['transcript'], 0, 4000)) : null;
 
-        $key = StorageKey::build($tenantId, self::STORAGE_SEGMENT . '/' . $chatId, bin2hex(random_bytes(16)) . '.' . $checked['ext']);
-        if ($this->storage->exists($key)) {
+        // The one file store (WHIT-1159).
+        try {
+            $stored = \Whity\Core\Storage\StoredFiles::store($this->storage, $tenantId, self::STORAGE_SEGMENT, (string) $chatId, $bytes, $checked['content_type'], $checked['ext']);
+        } catch (\Whity\Storage\StorageException) {
             throw new ChatException('The file could not be stored. Please try again.', 503);
         }
-        $this->storage->put($key, $bytes, ['ContentType' => $checked['content_type']]);
+        $key = $stored['storage_key'];
+        $storedFileId = \Whity\Core\Storage\StoredFiles::remember(
+            $this->db,
+            $tenantId,
+            \Whity\Core\Storage\StoredFiles::CHAT_ATTACHMENT,
+            $stored,
+            self::safeFilename($filename, $checked['ext']),
+            $profileId,
+        );
 
         $stmt = $this->db->prepare('INSERT INTO chat_attachments (tenant_id, conversation_id, uploaded_by_profile_id, kind, storage_key, content_type, byte_size,
-                filename, width, height, duration_ms, transcript, created_at)
-             VALUES (:tid, :cid, :pid, :kind, :key, :type, :size, :name, :w, :h, :ms, :text, NOW())
+                filename, width, height, duration_ms, transcript, stored_file_id, created_at)
+             VALUES (:tid, :cid, :pid, :kind, :key, :type, :size, :name, :w, :h, :ms, :text, :stored, NOW())
              RETURNING id');
         $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
         $stmt->bindValue(':cid', $chatId, PDO::PARAM_INT);
@@ -74,6 +84,7 @@ final class ChatAttachments
             $stmt->bindValue($k, $v === null ? null : max(0, min((int) $v, 2_000_000_000)), $v === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
         }
         $stmt->bindValue(':text', $kind === 'voice' && $transcript !== '' ? $transcript : null, $kind === 'voice' && $transcript !== null && $transcript !== '' ? PDO::PARAM_STR : PDO::PARAM_NULL);
+        $stmt->bindValue(':stored', $storedFileId, PDO::PARAM_INT);
         $stmt->execute();
         $id = (int) $stmt->fetchColumn();
 
@@ -228,6 +239,7 @@ final class ChatAttachments
             } catch (\Throwable) {
                 // The row goes either way; a stray object costs storage, not privacy (nothing points at it).
             }
+            \Whity\Core\Storage\StoredFiles::forget($this->db, $tenantId, (string) $key);
         }
         $this->db->prepare('DELETE FROM chat_attachments WHERE tenant_id = :tid AND message_id = :mid')
             ->execute([':tid' => $tenantId, ':mid' => $messageId]);
