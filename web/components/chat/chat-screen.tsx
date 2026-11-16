@@ -288,7 +288,7 @@ export function ChatScreen() {
   }
 
   return (
-    <div className="relative flex h-[calc(100dvh-8.5rem)] min-h-[32rem] overflow-hidden rounded-card border border-border bg-card">
+    <div className="relative flex h-[calc(100dvh-8.5rem)] min-h-[32rem] overflow-hidden rounded-card border border-border bg-card max-sm:min-h-0 max-sm:rounded-none max-sm:border-0">
       <ChatList
         t={t}
         items={items}
@@ -480,7 +480,7 @@ function ChatList({
           clearLabel={t('list.clear', 'Clear search')}
           placeholder={t('list.search', 'Search chats')}
         />
-        <div role="tablist" aria-label={t('list.show', 'Show')} className="flex flex-wrap gap-1.5">
+        <div role="tablist" aria-label={t('list.show', 'Show')} className="flex flex-wrap gap-1.5 max-sm:-mx-4 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:px-4 max-sm:[scrollbar-width:none]">
           {tabs.map((tb) => (
             <button
               key={tb.value}
@@ -489,7 +489,7 @@ function ChatList({
               aria-selected={tab === tb.value}
               onClick={() => onTab(tb.value)}
               className={cn(
-                'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm',
+                'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm max-sm:h-10 max-sm:text-base',
                 tab === tb.value ? 'border-primary-tint bg-primary-tint font-medium text-primary-tint-foreground' : 'border-border text-foreground hover:bg-muted'
               )}
             >
@@ -893,8 +893,10 @@ function OpenChat({
             <h1 className="truncate text-base font-semibold">{chat.title}</h1>
             <p className="truncate text-sm text-muted-foreground">{subtitle(chat, t)}</p>
           </div>
-          <IconButton icon="search" label={t('search.open', 'Search in this chat')} pressed={side?.kind === 'search'} onClick={() => toggleSide('search')} />
+          {/* On a phone the header keeps Back, the chat and its details (UC.13); search and pin stay on the computer. */}
+          <IconButton icon="search" label={t('search.open', 'Search in this chat')} className="max-sm:hidden" pressed={side?.kind === 'search'} onClick={() => toggleSide('search')} />
           <IconButton
+            className="max-sm:hidden"
             icon="star"
             label={pinned ? t('pin.off', 'Unpin this chat') : t('pin.on', 'Pin this chat to the top')}
             pressed={pinned}
@@ -1755,7 +1757,7 @@ function Composer({
           }}
           aria-label={t('compose.label', 'Message')}
           placeholder={placeholder ?? t('compose.placeholderShort', 'Message {name}', { name: chat.title })}
-          className="min-h-10 flex-1 resize-none border-0 bg-transparent p-0 py-2 text-base shadow-none focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none md:text-base"
+          className="max-h-36 min-h-10 flex-1 resize-none overflow-y-auto border-0 bg-transparent p-0 py-2 text-base shadow-none [field-sizing:content] focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none max-sm:text-lg md:text-base"
         />
         {!editing && draft.trim() === '' && ready.length === 0 && (
           <Button type="button" variant="ghost" size="icon" aria-label={t('voice.record', 'Record a voice message')} onClick={() => setRecording(true)}>
@@ -1863,7 +1865,7 @@ function ThreadPane({
       {root === null ? (
         <Skeleton className="h-24 w-full" />
       ) : (
-        <div className="-mx-4 -mt-4 flex min-h-full flex-col">
+        <div className="-mx-4 -mt-4 -mb-4 flex flex-1 flex-col">
           <div className="grid gap-3 px-4 pt-4">
             <MessageRow t={t} api={api} message={root} chat={chat} myId={myId} layout={layout} readMarks={readMarks} actions={local} inThread onMessage={setRoot} onNotice={setNotice} />
             <div className="flex items-center gap-3 text-sm text-muted-foreground" role="separator">

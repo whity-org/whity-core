@@ -498,7 +498,7 @@ export function CustomerChat({
                     ? tc('customer.replyTo', 'Reply to {name} by {channel}', { name: firstName, channel })
                     : t('messages.composer.noteHint', 'Write a note. Only your team sees it.')
                 }
-                className="min-h-10 flex-1 resize-none border-0 bg-transparent p-0 py-2 text-base shadow-none focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none md:text-base"
+                className="max-h-36 min-h-10 flex-1 resize-none overflow-y-auto border-0 bg-transparent p-0 py-2 text-base shadow-none [field-sizing:content] focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none max-sm:text-lg md:text-base"
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault();
@@ -591,8 +591,13 @@ function CustomerMessageItem({
   const pending = isPending(message);
   const failed = message.status === 'failed';
   const bot = (message.source ?? '').startsWith('bot.');
+  // A bot is named by its rule; the Bot tag beside it says what it is.
   const author = bot
-    ? tc('bot.name', 'Bot')
+    ? message.source === 'bot.away'
+      ? tc('bots.away', 'Away reply')
+      : message.source === 'bot.welcome'
+        ? tc('bots.welcome', 'Welcome')
+        : tc('bot.name', 'Bot')
     : message.by_agent
       ? t('messages.byAgent', 'Agent for {name}', { name: message.author?.name ?? '' })
       : message.author?.name ?? t('messages.workspace', 'Your team');
@@ -629,7 +634,7 @@ function CustomerMessageItem({
               {note && <span className="text-muted-foreground">{tc('customer.noteOnly', 'Only the team sees this')}</span>}
             </p>
           )}
-          <p dir="auto" className="whitespace-pre-wrap break-words text-start text-foreground">{message.body}</p>
+          <p dir="auto" className="whitespace-pre-wrap break-words text-start text-foreground max-sm:text-lg">{message.body}</p>
           {message.attachments_not_shown > 0 && (
             <p className="text-xs text-muted-foreground">{t('messages.attachments', '{n} attachment(s) not shown', { n: message.attachments_not_shown })}</p>
           )}
@@ -816,13 +821,14 @@ export function ChatSidePane({
       className="absolute inset-0 z-20 flex min-h-0 flex-col bg-card md:inset-y-0 md:start-auto md:end-0 md:w-[22.5rem] md:border-s md:border-border md:shadow-lg xl:static xl:z-auto xl:shrink-0 xl:shadow-none"
     >
       <header className="flex items-start gap-2 border-b border-border px-4 py-3">
+        <IconButton icon="chevron-left" label={closeLabel} className="md:hidden rtl:rotate-180" onClick={onClose} />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-semibold">{title}</h2>
           {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
         </div>
-        <IconButton icon="close" label={closeLabel} onClick={onClose} />
+        <IconButton icon="close" label={closeLabel} className="max-md:hidden" onClick={onClose} />
       </header>
-      <div className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto p-4">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">{children}</div>
     </aside>
   );
 }

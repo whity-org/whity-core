@@ -802,7 +802,8 @@ final class ChatService
                 'pinned' => ($r['pinned_at'] ?? null) !== null,
                 'edited' => ($r['edited_at'] ?? null) !== null,
                 'deleted' => $deleted,
-                'can_edit' => $mine && !$deleted,
+                // A poll, a record or files without words have nothing to edit.
+                'can_edit' => $mine && !$deleted && (string) $r['body_text'] !== '' && !is_array($meta['block'] ?? null),
                 'can_delete' => $mine && !$deleted && $sent !== false && time() - $sent <= self::DELETE_WINDOW_SECONDS,
             ];
 
@@ -1040,6 +1041,9 @@ final class ChatService
     {
         $this->personOnly($viewer);
         [$message] = $this->ownMessage($tenantId, $viewer, $messageId);
+        if ((string) $message['body_text'] === '' || is_array($message['chat_meta']['block'] ?? null)) {
+            throw new ChatException('A poll, a record or files without words have nothing to edit.');
+        }
         $body = trim($body);
         if ($body === '') {
             throw new ChatException('The message is empty. To take it back, remove the message instead.');
