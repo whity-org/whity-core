@@ -239,7 +239,22 @@ final class QueueWorkCommand implements CliCommand
                 )),
                 false
             );
-            $runner ??= new JobRunner($repo, $registry, $this->logger);
+            if ($runner === null) {
+                $runner = new JobRunner($repo, $registry, $this->logger);
+                // WHIT-1123: a plugin's jobs don't run where it is off.
+                $activation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($pdo);
+                // WHIT-1125: and pause while a paid plugin is read-only there.
+                $activation->usePaidAccess(static fn (): array => $loaded->loader?->getPaidAccess() ?? []);
+                $entitlements = new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo));
+                $activation->useEntitlements(static function (int $tenantId, string $key) use ($entitlements): bool {
+                    try {
+                        return $entitlements->isGranted($tenantId, $key);
+                    } catch (\Throwable) {
+                        return false;
+                    }
+                });
+                $runner->setWorkspaceActivation($activation);
+            }
         }
         $this->repo = $repo;
         $this->runner = $runner;

@@ -39,6 +39,9 @@ final class HostNotifier implements Notifier
         private readonly array $types,
         private readonly \Closure $tenant,
         private readonly ?LoggerInterface $logger = null,
+        // WHIT-1123: true when the plugin is off for the workspace; then
+        // nothing is sent. Null: always sends, as before.
+        private readonly ?\Closure $offFor = null,
     ) {
     }
 
@@ -75,6 +78,11 @@ final class HostNotifier implements Notifier
             throw new \InvalidArgumentException("This plugin has not declared the notification type {$type}.");
         }
         self::assertText($notice);
+        if ($this->offFor !== null && ($this->offFor)($tenantId) === true) {
+            $this->logger?->info('Notification not sent: the plugin is off for this workspace', ['plugin' => $this->slug, 'tenant_id' => $tenantId]);
+
+            return 0;
+        }
         // Checked once up front: the per-person catch below must not swallow it.
         SideEffectGuard::assertAllowed('Sending a notification');
 

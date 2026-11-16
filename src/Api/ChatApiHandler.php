@@ -86,9 +86,12 @@ final class ChatApiHandler
             if ($this->messaging->conversations()->find($t, $conversation) === null) {
                 return Response::error('Chat not found', 404);
             }
-            $built = $this->customerBlocks->build($t, JsonBody::parsed($request));
+            $body = JsonBody::parsed($request);
+            $built = $this->customerBlocks->build($t, $body);
+            // UC.3: by the channel "Send by" chose, else where the customer last wrote.
+            $sendBy = is_string($body['channel'] ?? null) && $body['channel'] !== '' ? $body['channel'] : null;
             try {
-                $message = $this->messaging->reply($t, $conversation, $v->profileId, $built['text'], false, 'staff.reply', ['block' => $built['block']]);
+                $message = $this->messaging->reply($t, $conversation, $v->profileId, $built['text'], false, 'staff.reply', ['block' => $built['block']], $sendBy);
             } catch (MessagingException $e) {
                 // Its plain sentence, written for people; the detail stays in the log.
                 error_log('[ChatApiHandler] customer block not sent: ' . $e->getMessage());
@@ -299,6 +302,27 @@ final class ChatApiHandler
             }
 
             return Response::json(['data' => $this->chat->show($t, $v, $id)], 201);
+        });
+    }
+
+    /**
+     * "Discuss in chat" from a board, a meeting or a record (merge map C2): the
+     * chat linked to it, started if new. 201 when it was started, 200 when it
+     * was already there.
+     *
+     * @param array<string, string> $params
+     */
+    public function discuss(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request): Response {
+            $body = JsonBody::parsed($request);
+            $link = self::linkOf($body['link'] ?? null);
+            if ($link === null) {
+                return Response::error('link is a board, a meeting or a record, with its id and name.', 422);
+            }
+            $found = $this->chat->discuss($t, $v, $link);
+
+            return Response::json(['data' => $this->chat->show($t, $v, $found['id']) + ['created' => $found['created']]], $found['created'] ? 201 : 200);
         });
     }
 

@@ -93,7 +93,7 @@ use Whity\Sdk\Sdk;
  * the SDK plugin contract ({@see \Whity\Sdk\PluginInterface}, WC-162), and
  * registers their routes, permissions, and hooks.
  */
-class PluginLoader
+class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
 {
     /** Arguments and messages kept per plugin prompt, and the length of each message (SDK 1.80). */
     private const MAX_PROMPT_ITEMS = 20;
@@ -235,6 +235,12 @@ class PluginLoader
      * than a gap, which is part of why the worker's went unnoticed.
      */
     private ?AuditLogger $auditLogger = null;
+
+    /**
+     * Which workspaces have each code plugin on (WHIT-1122). Null means every
+     * plugin is on everywhere, as before.
+     */
+    private ?\Whity\Core\Plugin\Workspace\CodePluginActivation $workspaceActivation = null;
 
     /**
      * @var HookManager|null Hook manager instance
@@ -527,6 +533,182 @@ class PluginLoader
     public function setLicenceSales(HostLicenceSales $licenceSales): void
     {
         $this->licenceSales = $licenceSales;
+    }
+
+    /** Switch plugins on and off per workspace (WHIT-1122). */
+    public function setWorkspaceActivation(\Whity\Core\Plugin\Workspace\CodePluginActivation $activation): void
+    {
+        $this->workspaceActivation = $activation;
+    }
+
+    /**
+     * Is this plugin off for the current request's workspace (WHIT-1122)?
+     * The system workspace and work with no workspace see every plugin on.
+     *
+     * @param string $pluginKey The plugin's stable identity (original FQCN).
+     */
+    public function isOffForWorkspace(string $pluginKey, ?int $tenantId = null): bool
+    {
+        if ($this->workspaceActivation === null) {
+            return false;
+        }
+        $plugin = $this->registeredPlugins[$pluginKey]['plugin'] ?? null;
+        if ($plugin === null) {
+            return false;
+        }
+
+        // Read-only still shows: its pages and reads keep working (WHIT-1125).
+        return !$this->workspaceActivation->isVisible($plugin->getName(), $tenantId);
+    }
+
+    /**
+     * What a paid plugin's screens should say about its access in the current
+     * workspace, or null when there is nothing to say.
+     *
+     * @return array{state: string, reason: ?string, graceUntil: ?string}|null
+     */
+    private function screenAccessNote(string $pluginName): ?array
+    {
+        if ($this->workspaceActivation === null || $this->workspaceActivation->paidAccessOf($pluginName) === null) {
+            return null;
+        }
+        $state = $this->workspaceActivation->stateFor($pluginName);
+        if (!in_array($state['reason'], ['grace', 'lapsed', 'installation_unlicensed', 'installation_grace'], true)) {
+            return null;
+        }
+
+        return ['state' => $state['state'], 'reason' => $state['reason'], 'graceUntil' => $state['graceUntil']];
+    }
+
+    /**
+     * Is this plugin paused for the workspace: off, or read-only because its
+     * paid access ended (WHIT-1125)? Its hooks, jobs and notifications stop.
+     */
+    public function isPausedForWorkspace(string $pluginKey, ?int $tenantId = null): bool
+    {
+        if ($this->workspaceActivation === null) {
+            return false;
+        }
+        $plugin = $this->registeredPlugins[$pluginKey]['plugin'] ?? null;
+        if ($plugin === null) {
+            return false;
+        }
+
+        return !$this->workspaceActivation->isOn($plugin->getName(), $tenantId);
+    }
+
+    /** @var array<string, array{entitlement: string, product: string, trialDays: int}>|null */
+    private ?array $paidAccess = null;
+
+    private string $paidAccessFingerprint = '';
+
+    /**
+     * Every active paid plugin's declaration (SDK 1.107), by plugin name. A
+     * malformed one is logged and the plugin is treated as paid with no way in
+     * but the operator's "free for every workspace": failing open would give a
+     * paid plugin away.
+     *
+     * @return array<string, array{entitlement: string, product: string, trialDays: int}>
+     */
+    public function getPaidAccess(): array
+    {
+        // Rebuilt whenever the set of loaded plugins changes (load, reload,
+        // enable, uninstall), so a worker never serves a stale declaration.
+        $fingerprint = implode('|', array_keys($this->registeredPlugins));
+        if ($this->paidAccess !== null && $this->paidAccessFingerprint === $fingerprint) {
+            return $this->paidAccess;
+        }
+        $this->paidAccessFingerprint = $fingerprint;
+        $paid = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $plugin = $info['plugin'];
+            if (!$plugin instanceof \Whity\Sdk\PluginAccessInterface) {
+                continue;
+            }
+            $name = $plugin->getName();
+            try {
+                $declared = $plugin->getAccess();
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getAccess');
+                $declared = [];
+            }
+            if ($declared === null) {
+                continue;
+            }
+            $slug = \Whity\Sdk\PluginNamespace::slug($name);
+            $entitlement = $declared['entitlement'] ?? '';
+            $product = $declared['product'] ?? '';
+            $trialDays = $declared['trialDays'] ?? 0;
+            // The entitlement must be a boolean key of the plugin's own shape
+            // (`front_office.access`); pointing at someone else's only gives
+            // the plugin away, so the shape is all that is checked here.
+            // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+            if (!is_string($entitlement) || preg_match('/^[a-z][a-z0-9_-]*\.[a-z0-9._-]+$/', $entitlement) !== 1 || !is_string($product) || preg_match('/^plugin\.[a-z0-9][a-z0-9._-]{0,127}$/', $product) !== 1 || !is_int($trialDays) || $trialDays < 0 || $trialDays > 90) {
+                $this->logWarning("[Plugin:{$pluginKey}] getAccess(): the declaration is malformed; the plugin is paid with no way in but 'free for every workspace'.");
+                // No entitlement can grant it and no trial: only the operator's switch.
+                $paid[$name] = ['entitlement' => '', 'product' => 'plugin.' . $slug, 'trialDays' => 0];
+                continue;
+            }
+            $paid[$name] = ['entitlement' => $entitlement, 'product' => $product, 'trialDays' => $trialDays];
+        }
+
+        return $this->paidAccess = $paid;
+    }
+
+    /**
+     * Tell a plugin a workspace turned it on or off (SDK 1.107). A throw is
+     * logged and doesn't undo the switch.
+     */
+    public function notifyWorkspaceSwitch(string $pluginName, int $tenantId, bool $enabled): void
+    {
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $plugin = $info['plugin'];
+            if ($plugin->getName() !== $pluginName || !$plugin instanceof \Whity\Sdk\PluginWorkspaceLifecycleInterface) {
+                continue;
+            }
+            try {
+                $enabled ? $plugin->onWorkspaceEnabled($tenantId) : $plugin->onWorkspaceDisabled($tenantId);
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, $enabled ? 'onWorkspaceEnabled' : 'onWorkspaceDisabled');
+            }
+        }
+    }
+
+    public function isPluginOffForWorkspace(string $pluginName, ?int $tenantId = null): bool
+    {
+        return $this->workspaceActivation !== null && !$this->workspaceActivation->isOn($pluginName, $tenantId);
+    }
+
+    public function isToolsetOffForWorkspace(?string $toolset, ?int $tenantId = null): bool
+    {
+        if ($this->workspaceActivation === null || $toolset === null || $toolset === '') {
+            return false;
+        }
+        foreach ($this->registeredPlugins as $info) {
+            $name = $info['plugin']->getName();
+            $root = \Whity\Mcp\Tools\CoreToolsets::pluginToolsetId($name);
+            if ($root !== '' && \Whity\Mcp\Tools\ToolSurface::isWithin($toolset, $root)) {
+                return !$this->workspaceActivation->isOn($name, $tenantId);
+            }
+        }
+
+        return false;
+    }
+
+    public function isClassOffForWorkspace(string $class, ?int $tenantId = null): bool
+    {
+        if ($this->workspaceActivation === null) {
+            return false;
+        }
+        $class = ltrim($class, '\\');
+        foreach ($this->registeredPlugins as $info) {
+            $prefix = rtrim($info['namespacePrefix'], '\\');
+            if ($prefix !== '' && str_starts_with($class, $prefix . '\\')) {
+                return !$this->workspaceActivation->isOn($info['plugin']->getName(), $tenantId);
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -5242,7 +5424,18 @@ class PluginLoader
                 continue;
             }
 
+            if ($this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+
+            // A paid plugin in grace or read-only says so on its own screens
+            // (WHIT-1127); the people using it are rarely the ones who buy it.
+            $access = $this->screenAccessNote($info['plugin']->getName());
+
             foreach ($info['frontendFeatures'] as $feature) {
+                if ($access !== null) {
+                    $feature['pluginAccess'] = $access;
+                }
                 $features[] = $feature;
             }
         }
@@ -5267,6 +5460,10 @@ class PluginLoader
 
             $lifecycle = $this->lifecycles[$pluginKey] ?? null;
             if ($lifecycle === null || !$lifecycle->isActive()) {
+                continue;
+            }
+
+            if ($this->isOffForWorkspace($pluginKey)) {
                 continue;
             }
 
@@ -5404,6 +5601,23 @@ class PluginLoader
                 return Response::error('Plugin temporarily unavailable', 503);
             }
 
+            // Off for this workspace (WHIT-1122): it isn't there at all. The
+            // answer is the same as for a route that doesn't exist, so a
+            // workspace can't learn what another workspace has turned on.
+            if ($this->isOffForWorkspace($pluginKey)) {
+                return Response::error('Not Found', 404, ['reason' => 'plugin_off']);
+            }
+
+            // Read-only after paid access ended (WHIT-1125): reads keep
+            // working, nothing can be changed until access is back.
+            if (!in_array(strtoupper($request->getMethod()), ['GET', 'HEAD', 'OPTIONS'], true)
+                && $this->workspaceActivation !== null
+                && ($plugin = $this->registeredPlugins[$pluginKey]['plugin'] ?? null) !== null
+                && $this->workspaceActivation->stateFor($plugin->getName())['state'] === \Whity\Core\Plugin\Workspace\CodePluginActivation::STATE_READ_ONLY
+            ) {
+                return Response::error('This plugin is read-only until its access is renewed', 402, ['reason' => 'plugin_read_only']);
+            }
+
             try {
                 $result = $handler($request, $params);
 
@@ -5461,6 +5675,12 @@ class PluginLoader
                 return $data;
             }
 
+            // Off for the workspace this event belongs to (WHIT-1123): the
+            // listener doesn't run, and the data passes through unchanged.
+            if ($this->isPausedForWorkspace($pluginKey, self::hookTenant($context))) {
+                return $data;
+            }
+
             try {
                 $result = $callback($data, $context);
                 $lifecycle?->recordSuccess();
@@ -5500,6 +5720,10 @@ class PluginLoader
                 return;
             }
 
+            if ($this->isPausedForWorkspace($pluginKey, self::hookTenant($context))) {
+                return;
+            }
+
             try {
                 $callback($data, $context);
                 $lifecycle?->recordSuccess();
@@ -5514,6 +5738,20 @@ class PluginLoader
                 $this->handlePluginThrowable($pluginKey, $e, 'hook callback');
             }
         };
+    }
+
+    /**
+     * The workspace a hook event belongs to: the event's own `tenant_id` when
+     * it names one (a job or a CLI run has no request workspace), else the
+     * current request's.
+     *
+     * @param array<mixed> $context
+     */
+    private static function hookTenant(array $context): ?int
+    {
+        $tenant = $context['tenant_id'] ?? null;
+
+        return is_int($tenant) ? $tenant : \Whity\Core\Tenant\TenantContext::getTenantId();
     }
 
     /**

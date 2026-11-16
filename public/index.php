@@ -882,19 +882,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     // the permission its own screen's primary fetch requires, so a link somebody
     // can see is a link that works.
     //
-    // The hrefs point at `/admin/x/{featureId}`, the descriptor host, because
-    // these screens are `screen:'blocks'` descriptors rather than hand-written
-    // pages ({@see \Whity\Core\Form\FormFrontendFeatures}) — which is what lets
-    // the desktop and mobile clients render them at all.
+    // The hrefs keep their `/admin/x/...` addresses, which the web app's own
+    // form pages answer. The `screen:'blocks'` descriptors that once drew these
+    // screens are gone (WHIT-1049): every client draws the React pages.
     //
     // Registered HERE rather than left to PluginNavigationBridge: that bridge
-    // reads PluginLoader, and these descriptors are core's, not a plugin's. The
+    // reads PluginLoader, and these screens are core's, not a plugin's. The
     // ids therefore carry no `plugin-` prefix, and cannot collide with one.
     $items[] = [
         'id' => 'forms-builder',
         'label' => 'Form Builder',
         'icon' => 'forms',
-        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::BUILDER_ID,
+        'href' => '/admin/x/forms-builder',
         'group' => 'documents',
         // Group-local, a unique positive integer (#1007/#1010 — a fractional
         // order is silently skipped by a regroup that matches integers, and a
@@ -911,7 +910,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'id' => 'forms-catalog',
         'label' => 'Forms',
         'icon' => 'clipboard-list',
-        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::CATALOG_ID,
+        'href' => '/admin/x/forms-catalog',
         'group' => 'documents',
         'order' => 6,
         // Mirrors GET /api/v1/forms and /api/v1/form-submissions, both gated
@@ -922,7 +921,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'id' => 'my-form-submissions',
         'label' => 'My Submissions',
         'icon' => 'file-check',
-        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::MY_SUBMISSIONS_ID,
+        'href' => '/admin/x/my-form-submissions',
         'group' => 'overview',
         // In `overview` beside Dashboard (1) and Inbox (2) rather than in
         // `records`: this is a surface a person opens about THEIR OWN work, like
@@ -938,7 +937,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // their workspace has opened a form to them. Same page, so never both.
         'id' => 'member-forms',
         'label' => 'Forms',
-        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::CATALOG_ID,
+        'href' => '/admin/x/forms-catalog',
         'icon' => 'forms',
         'group' => 'overview',
         'order' => 5,
@@ -2080,6 +2079,9 @@ $router->register('DELETE', '/api/users/{id:\d+}/memberships/{membershipId:\d+}'
 // catalogue and role grants hide other workspaces' plugin permissions.
 $tenantPluginRepository = new \Whity\Core\Plugin\Tenant\TenantPluginRepository($db->getPdo());
 $tenantManifestHost = new \Whity\Core\Plugin\Tenant\TenantManifestHost($tenantPluginRepository, $permissionRegistry, $logger);
+// WHIT-1122: installed code plugins, switched on per workspace.
+$codePluginActivation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($db->getPdo());
+$pluginLoader->setWorkspaceActivation($codePluginActivation);
 
 $rolesHandler = new RolesApiHandler(
     $db->getPdo(),
@@ -2211,14 +2213,6 @@ $router->register('POST', '/api/me/permitted-actions', [$permittedActionsHandler
 // fails host validation is dropped fail-closed with a structured, secret-free
 // reason (feature id + validator errors) — never leaked to the client.
 
-// FORMS (migrations 127/128): core's own `screen:'blocks'` descriptors — the
-// form builder, the form catalogue, and one person's own submissions. They are
-// passed as the fifth argument rather than being hand-written React pages
-// because the desktop and mobile clients render descriptors and cannot render a
-// bespoke page, and they go through the SAME per-caller permission filter and
-// the same fail-closed block validation as any plugin's. See
-// FormFrontendFeatures and FrontendFeaturesApiHandler::allFeatures().
-
 // #convening: CORE-declared `screen:'blocks'` features. The loader's validator
 // refuses any PLUGIN descriptor gated on a core permission ("core names are not
 // plugin-ownable"), which is right for a plugin and left core with nowhere to
@@ -2260,10 +2254,7 @@ $frontendFeaturesHandler = new FrontendFeaturesApiHandler(
     // #1044: core's own declarations answer in the caller's language.
     $serverLabels,
     $logger,
-    array_merge(
-        \Whity\Core\Form\FormFrontendFeatures::all(),
-        \Whity\Core\Convening\ConveningFeatures::all($router)
-    ),
+    \Whity\Core\Convening\ConveningFeatures::all($router),
     $tenantManifestHost
 );
 $router->register('GET', '/api/frontend/features', [$frontendFeaturesHandler, 'list'], null);
@@ -2360,6 +2351,16 @@ $router->register('POST', '/api/workspace-plugins/test', [$tenantPluginVersionsH
 $router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions', [$tenantPluginVersionsHandler, 'versions'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}', [$tenantPluginVersionsHandler, 'version'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}/activate', [$tenantPluginVersionsHandler, 'activate'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_PUBLISH);
+
+// Installed code plugins, switched on per workspace (WHIT-1122).
+$workspaceCodePluginsHandler = new \Whity\Api\WorkspaceCodePluginsApiHandler($pluginLoader, $codePluginActivation, $db->getPdo(), $auditLogger);
+$router->register('GET', '/api/workspace/code-plugins', [$workspaceCodePluginsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/enable', [$workspaceCodePluginsHandler, 'enable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
+$router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/disable', [$workspaceCodePluginsHandler, 'disable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_DISABLE);
+$router->register('GET', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/history', [$workspaceCodePluginsHandler, 'history'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/trial', [$workspaceCodePluginsHandler, 'trial'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
+$router->register('GET', '/api/plugins/workspace-access', [$workspaceCodePluginsHandler, 'accessList'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('PUT', '/api/plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/workspace-access', [$workspaceCodePluginsHandler, 'setAccess'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
 
 // Health monitoring endpoint (WC-4). Registered UNVERSIONED so load-balancer
 // probes that target GET /api/health never break regardless of the API version.
@@ -2871,6 +2872,31 @@ $router->register('POST', '/api/instance/complete-setup', [$instanceHandler, 'co
 $entitlementService = new \Whity\Core\Entitlement\EntitlementService(
     new \Whity\Core\Entitlement\TenantEntitlementRepository($db->getPdo())
 );
+// WHIT-1125: paid plugins. A workspace may use one its plan or add-on grants,
+// during its trial or grace, or when the operator made it free for everyone.
+// One installed from the store also needs this installation's store licence.
+$codePluginActivation->usePaidAccess(static fn (): array => $pluginLoader->getPaidAccess());
+$codePluginActivation->useEntitlements(static function (int $tenantId, string $key) use ($entitlementService): bool {
+    try {
+        return $entitlementService->isGranted($tenantId, $key);
+    } catch (\Throwable) {
+        return false; // an undeclared entitlement grants nothing
+    }
+});
+$codePluginRecords = new \Whity\Core\Plugin\PluginRecords($db->getPdo());
+$codePluginActivation->useInstallLicence(static function (string $plugin) use ($codePluginRecords, $hostStoreLicence): ?string {
+    $install = $codePluginRecords->install($plugin);
+    $slug = $install['store_slug'] ?? null;
+    if (($install['source'] ?? null) !== 'store' || !is_string($slug) || $slug === '') {
+        return null;
+    }
+
+    return $hostStoreLicence->status($slug)->state;
+});
+\Whity\register_service(\Whity\Sdk\Billing\WorkspaceAddons::class, new \Whity\Core\Plan\HostWorkspaceAddons($db->getPdo(), $codePluginActivation, $auditLogger)); // @phpstan-ignore-line
+// WHIT-1129 (SDK 1.108): packs set a workspace up through core's own routes,
+// as the person acting there, limited to WorkspaceSetup::ROUTES.
+\Whity\register_service(\Whity\Sdk\Setup\WorkspaceSetup::class, new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker)); // @phpstan-ignore-line
 // EM.1: workspace emails carry the workspace's brand, and white-label by plan.
 $brandedEmailSender->useBranding(new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService));
 $tenantEntitlementsHandler = new \Whity\Api\TenantEntitlementsApiHandler(
@@ -5711,9 +5737,9 @@ $router->register('POST', '/api/public/signup/workspaces/{workspace}', [$publicS
 // MESSAGES (ADR 0016, WHIT-938): conversations with customers by email and web
 // chat, one send API for every core module, channels a store plugin can add,
 // and outbound messages metered in warn mode. (The calendar's booking emails
-// and reminders don't use it: they go to the Mailer through
-// EmailBookingMessenger, and a plugin reminder channel joins through
-// CalendarPlugins::addReminderChannel().)
+// keep their own templates through EmailBookingMessenger; booking reminders
+// by text go through here, on every channel a plugin adds: C4,
+// BookingTextReminders.)
 // Plugin channels join this registry when plugins load below.
 $messageChannelRegistry = new \Whity\Core\Messaging\MessageChannelRegistry();
 \Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannelRegistry);
@@ -5738,6 +5764,12 @@ $jobsRegistry->register(
 $inboxSourceRegistry->registerCoreSource(
     \Whity\Core\Messaging\MessagesInboxSource::KEY,
     new \Whity\Core\Messaging\MessagesInboxSource($messagingService->conversations())
+);
+// Merge map C3: an agent's chat lines held for the person ("Ask first") wait
+// in Waiting for me too, and open their chat, where they are decided.
+$inboxSourceRegistry->registerCoreSource(
+    \Whity\Core\Chat\HeldLinesInboxSource::KEY,
+    new \Whity\Core\Chat\HeldLinesInboxSource($db->getPdo())
 );
 $messagingSettings = new \Whity\Core\Messaging\MessagingSettings($db->getPdo(), $secretStore);
 $messagesHandler = new \Whity\Api\MessagesApiHandler($messagingService, $messagingSettings);
@@ -5803,6 +5835,8 @@ $router->register('GET',    '/api/chat/bots',                                   
 $router->register('PUT',    '/api/chat/bots/{kind:[a-z]+}',                     [$chatHandler, 'bots'],          null);
 $router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null);
 $router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null);
+// Merge map C2: "Discuss in chat" opens the record's one chat, or starts it.
+$router->register('POST',   '/api/chat/chats/discuss',                          [$chatHandler, 'discuss'],       null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null);
 $router->register('PATCH',  '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'update'],        null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'messages'],      null);
@@ -6170,7 +6204,10 @@ CorePrompts::register($promptRegistry);
 // Collected from the grants as they stand at boot and on every reload, and asked
 // again on every call, so a revoke applies at once.
 $agentContextGrants = new \Whity\Core\Plugin\Trust\AgentContextGrants($db->getPdo(), new \Whity\Core\Plugin\Trust\CodePluginVerification($db->getPdo(), $storeMarks), $auditLogger);
-$agentContextGranted = static fn (string $plugin): bool => $agentContextGrants->isGranted($plugin);
+// Asked on every call: granted agent context by the operator, and on for the
+// caller's workspace (WHIT-1123).
+$agentContextGranted = static fn (string $plugin): bool => $agentContextGrants->isGranted($plugin)
+    && !$pluginLoader->isPluginOffForWorkspace($plugin);
 $agentContextGrantedNow = static function () use ($agentContextGrants): \Closure {
     $names = array_flip($agentContextGrants->granted());
 
@@ -6237,6 +6274,8 @@ $router->register('POST',   '/api/taskaat/connect',          [$taskaatHandler, '
 $router->register('POST',   '/api/taskaat/connect/complete', [$taskaatHandler, 'complete'],   null, null, CorePermissions::TASKS_MANAGE);
 $router->register('DELETE', '/api/taskaat/connection',       [$taskaatHandler, 'disconnect'], null, null, CorePermissions::TASKS_MANAGE);
 // Tasks and Boards read and written through Taskaat's record tools (TplTasks, TplBoard).
+// ADR 0018: tasks due show on the calendar, read from Taskaat when asked for.
+$calendarHandler->setTaskDueDates(new \Whity\Core\Taskaat\TaskDueDates($taskaatClient, $logger));
 $tasksHandler = new \Whity\Api\TasksApiHandler(
     $taskaatClient,
     new \Whity\Core\Taskaat\TaskPeople($db->getPdo(), new \Whity\Core\Agent\AgentRepository($db->getPdo())),
@@ -6280,6 +6319,7 @@ $mcpToolCatalogue = static function () use ($toolDeriver, $authoredMcpTools): ar
 $mcpToolsAdminHandler = new McpToolsAdminHandler($toolDeriver, $roleChecker, $authoredMcpTools, $mcpEnabledPluginAlwaysOn);
 $router->register('GET', '/api/admin/mcp/tools', [$mcpToolsAdminHandler, 'list'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 $mcpToolsListHandler = new ToolsListHandler($toolDeriver, $roleChecker, $tokenValidator, $authoredMcpTools);
+$mcpToolsListHandler->setWorkspaceGate($pluginLoader);
 $mcpServerEnabled = (bool) filter_var($_ENV['MCP_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
 // WHIT-784: an agent's Ask-first call is stored for its person to approve.
 $agentProposals = new \Whity\Core\Agent\AgentProposalRepository(
@@ -6317,6 +6357,7 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
 $mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters);
+$mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.
@@ -6651,6 +6692,12 @@ $pluginLoader->setInboxSources($inboxSourceRegistry);
 $pluginLoader->setMessageChannels($messageChannelRegistry);
 // A plugin's booking payment step and calendar busy times (SDK 1.98, ADR 0017).
 $pluginLoader->setCalendarPlugins($calendarPlugins);
+// WHIT-1123: what plugins add to these registries disappears in a workspace
+// that has the plugin off.
+$agentPresetRegistry->setWorkspaceGate($pluginLoader);
+$calendarPlugins->setWorkspaceGate($pluginLoader);
+$inboxSourceRegistry->setWorkspaceGate($pluginLoader);
+$messageChannelRegistry->setWorkspaceGate($pluginLoader);
 // WHIT-1011: plugin SERVICE routes accept a client-credentials token from the
 // trusted issuer (SERVICE_TOKEN_ISSUER, else MCP_OAUTH_ISSUER) for a client on
 // SERVICE_TOKEN_CLIENTS. Off, so no service route opens, until both are set.
@@ -6762,7 +6809,7 @@ if ($isWorker) {
         // are gated behind development/DEBUG. Decision is computed once per
         // iteration and captured by the request closure below.
         $logLifecycle = WorkerRuntime::shouldLogLifecycle($_ENV);
-        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry, $publicFormGate) {
+        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry, $publicFormGate, $codePluginActivation) {
             try {
                 // Dispatch request start hook
                 if ($logLifecycle) {
@@ -6882,6 +6929,7 @@ if ($isWorker) {
                 \Whity\Core\Http\AfterResponse::reset();
                 // WHIT-760: the workspace-plugin reads are per request too.
                 $tenantManifestHost->resetRequest();
+                $codePluginActivation->resetRequest();
                 // WHIT-742: and the workspace record types the field registry read from them.
                 $documentFieldRegistry->resetRequest();
                 // DB session hygiene (WC-21/PR #84): after the response is sent,
@@ -7019,6 +7067,7 @@ if ($isWorker) {
         RoleChecker::clearCache();
         \Whity\Core\Http\AfterResponse::reset();
         $tenantManifestHost->resetRequest();
+        $codePluginActivation->resetRequest();
         $documentFieldRegistry->resetRequest();
     }
 }

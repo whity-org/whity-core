@@ -16,6 +16,7 @@ import { classifyPluginVersion, type PluginVersionTier } from '@/lib/plugin-vers
 import { useRichTranslation, useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { PluginsTabs } from '@/components/plugins/plugins-tabs';
+import { PluginWorkspaceAccess, WorkspaceCodePlugins } from '@/components/plugins/workspace-code-plugins';
 import { PluginUpdateDialog, type PluginUpdateTarget } from '@/components/plugins/plugin-update-dialog';
 import { useDateDisplay } from '@whity/features/datetime';
 import { Button } from '@whity/ui/button';
@@ -23,7 +24,7 @@ import { Badge } from '@whity/ui/badge';
 import { DataTable, type DataTableColumn } from '@whity/ui/data-table';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
-import { AreaError, EmptyFirstTime, LoadingRows, ReadOnlyNotice } from '@whity/ui/page-states';
+import { AreaError, EmptyFirstTime, LoadingRows } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
 import {
   Dialog,
@@ -638,7 +639,8 @@ export default function PluginsPage() {
       ) : null}
 
       {data && !isOperator ? (
-        <ReadOnlyNotice title={t('plugins.readOnly', 'Code plugins run for every workspace on this deployment, so the platform operator manages them.')} />
+        // WHIT-1124: a workspace switches installed plugins on and off here.
+        <WorkspaceCodePlugins canEnable={hasPermission(PLUGINS_ENABLE)} canDisable={hasPermission(PLUGINS_DISABLE)} />
       ) : null}
 
       {isOperator && hasPermission(PLUGINS_INSTALL)
@@ -677,7 +679,7 @@ export default function PluginsPage() {
           })
         : null}
 
-      {error ? (
+      {data && !isOperator ? null : error ? (
         <AreaError
           message={error}
           retryLabel={t('plugins.tryAgain', 'Try again')}
@@ -715,6 +717,8 @@ export default function PluginsPage() {
           rowActionsLabel={t('plugins.col.actions', 'Actions')}
         />
       )}
+
+      {isOperator && plugins.length > 0 ? <PluginWorkspaceAccess canChange={hasPermission(PLUGINS_ENABLE)} /> : null}
 
       {(workspacePlugins ?? []).length > 0 ? (
         <section className="space-y-3" aria-labelledby="plugins-in-workspace">

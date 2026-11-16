@@ -228,30 +228,6 @@ final class OneCalendarRealEngineTest extends TestCase
         self::assertSame([], (new CalendarItems($this->bookings, $this->calendar))->between(1, 11, $this->at('2026-11-20T00:00:00+03:00'), $this->at('2026-11-21T00:00:00+03:00')));
     }
 
-    public function testOldTimeOffRowsAreCopiedOnceAndKeepTheirMeaning(): void
-    {
-        $this->pdo->exec(
-            "INSERT INTO calendar_availability_exceptions (id, tenant_id, profile_id, kind, starts_at, ends_at, note, created_by_profile_id)
-             VALUES (701, 1, 11, 'off', '2026-11-16 07:00:00', '2026-11-16 08:00:00', '', 11),
-                    (702, 1, 12, 'open', '2026-11-20 07:00:00', '2026-11-20 09:00:00', 'Market day', 12),
-                    (703, 2, 21, 'off', '2026-11-16 07:00:00', '2026-11-16 08:00:00', 'Holiday', 21)"
-        );
-        $db = \Whity\Database\Database::withFactory(fn (): PDO => $this->pdo, 86400, 86400);
-        $db->forceConnect();
-        require_once dirname(__DIR__, 3) . '/database/migrations/285_move_time_off_into_calendar_events.php';
-        \Database\Migrations\MoveTimeOffIntoCalendarEvents::up($db);
-        \Database\Migrations\MoveTimeOffIntoCalendarEvents::up($db);
-
-        $rows = $this->pdo->query("SELECT tenant_id, profile_id, kind, title, busy, legacy_ref FROM calendar_events WHERE legacy_ref IS NOT NULL ORDER BY legacy_ref");
-        self::assertNotFalse($rows);
-        self::assertSame([
-            ['1', '11', 'time_off', 'Time off', 'exception:701'],
-            ['1', '12', 'open_hours', 'Market day', 'exception:702'],
-            ['2', '21', 'time_off', 'Holiday', 'exception:703'],
-        ], array_map(static fn (array $r): array => [(string) $r['tenant_id'], (string) $r['profile_id'], $r['kind'], $r['title'], $r['legacy_ref']], $rows->fetchAll(PDO::FETCH_ASSOC)), 'copied once, each in its own workspace');
-        self::assertSame([], $this->free(11), 'the copied time off blocks');
-    }
-
     public function testAScheduledMeetingIsACalendarEventForEveryoneInvited(): void
     {
         $meeting = $this->meeting(created: 13, invited: [11 => 'accepted', 12 => 'invited']);

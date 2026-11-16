@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.106).
+ * SDK identity (v1.108).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1291,12 +1291,28 @@ namespace Whity\Sdk;
  * PHP's openssl extension. The host, the store plugin and the builder connector share it (WHIT-1026).
  *
  * Purely additive.)
+ *
+ * 1.107 (PAID PLUGINS, SWITCHED ON PER WORKSPACE: {@see PluginAccessInterface} lets a plugin say
+ * what a workspace needs to use it: an entitlement its plan or add-on grants, the product it is
+ * sold as (`plugin.<slug>`) and an optional trial. When access ends it has 7 days of grace, then
+ * turns read-only. {@see PluginWorkspaceLifecycleInterface} tells a plugin a workspace turned it
+ * on or off, so it can set the workspace up. {@see Billing\WorkspaceAddons} is the host service a
+ * billing plugin calls to grant and revoke a workspace's add-on plans (WHIT-1125).
+ *
+ * Purely additive.)
+ *
+ * 1.108 (WORKSPACE SETUP FOR PACKS: {@see Setup\WorkspaceSetup} lets a plugin set a workspace up
+ * through core's own routes (calendar settings, services, staff and hours; workspace settings;
+ * forms), as the person acting there and with only that person's permissions, so an industry pack
+ * can prepare a workspace when it is turned on (WHIT-1129).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.106.0';
+    public const VERSION = '1.108.0';
 
     /**
      * Static identity only — never instantiated.

@@ -9,6 +9,7 @@ use Whity\Auth\RoleChecker;
 use Whity\Core\Calendar\BookingRepository;
 use Whity\Core\Calendar\BookingService;
 use Whity\Core\Calendar\CalendarItems;
+use Whity\Core\Taskaat\TaskDueDates;
 use Whity\Core\Calendar\CalendarRejectedException;
 use Whity\Core\Calendar\CalendarRepository;
 use Whity\Core\Calendar\CalendarSettings;
@@ -49,6 +50,8 @@ final class CalendarApiHandler
 {
     /** The most people one event invites (ADR 0018). */
     public const MAX_EVENT_PEOPLE = 200;
+
+    private ?TaskDueDates $taskDueDates = null;
 
     private const MAX_RANGE_DAYS = 62;
     /** Year asks for a whole year; a leap year and a clock change fit. */
@@ -134,7 +137,7 @@ final class CalendarApiHandler
     public function getSettings(Request $request): Response
     {
         return $this->run($request, 'settings', function (int $tenantId): Response {
-            return Response::json(['data' => $this->booking->settingsFor($tenantId)->toApi()]);
+            return Response::json(['data' => $this->settingsOut($tenantId)]);
         });
     }
 
@@ -176,7 +179,7 @@ final class CalendarApiHandler
                 $this->settings->setTenant($tenantId, $key, $value);
             }
 
-            return Response::json(['data' => $this->booking->settingsFor($tenantId)->toApi()]);
+            return Response::json(['data' => $this->settingsOut($tenantId)]);
         });
     }
 
@@ -571,13 +574,19 @@ final class CalendarApiHandler
             $q = $this->query($request);
             $people = self::idList($q['people'] ?? '', 'people');
             $kinds = array_values(array_filter(explode(',', $q['kinds'] ?? ''), static fn (string $k): bool => $k !== ''));
+            $allowed = [...CalendarItems::KINDS, TaskDueDates::KIND];
             foreach ($kinds as $kind) {
-                if (!in_array($kind, CalendarItems::KINDS, true)) {
-                    throw new CalendarRejectedException('kinds are ' . implode(', ', CalendarItems::KINDS), 422);
+                if (!in_array($kind, $allowed, true)) {
+                    throw new CalendarRejectedException('kinds are ' . implode(', ', $allowed), 422);
                 }
             }
+            // Tasks due come from Taskaat only when asked for by name (Also show,
+            // off by default) and only for someone who may read tasks.
+            $withTasks = in_array(TaskDueDates::KIND, $kinds, true);
+            $kinds = array_values(array_diff($kinds, [TaskDueDates::KIND]));
             $manages = $actor > 0 && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::CALENDAR_MANAGE, $tenantId);
-            $items = (new CalendarItems($this->bookings, $this->calendar))->between(
+            // Asking for tasks due alone reads nothing else.
+            $items = $withTasks && $kinds === [] ? [] : (new CalendarItems($this->bookings, $this->calendar))->between(
                 $tenantId,
                 $actor,
                 $from,
@@ -588,9 +597,27 @@ final class CalendarApiHandler
                 $manages,
                 $this->optionalInt($request, 'unit_id'),
             );
+            $unavailable = [];
+            if ($withTasks && $this->taskDueDates !== null && $actor > 0
+                && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::TASKS_READ, $tenantId)) {
+                $zone = CalendarSettings::fromSettings($this->settings->effective($tenantId))->zone;
+                $tasks = $this->taskDueDates->between($tenantId, $from, $to, $zone, $people);
+                if ($tasks === null) {
+                    $unavailable[] = TaskDueDates::KIND;
+                } else {
+                    $items = [...$items, ...$tasks];
+                    usort($items, static fn (array $a, array $b): int => [$a['starts_at'], $a['id']] <=> [$b['starts_at'], $b['id']]);
+                }
+            }
 
-            return Response::json(['data' => $items]);
+            return Response::json(['data' => $items, 'unavailable' => $unavailable]);
         });
+    }
+
+    /** ADR 0018: tasks due on the calendar, read from Taskaat. */
+    public function setTaskDueDates(TaskDueDates $taskDueDates): void
+    {
+        $this->taskDueDates = $taskDueDates;
     }
 
     /** @return list<int> */
@@ -811,6 +838,24 @@ final class CalendarApiHandler
             'book_anyway' => !$isAgent && ($body['book_anyway'] ?? false) === true,
             'within_hours' => ($body['within_hours'] ?? false) === true,
         ];
+    }
+
+    /**
+     * The settings, and the public booking page's address so staff can share
+     * it (WHIT-1117): `{app}/book/{workspace}`, the same link the booking
+     * emails use for "Book again". Null when the workspace has no slug or no
+     * app address is configured.
+     *
+     * @return array<string, mixed>
+     */
+    private function settingsOut(int $tenantId): array
+    {
+        $out = $this->booking->settingsFor($tenantId)->toApi();
+        $slug = (new \Whity\Core\Branding\TenantHostRepository($this->calendar->db()))->findSlugById($tenantId);
+        $base = rtrim($this->feedUrlBase, '/');
+        $out['booking_page_url'] = $slug !== null && $slug !== '' && $base !== '' ? $base . '/book/' . rawurlencode($slug) : null;
+
+        return $out;
     }
 
     private static function isAgent(Request $request): bool

@@ -145,6 +145,44 @@ final class AwayAndIdentityCheckRealEngineTest extends TestCase
         self::assertNull($check->verify(self::TENANT, self::EMAD, 'request:7', '000000'));
     }
 
+    /**
+     * Someone who signs in only through Whity ID confirms by signing in there again (WHIT-1147):
+     * nothing is emailed, the page is told where to go and for which approval, and only a fresh
+     * sign-in recorded for that very approval confirms it, once.
+     */
+    public function testAnSsoOnlyApproverConfirmsWithAFreshSignInForThatApproval(): void
+    {
+        $this->pdo->exec("UPDATE profiles SET auth_method = 'idp' WHERE id = " . self::EMAD);
+        $this->pdo->exec("INSERT INTO external_identities (profile_id, provider_id, provider_key, issuer, subject, last_login_at)
+                          VALUES (" . self::EMAD . ", NULL, 'whity_id', 'https://id.whity.test', 'sub-emad', CURRENT_TIMESTAMP)");
+        $check = $this->identityCheck();
+
+        $started = $check->start(self::TENANT, self::EMAD, 'password-reset:7', 'approving a password reset');
+
+        self::assertSame(['method' => 'fresh_sign_in', 'email_hint' => null, 'provider_key' => 'whity_id', 'purpose' => 'password-reset:7'], $started);
+        self::assertCount(0, $this->sent, 'nothing is emailed');
+        self::assertNull($check->verify(self::TENANT, self::EMAD, 'password-reset:7', null), 'not before signing in again');
+
+        $challenges = new SigningChallengeRepository($this->pdo);
+        $challenges->recordGateFreshSignIn(self::TENANT, self::EMAD, IdentityCheck::key('password-reset:7'));
+
+        self::assertNull($check->verify(self::TENANT, self::EMAD, 'password-reset:8', null), 'not for another approval');
+        self::assertNull($check->verify(self::TENANT, self::AMRO, 'password-reset:7', null), 'not for another admin');
+        self::assertSame('fresh_sign_in', $check->verify(self::TENANT, self::EMAD, 'password-reset:7', null));
+        self::assertNull($check->verify(self::TENANT, self::EMAD, 'password-reset:7', null), 'used once');
+    }
+
+    public function testAFreshSignInForAnApprovalRunsOutAfterFiveMinutes(): void
+    {
+        $this->pdo->exec("UPDATE profiles SET auth_method = 'idp' WHERE id = " . self::EMAD);
+        $this->pdo->exec("INSERT INTO external_identities (profile_id, provider_id, provider_key, issuer, subject, last_login_at)
+                          VALUES (" . self::EMAD . ", NULL, 'whity_id', 'https://id.whity.test', 'sub-emad', CURRENT_TIMESTAMP)");
+        (new SigningChallengeRepository($this->pdo))->recordGateFreshSignIn(self::TENANT, self::EMAD, IdentityCheck::key('agent-proposal:3'));
+        $this->pdo->exec("UPDATE signing_challenges SET expires_at = '2000-01-01 00:00:00'");
+
+        self::assertNull($this->identityCheck()->verify(self::TENANT, self::EMAD, 'agent-proposal:3', null));
+    }
+
     private function identityCheck(): IdentityCheck
     {
         $sent = &$this->sent;

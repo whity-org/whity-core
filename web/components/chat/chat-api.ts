@@ -122,6 +122,9 @@ export function chatApi(api: ApiClient) {
           ...(link ? { link } : {}),
         })
       ),
+    // C2 (WHIT-1135): the group chat linked to a record, found or made. 200 when it existed, 201 when new.
+    discuss: (link: ChatLink) =>
+      whole<{ data: ChatDetail; created: boolean }>(api, '/api/v1/chat/chats/discuss', json('POST', { link })),
     direct: (target: { profile_id: number } | { agent_id: number }) => call<ChatDetail>(api, '/api/v1/chat/chats', json('POST', { type: 'direct', ...target })),
     addPerson: (id: number, profileId: number) => call<ChatDetail>(api, `/api/v1/chat/chats/${id}/members`, json('POST', { profile_id: profileId })),
     addAgent: (id: number, agentId: number, worksFor: number, reads: ChatReads, actions: Record<string, ChatMode>) =>

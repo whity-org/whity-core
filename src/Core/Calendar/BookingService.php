@@ -52,6 +52,9 @@ final class BookingService
 
     private ?CalendarPlugins $plugins = null;
 
+    /** C4: reminders by text, through Messages. */
+    private ?BookingTextReminders $textReminders = null;
+
     private string $manageUrlBase = '';
 
     private ?RoomRepository $rooms = null;
@@ -90,6 +93,12 @@ final class BookingService
     }
 
     /** Plugins' payment step and busy times (SDK 1.98), read at call time. */
+    /** Reminders by text (C4); left unset, the app's Messages is used when a reminder goes. */
+    public function setTextReminders(BookingTextReminders $textReminders): void
+    {
+        $this->textReminders = $textReminders;
+    }
+
     public function setPlugins(CalendarPlugins $plugins): void
     {
         $this->plugins = $plugins;
@@ -687,13 +696,12 @@ final class BookingService
         }
         $booking = $this->bookingOrFail($tenantId, $bookingId);
         $this->tell('remind', $tenantId, $booking);
-        // Other channels a plugin adds (design 3.3: WhatsApp is paid).
-        foreach ($this->plugins?->reminderChannels() ?? [] as $channel) {
-            try {
-                $channel->remind($tenantId, $booking);
-            } catch (Throwable $e) {
-                error_log('[calendar] the ' . $channel->name() . ' reminder failed: ' . $e->getMessage());
-            }
+        // C4: and by text on every channel a plugin adds (design 3.3: WhatsApp
+        // is paid), through the one way Whity messages customers.
+        try {
+            ($this->textReminders ??= BookingTextReminders::fromApp($this->settings))->remind($tenantId, $booking);
+        } catch (Throwable $e) {
+            error_log('[calendar] the text reminders failed: ' . $e->getMessage());
         }
 
         return 'sent';

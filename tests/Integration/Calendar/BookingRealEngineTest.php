@@ -421,36 +421,96 @@ final class BookingRealEngineTest extends TestCase
         self::assertSame(['date' => '2026-11-15', 'booked' => 0, 'checked_in' => 0, 'requests' => 0, 'reminders_sent' => 0], $this->service->today(2, null, null));
     }
 
-    public function testAReminderChannelIsAskedAfterTheEmailAndAFailureIsContained(): void
+    public function testAReminderAlsoGoesByTextThroughMessagesOnEveryChannelThatIsOn(): void
     {
-        $plugins = new \Whity\Core\Calendar\CalendarPlugins();
-        $asked = [];
-        $channel = new class (static function (int $id) use (&$asked): void {
-            $asked[] = $id;
-        }) implements \Whity\Core\Calendar\ReminderChannel {
-            public function __construct(private readonly \Closure $record)
+        // C4: a WhatsApp channel from a plugin, and an SMS one turned off.
+        $sent = [];
+        // A plain closure, so what each channel sends reaches $sent (an arrow fn would copy it).
+        $channel = static function (string $key, bool $on) use (&$sent): \Whity\Sdk\Messaging\MessageChannel {
+            return new class ($key, $on, static function (\Whity\Sdk\Messaging\OutboundMessage $m) use (&$sent, $key): void {
+            $sent[] = [$key, $m->to, $m->body];
+        }) implements \Whity\Sdk\Messaging\MessageChannel {
+            public function __construct(private readonly string $k, private readonly bool $on, private readonly \Closure $sink)
             {
             }
 
-            public function name(): string
+            public function key(): string
             {
-                return 'whatsapp';
+                return $this->k;
             }
 
-            public function remind(int $tenantId, array $booking): void
+            public function label(): array
             {
-                ($this->record)((int) $booking['id']);
-                throw new \RuntimeException('the provider is down');
+                return ['en' => $this->k, 'ar' => $this->k];
+            }
+
+            public function isEnabled(int $tenantId): bool
+            {
+                return $this->on;
+            }
+
+            public function capabilities(): \Whity\Sdk\Messaging\ChannelCapabilities
+            {
+                return new \Whity\Sdk\Messaging\ChannelCapabilities();
+            }
+
+            public function send(\Whity\Sdk\Messaging\OutboundMessage $message): \Whity\Sdk\Messaging\SendOutcome
+            {
+                ($this->sink)($message);
+
+                return \Whity\Sdk\Messaging\SendOutcome::sent();
+            }
+
+            public function receive(int $tenantId, string $rawBody, array $headers): array
+            {
+                return [];
+            }
+
+            public function templates(int $tenantId): array
+            {
+                return [];
             }
         };
-        self::assertTrue($plugins->addReminderChannel('example', $channel));
-        self::assertFalse($plugins->addReminderChannel('other', $channel));
-        $this->service->setPlugins($plugins);
+        };
+        $registry = new \Whity\Core\Messaging\MessageChannelRegistry();
+        $registry->register('acme', [$channel('whatsapp', true), $channel('sms', false)]);
+        $jobs = [];
+        $messaging = \Whity\Core\Messaging\CoreMessaging::build(
+            $this->pdo,
+            $registry,
+            new class implements \Whity\Core\Mail\ThreadedMailer {
+                public function sendThreaded(\Whity\Core\Mail\OutgoingEmail $email): void
+                {
+                }
+            },
+            new \Whity\Core\Security\EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'),
+            static function (string $name, array $payload, array $opts) use (&$jobs): int {
+                $jobs[] = $payload;
+
+                return count($jobs);
+            },
+        );
+        $this->service->setTextReminders(new \Whity\Core\Calendar\BookingTextReminders(static fn () => $messaging, $this->settings));
+
+        $booking = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11, ['customer_phone' => '+962 79 123 4567']));
+        $this->pdo->exec("UPDATE calendar_bookings SET reminder_due_at = '2026-11-15 03:00:00' WHERE id = " . (int) $booking['id']);
+        self::assertSame('sent', $this->service->sendReminder(1, (int) $booking['id'], (string) $booking['starts_at']));
+
+        foreach ($jobs as $job) {
+            $messaging->deliver(1, (int) $job['message_id']);
+        }
+        self::assertSame([['whatsapp', '+962 79 123 4567', 'Reminder: Cake tasting on Mon 16 Nov, 10:00 with p11.']], $sent, 'only the channel that is on');
+        $conversations = $this->scalar("SELECT COUNT(*) FROM conversations WHERE tenant_id = 1 AND channel = 'acme:whatsapp'");
+        self::assertSame(1, (int) $conversations, 'it lands in the customer\'s conversation');
+    }
+
+    public function testNoPhoneNoTextReminderAndTheEmailOneStillGoes(): void
+    {
+        $this->service->setTextReminders(new \Whity\Core\Calendar\BookingTextReminders(static fn () => throw new \LogicException('not asked without a phone'), $this->settings));
 
         $booking = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
         $this->pdo->exec("UPDATE calendar_bookings SET reminder_due_at = '2026-11-15 03:00:00' WHERE id = " . (int) $booking['id']);
         self::assertSame('sent', $this->service->sendReminder(1, (int) $booking['id'], (string) $booking['starts_at']));
-        self::assertSame([(int) $booking['id']], $asked);
     }
 
     /**

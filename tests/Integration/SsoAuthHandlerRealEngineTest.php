@@ -335,6 +335,23 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         self::assertStringContainsString('/login?sso_error=provider_unavailable', $this->location($res));
     }
 
+    /**
+     * Signing in again to confirm a gated approval (WHIT-1147) needs a signed-in person and the
+     * wiring that checks the answer; without them it is refused, never started as a plain sign-in.
+     */
+    public function testAGateReauthWithoutASessionIsRefused(): void
+    {
+        $_GET = ['reauth' => 'gate', 'purpose' => 'password-reset:7', 'return_to' => '/admin/approval-gating/password-resets'];
+        try {
+            $res = $this->handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+        } finally {
+            $_GET = [];
+        }
+
+        self::assertSame(302, $res->getStatusCode());
+        self::assertStringContainsString('sso_error=reauth_unavailable', $this->location($res));
+    }
+
     // ── headless frontend (WHIT-693) ──────────────────────────────────────────
 
     public function testHeadlessFrontendReceivesTheRedirectsWhileTheCallbackStaysOnTheBackend(): void

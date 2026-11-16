@@ -137,7 +137,7 @@ final class SettingsRegistryTest extends TestCase
              // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
              'signup.mode', 'signup.role_id', 'signup.allowed_domains', 'signup.customer_invites',
              // WHIT-1043.
-             'signup.invites_per_customer'],
+             'signup.invites_per_customer', 'messaging.webchat_enabled', 'messaging.webchat_greeting', 'messaging.inbound_email_address'],
             SettingsRegistry::keys()
         );
     }
@@ -471,7 +471,8 @@ final class SettingsRegistryTest extends TestCase
         // 117 since WHIT-960: website.plans and website.contact_workspace.
         // 120 since design 3.4 (P1): company.name_ar and company.address_ar.
         // 124 since WHIT-1035: the four signup.* keys; 125 since WHIT-1043.
-        self::assertCount(125, $describe);
+        // 128 since migration 294: the three messaging.* keys.
+        self::assertCount(128, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

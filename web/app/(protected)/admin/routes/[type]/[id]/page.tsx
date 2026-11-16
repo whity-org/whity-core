@@ -20,6 +20,7 @@ import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
 import { PageHeader } from '@whity/ui/page-header';
+import { DiscussInChat, recordLink } from '@/components/chat/discuss-in-chat';
 import { AreaError } from '@whity/ui/page-states';
 import { RadioGroup, RadioGroupItem } from '@whity/ui/radio-group';
 import { Textarea } from '@whity/ui/textarea';
@@ -193,6 +194,11 @@ export default function RouteSubjectPage({ params }: { params: Promise<{ type: s
           view.subject.type === 'form_submission'
             ? t('subject.formSubmission', 'A form somebody sent. It has no document yet: one is made when its route is finished.')
             : undefined
+        }
+        action={
+          view.subject.type === 'form_submission' ? (
+            <DiscussInChat link={recordLink('form_submission', id, view.subject.title ?? t('subject.untitled', 'Request'))} />
+          ) : undefined
         }
       />
 

@@ -165,7 +165,7 @@ final class ChatCustomerBlocksAndForwardRealEngineTest extends TestCase
                         VALUES ({$id}, '{$name}', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
             $pdo->exec("INSERT INTO memberships (profile_id, tenant_id, role_id, status, kind, created_at) VALUES ({$id}, " . self::A . ", {$role}, 'active', 'member', CURRENT_TIMESTAMP)");
         }
-        $pdo->exec('INSERT INTO messaging_settings (tenant_id, webchat_enabled, updated_at) VALUES (' . self::A . ', TRUE, CURRENT_TIMESTAMP)');
+        $pdo->exec("INSERT INTO tenant_settings (tenant_id, setting_key, value, updated_at) VALUES (" . self::A . ", 'messaging.webchat_enabled', 'true', CURRENT_TIMESTAMP)");
         $pdo->exec('INSERT INTO calendar_services (id, tenant_id, name, duration_minutes, active, created_at, updated_at) VALUES (1, ' . self::A . ", 'Cake tasting', 75, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
         $pdo->exec("INSERT INTO forms (id, tenant_id, form_key, name, title, status, public_enabled, public_slug, created_at, updated_at)
                     VALUES (1, " . self::A . ", 'event-order', 'Event order', NULL, 'published', TRUE, '" . str_repeat('a', 64) . "', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),

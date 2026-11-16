@@ -4,7 +4,7 @@
 
 [English](Whity-CLI.md)
 
-تثبّت الأداة `whity` نسخة Whity مستضافة ذاتيًا على Docker وتحدّثها. وهي تأتي من حزمة npm باسم `whity` (والأمر نفسه منشور أيضًا باسم `@whity/cli`؛ ثبّت إحداهما لا كلتيهما)، وتعمل على Linux وmacOS وWindows (PowerShell 5.1 وما بعده).
+تثبّت الأداة `whity` نسخة Whity مستضافة ذاتيًا على Docker وتحدّثها. وهي تأتي من حزمة npm باسم `@whity/cli`، وتعمل على Linux وmacOS وWindows (PowerShell 5.1 وما بعده).
 
 يتحدث التثبيت بالعربية حين تكون لغة النظام العربية وتستطيع الطرفية عرضها: على Linux وmacOS وWindows Terminal. أما وحدة تحكم PowerShell 5.1 القديمة فتشوّه النص العربي، فتبقى الأداة فيها بالإنجليزية. وتبقى أسماء الأوامر والعناوين والملفات بحروف لاتينية.
 
@@ -21,7 +21,7 @@
 <div dir="ltr">
 
 ```bash
-npm install -g whity
+npm install -g @whity/cli
 whity install
 ```
 

@@ -13,10 +13,10 @@ import type { components } from '@whity/api-client';
 import { api } from '@/lib/api/client';
 
 export type ViewChoices = components['schemas']['CalendarViewChoices'];
-export type AlsoShow = 'team_events' | 'time_off' | 'cancelled';
+export type AlsoShow = 'team_events' | 'time_off' | 'cancelled' | 'meetings' | 'tasks_due';
 
-/** Team events and time off are shown until a person unticks them; cancelled bookings are not. */
-export const DEFAULT_ALSO_SHOW: AlsoShow[] = ['team_events', 'time_off'];
+/** Team events, time off and meetings are shown until a person unticks them; cancelled bookings and tasks due are not. */
+export const DEFAULT_ALSO_SHOW: AlsoShow[] = ['team_events', 'time_off', 'meetings'];
 
 const LOCAL_KEY = 'whity.calendar.view';
 const RAIL_KEY = 'whity.calendar.sidebar-open';

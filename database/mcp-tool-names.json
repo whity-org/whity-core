@@ -820,6 +820,10 @@
     "en": "See a store plugin's licence",
     "ar": "عرض ترخيص إضافة من المتجر"
   },
+  "get_api_plugins_workspace_access": {
+    "en": "List who can use each installed plugin",
+    "ar": "عرض من يمكنه استخدام كل إضافة مثبتة"
+  },
   "get_api_profiles_id_relations": {
     "en": "See a user's person record and relationships",
     "ar": "عرض بيانات شخص وعلاقاته من حسابه"
@@ -993,6 +997,14 @@
   "get_api_users_id_memberships": {
     "en": "See the roles a user holds",
     "ar": "عرض أدوار مستخدم"
+  },
+  "get_api_workspace_code_plugins": {
+    "en": "List the installed plugins this workspace can use",
+    "ar": "عرض الإضافات المثبتة التي يمكن لمساحة العمل استخدامها"
+  },
+  "get_api_workspace_code_plugins_plugin_history": {
+    "en": "See who turned a plugin on or off, and when",
+    "ar": "معرفة من شغّل الإضافة أو أوقفها ومتى"
   },
   "get_api_workspace_plugins": {
     "ar": "عرض إضافات مساحة العمل"
@@ -1765,6 +1777,18 @@
     "en": "Send a user a password reset link",
     "ar": "إرسال رابط إعادة تعيين كلمة المرور لمستخدم"
   },
+  "post_api_workspace_code_plugins_plugin_disable": {
+    "en": "Turn an installed plugin off for this workspace",
+    "ar": "إيقاف إضافة مثبتة لمساحة العمل"
+  },
+  "post_api_workspace_code_plugins_plugin_enable": {
+    "en": "Turn an installed plugin on for this workspace",
+    "ar": "تشغيل إضافة مثبتة لمساحة العمل"
+  },
+  "post_api_workspace_code_plugins_plugin_trial": {
+    "en": "Start this workspace's free trial of a paid plugin",
+    "ar": "بدء الفترة التجريبية المجانية لإضافة مدفوعة في مساحة العمل"
+  },
   "post_api_workspace_plugins": {
     "ar": "نشر إصدار من إضافة مساحة العمل"
   },
@@ -1853,6 +1877,10 @@
   "put_api_plans_id_entitlements": {
     "en": "Set what a plan includes",
     "ar": "تعيين ما تتضمنه باقة"
+  },
+  "put_api_plugins_plugin_workspace_access": {
+    "en": "Choose who can use an installed plugin",
+    "ar": "اختيار من يمكنه استخدام إضافة مثبتة"
   },
   "put_api_signup_settings": {
     "en": "Change your workspace's customer sign-up settings",

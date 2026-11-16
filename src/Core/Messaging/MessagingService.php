@@ -48,7 +48,11 @@ final class MessagingService implements HostWiredService
         private readonly Closure $enqueue,
         private readonly ?MeterService $meters = null,
     ) {
+        $this->contacts = new ConversationContacts($db);
     }
+
+    /** C5: who a customer is, whatever channel they write on. */
+    private ConversationContacts $contacts;
 
     /** UC.12: says whether a sender is blocked; what they send is then dropped. */
     private ?Closure $blocked = null;
@@ -77,6 +81,12 @@ final class MessagingService implements HostWiredService
     public function messages(): MessageRepository
     {
         return $this->messages;
+    }
+
+    /** C5: who a customer is across channels. */
+    public function contacts(): ConversationContacts
+    {
+        return $this->contacts;
     }
 
     public function channels(): MessageChannelRegistry
@@ -111,14 +121,19 @@ final class MessagingService implements HostWiredService
             throw new MessagingException('The email address is not valid.');
         }
 
-        $conversation = $options->newConversation
+        // C5: the customer's conversation on any channel, then this address's.
+        $contactId = $this->contacts->contactFor($tenantId, $address);
+        $existing = $options->newConversation
             ? null
-            : $this->conversations->findOpenForContact($tenantId, $options->channel, $address);
-        $conversationId = $conversation !== null
-            ? (int) $conversation['id']
-            : $this->conversations->create($tenantId, $options->channel, $address, $name, $options->subject, $customerId);
+            : $this->contacts->conversationFor($tenantId, $options->channel, $address, $contactId, $customerId);
+        if ($existing === null && !$options->newConversation) {
+            $open = $this->conversations->findOpenForContact($tenantId, $options->channel, $address);
+            $existing = $open !== null ? (int) $open['id'] : null;
+        }
+        $conversationId = $existing ?? $this->conversations->create($tenantId, $options->channel, $address, $name, $options->subject, $customerId);
+        $this->contacts->remember($tenantId, $options->channel, $address, $conversationId, $contactId);
 
-        return $this->queueOutbound($tenantId, $conversationId, $channel, $body, $options->authorProfileId, $options->byAgent, $options->source);
+        return $this->queueOutbound($tenantId, $conversationId, $channel, $body, $options->authorProfileId, $options->byAgent, $options->source, [], $options->channel, $address);
     }
 
     /**
@@ -127,7 +142,7 @@ final class MessagingService implements HostWiredService
      * @param array<string, mixed> $meta what the team sees with it (a block, UC.5); the customer gets the words
      * @return array<string, mixed> the message
      */
-    public function reply(int $tenantId, int $conversationId, ?int $authorProfileId, string $body, bool $byAgent = false, ?string $source = null, array $meta = []): array
+    public function reply(int $tenantId, int $conversationId, ?int $authorProfileId, string $body, bool $byAgent = false, ?string $source = null, array $meta = [], ?string $sendBy = null): array
     {
         if ($source !== null && preg_match('/^[a-z][a-z0-9_.:-]{0,63}$/', $source) !== 1) {
             throw new MessagingException('The source must be a short lowercase word such as calendar.reminder.');
@@ -136,9 +151,20 @@ final class MessagingService implements HostWiredService
         if ($conversation === null) {
             throw new MessagingException('Conversation not found.');
         }
-        $channel = $this->channel($tenantId, (string) $conversation['channel']);
+        // C5 (UC.3): by the channel the customer last wrote on, unless "Send by"
+        // chose another they have; the conversation's own channel when they
+        // haven't written yet.
+        $addresses = $this->contacts->addresses($tenantId, $conversationId);
+        $key = $sendBy ?? (array_key_first($addresses) ?? (string) $conversation['channel']);
+        $address = $addresses[$key] ?? ($key === (string) $conversation['channel'] ? (string) $conversation['contact_address'] : null);
+        if ($address === null) {
+            throw new MessagingException('This customer has not written on that channel, so there is no address to send to.');
+        }
+        $channel = $this->channel($tenantId, $key);
 
-        $lastInbound = $conversation['last_inbound_at'] !== null ? strtotime((string) $conversation['last_inbound_at'] . ' UTC') : false;
+        $lastOnChannel = $this->messages->lastInboundAt($tenantId, $conversationId, $key)
+            ?? ($key === (string) $conversation['channel'] ? $conversation['last_inbound_at'] : null);
+        $lastInbound = $lastOnChannel !== null ? strtotime((string) $lastOnChannel . ' UTC') : false;
         $since = $lastInbound === false ? null : max(0, time() - $lastInbound);
         if (!$channel->capabilities()->allowsFreeform($since)) {
             throw new MessagingException('This channel only allows an approved template now, because the customer has not written recently.');
@@ -153,6 +179,8 @@ final class MessagingService implements HostWiredService
             $byAgent,
             $source ?? ($byAgent ? 'agent.reply' : 'staff.reply'),
             $meta,
+            $key,
+            $address,
         );
     }
 
@@ -198,10 +226,16 @@ final class MessagingService implements HostWiredService
             return null;
         }
 
-        $conversationId ??= $this->threadFor($tenantId, $channelKey, $in);
+        $customerProfileId ??= $channelKey === 'email' ? $this->conversations->customerByEmail($tenantId, $in->from) : null;
+        $contactId = $this->contacts->contactFor($tenantId, $in->from);
+        // C5 (owner Q35.2): a reply's own ids first; then who the customer is,
+        // on any channel (a conversation closed within 30 days reopens, Q11);
+        // then the older per-channel matches.
+        $conversationId ??= $this->threadByIds($tenantId, $in)
+            ?? $this->contacts->conversationFor($tenantId, $channelKey, $in->from, $contactId, $customerProfileId)
+            ?? $this->threadFor($tenantId, $channelKey, $in);
         $isNew = $conversationId === null;
         if ($conversationId === null) {
-            $customerProfileId ??= $channelKey === 'email' ? $this->conversations->customerByEmail($tenantId, $in->from) : null;
             $subject = $in->subject !== null ? InboundEmailParser::baseSubject($in->subject) : null;
             $conversationId = $this->conversations->create(
                 $tenantId,
@@ -219,7 +253,12 @@ final class MessagingService implements HostWiredService
             return null;
         }
 
+        $this->contacts->remember($tenantId, $channelKey, $in->from, $conversationId, $contactId);
+        $this->conversations->useChannel($tenantId, $conversationId, $channelKey, $in->from);
+
         $id = $this->messages->insert($tenantId, $conversationId, [
+            'channel' => $channelKey,
+            'channel_address' => $in->from,
             'kind' => MessageRepository::KIND_INBOUND,
             'status' => 'received',
             'body_text' => self::cleanBody($in->body, InboundEmailParser::MAX_BODY_CHARS, true),
@@ -279,19 +318,23 @@ final class MessagingService implements HostWiredService
         if ($conversation === null) {
             return 'skipped';
         }
-        $channel = $this->channels->get((string) $conversation['channel']);
+        // C5: a message goes on its own channel to its own address; older
+        // messages without one use the conversation's.
+        $channelKey = is_string($message['channel'] ?? null) && $message['channel'] !== '' ? (string) $message['channel'] : (string) $conversation['channel'];
+        $to = is_string($message['channel_address'] ?? null) && $message['channel_address'] !== '' ? (string) $message['channel_address'] : (string) $conversation['contact_address'];
+        $channel = $this->channels->get($channelKey);
         if ($channel === null) {
             $this->messages->markFailed($tenantId, $messageId, 'This channel is no longer installed.');
 
             return 'failed';
         }
 
-        $thread = $this->messages->threadIds($tenantId, (int) $conversation['id']);
+        $thread = $this->messages->threadIds($tenantId, (int) $conversation['id'], $channelKey);
         $outbound = new OutboundMessage(
             tenantId: $tenantId,
             conversationId: (int) $conversation['id'],
             messageId: $messageId,
-            to: (string) $conversation['contact_address'],
+            to: $to,
             toName: $conversation['contact_name'] !== null ? (string) $conversation['contact_name'] : null,
             subject: $conversation['subject'] !== null ? (string) $conversation['subject'] : null,
             body: (string) $message['body_text'],
@@ -302,7 +345,7 @@ final class MessagingService implements HostWiredService
         try {
             $outcome = $channel->send($outbound);
         } catch (\Throwable $e) {
-            error_log("[MessagingService] channel {$conversation['channel']} threw while sending: " . $e->getMessage());
+            error_log("[MessagingService] channel {$channelKey} threw while sending: " . $e->getMessage());
             $outcome = \Whity\Sdk\Messaging\SendOutcome::failed('The channel could not send the message.', true);
         }
 
@@ -334,6 +377,8 @@ final class MessagingService implements HostWiredService
         bool $byAgent,
         string $source,
         array $meta = [],
+        ?string $channelKey = null,
+        ?string $address = null,
     ): array {
         $body = self::cleanBody($body, $channel->capabilities()->maxBodyLength);
         $hold = $byAgent ? self::AGENT_HOLD_SECONDS : 0;
@@ -347,6 +392,8 @@ final class MessagingService implements HostWiredService
             'source' => $source,
             'send_after_seconds' => $hold,
             'chat_meta' => $meta,
+            'channel' => $channelKey,
+            'channel_address' => $address,
         ]);
         $this->conversations->touch($tenantId, $conversationId, false);
         $this->count($tenantId);
@@ -410,8 +457,8 @@ final class MessagingService implements HostWiredService
         return $channel;
     }
 
-    /** The conversation an inbound message continues, by its ids, then by sender and subject. */
-    private function threadFor(int $tenantId, string $channelKey, InboundMessage $in): ?int
+    /** The conversation a reply names by its ids (In-Reply-To, References, a thread key), on any channel. */
+    private function threadByIds(int $tenantId, InboundMessage $in): ?int
     {
         $ids = $in->references;
         if ($in->inReplyTo !== null) {
@@ -421,13 +468,13 @@ final class MessagingService implements HostWiredService
             $ids[] = $in->threadKey;
         }
         $byId = $this->messages->conversationForExternalIds($tenantId, $ids);
-        if ($byId !== null) {
-            $conversation = $this->conversations->find($tenantId, $byId);
-            if ($conversation !== null && $conversation['channel'] === $channelKey) {
-                return $byId;
-            }
-        }
 
+        return $byId !== null && $this->conversations->find($tenantId, $byId) !== null ? $byId : null;
+    }
+
+    /** The older per-channel matches: by sender and subject (email), or the address's open conversation. */
+    private function threadFor(int $tenantId, string $channelKey, InboundMessage $in): ?int
+    {
         if ($channelKey === 'email') {
             $subject = InboundEmailParser::baseSubject($in->subject);
             $match = $subject !== '' ? $this->conversations->findBySubject($tenantId, $channelKey, $in->from, $subject) : null;

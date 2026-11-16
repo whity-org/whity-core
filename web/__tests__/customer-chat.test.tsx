@@ -237,3 +237,59 @@ test('a failed reply says why and can be sent again', async () => {
     )
   );
 });
+
+test('a customer on two channels: messages name their channel, and Send by picks where the reply goes (UC.3)', async () => {
+  mockApiClient.mockImplementation((url: string, init?: RequestInit) => {
+    if (url === '/api/v1/messages/conversations/42' && !init?.method) {
+      return json(200, {
+        data: {
+          ...conversation,
+          send_by: [
+            { channel: 'whatsapp', address: '+962790001234' },
+            { channel: 'email', address: 'sara@example.test' },
+          ],
+          messages: [
+            message({ id: 1, kind: 'inbound', body: 'Two cakes please', status: 'received', channel: 'email' }),
+            message({ id: 2, kind: 'inbound', body: 'Can they be chocolate?', status: 'received', channel: 'whatsapp' }),
+          ],
+        },
+      });
+    }
+    return routes(url, init);
+  });
+  render(<Chat />);
+  await screen.findByText('Can they be chocolate?', { selector: 'p' });
+
+  // Each message says which channel it came on.
+  expect(screen.getAllByText('WhatsApp').length).toBeGreaterThan(0);
+
+  // By default the reply follows the customer to WhatsApp, where they last wrote.
+  await userEvent.type(screen.getByRole('textbox', { name: 'Your reply' }), 'Yes, chocolate');
+  await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+  await waitFor(() =>
+    expect(mockApiClient).toHaveBeenCalledWith(
+      '/api/v1/messages/conversations/42/replies',
+      expect.objectContaining({ body: JSON.stringify({ body: 'Yes, chocolate', channel: 'whatsapp' }) })
+    )
+  );
+
+  // Send by › Email sends the next one by email.
+  await userEvent.click(screen.getByRole('button', { name: /Send by/ }));
+  await userEvent.click(await screen.findByRole('menuitemradio', { name: /Email/ }));
+  await userEvent.type(screen.getByRole('textbox', { name: 'Your reply' }), 'Receipt attached');
+  await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+  await waitFor(() =>
+    expect(mockApiClient).toHaveBeenCalledWith(
+      '/api/v1/messages/conversations/42/replies',
+      expect.objectContaining({ body: JSON.stringify({ body: 'Receipt attached', channel: 'email' }) })
+    )
+  );
+});
+
+test('a customer on one channel gets no picker and no channel tags', async () => {
+  render(<Chat />);
+  await screen.findByText('Two cakes please', { selector: 'p' });
+
+  expect(screen.queryByRole('button', { name: /Send by/ })).not.toBeInTheDocument();
+  expect(screen.getByText('Send by Email')).toBeInTheDocument();
+});
