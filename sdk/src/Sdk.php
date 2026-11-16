@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.110).
+ * SDK identity (v1.111).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1324,12 +1324,18 @@ namespace Whity\Sdk;
  * and contacts (list, create), for a salon's walk-ins and commission (WHIT-1154).
  *
  * Purely additive.)
+ *
+ * 1.111 (QR CODES: {@see Print\QrCode} encodes bytes as a QR code and draws it as SVG or a data
+ * URI, so a plugin prints a code without a vendor package. It moved here from Front Office's
+ * receipt (WHIT-1060).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.110.0';
+    public const VERSION = '1.111.0';
 
     /**
      * Static identity only — never instantiated.
