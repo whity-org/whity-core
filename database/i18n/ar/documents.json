@@ -609,6 +609,7 @@
         "inbox.notices.what": "ماذا",
         "inbox.notices.when": "متى",
         "inbox.source.documentRouting": "مستندات في انتظارك",
+        "inbox.source.heldLines": "وكلاء ينتظرونك في المحادثات",
         "inbox.source.messages": "المحادثات المُسندة إليك",
         "inbox.source.proposals": "وكلاء يطلبون منك",
         "inbox.sources": "مصادر الوارد",

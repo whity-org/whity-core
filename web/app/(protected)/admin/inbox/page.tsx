@@ -220,7 +220,9 @@ function WaitingForMe() {
         ? t('inbox.source.messages', 'Conversations assigned to you')
         : source.key === PROPOSALS_SOURCE
           ? t('inbox.source.proposals', 'Agents asking you')
-          : source.label;
+          : source.key === 'chat_held_lines'
+            ? t('inbox.source.heldLines', 'Agents waiting in chats')
+            : source.label;
   const activeSourceLabel = sourceList.find((s) => s.key === activeSource);
 
   /**
@@ -404,6 +406,11 @@ function WaitingForMe() {
             // Messages (ADR 0016): a conversation assigned to the caller.
             if (row.resource_type === 'conversation' && row.resource_id) {
               router.push(`/chat?c=${encodeURIComponent(row.resource_id)}&k=customer`);
+              return;
+            }
+            // C3: an agent's line held for you opens its chat, where you decide it.
+            if (row.resource_type === 'chat' && row.resource_id) {
+              router.push(`/chat?c=${encodeURIComponent(row.resource_id)}`);
               return;
             }
             const meta = routingMeta(row);

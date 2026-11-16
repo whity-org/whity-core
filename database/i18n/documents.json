@@ -608,6 +608,7 @@
         "inbox.notices.what": "What",
         "inbox.notices.when": "When",
         "inbox.source.documentRouting": "Documents awaiting you",
+        "inbox.source.heldLines": "Agents waiting in chats",
         "inbox.source.messages": "Conversations assigned to you",
         "inbox.source.proposals": "Agents asking you",
         "inbox.sources": "Inbox sources",
