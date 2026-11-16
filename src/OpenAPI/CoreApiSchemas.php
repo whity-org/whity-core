@@ -9498,6 +9498,8 @@ final class CoreApiSchemas
                 'columns' => ['type' => 'array', 'maxItems' => 20, 'items' => SchemaBuilder::ref('FormFieldColumn'), 'description' => 'The columns of a repeating question. Required on one.'],
                 'minRows' => self::int() + ['description' => 'Fewest rows a repeating question takes when it has any.'],
                 'maxRows' => self::int() + ['description' => 'Most rows a repeating question takes, up to 200.'],
+                'maxWords' => self::int() + ['description' => 'A long answer limit in words, 1 to 20000. Refused on submit above it; printed as "142 of 300 words" (WHIT-1164).'],
+                'printGroup' => ['description' => 'Questions that print together under one number and title, as text or {en, ar}. Consecutive questions sharing it print as one block (WHIT-1164).'],
             ], []),
             // DERIVED from the fields' `section_key`, never stored. There is no
             // `form_sections` table, so a section cannot exist with no fields and

@@ -452,6 +452,7 @@ final class FormPrintout
         $q = 0;
         /** @var list<array{block: array<string, mixed>, key: string, text: string, value: string, word: string}> $run */
         $run = [];
+        /** @param array{number: string, text: string}|null $heading */
         $flush = function (?array $heading = null) use (&$run, &$content): void {
             if (count($run) >= self::YES_NO_RUN || ($run !== [] && ($this->style['yesNo'] === 'threeColumns' || $heading !== null))) {
                 $content[] = $this->yesNoRows($run, $heading);
@@ -500,7 +501,7 @@ final class FormPrintout
             $block = $this->question($prefix . $q, $field, $answer);
             $isYesNo = ($block['answer']['kind'] ?? '') === 'yesNo' && !isset($block['guidance']);
             if ($isYesNo) {
-                $run[] = ['block' => $block, 'key' => (string) $field['field_key'], 'text' => $block['text'], 'value' => $block['answer']['value'], 'word' => $block['answer']['word']];
+                $run[] = ['block' => $block, 'key' => (string) $field['field_key'], 'text' => (string) $block['text'], 'value' => (string) $block['answer']['value'], 'word' => (string) $block['answer']['word']];
                 continue;
             }
             $flush();
@@ -548,7 +549,7 @@ final class FormPrintout
             $block = $this->question($number, $field, $answer);
             $kind = $block['answer']['kind'] ?? '';
             if ($kind === 'yesNo') {
-                $run[] = ['block' => $block, 'key' => (string) $field['field_key'], 'text' => $block['text'], 'value' => $block['answer']['value'], 'word' => $block['answer']['word']];
+                $run[] = ['block' => $block, 'key' => (string) $field['field_key'], 'text' => (string) $block['text'], 'value' => (string) $block['answer']['value'], 'word' => (string) $block['answer']['word']];
                 continue;
             }
             $allYesNo = false;
@@ -640,7 +641,7 @@ final class FormPrintout
 
     /**
      * @param list<array{block: array<string, mixed>, key: string, text: string, value: string, word: string}> $run
-     * @param array{number: string, text: string}|null $heading
+     * @param array<string, mixed>|null $heading
      * @return array<string, mixed>
      */
     private function yesNoRows(array $run, ?array $heading = null): array
@@ -873,7 +874,7 @@ final class FormPrintout
             if ($at !== null) {
                 $items[] = ['label' => $t->get('date'), 'value' => $t->date($at)];
             }
-            $title = $stage['title'] !== '' ? $stage['title'] : (string) ($items[0]['label'] ?? '—');
+            $title = $stage['title'] !== '' ? $stage['title'] : $items[0]['label'];
             if ($stage['title'] === '' && count($stage['entries']) === 1) {
                 $items[0]['label'] = $t->get('answer');
             }

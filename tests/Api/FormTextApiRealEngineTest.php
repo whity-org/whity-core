@@ -100,6 +100,22 @@ final class FormTextApiRealEngineTest extends TestCase
         return $decoded['data'];
     }
 
+    /** WHIT-1164: a long answer's word limit and a print group are kept, and checked. */
+    public function testAWordLimitAndAPrintGroupAreKept(): void
+    {
+        $response = $this->addField('aims', [
+            'field_type' => 'textarea', 'label' => ['en' => '2.1 Aims of the project'],
+            'validation' => ['maxWords' => 300, 'printGroup' => ['en' => 'Project details']],
+        ]);
+        self::assertSame(201, $response->getStatusCode(), $response->getBody());
+        $field = self::data($response);
+        self::assertSame(300, $field['validation']['maxWords']);
+        self::assertSame(['en' => 'Project details'], $field['validation']['printGroup']);
+
+        self::assertSame(422, $this->addField('b', ['field_type' => 'textarea', 'validation' => ['maxWords' => 0]])->getStatusCode());
+        self::assertSame(422, $this->addField('c', ['validation' => ['printGroup' => ['fr' => 'x']]])->getStatusCode());
+    }
+
     public function testADescriptionWrittenAsPlainTextBeforeThisChangeReadsAsItDid(): void
     {
         $this->pdo->exec("UPDATE forms SET description = 'Tell us about your supplier.' WHERE id = " . $this->formId);
