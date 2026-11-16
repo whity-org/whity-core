@@ -192,7 +192,8 @@ describe('Preferences › Notifications', () => {
     await waitFor(() => expect(screen.getByTestId('push-this-device').getAttribute('aria-checked')).toBe('true'));
     expect(screen.getByText('Chrome on Windows')).toBeTruthy();
 
-    const mention = screen.getByText('Mentions in comments').closest('label')!.querySelector('[role="switch"]')!;
+    // N3: each kind is a row with its Push switch first, then Email.
+    const mention = screen.getByText('Mentions in comments').closest('tr')!.querySelector('[role="switch"]')!;
     expect(mention.getAttribute('aria-checked')).toBe('false');
     await userEvent.click(mention);
     expect(mockApi.PUT).toHaveBeenCalledWith('/api/v1/me/notification-preferences', {
