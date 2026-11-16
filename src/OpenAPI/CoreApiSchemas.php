@@ -6668,6 +6668,9 @@ final class CoreApiSchemas
                 // resubmits.
                 'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true],
                 'occurred_at' => self::str(),
+                // Merge map A2: the person who was away, when the actor decided
+                // for them ("Awss Haddad for Amro Saleh"). Null otherwise.
+                'on_behalf_of_profile_id' => self::int(true),
                 // WHIT-922, on the audit page only: the hash of the entry before
                 // this one on the document, and this entry's own. Null on
                 // entries written before the chain began.
@@ -7065,6 +7068,22 @@ final class CoreApiSchemas
                 'agent_id' => self::int() + ['description' => 'For a direct chat with one of your agents.'],
                 'link' => SchemaBuilder::ref('ChatLink'),
             ], []),
+            'ChatDiscussRequest' => self::object([
+                'link' => SchemaBuilder::ref('ChatLink'),
+            ], ['link']),
+            'ChatDiscussResponse' => self::dataEnvelope([
+                'allOf' => [
+                    SchemaBuilder::ref('Chat'),
+                    self::object([
+                        'members' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMember')],
+                        'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMessage')],
+                        'has_earlier' => self::bool(),
+                        'my_member_id' => self::int(),
+                        'last_read_message_id' => self::int(),
+                        'created' => self::bool() + ['description' => 'True when this call started the chat.'],
+                    ], ['members', 'messages', 'created']),
+                ],
+            ]),
             'ChatUpdateRequest' => self::object([
                 'title' => self::str() + ['description' => 'A group\'s new name.'],
                 'link' => ['oneOf' => [SchemaBuilder::ref('ChatLink'), ['type' => 'null']], 'description' => 'What the chat is about, or null to remove the link.'],
@@ -13100,6 +13119,19 @@ final class CoreApiSchemas
                 'responses' => [
                     201 => self::jsonResponse('The chat', 'ChatDetailResponse'),
                     422 => self::errorResponse('No name, someone who is not in this workspace, or an agent that does not work for you'),
+                ] + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/chats/discuss', [
+                'mcp' => $personOnly,
+                'summary' => 'Open the chat about a board, a meeting or a record, starting it if new',
+                'description' => 'One group chat per linked board, meeting or record, named after it. You join it if you are not in it yet. '
+                    . '201 when the chat was started, 200 when it was already there; `created` says the same.',
+                'tags' => ['chat'],
+                'request' => 'ChatDiscussRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The chat it already had', 'ChatDiscussResponse'),
+                    201 => self::jsonResponse('The chat, just started', 'ChatDiscussResponse'),
+                    422 => self::errorResponse('The link is not a board, a meeting or a record with an id and a name'),
                 ] + self::authErrors(),
             ]),
             self::ungatedRoute('GET', '/api/chat/chats/{id:\d+}', [
@@ -19196,6 +19228,7 @@ final class CoreApiSchemas
         $readOnly = ['readOnlyHint' => true, 'idempotentHint' => true];
         $propose = ['agentPolicy' => 'propose'];
         $plugin = ['name' => 'plugin', 'in' => 'path', 'required' => true, 'description' => 'The workspace plugin\'s slug: its name in lower case, as its permissions start with.', 'schema' => ['type' => 'string']];
+        $codePlugin = ['name' => 'plugin', 'in' => 'path', 'required' => true, 'description' => 'The installed plugin\'s name, as it gives it (FrontOffice).', 'schema' => ['type' => 'string']];
         $id = static fn (string $what): array => ['name' => 'id', 'in' => 'path', 'required' => true, 'description' => $what, 'schema' => ['type' => 'integer']];
 
         return [
@@ -19355,6 +19388,62 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            // WHIT-1122: installed code plugins, switched on per workspace.
+            self::permissionRoute('GET', '/api/workspace/code-plugins', 'plugins:read', [
+                'summary' => 'List the installed plugins this workspace can use',
+                'description' => 'Plugins installed for the whole installation that the operator lets workspaces use, each with whether it is on here, whether this workspace can switch it, and the last change.',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('The plugins', 'WorkspaceCodePluginListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/enable', 'plugins:enable', [
+                'summary' => 'Turn an installed plugin on for this workspace',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('Turned on', 'WorkspaceCodePluginSwitchResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                    409 => self::errorResponse('The plugin is on for every workspace and has no switch'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/disable', 'plugins:disable', [
+                'summary' => 'Turn an installed plugin off for this workspace',
+                'description' => 'Its data is kept; turning it back on brings everything back.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('Turned off', 'WorkspaceCodePluginSwitchResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                    409 => self::errorResponse('The plugin is on for every workspace and has no switch'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/history', 'plugins:read', [
+                'summary' => 'Who turned an installed plugin on or off in this workspace, and when',
+                'description' => 'Newest first, at most 50.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('The changes', 'WorkspaceCodePluginHistoryResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/plugins/workspace-access', 'plugins:read', [
+                'summary' => 'List who can use each installed plugin',
+                'description' => 'Operator only (the system workspace).',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('Each active plugin and its workspace access', 'CodePluginAccessListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/workspace-access', 'plugins:enable', [
+                'summary' => 'Choose who can use an installed plugin',
+                'description' => 'Operator only. all: on for every workspace. choose: each workspace turns it on. operator: only the system workspace.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'request' => 'CodePluginAccessRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The access as it now stands', 'CodePluginAccessResponse'),
+                    404 => self::errorResponse('Not an active plugin'),
+                    422 => self::errorResponse('access must be all, choose or operator'),
+                ] + self::authErrors(),
+            ]),
         ];
     }
 
@@ -19384,6 +19473,40 @@ final class CoreApiSchemas
                 'updated_at' => self::str(),
             ], ['slug', 'plugin', 'version_id', 'version', 'trust', 'enabled', 'automations_enabled']),
             'WorkspacePluginListResponse' => self::listEnvelope('WorkspacePlugin'),
+            'WorkspaceCodePlugin' => self::object([
+                'name' => self::str() + ['description' => 'The plugin\'s name'],
+                'version' => self::str(),
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose'], 'description' => 'all: on for every workspace; choose: this workspace decides'],
+                'canSwitch' => self::bool(),
+                'enabled' => self::bool() + ['description' => 'Whether it is on in this workspace'],
+                'changedAt' => ['type' => 'string', 'nullable' => true],
+                'changedBy' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
+            ], ['name', 'version', 'access', 'canSwitch', 'enabled']),
+            'WorkspaceCodePluginListResponse' => self::listEnvelope('WorkspaceCodePlugin'),
+            'WorkspaceCodePluginSwitchResponse' => self::object([
+                'data' => self::object(['name' => self::str(), 'enabled' => self::bool()], ['name', 'enabled']),
+            ], ['data']),
+            'WorkspaceCodePluginHistoryResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => self::object([
+                    'action' => ['type' => 'string', 'enum' => ['enabled', 'disabled']],
+                    'at' => self::str(),
+                    'by' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
+                ], ['action', 'at'])],
+            ], ['data']),
+            'CodePluginAccess' => self::object([
+                'name' => self::str(),
+                'version' => self::str(),
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose', 'operator']],
+                'freeForAll' => self::bool() + ['description' => 'A paid plugin is free for every workspace'],
+            ], ['name', 'access', 'freeForAll']),
+            'CodePluginAccessListResponse' => self::listEnvelope('CodePluginAccess'),
+            'CodePluginAccessRequest' => self::object([
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose', 'operator'], 'description' => 'Who can use it: all (on for every workspace), choose (each workspace turns it on) or operator (the system workspace only)'],
+                'freeForAll' => self::bool() + ['description' => 'For a paid plugin: free for every workspace, with no plan, add-on or trial needed. Left out: unchanged.'],
+            ], ['access']),
+            'CodePluginAccessResponse' => self::object([
+                'data' => SchemaBuilder::ref('CodePluginAccess'),
+            ], ['data']),
             'WorkspacePluginManifestRequest' => self::object(['manifest' => $manifest], ['manifest']),
             'PublishWorkspacePluginRequest' => self::object([
                 'manifest' => $manifest,

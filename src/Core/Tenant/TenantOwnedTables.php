@@ -123,7 +123,6 @@ final class TenantOwnedTables
         // ignores that read the tenant from the row they find.
         'calendar_staff' => '247_create_calendar.php',
         'calendar_working_hours' => '247_create_calendar.php',
-        'calendar_availability_exceptions' => '247_create_calendar.php',
         'calendar_events' => '247_create_calendar.php',
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_service_staff' => '248_create_calendar_bookings.php',
@@ -166,6 +165,8 @@ final class TenantOwnedTables
         // Bots and blocked senders (UC.4, UC.12).
         'chat_bots' => '283_create_chat_bots_and_blocking.php',
         'chat_blocked_senders' => '283_create_chat_bots_and_blocking.php',
+        // Code plugins switched on per workspace (WHIT-1122).
+        'tenant_code_plugins' => '287_create_tenant_code_plugins.php',
 
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says

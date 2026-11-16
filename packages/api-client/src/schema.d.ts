@@ -1841,6 +1841,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/chats/discuss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open the chat about a board, a meeting or a record, starting it if new
+         * @description One group chat per linked board, meeting or record, named after it. You join it if you are not in it yet. 201 when the chat was started, 200 when it was already there; `created` says the same.
+         */
+        post: operations["post_api_v1_chat_chats_discuss"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat/chats/{id}": {
         parameters: {
             query?: never;
@@ -8101,6 +8121,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plugins/workspace-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List who can use each installed plugin
+         * @description Operator only (the system workspace).
+         */
+        get: operations["get_api_v1_plugins_workspace_access"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/plugins/{id}/re-enable": {
         parameters: {
             query?: never;
@@ -8231,6 +8271,26 @@ export interface paths {
         put?: never;
         /** Drop a waiting update and stay on this version */
         post: operations["post_api_v1_plugins_name_update_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{plugin}/workspace-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose who can use an installed plugin
+         * @description Operator only. all: on for every workspace. choose: each workspace turns it on. operator: only the system workspace.
+         */
+        put: operations["put_api_v1_plugins_plugin_workspace_access"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -10852,6 +10912,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspace/code-plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the installed plugins this workspace can use
+         * @description Plugins installed for the whole installation that the operator lets workspaces use, each with whether it is on here, whether this workspace can switch it, and the last change.
+         */
+        get: operations["get_api_v1_workspace_code_plugins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/code-plugins/{plugin}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn an installed plugin off for this workspace
+         * @description Its data is kept; turning it back on brings everything back.
+         */
+        post: operations["post_api_v1_workspace_code_plugins_plugin_disable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/code-plugins/{plugin}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn an installed plugin on for this workspace */
+        post: operations["post_api_v1_workspace_code_plugins_plugin_enable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/code-plugins/{plugin}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who turned an installed plugin on or off in this workspace, and when
+         * @description Newest first, at most 50.
+         */
+        get: operations["get_api_v1_workspace_code_plugins_plugin_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -12195,6 +12332,20 @@ export interface components {
                 }[];
             };
         };
+        ChatDiscussRequest: {
+            link: components["schemas"]["ChatLink"];
+        };
+        ChatDiscussResponse: {
+            data: components["schemas"]["Chat"] & {
+                members: components["schemas"]["ChatMember"][];
+                messages: components["schemas"]["ChatMessage"][];
+                has_earlier?: boolean;
+                my_member_id?: number;
+                last_read_message_id?: number;
+                /** @description True when this call started the chat. */
+                created: boolean;
+            };
+        };
         ChatDoneResponse: {
             data: {
                 [key: string]: boolean;
@@ -12490,6 +12641,29 @@ export interface components {
             data: {
                 url: string;
             };
+        };
+        CodePluginAccess: {
+            name: string;
+            version?: string;
+            /** @enum {string} */
+            access: "all" | "choose" | "operator";
+            /** @description A paid plugin is free for every workspace */
+            freeForAll: boolean;
+        };
+        CodePluginAccessListResponse: {
+            data: components["schemas"]["CodePluginAccess"][];
+        };
+        CodePluginAccessRequest: {
+            /**
+             * @description Who can use it: all (on for every workspace), choose (each workspace turns it on) or operator (the system workspace only)
+             * @enum {string}
+             */
+            access: "all" | "choose" | "operator";
+            /** @description For a paid plugin: free for every workspace, with no plan, add-on or trial needed. Left out: unchanged. */
+            freeForAll?: boolean;
+        };
+        CodePluginAccessResponse: {
+            data: components["schemas"]["CodePluginAccess"];
         };
         Contact: {
             id: number;
@@ -14741,6 +14915,7 @@ export interface components {
             /** @enum {string|null} */
             resume_from?: "sender" | "start" | null;
             occurred_at: string;
+            on_behalf_of_profile_id?: number | null;
             prev_hash?: string | null;
             entry_hash?: string | null;
         };
@@ -19915,6 +20090,44 @@ export interface components {
             data: {
                 received: number;
                 settled: number;
+            };
+        };
+        WorkspaceCodePlugin: {
+            /** @description The plugin's name */
+            name: string;
+            version: string;
+            /**
+             * @description all: on for every workspace; choose: this workspace decides
+             * @enum {string}
+             */
+            access: "all" | "choose";
+            canSwitch: boolean;
+            /** @description Whether it is on in this workspace */
+            enabled: boolean;
+            changedAt?: string | null;
+            changedBy?: {
+                id?: number;
+                name?: string;
+            } | null;
+        };
+        WorkspaceCodePluginHistoryResponse: {
+            data: {
+                /** @enum {string} */
+                action: "enabled" | "disabled";
+                at: string;
+                by?: {
+                    id?: number;
+                    name?: string;
+                } | null;
+            }[];
+        };
+        WorkspaceCodePluginListResponse: {
+            data: components["schemas"]["WorkspaceCodePlugin"][];
+        };
+        WorkspaceCodePluginSwitchResponse: {
+            data: {
+                name: string;
+                enabled: boolean;
             };
         };
         WorkspacePlugin: {
@@ -29519,6 +29732,102 @@ export interface operations {
                 };
             };
             /** @description No name, someone who is not in this workspace, or an agent that does not work for you */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_chats_discuss: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatDiscussRequest"];
+            };
+        };
+        responses: {
+            /** @description The chat it already had */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDiscussResponse"];
+                };
+            };
+            /** @description The chat, just started */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDiscussResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The link is not a board, a meeting or a record with an id and a name */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -62733,6 +63042,71 @@ export interface operations {
             };
         };
     };
+    get_api_v1_plugins_workspace_access: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Each active plugin and its workspace access */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodePluginAccessListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_plugins_id_re_enable: {
         parameters: {
             query?: never;
@@ -63354,6 +63728,96 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_plugins_plugin_workspace_access: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The installed plugin's name, as it gives it (FrontOffice). */
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodePluginAccessRequest"];
+            };
+        };
+        responses: {
+            /** @description The access as it now stands */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodePluginAccessResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not an active plugin */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description access must be all, choose or operator */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -78310,6 +78774,293 @@ export interface operations {
             };
             /** @description The version no longer passes the checks; details.errors lists why */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_workspace_code_plugins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plugins */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceCodePluginListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_code_plugins_plugin_disable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The installed plugin's name, as it gives it (FrontOffice). */
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Turned off */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceCodePluginSwitchResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a plugin this workspace can use */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The plugin is on for every workspace and has no switch */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_code_plugins_plugin_enable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The installed plugin's name, as it gives it (FrontOffice). */
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Turned on */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceCodePluginSwitchResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a plugin this workspace can use */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The plugin is on for every workspace and has no switch */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_workspace_code_plugins_plugin_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The installed plugin's name, as it gives it (FrontOffice). */
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The changes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceCodePluginHistoryResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a plugin this workspace can use */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

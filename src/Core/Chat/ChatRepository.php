@@ -89,6 +89,20 @@ final class ChatRepository
         return $id === false ? null : (int) $id;
     }
 
+    /** The oldest group chat linked to this board, meeting or record, if any. */
+    public function findLinked(int $tenantId, string $type, string $linkId): ?int
+    {
+        $stmt = $this->db->prepare(
+            "SELECT conversation_id FROM chats
+              WHERE tenant_id = :tid AND type = 'group' AND link_type = :type AND link_id = :lid
+              ORDER BY conversation_id ASC LIMIT 1"
+        );
+        $stmt->execute([':tid' => $tenantId, ':type' => $type, ':lid' => $linkId]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int) $id;
+    }
+
     public function rename(int $tenantId, int $id, string $title): void
     {
         $this->db->prepare('UPDATE conversations SET subject = :title, updated_at = NOW() WHERE tenant_id = :tid AND id = :id')

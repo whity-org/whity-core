@@ -59,7 +59,6 @@ final class CoreTables
         'audit_log' => '016_create_audit_log.php',
         'away_periods' => '251_add_two_admin_resets_and_away.php',
         'backup_codes' => '007_add_two_factor_support.php',
-        'calendar_availability_exceptions' => '247_create_calendar.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
         'calendar_events' => '247_create_calendar.php',
         'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
@@ -228,6 +227,9 @@ final class CoreTables
         // Bots and blocked senders (UC.4, UC.12).
         'chat_bots' => '283_create_chat_bots_and_blocking.php',
         'chat_blocked_senders' => '283_create_chat_bots_and_blocking.php',
+        // Code plugins switched on per workspace (WHIT-1122).
+        'tenant_code_plugins' => '287_create_tenant_code_plugins.php',
+        'code_plugin_access' => '288_create_code_plugin_access.php',
         'tenant_settings' => '025_create_tenant_settings.php',
         'tenant_storage_config' => '053_create_tenant_storage_config.php',
         'tenants' => '001_create_users_roles.php',

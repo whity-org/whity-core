@@ -40,6 +40,18 @@ final class JobRunner
     }
 
     /**
+     * Plugins switched off for a workspace (WHIT-1123). A job a plugin queued
+     * for a workspace where it is now off is completed without running.
+     * Null: every job runs, as before.
+     */
+    private ?\Whity\Core\Plugin\Workspace\CodePluginActivation $activation = null;
+
+    public function setWorkspaceActivation(\Whity\Core\Plugin\Workspace\CodePluginActivation $activation): void
+    {
+        $this->activation = $activation;
+    }
+
+    /**
      * Reserve and process the next runnable job on a queue.
      *
      * @return bool true if a job was processed, false if the queue was empty.
@@ -82,6 +94,17 @@ final class JobRunner
         // which is also what puts the ENQUEUEING tenant on any audit row the
         // handler causes, rather than the system tenant (#935).
         TenantContext::setTenantId((int) $job['tenant_id']);
+        // Read fresh for every job: a long-running worker must see a workspace
+        // turn a plugin off without restarting.
+        $this->activation?->resetRequest();
+        $source = $this->registry->sourceOf($name);
+        if ($source !== null && $this->activation !== null && !$this->activation->isOn($source, (int) $job['tenant_id'])) {
+            $this->logger->info('Job skipped: its plugin is off for this workspace', ['job' => $name, 'id' => $id, 'tenant_id' => (int) $job['tenant_id']]);
+            $this->repo->markCompleted($id, ['skipped' => 'plugin_off']);
+            TenantContext::reset();
+
+            return;
+        }
         // Name the unit of work for the audit trail. The NAME only, never the
         // payload: payloads carry caller-supplied data and the trail is readable
         // by any tenant admin with `audit:read` — the same rule #931 adopted for

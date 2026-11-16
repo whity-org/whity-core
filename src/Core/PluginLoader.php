@@ -93,7 +93,7 @@ use Whity\Sdk\Sdk;
  * the SDK plugin contract ({@see \Whity\Sdk\PluginInterface}, WC-162), and
  * registers their routes, permissions, and hooks.
  */
-class PluginLoader
+class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
 {
     /** Arguments and messages kept per plugin prompt, and the length of each message (SDK 1.80). */
     private const MAX_PROMPT_ITEMS = 20;
@@ -235,6 +235,12 @@ class PluginLoader
      * than a gap, which is part of why the worker's went unnoticed.
      */
     private ?AuditLogger $auditLogger = null;
+
+    /**
+     * Which workspaces have each code plugin on (WHIT-1122). Null means every
+     * plugin is on everywhere, as before.
+     */
+    private ?\Whity\Core\Plugin\Workspace\CodePluginActivation $workspaceActivation = null;
 
     /**
      * @var HookManager|null Hook manager instance
@@ -527,6 +533,68 @@ class PluginLoader
     public function setLicenceSales(HostLicenceSales $licenceSales): void
     {
         $this->licenceSales = $licenceSales;
+    }
+
+    /** Switch plugins on and off per workspace (WHIT-1122). */
+    public function setWorkspaceActivation(\Whity\Core\Plugin\Workspace\CodePluginActivation $activation): void
+    {
+        $this->workspaceActivation = $activation;
+    }
+
+    /**
+     * Is this plugin off for the current request's workspace (WHIT-1122)?
+     * The system workspace and work with no workspace see every plugin on.
+     *
+     * @param string $pluginKey The plugin's stable identity (original FQCN).
+     */
+    public function isOffForWorkspace(string $pluginKey, ?int $tenantId = null): bool
+    {
+        if ($this->workspaceActivation === null) {
+            return false;
+        }
+        $plugin = $this->registeredPlugins[$pluginKey]['plugin'] ?? null;
+        if ($plugin === null) {
+            return false;
+        }
+
+        return !$this->workspaceActivation->isOn($plugin->getName(), $tenantId);
+    }
+
+    public function isPluginOffForWorkspace(string $pluginName, ?int $tenantId = null): bool
+    {
+        return $this->workspaceActivation !== null && !$this->workspaceActivation->isOn($pluginName, $tenantId);
+    }
+
+    public function isToolsetOffForWorkspace(?string $toolset, ?int $tenantId = null): bool
+    {
+        if ($this->workspaceActivation === null || $toolset === null || $toolset === '') {
+            return false;
+        }
+        foreach ($this->registeredPlugins as $info) {
+            $name = $info['plugin']->getName();
+            $root = \Whity\Mcp\Tools\CoreToolsets::pluginToolsetId($name);
+            if ($root !== '' && \Whity\Mcp\Tools\ToolSurface::isWithin($toolset, $root)) {
+                return !$this->workspaceActivation->isOn($name, $tenantId);
+            }
+        }
+
+        return false;
+    }
+
+    public function isClassOffForWorkspace(string $class, ?int $tenantId = null): bool
+    {
+        if ($this->workspaceActivation === null) {
+            return false;
+        }
+        $class = ltrim($class, '\\');
+        foreach ($this->registeredPlugins as $info) {
+            $prefix = rtrim($info['namespacePrefix'], '\\');
+            if ($prefix !== '' && str_starts_with($class, $prefix . '\\')) {
+                return !$this->workspaceActivation->isOn($info['plugin']->getName(), $tenantId);
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -5242,6 +5310,10 @@ class PluginLoader
                 continue;
             }
 
+            if ($this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+
             foreach ($info['frontendFeatures'] as $feature) {
                 $features[] = $feature;
             }
@@ -5267,6 +5339,10 @@ class PluginLoader
 
             $lifecycle = $this->lifecycles[$pluginKey] ?? null;
             if ($lifecycle === null || !$lifecycle->isActive()) {
+                continue;
+            }
+
+            if ($this->isOffForWorkspace($pluginKey)) {
                 continue;
             }
 
@@ -5404,6 +5480,13 @@ class PluginLoader
                 return Response::error('Plugin temporarily unavailable', 503);
             }
 
+            // Off for this workspace (WHIT-1122): it isn't there at all. The
+            // answer is the same as for a route that doesn't exist, so a
+            // workspace can't learn what another workspace has turned on.
+            if ($this->isOffForWorkspace($pluginKey)) {
+                return Response::error('Not Found', 404, ['reason' => 'plugin_off']);
+            }
+
             try {
                 $result = $handler($request, $params);
 
@@ -5461,6 +5544,12 @@ class PluginLoader
                 return $data;
             }
 
+            // Off for the workspace this event belongs to (WHIT-1123): the
+            // listener doesn't run, and the data passes through unchanged.
+            if ($this->isOffForWorkspace($pluginKey, self::hookTenant($context))) {
+                return $data;
+            }
+
             try {
                 $result = $callback($data, $context);
                 $lifecycle?->recordSuccess();
@@ -5500,6 +5589,10 @@ class PluginLoader
                 return;
             }
 
+            if ($this->isOffForWorkspace($pluginKey, self::hookTenant($context))) {
+                return;
+            }
+
             try {
                 $callback($data, $context);
                 $lifecycle?->recordSuccess();
@@ -5514,6 +5607,20 @@ class PluginLoader
                 $this->handlePluginThrowable($pluginKey, $e, 'hook callback');
             }
         };
+    }
+
+    /**
+     * The workspace a hook event belongs to: the event's own `tenant_id` when
+     * it names one (a job or a CLI run has no request workspace), else the
+     * current request's.
+     *
+     * @param array<mixed> $context
+     */
+    private static function hookTenant(array $context): ?int
+    {
+        $tenant = $context['tenant_id'] ?? null;
+
+        return is_int($tenant) ? $tenant : \Whity\Core\Tenant\TenantContext::getTenantId();
     }
 
     /**

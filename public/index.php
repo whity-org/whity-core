@@ -2080,6 +2080,9 @@ $router->register('DELETE', '/api/users/{id:\d+}/memberships/{membershipId:\d+}'
 // catalogue and role grants hide other workspaces' plugin permissions.
 $tenantPluginRepository = new \Whity\Core\Plugin\Tenant\TenantPluginRepository($db->getPdo());
 $tenantManifestHost = new \Whity\Core\Plugin\Tenant\TenantManifestHost($tenantPluginRepository, $permissionRegistry, $logger);
+// WHIT-1122: installed code plugins, switched on per workspace.
+$codePluginActivation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($db->getPdo());
+$pluginLoader->setWorkspaceActivation($codePluginActivation);
 
 $rolesHandler = new RolesApiHandler(
     $db->getPdo(),
@@ -2360,6 +2363,15 @@ $router->register('POST', '/api/workspace-plugins/test', [$tenantPluginVersionsH
 $router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions', [$tenantPluginVersionsHandler, 'versions'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}', [$tenantPluginVersionsHandler, 'version'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}/activate', [$tenantPluginVersionsHandler, 'activate'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_PUBLISH);
+
+// Installed code plugins, switched on per workspace (WHIT-1122).
+$workspaceCodePluginsHandler = new \Whity\Api\WorkspaceCodePluginsApiHandler($pluginLoader, $codePluginActivation, $db->getPdo(), $auditLogger);
+$router->register('GET', '/api/workspace/code-plugins', [$workspaceCodePluginsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/enable', [$workspaceCodePluginsHandler, 'enable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
+$router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/disable', [$workspaceCodePluginsHandler, 'disable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_DISABLE);
+$router->register('GET', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/history', [$workspaceCodePluginsHandler, 'history'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('GET', '/api/plugins/workspace-access', [$workspaceCodePluginsHandler, 'accessList'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('PUT', '/api/plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/workspace-access', [$workspaceCodePluginsHandler, 'setAccess'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
 
 // Health monitoring endpoint (WC-4). Registered UNVERSIONED so load-balancer
 // probes that target GET /api/health never break regardless of the API version.
@@ -5823,6 +5835,8 @@ $router->register('GET',    '/api/chat/bots',                                   
 $router->register('PUT',    '/api/chat/bots/{kind:[a-z]+}',                     [$chatHandler, 'bots'],          null);
 $router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null);
 $router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null);
+// Merge map C2: "Discuss in chat" opens the record's one chat, or starts it.
+$router->register('POST',   '/api/chat/chats/discuss',                          [$chatHandler, 'discuss'],       null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null);
 $router->register('PATCH',  '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'update'],        null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'messages'],      null);
@@ -6192,7 +6206,10 @@ CorePrompts::register($promptRegistry);
 // Collected from the grants as they stand at boot and on every reload, and asked
 // again on every call, so a revoke applies at once.
 $agentContextGrants = new \Whity\Core\Plugin\Trust\AgentContextGrants($db->getPdo(), new \Whity\Core\Plugin\Trust\CodePluginVerification($db->getPdo(), $storeMarks), $auditLogger);
-$agentContextGranted = static fn (string $plugin): bool => $agentContextGrants->isGranted($plugin);
+// Asked on every call: granted agent context by the operator, and on for the
+// caller's workspace (WHIT-1123).
+$agentContextGranted = static fn (string $plugin): bool => $agentContextGrants->isGranted($plugin)
+    && !$pluginLoader->isPluginOffForWorkspace($plugin);
 $agentContextGrantedNow = static function () use ($agentContextGrants): \Closure {
     $names = array_flip($agentContextGrants->granted());
 
@@ -6304,6 +6321,7 @@ $mcpToolCatalogue = static function () use ($toolDeriver, $authoredMcpTools): ar
 $mcpToolsAdminHandler = new McpToolsAdminHandler($toolDeriver, $roleChecker, $authoredMcpTools, $mcpEnabledPluginAlwaysOn);
 $router->register('GET', '/api/admin/mcp/tools', [$mcpToolsAdminHandler, 'list'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 $mcpToolsListHandler = new ToolsListHandler($toolDeriver, $roleChecker, $tokenValidator, $authoredMcpTools);
+$mcpToolsListHandler->setWorkspaceGate($pluginLoader);
 $mcpServerEnabled = (bool) filter_var($_ENV['MCP_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
 // WHIT-784: an agent's Ask-first call is stored for its person to approve.
 $agentProposals = new \Whity\Core\Agent\AgentProposalRepository(
@@ -6341,6 +6359,7 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
 $mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters);
+$mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.
@@ -6675,6 +6694,12 @@ $pluginLoader->setInboxSources($inboxSourceRegistry);
 $pluginLoader->setMessageChannels($messageChannelRegistry);
 // A plugin's booking payment step and calendar busy times (SDK 1.98, ADR 0017).
 $pluginLoader->setCalendarPlugins($calendarPlugins);
+// WHIT-1123: what plugins add to these registries disappears in a workspace
+// that has the plugin off.
+$agentPresetRegistry->setWorkspaceGate($pluginLoader);
+$calendarPlugins->setWorkspaceGate($pluginLoader);
+$inboxSourceRegistry->setWorkspaceGate($pluginLoader);
+$messageChannelRegistry->setWorkspaceGate($pluginLoader);
 // WHIT-1011: plugin SERVICE routes accept a client-credentials token from the
 // trusted issuer (SERVICE_TOKEN_ISSUER, else MCP_OAUTH_ISSUER) for a client on
 // SERVICE_TOKEN_CLIENTS. Off, so no service route opens, until both are set.
@@ -6786,7 +6811,7 @@ if ($isWorker) {
         // are gated behind development/DEBUG. Decision is computed once per
         // iteration and captured by the request closure below.
         $logLifecycle = WorkerRuntime::shouldLogLifecycle($_ENV);
-        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry, $publicFormGate) {
+        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry, $publicFormGate, $codePluginActivation) {
             try {
                 // Dispatch request start hook
                 if ($logLifecycle) {
@@ -6906,6 +6931,7 @@ if ($isWorker) {
                 \Whity\Core\Http\AfterResponse::reset();
                 // WHIT-760: the workspace-plugin reads are per request too.
                 $tenantManifestHost->resetRequest();
+                $codePluginActivation->resetRequest();
                 // WHIT-742: and the workspace record types the field registry read from them.
                 $documentFieldRegistry->resetRequest();
                 // DB session hygiene (WC-21/PR #84): after the response is sent,
@@ -7043,6 +7069,7 @@ if ($isWorker) {
         RoleChecker::clearCache();
         \Whity\Core\Http\AfterResponse::reset();
         $tenantManifestHost->resetRequest();
+        $codePluginActivation->resetRequest();
         $documentFieldRegistry->resetRequest();
     }
 }

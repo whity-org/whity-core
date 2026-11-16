@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use PDO;
 use Throwable;
 use Whity\Core\Audience\ActiveMemberFilter;
+use Whity\Core\Delegation\AwayService;
 use Whity\Core\Document\Numbering\DocumentNumbering;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Ou\PrimaryMembershipOu;
@@ -179,6 +180,9 @@ final class DocumentRouter
 
     private readonly RouteStepValueRepository $stepValues;
 
+    /** Merge map A2: who decides route items for a person while they are away. */
+    private readonly AwayService $away;
+
     public function __construct(
         private readonly PDO $db,
         private readonly RouteRepository $routes,
@@ -201,6 +205,7 @@ final class DocumentRouter
         $this->numbering = new DocumentNumbering($db);
         $this->finalisations = new RouteFinalisationRepository($db);
         $this->stepValues = new RouteStepValueRepository($db);
+        $this->away = new AwayService($db);
     }
 
     /**
@@ -604,10 +609,25 @@ final class DocumentRouter
         }
 
         $recipient = $this->recipients->findOpenForProfile($tenantId, $routeId, $actorId);
+        // Merge map A2: with no item of their own here, the actor may hold one
+        // for someone who is away and named them to decide for them ("I'm
+        // away", approvals). Their answer counts as that person's on the step
+        // and the trail says whom they acted for.
+        $onBehalfOf = null;
+        if ($recipient === null) {
+            $recipient = $this->coveredItem($tenantId, $routeId, $actorId);
+            $onBehalfOf = $recipient !== null ? (int) $recipient['profile_id'] : null;
+        }
         if ($recipient === null) {
             throw RoutingRejectedException::because(
                 'You have no open item on this route. An item you have already acted on cannot be acted on '
                 . 'again — add a note instead, which appends to the trail without changing what happened.'
+            );
+        }
+        if ($onBehalfOf !== null && $signAct) {
+            // A signature is the signer's own. It waits for them.
+            throw RoutingRejectedException::because(
+                'Only the person it is for can sign this. It waits for them until they are back.'
             );
         }
         if ($recipient['role'] === RouteRecipientRepository::ROLE_AUTHOR) {
@@ -801,6 +821,7 @@ final class DocumentRouter
                 'to_author' => $toAuthor,
                 'subject_version' => $version['version'],
                 'content_hash' => $version['content_hash'],
+                'on_behalf_of_profile_id' => $onBehalfOf,
             ]);
 
             $this->recipients->close($tenantId, (int) $recipient['id'], $eventId);
@@ -1439,6 +1460,25 @@ final class DocumentRouter
      * route's final document now that it has committed. Does nothing when the
      * route is not waiting for one.
      */
+    /**
+     * Merge map A2: an open step item on this route held by someone the actor
+     * decides approvals for today, or null. Items sent back to an author stay
+     * with the author.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function coveredItem(int $tenantId, int $routeId, int $actorId): ?array
+    {
+        foreach ($this->away->coveredBy($tenantId, $actorId, AwayService::FLOWS) as $awayId) {
+            $item = $this->recipients->findOpenForProfile($tenantId, $routeId, $awayId);
+            if ($item !== null && $item['role'] !== RouteRecipientRepository::ROLE_AUTHOR) {
+                return $item;
+            }
+        }
+
+        return null;
+    }
+
     public function finalisePending(int $tenantId, int $routeId): void
     {
         if ($this->db->inTransaction()) {
