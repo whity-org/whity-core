@@ -1,5 +1,46 @@
 # Implementation notes
 
+# Owner decision: the installer is a server install, and it is `whity install` (16 Nov 2026)
+
+**Decision.** The owner chose the server install `SiteInstallerTerminal` draws ("Server install"),
+replacing register WS.20's local install at localhost:3000; and installing Whity is two npm lines,
+`npm install -g @whity/cli` then `whity install` (the command stays `whity`), with
+`curl -fsSL https://whity.dev/install.sh | sh` kept as a thin bootstrap that checks Node.js 20+
+and runs those two. The register's WS.20 still reads "local install"; it is for the owner and the
+design team to update, not engineering.
+
+**What `whity install` does (WHIT-1044, `packages/cli`).** Checks this server (system, CPUs,
+memory, free disk), Docker with Compose v2, ports 80 and 443 (or `--port`) and that the domain
+resolves, all before writing anything; asks the web address and the first owner's email on a
+terminal (`--domain`, `--email` answer them); downloads the release's compose file and images;
+writes `.env` the way `whity update` expects, plus `Caddyfile` and `docker-compose.override.yml`
+with a Caddy service (an update replaces only `docker-compose.yml`, so Caddy stays); starts the
+database, runs migrations and seed, starts everything and checks it; waits until the address
+answers over HTTPS before printing "Got a certificate"; checks the owner account exists; prints
+the address and `whity update`.
+
+**Where it differs from the card, and why.**
+- The card ends "Sign in with the link we emailed". A new server has no mail set up, so nothing
+  can be emailed; the line names the owner's email and says the first password is
+  `INITIAL_SYSTEM_ADMIN_PASSWORD` in `.env` (the tool keeps passwords out of terminal history,
+  WHIT-840). A sign-in link by email needs mail first; not built.
+- No certificate within three minutes (DNS not there yet, ports closed): an amber "No certificate
+  yet" with what to check and `docker compose restart caddy`, and the rest finishes. It never
+  prints the ✓ it didn't get.
+- Arabic and the ✓ ✗ marks only where the console shows them (Linux, macOS, Windows Terminal);
+  Windows PowerShell 5.1's classic console keeps English and plain marks, as WHIT-840 decided.
+- Node.js 20+ is needed on the server, besides Docker: the install is the `whity` command.
+
+**Publishing.** The package is `@whity/cli` (0.2.0), published by `publish-cli.yml` on a release
+to main through npm trusted publishing. A plain `whity` name was tried and dropped: npm refused it
+as too similar to existing packages (`which`, `write`), so the owner chose `@whity/cli` (16 Nov 2026).
+
+**Order, so the live one-liner never breaks.** whity.dev serves `install.sh` from whity-core's
+develop on every whity-web deploy. So `install.sh` stays the local installer until `@whity/cli`
+0.2.0 is on npm (the next release publishes it); only then does it become
+the bootstrap, and whity.dev/install switch to the two npm lines and this output, in English and
+Arabic.
+
 # Design 3.5.1: US dollars (15 Nov 2026)
 
 3.5.1 makes US dollars the default currency (register CU.1–CU.5); the owner approved the plan on 15 Nov 2026. Core stays multi-currency: each workspace has a currency (`billing.default_currency`, USD for new workspaces) and every stored amount keeps its own row's currency. Workspaces that existed before 3.5.1 are pinned to the currency they had (JOD), and no stored amount is rewritten.
@@ -1023,3 +1064,17 @@ All answered on 29 Oct 2026 (above). Kept here as asked, for the record.
     - `docs/design/fonts/` ships 700 weights and Geist Mono 600, which stage 9 says are no longer declared. M1 won't copy them.
 13. **Responsive states have no cards.** Every editor card is 1280px wide, but the design changes layout at 1280, 1024 and 768 (outline closes, rail becomes a drawer, toolbar scrolls). Those can only be checked against the text, not a screenshot. Should cards be added, or is the text enough?
 14. **Branch and commit names.** CONTRIBUTING wants `type/WC-XX-…` branches and `WC-XX:` commits. Is there a ticket for the editor, and should later milestones follow that (`feature/WC-XX-editor-m1`), or keep `design/editor-mN`?
+
+## One chat (A17, design 3.5): owner's answers, 16 Nov 2026
+
+The owner kept all five defaults ("Keep defaults"):
+
+| Question | Answer |
+| --- | --- |
+| Voice "with its text" | The browser's own speech recognition while recording, where it exists; no server transcription. Elsewhere the voice goes without words. |
+| Order-status and stock bots | They come from plugins (Front Office has the data). Core has the away reply, the welcome message and hand-over. |
+| Payment links in chat | Only when Whity Pay is installed. |
+| Who sees customer chats | People with `messages.read`, as Messages had; team chats by membership. |
+| Typing and seen | The existing 5-second polling, no websocket. |
+
+Built as WHIT-1093 to WHIT-1099 (#2011, #2017, #2019, #2020, #2022, #2023), migrations 279 to 283; #2011 and #2017 merged first as 281 and 282 and ran on app.whity.dev before the final numbers were set, so they keep them. Still to build for A17's "done when": one conversation per customer across channels (a WhatsApp reply and an email reply in the same conversation), payment links, booking times and forms in customer chats, and Forward and Turn into a task.

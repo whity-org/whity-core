@@ -6,6 +6,7 @@ namespace Whity\Core\Calendar;
 
 use DateTimeImmutable;
 use PDO;
+use Whity\Core\Security\PublicToken;
 
 /**
  * The customer's link to move or cancel a booking (ADR 0017, section 6).
@@ -24,12 +25,12 @@ final class ManageLinks
     /** Issue a fresh token for a booking and return it (the only time it is seen). */
     public function issue(int $tenantId, int $bookingId, DateTimeImmutable $expiresAt): string
     {
-        $raw = bin2hex(random_bytes(32));
+        $raw = PublicToken::make(32);
         $this->db->prepare(
             'UPDATE calendar_bookings SET manage_token_hash = :hash, manage_token_expires_at = :expires
               WHERE tenant_id = :tenant_id AND id = :id'
         )->execute([
-            ':hash' => hash('sha256', $raw),
+            ':hash' => PublicToken::hash($raw),
             ':expires' => Interval::toDb($expiresAt),
             ':tenant_id' => $tenantId,
             ':id' => $bookingId,
@@ -53,7 +54,7 @@ final class ManageLinks
         $stmt = $this->db->prepare(
             'SELECT tenant_id, id FROM calendar_bookings WHERE manage_token_hash = :hash AND manage_token_expires_at > :now LIMIT 1'
         );
-        $stmt->execute([':hash' => hash('sha256', $raw), ':now' => Interval::toDb($now)]);
+        $stmt->execute([':hash' => PublicToken::hash($raw), ':now' => Interval::toDb($now)]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return is_array($row) ? [(int) $row['tenant_id'], (int) $row['id']] : null;

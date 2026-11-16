@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useNavigation } from '@/lib/navigation-context';
 import type { Membership } from '@/lib/auth-context';
@@ -42,6 +42,7 @@ import {
 import { useState, useCallback, useMemo } from 'react';
 import { useShellNav } from '@/components/shell/use-shell-nav';
 import { localizedText } from '@whity/ui/localized-text';
+import { useCalendarSidebarOpen } from '@/lib/calendar/choices';
 
 /** Settings stays at the foot with the account row on short windows (PW.10). */
 const PINNED_GROUP_IDS = ['settings'];
@@ -154,7 +155,17 @@ export function Sidebar() {
   // Between 768 and 1023px the sidebar is the rail whatever the toggle says
   // (register 4.5); the logo, switcher and footer follow the same state.
   const forcedRail = useForcedRail();
-  const collapsed = (isCollapsed || forcedRail) && !isMobileOpen;
+  // Calendar screens start as the 56px rail so the grid gets the room; a
+  // person who opens the sidebar there keeps it open on their calendar (CV.1).
+  const pathname = usePathname();
+  const onCalendar = pathname === '/calendar' || (pathname?.startsWith('/calendar/') ?? false);
+  const [calendarOpen, setCalendarOpen] = useCalendarSidebarOpen();
+  const chosenRail = onCalendar ? !calendarOpen : isCollapsed;
+  const collapsed = (chosenRail || forcedRail) && !isMobileOpen;
+  const onCollapsedChange = useCallback(
+    (next: boolean) => (onCalendar ? setCalendarOpen(!next) : setIsCollapsed(next)),
+    [onCalendar, setCalendarOpen]
+  );
 
 
   const handleLogout = () => {
@@ -327,17 +338,14 @@ export function Sidebar() {
       }
       footer={footer}
       collapsed={collapsed}
-      onCollapsedChange={setIsCollapsed}
+      onCollapsedChange={onCollapsedChange}
       mobileOpen={isMobileOpen}
       onMobileOpenChange={setIsMobileOpen}
       linkComponent={Link}
       phoneTabBar
       pinnedGroupIds={PINNED_GROUP_IDS}
       collapsibleGroups
-      searchable
-      searchPlaceholder={t('sidebar.search.placeholder', 'Search pages')}
-      clearSearchLabel={t('sidebar.search.clear', 'Clear search')}
-      searchNoResultsLabel={t('sidebar.search.noResults', 'No matching pages')}
+      // One search (WHIT-1082): the top bar's, Ctrl+K. The sidebar's own filter box went.
       navLabel={t('sidebar.navLabel', 'Main')}
       openNavLabel={t('sidebar.openNav', 'Open navigation')}
       closeNavLabel={t('sidebar.closeNav', 'Close navigation')}

@@ -96,7 +96,7 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
         waited: dates.relative(row.at, ageLabels),
         href:
           row.item.resource_type === 'conversation' && row.item.resource_id
-            ? `/admin/messages?c=${encodeURIComponent(row.item.resource_id)}`
+            ? `/chat?c=${encodeURIComponent(row.item.resource_id)}&k=customer`
             : meta === null
               ? undefined
               : routingHref(meta),
@@ -259,9 +259,16 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
                 <Button variant="ghost" onClick={() => void decide(row.proposal as AgentProposal, 'decline')}>
                   {t('dashboard.waiting.decline', 'Decline')}
                 </Button>
-                <Button variant="outline" onClick={() => void decide(row.proposal as AgentProposal, 'approve')}>
-                  {t('dashboard.waiting.approve', 'Approve')}
-                </Button>
+                {row.proposal.tier === 3 ? (
+                  // AG.1: Needs verifying opens on its own, where the person confirms it's them.
+                  <Button variant="outline" onClick={() => router.push('/admin/approvals')}>
+                    {t('dashboard.waiting.open', 'Open')}
+                  </Button>
+                ) : (
+                  <Button variant="outline" onClick={() => void decide(row.proposal as AgentProposal, 'approve')}>
+                    {t('dashboard.waiting.approve', 'Approve')}
+                  </Button>
+                )}
               </div>
             ) : (
               row.href !== undefined && (

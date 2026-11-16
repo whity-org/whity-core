@@ -61,6 +61,14 @@ final class InvitationsApiHandler
         private readonly ?InvitationMailer $mailer = null,
     ) {}
 
+    /** @var \Whity\Core\Seat\SeatService|null WHIT-1156: the plan's staff limit, asked before each invitation */
+    private ?\Whity\Core\Seat\SeatService $seats = null;
+
+    public function useSeats(\Whity\Core\Seat\SeatService $seats): void
+    {
+        $this->seats = $seats;
+    }
+
     /**
      * GET /api/v1/invitations — the pending (and recently closed) invitations
      * for the caller's own tenant.
@@ -110,6 +118,19 @@ final class InvitationsApiHandler
             return Response::error('That organizational unit does not exist in this tenant', 422);
         }
 
+        // WHIT-1156: the plan's staff limit (`members.max`), as `seats.enforcement`
+        // says: `block` refuses the next invitation, `warn` sends it and says so.
+        // Nobody already in the workspace is ever removed.
+        $seat = $this->seats?->decide($ctx['tenantId']);
+        if ($seat !== null && !$seat->allowed) {
+            return Response::error(
+                "Your workspace's plan includes {$seat->limit} staff, and all of them are taken. "
+                . 'To invite more people, move the workspace to a larger plan on Billing. Nobody already here is removed.',
+                409,
+                ['code' => 'seat_limit', 'limit' => $seat->limit, 'used' => $seat->used],
+            );
+        }
+
         $throttled = $this->throttle($ctx['tenantId'], $ctx['userId']);
         if ($throttled instanceof Response) {
             return $throttled;
@@ -138,7 +159,17 @@ final class InvitationsApiHandler
 
         $this->dispatchMail($email, $ctx['tenantId'], $result['token'], $ttlDays);
 
-        return Response::json(['data' => $this->rowFor($result['id'], $ctx['tenantId'])], 201);
+        $row = $this->rowFor($result['id'], $ctx['tenantId']);
+        if ($seat !== null && $seat->atLimit) {
+            $row['seats'] = [
+                'limit' => $seat->limit,
+                'used' => $seat->used + 1,
+                'message' => "Your workspace's plan includes {$seat->limit} staff, and this invitation goes past it. "
+                    . 'Move the workspace to a larger plan on Billing to stay within it.',
+            ];
+        }
+
+        return Response::json(['data' => $row], 201);
     }
 
     /**

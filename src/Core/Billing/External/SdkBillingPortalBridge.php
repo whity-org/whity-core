@@ -61,6 +61,38 @@ final class SdkBillingPortalBridge implements BillingPortal
         return new CheckoutHandoff($handoff->url, $handoff->reference);
     }
 
+    /**
+     * Sell several of one price in one checkout (SDK 1.110), when the billing
+     * plugin can; otherwise refused as unsupported, never charged as one.
+     *
+     * @param array<string, mixed> $payer
+     */
+    public function startCheckoutForQuantity(
+        BillingActor $actor,
+        string $subjectRef,
+        string $priceRef,
+        int $quantity,
+        string $returnUrl,
+        ?string $cancelUrl = null,
+        array $payer = [],
+    ): CheckoutHandoff {
+        $portal = $this->portal;
+        if (!$portal instanceof \Whity\Sdk\Billing\QuantityCheckout) {
+            throw BillingPortalException::unsupported('this billing plugin sells one at a time');
+        }
+        $handoff = $this->call(fn () => $portal->startCheckoutForQuantity(
+            $actor->value,
+            $subjectRef,
+            $priceRef,
+            max(1, $quantity),
+            $returnUrl,
+            $cancelUrl,
+            $payer,
+        ));
+
+        return new CheckoutHandoff($handoff->url, $handoff->reference);
+    }
+
     public function accessFor(string $subjectRef): AccessSnapshot
     {
         $snapshot = $this->call(fn () => $this->portal->accessFor($subjectRef));

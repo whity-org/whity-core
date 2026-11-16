@@ -19,7 +19,7 @@ final class FormPrintoutTest extends TestCase
         $f = static fn (string $key, string $type, string $label, ?string $section, array $extra = []): array => $extra + [
             'field_key' => $key, 'field_type' => $type, 'label' => ['en' => $label, 'ar' => $label . ' (ar)'],
             'help_text' => null, 'help_text_i18n' => [], 'is_required' => true, 'options' => [], 'validation' => [],
-            'section_key' => $section, 'visible_when' => null, 'audience' => 'applicant',
+            'section_key' => $section, 'visible_when' => null,
         ];
         $yn = [['value' => 'yes', 'label' => ['en' => 'Yes']], ['value' => 'no', 'label' => ['en' => 'No']], ['value' => 'na', 'label' => ['en' => 'N/A']]];
 
@@ -38,7 +38,6 @@ final class FormPrintoutTest extends TestCase
             // An "if yes" follow-up left empty does not stop the section collapsing.
             $f('drug_identify', 'textarea', 'Identify the drugs', 'regulated', ['is_required' => false]),
             $f('pi_sign', 'signature', 'Principal investigator', 'declaration'),
-            $f('dean', 'select', 'Dean’s recommendation', null, ['audience' => 'staff', 'options' => [['value' => 'recommend', 'label' => ['en' => 'Recommend approval']]]]),
         ];
     }
 
@@ -71,7 +70,8 @@ final class FormPrintoutTest extends TestCase
                 'drugs' => 'na', 'devices' => 'na', 'samples' => 'na',
                 'pi_sign' => ['name' => 'Dr Ahmad Khalil', 'signed_at' => '2026-11-02T09:12:00Z', 'drawing' => ['viewBox' => [200, 60], 'paths' => ['M0 0 L10 10']]],
             ],
-            'office' => ['dean' => ['value' => 'recommend', 'by' => 'Prof. Ahmad Odeh', 'at' => '2026-11-06 10:00:00']],
+            // Merge map A3: what the office entered at a route step.
+            'office' => [['label' => ['en' => 'Dean’s recommendation'], 'value' => 'Recommend approval', 'by' => 'Prof. Ahmad Odeh', 'at' => '2026-11-06 10:00:00']],
             'submission' => ['reference' => 'REC-EU 14/3/2026-27', 'submittedAt' => '2026-11-02 09:00:00', 'submittedBy' => 'Dr Ahmad Khalil'],
             'decision' => [
                 'status' => 'approved', 'decidedAt' => '2026-11-12 10:14:00',

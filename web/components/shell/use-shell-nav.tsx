@@ -25,7 +25,10 @@ import {
   PLATFORM_SETTINGS_TABS,
   SETTINGS_AREA_NAV_IDS,
   SETTINGS_AREA_PREFIXES,
+  WORKSPACE_PAGE_NAV_IDS,
+  WORKSPACE_PAGE_PREFIXES,
 } from '@/components/settings/settings-area';
+import { SETTINGS_HOME_HREF } from '@/lib/settings/my-settings';
 
 /**
  * Resolve a navigation `icon` name to a Tabler icon component.
@@ -81,9 +84,9 @@ export function resolveIcon(name: string | undefined): Icon {
  */
 const NAV_GROUP_ORDER = [
   'overview',
-  // Register, section 27: Work follows the top items, then Operations.
+  // Register, section 27: Work follows the top items. Operations, which held
+  // only Contacts, folded into Work (WHIT-1082).
   'work',
-  'operations',
   'people',
   'ai',
   'documents',
@@ -99,6 +102,7 @@ const NAV_GROUP_ORDER = [
  * heading of its own.
  */
 const LEGACY_NAV_GROUPS: Readonly<Record<string, string>> = {
+  operations: 'work',
   access: 'people',
   records: 'documents',
   extend: 'platform',
@@ -127,7 +131,7 @@ function prettifyGroupId(groupId: string): string {
  * summed over its sources (`GET /api/me/inbox/sources` carries each source's
  * open count for exactly this badge), the agent proposals waiting for
  * their approval (`GET /api/me/agent-proposals?status=waiting`), and unread
- * chat messages (`GET /api/v1/chat/chats`, the phone tab bar's Chat count). Re-read on every page change, so acting
+ * chat messages (`GET /api/v1/chat/inbox`, the sidebar's and the phone tab bar's Chat count). Re-read on every page change, so acting
  * on an item and moving on updates the count. A failed read shows no count
  * rather than a wrong one.
  */
@@ -149,7 +153,7 @@ export function useWaitingCounts(pathname: string | null): Record<string, number
       const [sources, proposals, chats] = await Promise.all([
         api.GET('/api/v1/me/inbox/sources').catch(() => null),
         api.GET('/api/v1/me/agent-proposals', { params: { query: { status: 'waiting' } } }).catch(() => null),
-        api.GET('/api/v1/chat/chats').catch(() => null),
+        api.GET('/api/v1/chat/inbox').catch(() => null),
       ]);
       const list = (result: { data?: unknown } | null): Record<string, unknown>[] => {
         const body = result?.data as { data?: unknown } | undefined;
@@ -157,9 +161,12 @@ export function useWaitingCounts(pathname: string | null): Record<string, number
       };
       const sum = (rows: Record<string, unknown>[], key: string) =>
         rows.reduce((total, row) => total + (typeof row[key] === 'number' ? (row[key] as number) : 0), 0);
-      const inbox = sum(list(sources), 'open_count');
       const approvals = list(proposals).length;
-      // Chat (CH.3): unread messages over every chat the person is in.
+      // The Inbox's Waiting for me holds agents' proposals too (owner, 16 Nov
+      // 2026), so its count does; Approvals keeps its own count of them.
+      const inbox = sum(list(sources), 'open_count') + approvals;
+      // Chat (CH.3, UC.1): unread messages over every chat the person is in,
+      // customer conversations included for people who may read them.
       const chat = sum(list(chats), 'unread');
       if (!cancelled) setCounts((prev) => ({ ...prev, inbox, approvals, chat }));
     })();
@@ -231,11 +238,18 @@ export function useShellNav(): ShellNav {
   const groups = useMemo(() => {
     // The Settings area (WHIT-806, owner decision D1): every settings page,
     // the data pages it holds and the server's `settings` group become ONE
-    // entry at the foot, opening the area's own sub-nav. The personal account
-    // page leaves the nav too: it is the user row in the footer.
+    // entry at the foot, opening the area's own sub-nav. Since WHIT-1081 your
+    // own settings are in the same area, so the entry is there for everyone,
+    // members who can change nothing of the workspace's included.
+    // Billing, Plugins, Audit log and Notification log join it too for a
+    // workspace (WHIT-1082); the system tenant keeps them in Platform.
     const inSettingsArea = (item: { id: string; group?: string }) =>
-      item.group === 'settings' || (SETTINGS_AREA_NAV_IDS as readonly string[]).includes(item.id);
-    const settingsEntry = navItems.find((item) => item.id === 'website-settings') ?? navItems.find(inSettingsArea);
+      item.group === 'settings' ||
+      (SETTINGS_AREA_NAV_IDS as readonly string[]).includes(item.id) ||
+      (!isSystemTenant && item.id in WORKSPACE_PAGE_NAV_IDS);
+    const settingsPrefixes: readonly string[] = isSystemTenant
+      ? SETTINGS_AREA_PREFIXES
+      : [...SETTINGS_AREA_PREFIXES, ...WORKSPACE_PAGE_PREFIXES];
     const regrouped = navItems
       .filter((item) => !inSettingsArea(item) && item.id !== ACCOUNT_SETTINGS_ITEM_ID)
       .map((item) =>
@@ -262,7 +276,6 @@ export function useShellNav(): ShellNav {
         counts[item.id] ? { ...item, count: counts[item.id], countLabel: countLabel(counts[item.id]) } : item,
       ),
     }));
-    if (!settingsEntry) return withCounts;
     return [
       ...withCounts,
       {
@@ -271,18 +284,18 @@ export function useShellNav(): ShellNav {
           {
             id: 'settings-area',
             label: t('sidebar.item.settings', 'Settings'),
-            href: settingsEntry.href,
+            href: SETTINGS_HOME_HREF,
             icon: <IconSettings size={20} />,
             active:
               !Object.values(PLATFORM_SETTINGS_TABS).includes(pathname ?? '') &&
-              SETTINGS_AREA_PREFIXES.some(
+              settingsPrefixes.some(
                 (prefix) => pathname === prefix || (pathname ?? '').startsWith(`${prefix}/`),
               ),
           },
         ],
       },
     ];
-  }, [navItems, pathname, groupLabels, itemLabels, counts, t]);
+  }, [navItems, pathname, groupLabels, itemLabels, counts, t, isSystemTenant]);
 
   const hrefOf = useMemo(() => {
     const byId = new Map(navItems.map((item) => [item.id, item.href]));

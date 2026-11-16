@@ -128,7 +128,15 @@ export function resetInstallOfferForTests(): void {
 }
 
 /** What to offer right now: the browser's prompt, the iPhone steps, or nothing. */
-export function useInstallOffer(): { kind: InstallOfferKind | null; name: string; iconUrl: string | null } {
+export function useInstallOffer(): {
+  kind: InstallOfferKind | null;
+  name: string;
+  iconUrl: string | null;
+  /** Installing is switched on for this host (WHIT-1155). */
+  enabled: boolean;
+  /** The browser's prompt is held, whether or not More's offer was dismissed (WHIT-1155). */
+  canPrompt: boolean;
+} {
   const [kind, setKind] = useState<InstallOfferKind | null>(null);
   const [, bump] = useState(0);
 
@@ -147,5 +155,5 @@ export function useInstallOffer(): { kind: InstallOfferKind | null; name: string
     };
   }, []);
 
-  return { kind, name: state.name, iconUrl: state.iconUrl };
+  return { kind, name: state.name, iconUrl: state.iconUrl, enabled: state.enabled, canPrompt: state.deferred !== null && !state.installed };
 }

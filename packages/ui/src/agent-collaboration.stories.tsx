@@ -25,7 +25,7 @@ const reminders = {
   title: "Send payment reminders to 12 customers",
   summary: "These invoices are more than 14 days overdue. Each customer gets your standard reminder by email.",
   changes: [
-    { label: "Invoices", after: "12 overdue · JOD 4,860" },
+    { label: "Invoices", after: "12 overdue · $4,860" },
     { label: "Status", before: "Overdue", after: "Reminder sent" },
   ],
   scope: ["invoice:read", "invoice:remind"],
@@ -40,7 +40,7 @@ export const Proposals: Story = {
         agent="Billing assistant"
         onBehalfOf="Rana"
         title="Mark invoice INV-1042 as paid"
-        changes={[{ label: "INV-1042", before: "Unpaid", after: "Paid · JOD 320" }]}
+        changes={[{ label: "INV-1042", before: "Unpaid", after: "Paid · $320" }]}
         scope={["invoice:update"]}
         undoWindow="30 minutes"
         status="approved"
@@ -51,7 +51,7 @@ export const Proposals: Story = {
         agent="Front desk"
         onBehalfOf="Omar"
         title="Create a quote for Example Hotel"
-        changes={[{ label: "Total", after: "JOD 1,240.000" }]}
+        changes={[{ label: "Total", after: "$1,240.00" }]}
         scope={["quote:create"]}
         status="declined"
       />

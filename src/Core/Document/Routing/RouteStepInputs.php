@@ -44,6 +44,18 @@ final class RouteStepInputs
 
     private const KEY = '/^[a-z][a-z0-9_]{0,39}$/';
 
+    /** A line of text: a meeting number, a reference. */
+    public const TYPE_TEXT = 'text';
+
+    /**
+     * A person in the workspace, stored as their user id (merge map A3). The
+     * office names a form's supervisor this way at pre-check, and a later step's
+     * recusal reads it ({@see RouteStepExclusions}).
+     */
+    public const TYPE_PERSON = 'person';
+
+    public const TYPES = [self::TYPE_TEXT, self::TYPE_PERSON];
+
     /**
      * Static helper only — never instantiated.
      */
@@ -54,7 +66,7 @@ final class RouteStepInputs
     /**
      * Validate a step's declared inputs from a request body.
      *
-     * @return list<array{key: string, label: string, label_ar: ?string, required: bool, max_length: int}>
+     * @return list<array{key: string, label: string, label_ar: ?string, required: bool, max_length: int, type: string}>
      *
      * @throws InvalidArgumentException With a sentence naming what is wrong.
      */
@@ -108,6 +120,10 @@ final class RouteStepInputs
                     "Value {$nth}: 'max_length' must be a whole number from 1 to " . self::MAX_LENGTH . '.'
                 );
             }
+            $type = $input['type'] ?? self::TYPE_TEXT;
+            if (!is_string($type) || !in_array($type, self::TYPES, true)) {
+                throw new InvalidArgumentException("Value {$nth}: 'type' is text or person.");
+            }
 
             $out[] = [
                 'key' => $key,
@@ -115,6 +131,7 @@ final class RouteStepInputs
                 'label_ar' => $labelAr,
                 'required' => $required,
                 'max_length' => $maxLength,
+                'type' => $type,
             ];
         }
 
@@ -160,7 +177,7 @@ final class RouteStepInputs
      * the safe direction: the step then asks for nothing rather than for
      * something nobody can see.
      *
-     * @return list<array{key: string, label: string, label_ar: ?string, required: bool, max_length: int}>
+     * @return list<array{key: string, label: string, label_ar: ?string, required: bool, max_length: int, type: string}>
      */
     public static function decode(mixed $stored): array
     {
@@ -181,7 +198,7 @@ final class RouteStepInputs
     /**
      * Check the values sent with an act against what the step asks for.
      *
-     * @param list<array{key: string, label: string, label_ar: ?string, required: bool, max_length: int}> $inputs
+     * @param list<array{key: string, label: string, label_ar: ?string, required: bool, max_length: int, type: string}> $inputs
      * @param array<string, string> $values Already shaped by {@see parseValues()}.
      * @return array<string, string> The values to keep, blanks dropped.
      *
@@ -208,7 +225,13 @@ final class RouteStepInputs
                 }
                 continue;
             }
-            if (mb_strlen($value) > $input['max_length']) {
+            if ($input['type'] === self::TYPE_PERSON) {
+                // A person is their user id. Whether they belong to this
+                // workspace is the router's check, which can read it.
+                if (preg_match('/^[1-9][0-9]{0,18}$/', $value) !== 1) {
+                    throw new InvalidArgumentException("Choose a person for “{$input['label']}”.");
+                }
+            } elseif (mb_strlen($value) > $input['max_length']) {
                 throw new InvalidArgumentException(
                     "“{$input['label']}” must be {$input['max_length']} characters or fewer."
                 );

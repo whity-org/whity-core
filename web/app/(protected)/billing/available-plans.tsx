@@ -117,7 +117,9 @@ export function AvailablePlans({ kind }: { kind: PlanKind }) {
   const periodLabel = (plan: PurchasablePlan): string => {
     const per = plan.billing_period === 'year'
       ? t('billing.plans.perYear', 'per year')
-      : t('billing.plans.perMonth', 'per month');
+      : plan.billing_period === 'half_year'
+        ? t('billing.plans.perHalfYear', 'every 6 months')
+        : t('billing.plans.perMonth', 'per month');
 
     if (plan.is_per_seat) {
       return `${per} · ${t('billing.plans.perSeat', 'per seat')}`;

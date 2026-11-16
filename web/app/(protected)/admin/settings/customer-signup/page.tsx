@@ -9,12 +9,14 @@
  * and stays the operator's. The server only offers this page outside the
  * system workspace, to people with `signup:manage`.
  *
- * No design card yet (design ask in DESIGN-ASKS.md). Built from section 21:
- * edit in place with the save bar, the six states, and the Public forms page's
- * card layout.
+ * Card: TplSettingsSignup (WHIT-1044). Who can sign up with the starting role
+ * and the allowed domains as chips side by side and the link with Copy under
+ * them; Team invites as its own card with its switch; the queue with Approve,
+ * Reject and Approve all; saving through the save bar (section 21).
  */
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -22,22 +24,22 @@ import { SIGNUP_MANAGE } from '@/lib/capabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { FieldSelect } from '@/components/field-select';
+import { ChipsInput, splitChips } from '@/components/chips-input';
 import { AccessDenied } from '@/components/ui/access-denied';
-import { ActorChip } from '@whity/ui/actor-chip';
-import { Alert, AlertDescription } from '@whity/ui/alert';
-import { Badge } from '@whity/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
-import { CopyBlock } from '@whity/ui/copy-block';
 import { RadioGroup, RadioGroupItem } from '@whity/ui/radio-group';
 import { SaveBar, ChangedField } from '@whity/ui/save-bar';
 import { Input } from '@whity/ui/input';
 import { Switch } from '@whity/ui/switch';
-import { Textarea } from '@whity/ui/textarea';
-import { IconUserCheck } from '@tabler/icons-react';
+import { Avatar } from '@whity/ui/avatar';
+import { EmptyState } from '@whity/ui/empty-state';
+import { Icon } from '@whity/ui/icon';
+import { useAuth } from '@/lib/auth-context';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { ConfirmAction } from '@whity/ui/confirm-action';
-import { useDateDisplay } from '@whity/features/datetime';
+import { useDateDisplay, type RelativeAgeLabels } from '@whity/features/datetime';
 
 type Mode = 'off' | 'approval' | 'open';
 
@@ -58,6 +60,8 @@ interface SignupSettings {
   customer_invites?: boolean;
   /** How many people one customer may invite; 0 is no limit (WHIT-1043). */
   invites_per_customer?: number;
+  /** Merge map A4: the route join requests travel on; null is the default one step. */
+  route_template_id?: number | null;
   eligible_roles: EligibleRole[];
   pending_count: number;
   workspace_slug: string | null;
@@ -83,28 +87,34 @@ type QueueStatus = 'pending' | 'rejected';
 interface Draft {
   mode: Mode;
   roleId: string;
-  domains: string;
+  /** The domains already turned into chips. */
+  domains: string[];
+  /** What is typed in the domain box and not yet a chip; it is saved too. */
+  domainInput: string;
   customerInvites: boolean;
   /** Text as typed; empty is no limit. */
   perCustomer: string;
+  /** '' is the default route: one step for everyone who can manage sign-ups. */
+  routeTemplateId: string;
 }
 
 function draftOf(settings: SignupSettings): Draft {
   return {
     mode: settings.mode,
     roleId: settings.role_id === null ? '' : String(settings.role_id),
-    domains: settings.allowed_domains.join('\n'),
+    domains: settings.allowed_domains,
+    domainInput: '',
     customerInvites: settings.customer_invites === true,
     perCustomer: settings.invites_per_customer ? String(settings.invites_per_customer) : '',
+    routeTemplateId: settings.route_template_id ? String(settings.route_template_id) : '',
   };
 }
 
-function splitDomains(text: string): string[] {
-  return text
-    .split(/[\s,]+/)
-    .map((d) => d.trim())
-    .filter((d) => d !== '');
+/** The chips and whatever is still typed in the box, as the list that is saved. */
+function domainsOf(draft: Draft): string[] {
+  return [...draft.domains, ...splitChips(draft.domainInput)];
 }
+
 
 /**
  * The server's refusal in the reader's language (WHIT-916). The server sends a
@@ -127,6 +137,8 @@ function codeText(t: TranslateFn, details: Record<string, unknown>): string | nu
       return t('settings.customerSignup.error.perCustomerInvalid', 'Enter a whole number from 1 to 1000, or leave it empty for no limit.');
     case 'customer_invites_invalid':
       return t('settings.customerSignup.error.invitesInvalid', 'Turn customer invitations on or off.');
+    case 'route_template_invalid':
+      return t('settings.customerSignup.error.routeInvalid', 'Choose one of this workspace’s routes, or the default.');
     case 'mode_invalid':
       return t('settings.customerSignup.error.modeInvalid', 'Choose Off, Approval required or Open.');
     case 'role_required':
@@ -176,6 +188,8 @@ export default function CustomerSignupSettingsPage() {
   const { addToast } = useToast();
   const { has, loading: capabilitiesLoading } = useCapabilities();
   const canManage = has(SIGNUP_MANAGE);
+  const { user, memberships } = useAuth();
+  const workspaceName = memberships.find((m) => m.tenant_id === user?.tenant_id)?.tenant_name ?? null;
 
   const {
     data: settings,
@@ -187,6 +201,14 @@ export default function CustomerSignupSettingsPage() {
       throw new Error(readError(error, t('settings.customerSignup.loadFailed', 'Sign-up settings could not be loaded'), t));
     }
     return (data as unknown as { data: SignupSettings }).data;
+  }, []);
+
+  // Merge map A4: the routes a join request can travel on. Somebody who can't
+  // read route templates still sees and keeps the default.
+  const { data: routeTemplates } = useFetch<{ id: number; name: string }[]>(async () => {
+    const { data, response: res } = await api.GET('/api/v1/document-route-templates');
+    if (!res.ok) return [];
+    return ((data as unknown as { data?: { id: number; name: string }[] }).data ?? []).map((r) => ({ id: r.id, name: r.name }));
   }, []);
 
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -202,7 +224,8 @@ export default function CustomerSignupSettingsPage() {
       current.roleId !== saved.roleId ||
       current.customerInvites !== saved.customerInvites ||
       current.perCustomer.trim() !== saved.perCustomer ||
-      splitDomains(current.domains).join(',') !== splitDomains(saved.domains).join(','));
+      current.routeTemplateId !== saved.routeTemplateId ||
+      domainsOf(current).join(',') !== domainsOf(saved).join(','));
 
   if (!capabilitiesLoading && !canManage) {
     return (
@@ -228,10 +251,11 @@ export default function CustomerSignupSettingsPage() {
       body: {
         mode: current.mode,
         role_id: current.roleId === '' ? null : Number(current.roleId),
-        allowed_domains: splitDomains(current.domains),
+        allowed_domains: domainsOf(current),
         customer_invites: current.customerInvites,
         // Empty is no limit (0); anything else the server checks is a whole number.
         invites_per_customer: current.perCustomer.trim() === '' ? 0 : Number(current.perCustomer.trim()),
+        route_template_id: current.routeTemplateId === '' ? null : Number(current.routeTemplateId),
       },
     });
     setSaving(false);
@@ -255,11 +279,20 @@ export default function CustomerSignupSettingsPage() {
       ? `${window.location.origin}/join/${settings.workspace_slug}`
       : null;
 
+  const copyLink = async (link: string) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      addToast(t('settings.customerSignup.copied', 'Copied'), 'success');
+    } catch {
+      addToast(t('settings.customerSignup.copyFailed', 'Could not copy. Select the link and copy it yourself.'), 'error');
+    }
+  };
+
   const changed: string[] = [];
   if (saved && current) {
     if (current.mode !== saved.mode) changed.push(t('settings.customerSignup.mode', 'Who can sign up'));
     if (current.roleId !== saved.roleId) changed.push(t('settings.customerSignup.role', 'Starting role'));
-    if (splitDomains(current.domains).join(',') !== splitDomains(saved.domains).join(','))
+    if (domainsOf(current).join(',') !== domainsOf(saved).join(','))
       changed.push(t('settings.customerSignup.domains', 'Allowed email domains'));
     if (current.customerInvites !== saved.customerInvites)
       changed.push(t('settings.customerSignup.invites', 'Customers can invite their team'));
@@ -268,13 +301,14 @@ export default function CustomerSignupSettingsPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto px-4 md:px-0 pb-16">
+    <div className="space-y-6 max-w-4xl mx-auto px-4 md:px-0 pb-16">
       <AdminHeader
         title={t('settings.customerSignup.title', 'Sign-up')}
-        description={t(
-          'settings.customerSignup.description',
-          'Let people join this workspace as customers on their own. Customers never get admin access, whatever their role.'
-        )}
+        description={
+          workspaceName
+            ? t('settings.customerSignup.descriptionNamed', 'How customers join {name}.', { name: workspaceName })
+            : t('settings.customerSignup.descriptionPlain', 'How customers join this workspace.')
+        }
       />
 
       {loadError && (
@@ -305,10 +339,12 @@ export default function CustomerSignupSettingsPage() {
           )}
           {settings.mode !== 'off' && settings.role_customer_safe === false && (
             <Alert variant="destructive" data-testid="customer-signup-unsafe-role">
+              <AlertTitle>{t('settings.customerSignup.paused.title', 'Sign-ups are paused')}</AlertTitle>
               <AlertDescription>
                 {t(
-                  'settings.customerSignup.unsafeRole',
-                  'Sign-ups are paused: the starting role now has admin permissions. Choose another role, or remove those permissions.'
+                  'settings.customerSignup.paused.description',
+                  '“{role}” can now change settings, so new people can’t start with it. Choose another role, or remove those permissions from {role}.',
+                  { role: settings.role_name ?? '' }
                 )}
               </AlertDescription>
             </Alert>
@@ -317,10 +353,10 @@ export default function CustomerSignupSettingsPage() {
               shares a sign-up link that can't work. */}
           {current.mode !== 'off' && settings.email_signup_ready === false && (
             <Alert variant="destructive" data-testid="customer-signup-no-bot-check">
+              <AlertTitle>
+                {t('settings.customerSignup.noBotCheck.title', 'Sign-up won’t work until the operator sets up a bot check')}
+              </AlertTitle>
               <AlertDescription className="space-y-1">
-                <span className="block font-medium">
-                  {t('settings.customerSignup.noBotCheck.title', 'Sign-up won’t work until the operator sets up a bot check')}
-                </span>
                 <span className="block">
                   {(settings.join_providers ?? []).length > 0
                     ? t(
@@ -345,107 +381,184 @@ export default function CustomerSignupSettingsPage() {
               <CardTitle>{t('settings.customerSignup.mode', 'Who can sign up')}</CardTitle>
               <CardDescription>
                 {t(
-                  'settings.customerSignup.mode.hint',
-                  'Everyone confirms their email first. Signing up never creates a new workspace.'
+                  'settings.customerSignup.mode.forCustomers',
+                  'For your customers. Staff join by invitation or by email domain.'
                 )}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-5">
               <ChangedField changed={current.mode !== saved?.mode}>
+                <p id="signup-mode-label" className="text-sm font-medium text-foreground">
+                  {t('settings.customerSignup.mode.label', 'Sign-up')}
+                </p>
                 <RadioGroup
                   value={current.mode}
                   onValueChange={(value) => update({ mode: value as Mode })}
-                  className="space-y-3"
+                  aria-labelledby="signup-mode-label"
+                  className="space-y-2"
                   data-testid="customer-signup-mode"
                 >
                   {(
                     [
-                      ['off', t('settings.customerSignup.mode.off', 'Off'), t('settings.customerSignup.mode.off.hint', 'Nobody can sign up. People join only when invited.')],
-                      ['approval', t('settings.customerSignup.mode.approval', 'Approval required'), t('settings.customerSignup.mode.approval.hint', 'People sign up and wait. An admin lets each one in below.')],
-                      ['open', t('settings.customerSignup.mode.open', 'Open'), t('settings.customerSignup.mode.open.hint', 'People join as soon as they confirm their email.')],
+                      ['off', t('settings.customerSignup.mode.off', 'Off'), t('settings.customerSignup.mode.off.short', 'Only people you invite can join.')],
+                      ['approval', t('settings.customerSignup.mode.approval', 'Approval required'), t('settings.customerSignup.mode.approval.short', 'Anyone can ask; an admin approves each one.')],
+                      ['open', t('settings.customerSignup.mode.open', 'Open'), t('settings.customerSignup.mode.open.short', 'Anyone with the link joins as soon as they confirm their email.')],
                     ] as const
                   ).map(([value, label, hint]) => (
                     <label key={value} htmlFor={`signup-mode-${value}`} className="flex cursor-pointer items-start gap-3">
                       <RadioGroupItem id={`signup-mode-${value}`} value={value} className="mt-1" />
-                      <span className="space-y-0.5">
-                        <span className="block text-sm font-medium text-foreground">{label}</span>
-                        <span className="block text-sm text-muted-foreground">{hint}</span>
+                      <span>
+                        <span className="block text-sm text-foreground">{label}</span>
+                        <span className="block text-xs text-muted-foreground">{hint}</span>
                       </span>
                     </label>
                   ))}
                 </RadioGroup>
               </ChangedField>
 
-              <ChangedField changed={current.roleId !== saved?.roleId}>
-                <label htmlFor="signup-role" className="text-sm font-medium text-foreground">
-                  {t('settings.customerSignup.role', 'Starting role')}
-                </label>
-                <FieldSelect
-                  id="signup-role"
-                  value={current.roleId}
-                  onChange={(value) => update({ roleId: value })}
-                  placeholder={t('settings.customerSignup.role.placeholder', 'Choose a role')}
-                  options={settings.eligible_roles.map((role) => ({ value: String(role.id), label: role.name }))}
-                />
-                <p className="text-sm text-muted-foreground" data-testid="customer-signup-role-hint">
-                  {settings.eligible_roles.length === 0
-                    ? t(
-                        'settings.customerSignup.role.none',
-                        'No role qualifies yet. In Roles, create one with only what customers need, such as submitting forms.'
-                      )
-                    : t(
-                        'settings.customerSignup.role.hint',
-                        'Only roles with no admin permissions are listed.'
-                      )}
-                </p>
-              </ChangedField>
-
-              <ChangedField
-                changed={splitDomains(current.domains).join(',') !== splitDomains(saved?.domains ?? '').join(',')}
-              >
-                <label htmlFor="signup-domains" className="text-sm font-medium text-foreground">
-                  {t('settings.customerSignup.domains', 'Allowed email domains')}
-                </label>
-                <Textarea
-                  id="signup-domains"
-                  dir="ltr"
-                  rows={3}
-                  value={current.domains}
-                  placeholder="example-bakery.com"
-                  onChange={(e) => update({ domains: e.target.value })}
-                />
-                <p className="text-sm text-muted-foreground">
-                  {t(
-                    'settings.customerSignup.domains.hint',
-                    'Optional. One per line, like example-bakery.com. Leave empty to accept any email address.'
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ChangedField changed={current.roleId !== saved?.roleId}>
+                  <label htmlFor="signup-role" className="text-sm font-medium text-foreground">
+                    {t('settings.customerSignup.role.startAs', 'New people start as')}
+                  </label>
+                  <FieldSelect
+                    id="signup-role"
+                    value={current.roleId}
+                    onChange={(value) => update({ roleId: value })}
+                    placeholder={t('settings.customerSignup.role.placeholder', 'Choose a role')}
+                    options={settings.eligible_roles.map((role) => ({ value: String(role.id), label: role.name }))}
+                  />
+                  {settings.eligible_roles.length === 0 ? (
+                    <div className="space-y-2" data-testid="customer-signup-role-hint">
+                      <p className="text-xs text-destructive">
+                        {t('settings.customerSignup.role.noneShort', 'Make a role without admin permissions first.')}
+                      </p>
+                      <Button asChild variant="outline" size="sm">
+                        <Link href="/admin/roles">{t('settings.customerSignup.role.openRoles', 'Open Roles')}</Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground" data-testid="customer-signup-role-hint">
+                      {t('settings.customerSignup.role.safe', 'Only roles safe for customers are listed.')}
+                    </p>
                   )}
-                </p>
-              </ChangedField>
+                </ChangedField>
 
-              <ChangedField changed={current.customerInvites !== saved?.customerInvites}>
-                <div className="flex items-center gap-3">
-                  <div className="min-w-0 flex-1">
-                    <label htmlFor="signup-customer-invites" className="text-sm font-medium text-foreground">
-                      {t('settings.customerSignup.invites', 'Customers can invite their team')}
-                    </label>
-                    <p className="text-sm text-muted-foreground">
+                <ChangedField changed={domainsOf(current).join(',') !== (saved ? domainsOf(saved).join(',') : '')}>
+                  <label htmlFor="signup-domains" className="text-sm font-medium text-foreground">
+                    {t('settings.customerSignup.domains', 'Allowed email domains')}
+                  </label>
+                  <ChipsInput
+                    id="signup-domains"
+                    testId="customer-signup-domains"
+                    values={current.domains}
+                    input={current.domainInput}
+                    onChange={(domains, domainInput) => update({ domains, domainInput })}
+                    placeholder={t('settings.customerSignup.domains.add', 'Add a domain…')}
+                    emptyChip={t('settings.customerSignup.domains.any', 'Any domain')}
+                    removeLabel={(domain) => t('settings.customerSignup.domains.remove', 'Remove {domain}', { domain })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.customerSignup.domains.chipsHint', 'Like example-bakery.com. Leave empty to accept any email address.')}
+                  </p>
+                </ChangedField>
+              </div>
+
+              {current.mode === 'approval' && (
+                <ChangedField changed={current.routeTemplateId !== saved?.routeTemplateId}>
+                  <label htmlFor="signup-route" className="text-sm font-medium text-foreground">
+                    {t('settings.customerSignup.route.label', 'Who decides')}
+                  </label>
+                  <FieldSelect
+                    id="signup-route"
+                    value={current.routeTemplateId === '' ? 'default' : current.routeTemplateId}
+                    onChange={(value) => update({ routeTemplateId: value === 'default' ? '' : value })}
+                    options={[
+                      { value: 'default', label: t('settings.customerSignup.route.default', 'Anyone who can manage sign-ups') },
+                      ...(routeTemplates ?? []).map((route) => ({ value: String(route.id), label: route.name })),
+                    ]}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t(
+                      'settings.customerSignup.route.hint',
+                      'Each request waits in their Inbox. Choose one of your routes to add steps, such as a check by the front desk first.'
+                    )}
+                  </p>
+                </ChangedField>
+              )}
+
+              {joinLink && (
+                <div
+                  className="flex flex-wrap items-center gap-3 rounded-lg bg-muted px-3 py-2"
+                  data-testid="customer-signup-link"
+                >
+                  <span className="text-sm text-muted-foreground">{t('settings.customerSignup.linkLabel', 'Link')}</span>
+                  <code dir="ltr" className="min-w-0 flex-1 truncate font-mono text-sm text-foreground">
+                    {joinLink.replace(/^https?:\/\//, '')}
+                  </code>
+                  <Button variant="outline" size="sm" className="gap-1" onClick={() => void copyLink(joinLink)}>
+                    <Icon name="copy" size={16} />
+                    {t('settings.customerSignup.copy', 'Copy')}
+                  </Button>
+                </div>
+              )}
+
+              {saveError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{saveError}</AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border bg-card shadow-sm" data-testid="customer-signup-team-invites">
+            <CardHeader>
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <CardTitle>
+                    <label htmlFor="signup-customer-invites">{t('settings.customerSignup.teamInvites', 'Team invites')}</label>
+                  </CardTitle>
+                  <CardDescription>
+                    {t(
+                      'settings.customerSignup.teamInvites.hint',
+                      'A customer company can invite its own people, so you don’t have to. Invitations go by email, so this needs email set up for this instance.'
+                    )}
+                  </CardDescription>
+                </div>
+                <ChangedField changed={current.customerInvites !== saved?.customerInvites}>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="signup-customer-invites"
+                      checked={current.customerInvites}
+                      onCheckedChange={(checked) => update({ customerInvites: checked })}
+                    />
+                    <span className="text-sm text-foreground" aria-hidden="true">
+                      {current.customerInvites
+                        ? t('settings.customerSignup.on', 'On')
+                        : t('settings.customerSignup.off', 'Off')}
+                    </span>
+                  </div>
+                </ChangedField>
+              </div>
+            </CardHeader>
+            {current.customerInvites && (
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-medium text-foreground">
+                      {t('settings.customerSignup.invitedStartAs', 'Invited people start as')}
+                    </p>
+                    <p className="text-sm text-foreground">
+                      {t('settings.customerSignup.invitedRole', 'The same role as the customer who invited them')}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
                       {t(
-                        'settings.customerSignup.invites.hint',
-                        'A customer can invite colleagues by email. They join with the same role as the customer who invited them, as customers, and never as staff. They join without waiting for approval, even when sign-up is off. Invitations are sent by email, so this needs email set up for this instance.'
+                        'settings.customerSignup.invitedRole.hint',
+                        'They join as customers, never as staff, without waiting for approval, even when sign-up is off.'
                       )}
                     </p>
                   </div>
-                  <Switch
-                    id="signup-customer-invites"
-                    checked={current.customerInvites}
-                    onCheckedChange={(checked) => update({ customerInvites: checked })}
-                  />
-                </div>
-              </ChangedField>
-
-              {current.customerInvites && (
-                <ChangedField changed={current.perCustomer.trim() !== saved?.perCustomer}>
-                  <div className="grid max-w-xs gap-1.5">
+                  <ChangedField changed={current.perCustomer.trim() !== saved?.perCustomer}>
                     <label htmlFor="signup-per-customer" className="text-sm font-medium text-foreground">
                       {t('settings.customerSignup.perCustomer', 'People per customer')}
                     </label>
@@ -457,46 +570,17 @@ export default function CustomerSignupSettingsPage() {
                       placeholder={t('settings.customerSignup.perCustomer.none', 'No limit')}
                       onChange={(event) => update({ perCustomer: event.target.value })}
                     />
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {t(
                         'settings.customerSignup.perCustomer.hint',
                         'Each customer can invite up to this many. Leave it empty for no limit. Withdrawn invitations free a place.'
                       )}
                     </p>
-                  </div>
-                </ChangedField>
-              )}
-
-              {saveError && (
-                <Alert variant="destructive">
-                  <AlertDescription>{saveError}</AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-
-          {settings.mode !== 'off' && joinLink && (
-            <Card className="border border-border bg-card shadow-sm" data-testid="customer-signup-link">
-              <CardHeader>
-                <CardTitle>{t('settings.customerSignup.link', 'Your sign-up page')}</CardTitle>
-                <CardDescription>
-                  {t(
-                    'settings.customerSignup.link.hint',
-                    'Share this link, or put it on your website. It also works on your own domain once it is set up in Branding.'
-                  )}
-                </CardDescription>
-              </CardHeader>
-              {/* A link is read left to right in both languages; without this the
-                  copy button sits on top of the URL in Arabic. */}
-              <CardContent dir="ltr">
-                <CopyBlock
-                  value={joinLink}
-                  copyLabel={t('settings.customerSignup.copy', 'Copy')}
-                  copiedLabel={t('settings.customerSignup.copied', 'Copied')}
-                />
+                  </ChangedField>
+                </div>
               </CardContent>
-            </Card>
-          )}
+            )}
+          </Card>
 
           <PendingQueue pendingCount={settings.pending_count} onDecided={refetch} />
         </>
@@ -522,7 +606,7 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
   const t = useTranslation('admin');
   const { addToast } = useToast();
   const dates = useDateDisplay();
-  const [busy, setBusy] = useState<number | null>(null);
+  const [busy, setBusy] = useState<number | 'all' | null>(null);
   const [status, setStatus] = useState<QueueStatus>('pending');
   const [rejecting, setRejecting] = useState<SignupRequest | null>(null);
 
@@ -537,18 +621,31 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
   }, [pendingCount, status]);
 
   const rows = useMemo(() => data ?? [], [data]);
+  const ageLabels: RelativeAgeLabels = {
+    seconds: () => t('settings.customerSignup.ago.now', 'Just now'),
+    minutes: (n) => t('settings.customerSignup.ago.minutes', '{n} minutes ago', { n }),
+    hours: (n) => t('settings.customerSignup.ago.hours', '{n} hours ago', { n }),
+    days: (n) => t('settings.customerSignup.ago.days', '{n} days ago', { n }),
+  };
 
-  const decide = async (request: SignupRequest, approve: boolean) => {
-    setBusy(request.id);
+  /** One request, decided; true when the server took it. */
+  const send = async (request: SignupRequest, approve: boolean): Promise<boolean> => {
     const options = { params: { path: { id: request.id } } };
     const { response: res, error } = approve
       ? await api.POST('/api/v1/signup/requests/{id}/approve', options)
       : await api.POST('/api/v1/signup/requests/{id}/reject', options);
-    setBusy(null);
     if (!res.ok) {
       addToast(readError(error, t('settings.customerSignup.queue.failed', 'The request could not be updated'), t), 'error');
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const decide = async (request: SignupRequest, approve: boolean) => {
+    setBusy(request.id);
+    const ok = await send(request, approve);
+    setBusy(null);
+    if (!ok) return;
     addToast(
       approve
         ? t('settings.customerSignup.queue.approved', '{name} can now sign in', { name: request.display_name })
@@ -559,28 +656,56 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
     onDecided();
   };
 
+  // Oldest first, one at a time, stopping at the first the server refuses.
+  const approveAll = async () => {
+    setBusy('all');
+    let approved = 0;
+    for (const request of rows) {
+      if (!(await send(request, true))) break;
+      approved += 1;
+    }
+    setBusy(null);
+    if (approved > 0) {
+      addToast(t('settings.customerSignup.queue.approvedAll', '{count} people can now sign in', { count: String(approved) }), 'success');
+    }
+    refetch();
+    onDecided();
+  };
+
+  const waiting = status === 'pending' && rows.length > 0;
+
   return (
     <Card className="border border-border bg-card shadow-sm" data-testid="customer-signup-queue">
       <CardHeader>
-        <div className="flex flex-wrap items-center gap-2">
-          <CardTitle>{t('settings.customerSignup.queue', 'Waiting to join')}</CardTitle>
-          {rows.length > 0 && (
-            <Badge variant="outline" className="text-xs">
-              {rows.length}
-            </Badge>
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <CardTitle>
+              {waiting
+                ? t('settings.customerSignup.queue.titleCount', 'Waiting to join · {count}', { count: String(rows.length) })
+                : t('settings.customerSignup.queue', 'Waiting to join')}
+            </CardTitle>
+            <CardDescription>
+              {status === 'pending'
+                ? t('settings.customerSignup.queue.oldestFirst', 'People who confirmed their email. Oldest first.')
+                : t(
+                    'settings.customerSignup.queue.rejectedHint',
+                    'People you turned away. You can still let any of them in.'
+                  )}
+            </CardDescription>
+          </div>
+          {waiting && rows.length > 1 && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy !== null}
+              loading={busy === 'all'}
+              data-testid="customer-signup-approve-all"
+              onClick={() => void approveAll()}
+            >
+              {t('settings.customerSignup.queue.approveAll', 'Approve all {count}', { count: String(rows.length) })}
+            </Button>
           )}
         </div>
-        <CardDescription>
-          {status === 'pending'
-            ? t(
-                'settings.customerSignup.queue.hint',
-                'People who confirmed their email while sign-up needs approval. Oldest first.'
-              )
-            : t(
-                'settings.customerSignup.queue.rejectedHint',
-                'People you turned away. You can still let any of them in.'
-              )}
-        </CardDescription>
         <div role="group" aria-label={t('settings.customerSignup.queue.show', 'Show')} className="flex gap-2 pt-2">
           {(
             [
@@ -609,65 +734,55 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
         ) : data === null ? (
           <div className="h-12 animate-pulse rounded-lg bg-muted/40" />
         ) : rows.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-8 text-center" data-testid="customer-signup-queue-empty">
-            <IconUserCheck className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground">
-              {status === 'pending'
-                ? t('settings.customerSignup.queue.empty', 'Nobody is waiting.')
-                : t('settings.customerSignup.queue.emptyRejected', 'Nobody has been turned away.')}
-            </p>
-          </div>
+          <EmptyState
+            data-testid="customer-signup-queue-empty"
+            icon={<Icon name="users" size={24} />}
+            title={
+              status === 'pending'
+                ? t('settings.customerSignup.queue.emptyTitle', 'Nobody is waiting')
+                : t('settings.customerSignup.queue.emptyRejected', 'Nobody has been turned away.')
+            }
+            description={
+              status === 'pending'
+                ? t('settings.customerSignup.queue.emptyHint', 'People who ask to join appear here.')
+                : undefined
+            }
+          />
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
             {rows.map((request) => (
               <li
                 key={request.id}
-                className="flex min-h-12 flex-col gap-3 py-3 md:flex-row md:items-center md:justify-between"
+                className="flex min-h-12 flex-col gap-3 px-4 py-3 md:flex-row md:items-center"
                 data-testid={`customer-signup-request-${request.id}`}
               >
-                <div className="min-w-0 space-y-1">
-                  <ActorChip name={request.display_name} />
-                  <p className="text-sm text-muted-foreground">
-                    <span dir="ltr">{request.email}</span>
-                    {status === 'pending' && dates.dateTime(request.verified_at ?? request.requested_at) !== null && (
-                      <>
-                        {' · '}
-                        {t('settings.customerSignup.queue.since', 'Waiting since {when}', {
-                          when: dates.dateTime(request.verified_at ?? request.requested_at) ?? '',
-                        })}
-                      </>
-                    )}
-                    {status === 'rejected' && dates.dateTime(request.decided_at) !== null && (
-                      <>
-                        {' · '}
-                        {request.decided_by_name
-                          ? t('settings.customerSignup.queue.rejectedBy', 'Turned away by {name} on {when}', {
-                              name: request.decided_by_name,
-                              when: dates.dateTime(request.decided_at) ?? '',
-                            })
-                          : t('settings.customerSignup.queue.rejectedOn', 'Turned away on {when}', {
-                              when: dates.dateTime(request.decided_at) ?? '',
-                            })}
-                      </>
-                    )}
-                  </p>
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <Avatar name={request.display_name} pattern={request.email} size={36} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-foreground">{request.display_name}</p>
+                    <p className="truncate text-xs text-muted-foreground" dir="ltr">
+                      {request.email}
+                    </p>
+                  </div>
                 </div>
+                <p className="text-xs text-muted-foreground md:w-56">
+                  {status === 'pending' &&
+                    (dates.relative(request.verified_at ?? request.requested_at, ageLabels) ?? '')}
+                  {status === 'rejected' && dates.dateTime(request.decided_at) !== null &&
+                    (request.decided_by_name
+                      ? t('settings.customerSignup.queue.rejectedBy', 'Turned away by {name} on {when}', {
+                          name: request.decided_by_name,
+                          when: dates.dateTime(request.decided_at) ?? '',
+                        })
+                      : t('settings.customerSignup.queue.rejectedOn', 'Turned away on {when}', {
+                          when: dates.dateTime(request.decided_at) ?? '',
+                        }))}
+                </p>
                 <div className="flex shrink-0 items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={busy !== null}
-                    loading={busy === request.id}
-                    data-testid={`customer-signup-approve-${request.id}`}
-                    onClick={() => void decide(request, true)}
-                  >
-                    {t('settings.customerSignup.queue.approve', 'Approve')}
-                  </Button>
                   {status === 'pending' && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-destructive"
                       disabled={busy !== null}
                       data-testid={`customer-signup-reject-${request.id}`}
                       onClick={() => setRejecting(request)}
@@ -675,6 +790,17 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
                       {t('settings.customerSignup.queue.reject', 'Reject')}
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    className="gap-1"
+                    disabled={busy !== null}
+                    loading={busy === request.id}
+                    data-testid={`customer-signup-approve-${request.id}`}
+                    onClick={() => void decide(request, true)}
+                  >
+                    <Icon name="check" size={16} />
+                    {t('settings.customerSignup.queue.approve', 'Approve')}
+                  </Button>
                 </div>
               </li>
             ))}

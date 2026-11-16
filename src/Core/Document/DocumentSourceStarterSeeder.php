@@ -28,9 +28,14 @@ final class DocumentSourceStarterSeeder implements TenantProvisioningStep
 {
     private int $ids = 0;
 
+    /**
+     * @param (\Closure(int): string)|null $currencyOf the workspace's currency (CU.4),
+     *        which the starters' sample amounts are written in; USD when not given
+     */
     public function __construct(
         private readonly DocumentSourceRepository $sources,
         private readonly ?LoggerInterface $logger = null,
+        private readonly ?\Closure $currencyOf = null,
     ) {
     }
 
@@ -58,7 +63,7 @@ final class DocumentSourceStarterSeeder implements TenantProvisioningStep
         $added = 0;
         try {
             $existing = $this->sources->starterKeys($tenantId);
-            foreach ($this->starters() as $key => $starter) {
+            foreach ($this->starters($this->currencyFor($tenantId)) as $key => $starter) {
                 if (isset($existing[$key]) || ($only !== null && !in_array($key, $only, true))) {
                     continue;
                 }
@@ -95,7 +100,7 @@ final class DocumentSourceStarterSeeder implements TenantProvisioningStep
      */
     public function refreshUntouched(int $tenantId, array $keys): int
     {
-        $starters = $this->starters();
+        $starters = $this->starters($this->currencyFor($tenantId));
         $refreshed = 0;
         foreach ($keys as $key) {
             if (isset($starters[$key]) && $this->sources->replaceUntouchedStarter($tenantId, $key, $starters[$key] + ['lang' => 'en'])) {
@@ -106,18 +111,23 @@ final class DocumentSourceStarterSeeder implements TenantProvisioningStep
         return $refreshed;
     }
 
+    private function currencyFor(int $tenantId): string
+    {
+        return $this->currencyOf !== null ? ($this->currencyOf)($tenantId) : 'USD';
+    }
+
     /**
      * The starters by key. Example data follows the design system's (Example Bakery and friends).
      *
      * @return array<string, array{kind: string, title: string, lang?: string, page: array<string, mixed>,
      *                             own_fields: list<array<string, string>>, blocks: list<array<string, mixed>>}>
      */
-    public function starters(): array
+    public function starters(string $currency = 'USD'): array
     {
         $this->ids = 0;
         $a4 = ['size' => 'A4', 'marginMm' => 16, 'letterhead' => true];
 
-        return (new GuidelineStarters($this->id(...)))->all() + [
+        return (new GuidelineStarters($this->id(...), $currency))->all() + [
             'editor.exam' => [
                 'kind' => 'template',
                 'title' => 'Exam sheet',

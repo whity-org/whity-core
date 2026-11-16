@@ -39,7 +39,7 @@ export function LocalizedNameField({
   const t = useTranslation('common');
   const originalId = useId();
   const languageWord = (code: BilingualLanguage) =>
-    code === 'ar' ? t('localizedText.arabic', 'Arabic') : t('localizedText.english', 'English');
+    code === 'ar' ? t('localizedName.arabic', 'Arabic') : t('localizedName.english', 'English');
 
   return (
     <div className="space-y-3" data-testid={`${id}-field`}>
@@ -51,13 +51,13 @@ export function LocalizedNameField({
         disabled={disabled}
         primaryLang={{ code: 'ar', label: languageWord('ar') }}
         secondaryLang={{ code: 'en', label: languageWord('en') }}
-        presentLabel={t('localizedText.set', 'Set')}
-        emptyLabel={t('localizedText.empty', 'Empty')}
+        presentLabel={t('localizedName.set', 'Set')}
+        emptyLabel={t('localizedName.empty', 'Empty')}
       />
 
       <div className="space-y-1.5">
         <p id={originalId} className="text-sm font-medium text-foreground">
-          {t('localizedText.original', 'The original name is in')}
+          {t('localizedName.original', 'The original name is in')}
         </p>
         <RadioGroup
           aria-labelledby={originalId}
@@ -76,7 +76,7 @@ export function LocalizedNameField({
         </RadioGroup>
         <p className="text-xs text-muted-foreground">
           {t(
-            'localizedText.hint',
+            'localizedName.hint',
             'The original is the official name. People who read the other language see it when that language is empty.'
           )}
         </p>

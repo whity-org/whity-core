@@ -1039,6 +1039,11 @@ export interface PluginFeature {
   id: string;
   /** Name of the plugin providing the feature (e.g. "HelloWorld"). */
   plugin: string;
+  /**
+   * WHIT-1127: present only when a paid plugin is in its grace period or
+   * read-only in this workspace, so its screens can say so.
+   */
+  pluginAccess?: { state: 'on' | 'read_only'; reason: string | null; graceUntil: string | null } | null;
   /** Human-readable label shown in headers and navigation. */
   label: string;
   /** Tabler icon kebab name (e.g. "message-circle"), or null for default. */

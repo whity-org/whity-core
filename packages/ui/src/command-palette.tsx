@@ -47,7 +47,7 @@ export interface CommandPaletteItem {
    */
   disabled?: boolean
   /**
-   * Secondary words after the label, never matched against ("JOD 301.600 ·
+   * Secondary words after the label, never matched against ("$301.60 ·
    * overdue"): what tells two records with similar names apart.
    */
   hint?: string

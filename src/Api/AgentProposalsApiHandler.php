@@ -14,6 +14,7 @@ use Whity\Core\Plugin\Tenant\ManifestImpact;
 use Whity\Core\Plugin\Tenant\WorkspacePluginProposalDiffs;
 use Whity\Core\Request;
 use Whity\Core\Response;
+use Whity\Core\Security\GatedApproval;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpPrincipal;
@@ -26,7 +27,9 @@ use Whity\Mcp\Tools\ToolsCallHandler;
  * 7.5b Approvals inbox; docs/design/MCP-TOOL-SURFACE.md §5.11).
  *
  *   GET  /api/me/agent-proposals                 the caller's proposals (?status=waiting)
+ *   POST /api/me/agent-proposals/{id}/identity-check  start "confirm it's you" for a Needs verifying one
  *   POST /api/me/agent-proposals/{id}/approve    run it, optionally with edited `arguments`
+ *                                                (and the check's `code` when it is Needs verifying)
  *   POST /api/me/agent-proposals/{id}/decline    don't
  *   POST /api/me/agent-proposals/bulk-approve    several Ordinary (tier-1) ones together (AQ.1)
  *
@@ -60,6 +63,8 @@ final class AgentProposalsApiHandler
         private readonly ?AgentActionRepository $actions = null,
         // WHIT-867: each tool's plain name, for the Arabic screens.
         private readonly ?\Closure $toolInfo = null,
+        // AG.1: a Needs verifying (tier 3) proposal is a gated approval.
+        private readonly ?GatedApproval $gate = null,
     ) {
     }
 
@@ -115,12 +120,59 @@ final class AgentProposalsApiHandler
         // person's tick naming what is lost.
         $acknowledged = is_array($body) && ($body['acknowledgedDestructive'] ?? false) === true;
 
-        $outcome = $this->approveOne($tenantId, $profileId, $id, $arguments, $acknowledged);
+        // AG.1: a Needs verifying proposal runs only after the person confirms
+        // it's them, for this proposal, right now.
+        $proposal = $this->proposals->find($id, $tenantId);
+        if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
+            return Response::error('Proposal not found', 404);
+        }
+        $method = null;
+        if (self::isGated($proposal)) {
+            $method = GatedApprovalHttp::confirm($this->gate, $tenantId, $profileId, GatedApproval::AGENT_PROPOSAL, (string) $id, is_array($body) ? $body : []);
+            if ($method instanceof Response) {
+                return $method;
+            }
+        }
+
+        $outcome = $this->approveOne($tenantId, $profileId, $id, $arguments, $acknowledged, $method);
         if ($outcome instanceof Response) {
             return $outcome;
         }
 
         return Response::json(['data' => $outcome], 200);
+    }
+
+    /**
+     * POST /api/me/agent-proposals/{id}/identity-check: what the person confirms
+     * with before approving a Needs verifying proposal, and for an emailed code,
+     * send it. Any other proposal needs no check (422).
+     *
+     * @param array<string, string> $params
+     */
+    public function identityCheck(Request $request, array $params = []): Response
+    {
+        $caller = $this->caller($request);
+        if ($caller instanceof Response) {
+            return $caller;
+        }
+        [$tenantId, $profileId] = $caller;
+        $id = (int) ($params['id'] ?? 0);
+
+        $proposal = $this->proposals->find($id, $tenantId);
+        if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
+            return Response::error('Proposal not found', 404);
+        }
+        if (!self::isGated($proposal)) {
+            return Response::error('This proposal needs no check. Approve it as it is.', 422);
+        }
+
+        return GatedApprovalHttp::start($this->gate, $tenantId, $profileId, GatedApproval::AGENT_PROPOSAL, (string) $id);
+    }
+
+    /** @param array<string, mixed> $proposal */
+    private static function isGated(array $proposal): bool
+    {
+        return ProposalTier::of($proposal['permissions'], $proposal['undo_window_seconds']) === ProposalTier::NEEDS_VERIFYING;
     }
 
     /**
@@ -185,13 +237,19 @@ final class AgentProposalsApiHandler
      * One approval: re-checks the grant, decides atomically, runs, records.
      *
      * @param array<string, mixed>|null $arguments edited arguments, or null to run as proposed
+     * @param string|null $identityCheck how the person confirmed it's them, for a Needs verifying one
      * @return array<string, mixed>|Response the presented proposal, or the refusal
      */
-    private function approveOne(int $tenantId, int $profileId, int $id, ?array $arguments, bool $acknowledgedDestructive = false): array|Response
+    private function approveOne(int $tenantId, int $profileId, int $id, ?array $arguments, bool $acknowledgedDestructive = false, ?string $identityCheck = null): array|Response
     {
         $proposal = $this->proposals->find($id, $tenantId);
         if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
             return Response::error('Proposal not found', 404);
+        }
+        // Whatever the caller, a Needs verifying proposal never runs without
+        // the person's fresh check (AG.1).
+        if ($identityCheck === null && self::isGated($proposal)) {
+            return Response::error('Confirm it is you first, then approve this on its own.', 403, ['reason' => GatedApprovalHttp::REASON_FAILED]);
         }
         $blocked = self::impactPlanRefusal($proposal, $acknowledgedDestructive);
         if ($blocked !== null) {
@@ -248,7 +306,8 @@ final class AgentProposalsApiHandler
             'tenant_id'   => $tenantId,
             'target_type' => 'agent_proposal',
             'target_id'   => $id,
-            'metadata'    => ['tool' => $proposal['tool'], 'edited' => $arguments !== null, 'failed' => is_array($result) && ($result['isError'] ?? false) === true],
+            'metadata'    => ['tool' => $proposal['tool'], 'edited' => $arguments !== null, 'failed' => is_array($result) && ($result['isError'] ?? false) === true]
+                + ($identityCheck !== null ? ['identity_check' => $identityCheck] : []),
         ]);
         $this->proposals->events()?->decided($tenantId, $id, AgentProposalEvents::APPROVED, $profileId, $profileId, (string) $proposal['tool'], is_array($result) && ($result['isError'] ?? false) === true);
 

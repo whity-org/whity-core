@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Whity\Core\Document;
 
+use Whity\Core\Money\AmountInWords;
+use Whity\Core\Money\Currency;
+
 /**
  * The 13 document templates of the guideline (docs/design/16-documents.md,
  * decision 6.8) as editor starters, each in English and in Arabic (WHIT-843).
@@ -23,6 +26,11 @@ namespace Whity\Core\Document;
  * reference. Nothing here makes a document compliant with JoFotara; section 16's
  * "Before shipping" review is still open. The invoice here is an Invoice: the
  * Tax invoice is what Front Office adds (owner, 2 Nov 2026).
+ *
+ * Amounts are written in the workspace's currency when the starter is seeded
+ * (CU.1–CU.3): the figures, the "Total USD" labels and the amount in words. The
+ * sample figures are kept to cents, so they read the same in dollars ($301.60)
+ * and dinars (JOD 301.600) and the totals still add up.
  */
 final class GuidelineStarters
 {
@@ -48,9 +56,25 @@ final class GuidelineStarters
     /** @var array<string, array<string, string>> the current starter's own fields, by key */
     private array $own = [];
 
-    /** @param \Closure(): string $id the next block id */
-    public function __construct(private readonly \Closure $id)
+    /** The currency in prose: [English plural, Arabic after "الأسعار", Arabic short name]. */
+    private const NAMES = [
+        'USD' => ['US dollars', 'بالدولار الأمريكي', 'دولار'],
+        'EUR' => ['euros', 'باليورو', 'يورو'],
+        'JOD' => ['Jordanian dinars', 'بالدينار الأردني', 'دينار'],
+        'SAR' => ['Saudi riyals', 'بالريال السعودي', 'ريال'],
+        'AED' => ['UAE dirhams', 'بالدرهم الإماراتي', 'درهم'],
+    ];
+
+    private readonly string $currency;
+
+    /**
+     * @param \Closure(): string $id the next block id
+     * @param string $currency the workspace's currency (CU.4); USD by default
+     */
+    public function __construct(private readonly \Closure $id, string $currency = 'USD')
     {
+        $code = strtoupper(trim($currency));
+        $this->currency = preg_match('/^[A-Z]{3}$/', $code) === 1 ? $code : 'USD';
     }
 
     /**
@@ -93,7 +117,7 @@ final class GuidelineStarters
             ]),
             $this->lines(4),
             ...$this->totals(),
-            $this->labelled(['Terms', 'الشروط'], $this->t('Prices are in Jordanian dinars. This quote is valid until the date above. Delivery is confirmed when the quote is accepted.', 'الأسعار بالدينار الأردني. هذا العرض صالح حتى التاريخ أعلاه. يتأكد التسليم عند قبول العرض.')),
+            $this->labelled(['Terms', 'الشروط'], $this->t('Prices are in ' . $this->name()[0] . '. This quote is valid until the date above. Delivery is confirmed when the quote is accepted.', 'الأسعار ' . $this->name()[1] . '. هذا العرض صالح حتى التاريخ أعلاه. يتأكد التسليم عند قبول العرض.')),
             $this->signature([[['Accepted by', 'قبِله'], null], [['For', 'عن'], [$this->company('company.name', 'Company name', 'اسم الشركة')]]]),
         ], []];
     }
@@ -125,8 +149,8 @@ final class GuidelineStarters
                 [['Reason', 'السبب'], $this->f('reason', 'Reason', 'السبب', 'One large tray, damaged in delivery', 'صينية كبيرة واحدة تضررت أثناء التسليم')],
             ]),
             $this->lines(2),
-            ...$this->totals(['Credit total JOD', 'إجمالي الإشعار (دينار)']),
-            $this->labelled(['Balance', 'الرصيد'], $this->f('balance_after', 'Balance after this credit', 'الرصيد بعد هذا الإشعار', 'JOD 203.000 still due on INV-1042', 'JOD 203.000 مستحقة على INV-1042')),
+            ...$this->totals(['Credit total ' . $this->currency, 'إجمالي الإشعار (' . $this->name()[2] . ')']),
+            $this->labelled(['Balance', 'الرصيد'], $this->f('balance_after', 'Balance after this credit', 'الرصيد بعد هذا الإشعار', $this->m('203.00') . ' still due on INV-1042', $this->m('203.00') . ' مستحقة على INV-1042')),
         ], []];
     }
 
@@ -139,14 +163,14 @@ final class GuidelineStarters
                 [['Received from', 'استلمنا من'], $this->f('received_from', 'Received from', 'استلمنا من', 'Example Clinic')],
                 [['Payment method', 'طريقة الدفع'], $this->f('method', 'Payment method', 'طريقة الدفع', 'Bank transfer (CliQ)', 'حوالة بنكية (CliQ)')],
             ]),
-            $this->labelled(['Amount received', 'المبلغ المستلَم'], $this->f('amount', 'Amount received', 'المبلغ المستلَم', 'JOD 203.000')),
-            $this->para($this->f('amount_in_words', 'Amount in words', 'المبلغ كتابةً', 'Two hundred and three Jordanian dinars', 'مئتان وثلاثة دنانير أردنية')),
+            $this->labelled(['Amount received', 'المبلغ المستلَم'], $this->f('amount', 'Amount received', 'المبلغ المستلَم', $this->m('203.00'))),
+            $this->para($this->f('amount_in_words', 'Amount in words', 'المبلغ كتابةً', ...$this->words('203.00'))),
             $this->table(
                 [['Invoice', 'الفاتورة'], ['Invoice total', 'قيمة الفاتورة'], ['Credited', 'المُرجَع'], ['Paid now', 'المدفوع الآن']],
-                [[$this->f('invoice_no', 'Invoice number', 'رقم الفاتورة', 'INV-1042'), $this->f('invoice_total', 'Invoice total', 'قيمة الفاتورة', '301.600'), $this->f('credited', 'Credited', 'المُرجَع', '98.600'), $this->f('paid_now', 'Paid now', 'المدفوع الآن', '203.000')]],
+                [[$this->f('invoice_no', 'Invoice number', 'رقم الفاتورة', 'INV-1042'), $this->f('invoice_total', 'Invoice total', 'قيمة الفاتورة', $this->n('301.60')), $this->f('credited', 'Credited', 'المُرجَع', $this->n('98.60')), $this->f('paid_now', 'Paid now', 'المدفوع الآن', $this->n('203.00'))]],
                 ['start', 'end', 'end', 'end'],
             ),
-            $this->labelled(['Balance on account', 'الرصيد المتبقي'], $this->f('balance', 'Balance on account', 'الرصيد المتبقي', '0.000')),
+            $this->labelled(['Balance on account', 'الرصيد المتبقي'], $this->f('balance', 'Balance on account', 'الرصيد المتبقي', $this->n('0.00'))),
             // A5: one language, so the role fits on its line.
             $this->signature([[[$this->t('Received by', 'المستلِم'), null], [$this->f('received_by', 'Received by', 'المستلِم', 'Rana Haddad')]]]),
         ], ['size' => 'A5']];
@@ -157,9 +181,9 @@ final class GuidelineStarters
     {
         $rows = [];
         foreach ([
-            ['27 Oct 2026', 'INV-1042', '301.600', '', '721.600'],
-            ['29 Oct 2026', 'CN-0012', '', '98.600', '623.000'],
-            ['30 Oct 2026', 'RCT-0207', '', '342.000', '281.000'],
+            ['27 Oct 2026', 'INV-1042', $this->n('301.60'), '', $this->n('721.60')],
+            ['29 Oct 2026', 'CN-0012', '', $this->n('98.60'), $this->n('623.00')],
+            ['30 Oct 2026', 'RCT-0207', '', $this->n('342.00'), $this->n('281.00')],
             ['', '', '', '', ''],
         ] as $i => $sample) {
             $n = $i + 1;
@@ -177,19 +201,19 @@ final class GuidelineStarters
                 [['Statement no.', 'رقم الكشف'], $this->f('statement_no', 'Statement number', 'رقم الكشف', 'ST-2026-10-031')],
                 [['Customer', 'العميل'], $this->f('customer', 'Customer', 'العميل', 'Example Clinic')],
                 [['Period', 'الفترة'], $this->f('period', 'Period', 'الفترة', '1–31 Oct 2026')],
-                [['Opening balance', 'الرصيد الافتتاحي'], $this->f('opening_balance', 'Opening balance', 'الرصيد الافتتاحي', 'JOD 420.000')],
+                [['Opening balance', 'الرصيد الافتتاحي'], $this->f('opening_balance', 'Opening balance', 'الرصيد الافتتاحي', $this->m('420.00'))],
             ]),
             $this->table(
                 [['Date', 'التاريخ'], ['Reference', 'المرجع'], ['Debit', 'مدين'], ['Credit', 'دائن'], ['Balance', 'الرصيد']],
                 $rows,
                 ['start', 'start', 'end', 'end', 'end'],
             ),
-            $this->labelled(['Balance due', 'الرصيد المستحق'], $this->f('balance_due', 'Balance due', 'الرصيد المستحق', 'JOD 281.000')),
-            $this->para($this->f('amount_in_words', 'Amount in words', 'المبلغ كتابةً', 'Two hundred and eighty-one Jordanian dinars', 'مئتان وواحد وثمانون دينارًا أردنيًا')),
+            $this->labelled(['Balance due', 'الرصيد المستحق'], $this->f('balance_due', 'Balance due', 'الرصيد المستحق', $this->m('281.00'))),
+            $this->para($this->f('amount_in_words', 'Amount in words', 'المبلغ كتابةً', ...$this->words('281.00'))),
             $this->heading(['Ageing', 'أعمار الرصيد']),
             $this->table(
                 [['Not due', 'غير مستحق'], ['1–30 days', '1–30 يوماً'], ['31–60 days', '31–60 يوماً'], ['61–90 days', '61–90 يوماً'], ['Over 90 days', 'أكثر من 90 يوماً']],
-                [[$this->f('age_current', 'Not due', 'غير مستحق', '281.000'), $this->f('age_30', '1–30 days', '1–30 يوماً', '0.000'), $this->f('age_60', '31–60 days', '31–60 يوماً', '0.000'), $this->f('age_90', '61–90 days', '61–90 يوماً', '0.000'), $this->f('age_older', 'Over 90 days', 'أكثر من 90 يوماً', '0.000')]],
+                [[$this->f('age_current', 'Not due', 'غير مستحق', $this->n('281.00')), $this->f('age_30', '1–30 days', '1–30 يوماً', $this->n('0.00')), $this->f('age_60', '31–60 days', '31–60 يوماً', $this->n('0.00')), $this->f('age_90', '61–90 days', '61–90 يوماً', $this->n('0.00')), $this->f('age_older', 'Over 90 days', 'أكثر من 90 يوماً', $this->n('0.00'))]],
                 ['end', 'end', 'end', 'end', 'end'],
             ),
         ], []];
@@ -199,7 +223,7 @@ final class GuidelineStarters
     private function reminder(): array
     {
         $rows = [];
-        foreach ([['INV-0998', '1 Oct 2026', '15 Oct 2026', '19', '150.000'], ['INV-1007', '8 Oct 2026', '22 Oct 2026', '12', '94.500'], ['', '', '', '', '']] as $i => $sample) {
+        foreach ([['INV-0998', '1 Oct 2026', '15 Oct 2026', '19', $this->n('150.00')], ['INV-1007', '8 Oct 2026', '22 Oct 2026', '12', $this->n('94.50')], ['', '', '', '', '']] as $i => $sample) {
             $n = $i + 1;
             $rows[] = [
                 $this->f("line_{$n}_invoice", "Invoice {$n}", "الفاتورة {$n}", $sample[0]),
@@ -222,8 +246,8 @@ final class GuidelineStarters
                 $rows,
                 ['start', 'start', 'start', 'end', 'end'],
             ),
-            $this->labelled(['Total overdue JOD', 'إجمالي المتأخر (دينار)'], $this->f('total', 'Total overdue', 'إجمالي المتأخر', '244.500')),
-            $this->para($this->f('amount_in_words', 'Amount in words', 'المبلغ كتابةً', 'Two hundred and forty-four Jordanian dinars and five hundred fils', 'مئتان وأربعة وأربعون دينارًا أردنيًا وخمسمئة فلس')),
+            $this->labelled(['Total overdue ' . $this->currency, 'إجمالي المتأخر (' . $this->name()[2] . ')'], $this->f('total', 'Total overdue', 'إجمالي المتأخر', $this->n('244.50'))),
+            $this->para($this->f('amount_in_words', 'Amount in words', 'المبلغ كتابةً', ...$this->words('244.50'))),
             $this->labelled(['How to pay', 'طريقة الدفع'], $this->f('payment', 'How to pay', 'طريقة الدفع', 'Bank transfer to [Bank], IBAN [JO00 0000 0000 0000], or CliQ alias [EXAMPLEBAKERY].', 'حوالة بنكية إلى [البنك]، رقم الحساب [JO00 0000 0000 0000]، أو عبر CliQ [EXAMPLEBAKERY].')),
         ], []];
     }
@@ -262,7 +286,7 @@ final class GuidelineStarters
     private function payslip(): array
     {
         $rows = [];
-        foreach ([['Basic salary', 'الراتب الأساسي', '900.000', ''], ['Transport allowance', 'بدل المواصلات', '100.000', ''], ['Social security', 'الضمان الاجتماعي', '', '67.500'], ['Income tax', 'ضريبة الدخل', '', '12.000'], ['', '', '', '']] as $i => $s) {
+        foreach ([['Basic salary', 'الراتب الأساسي', $this->n('900.00'), ''], ['Transport allowance', 'بدل المواصلات', $this->n('100.00'), ''], ['Social security', 'الضمان الاجتماعي', '', $this->n('67.50')], ['Income tax', 'ضريبة الدخل', '', $this->n('12.00')], ['', '', '', '']] as $i => $s) {
             $n = $i + 1;
             $rows[] = [
                 $this->f("line_{$n}_item", "Line {$n} item", "بند السطر {$n}", $s[0], $s[1]),
@@ -281,11 +305,11 @@ final class GuidelineStarters
             ]),
             $this->table(
                 [['Item', 'البند'], ['Earnings', 'الاستحقاقات'], ['Deductions', 'الاقتطاعات']],
-                [...$rows, [$this->txt($this->t('Totals', 'المجموع')), $this->f('total_earnings', 'Total earnings', 'مجموع الاستحقاقات', '1,000.000'), $this->f('total_deductions', 'Total deductions', 'مجموع الاقتطاعات', '79.500')]],
+                [...$rows, [$this->txt($this->t('Totals', 'المجموع')), $this->f('total_earnings', 'Total earnings', 'مجموع الاستحقاقات', $this->n('1000.00')), $this->f('total_deductions', 'Total deductions', 'مجموع الاقتطاعات', $this->n('79.50'))]],
                 ['start', 'end', 'end'],
             ),
-            $this->labelled(['Net pay JOD', 'صافي الراتب (دينار)'], $this->f('net_pay', 'Net pay', 'صافي الراتب', '920.500')),
-            $this->para($this->f('amount_in_words', 'Amount in words', 'المبلغ كتابةً', 'Nine hundred and twenty Jordanian dinars and five hundred fils', 'تسعمئة وعشرون دينارًا أردنيًا وخمسمئة فلس')),
+            $this->labelled(['Net pay ' . $this->currency, 'صافي الراتب (' . $this->name()[2] . ')'], $this->f('net_pay', 'Net pay', 'صافي الراتب', $this->n('920.50'))),
+            $this->para($this->f('amount_in_words', 'Amount in words', 'المبلغ كتابةً', ...$this->words('920.50'))),
             $this->heading(['Leave balance 2026', 'رصيد الإجازات 2026']),
             $this->table(
                 [['Leave type', 'نوع الإجازة'], ['Yearly', 'الرصيد السنوي'], ['Used', 'المستخدم'], ['Left', 'المتبقي']],
@@ -304,8 +328,9 @@ final class GuidelineStarters
         $employee = $this->f('employee', 'Employee', 'الموظف', 'Omar Saleh', 'عمر صالح');
         $job = $this->f('job_title', 'Job title', 'الوظيفة', 'Accountant, full time', 'محاسب، دوام كامل');
         $joined = $this->f('joined', 'Joined', 'تاريخ التعيين', '1 March 2023', '1 آذار 2023');
-        $salary = $this->f('salary', 'Monthly salary', 'الراتب الشهري', 'JOD 1,000.000');
-        $words = $this->f('salary_in_words', 'Salary in words', 'الراتب كتابةً', 'one thousand Jordanian dinars', 'ألف دينار أردني');
+        $salary = $this->f('salary', 'Monthly salary', 'الراتب الشهري', $this->m('1000.00'));
+        [$salaryEn, $salaryAr] = $this->words('1000.00');
+        $words = $this->f('salary_in_words', 'Salary in words', 'الراتب كتابةً', lcfirst($salaryEn), $salaryAr);
         $company = $this->company('company.name', 'Company name', 'اسم الشركة');
 
         return [$this->t('Employment letter', 'كتاب تعريف بالعمل'), [
@@ -382,11 +407,11 @@ final class GuidelineStarters
             $this->heading(['Key numbers', 'الأرقام الرئيسية']),
             $this->table(
                 [['Sales', 'المبيعات'], ['Orders', 'الطلبات'], ['Average order', 'متوسط الطلب'], ['Overdue', 'المتأخر']],
-                [[$this->f('kpi_sales', 'Sales', 'المبيعات', 'JOD 15,200'), $this->f('kpi_orders', 'Orders', 'الطلبات', '212'), $this->f('kpi_average', 'Average order', 'متوسط الطلب', 'JOD 71.700'), $this->f('kpi_overdue', 'Overdue', 'المتأخر', 'JOD 429.500')]],
+                [[$this->f('kpi_sales', 'Sales', 'المبيعات', $this->m('15200.00')), $this->f('kpi_orders', 'Orders', 'الطلبات', '212'), $this->f('kpi_average', 'Average order', 'متوسط الطلب', $this->m('71.70')), $this->f('kpi_overdue', 'Overdue', 'المتأخر', $this->m('429.50'))]],
                 ['end', 'end', 'end', 'end'],
             ),
             $this->heading(['Sales by line', 'المبيعات حسب البند']),
-            $this->table([['Line', 'البند'], ['Sales (JOD)', 'المبيعات (دينار)'], ['Share', 'الحصة']], $rows, ['start', 'end', 'end']),
+            $this->table([['Line', 'البند'], ['Sales (' . $this->currency . ')', 'المبيعات (' . $this->name()[2] . ')'], ['Share', 'الحصة']], $rows, ['start', 'end', 'end']),
             $this->heading(['Notes', 'ملاحظات']),
             $this->para($this->f('notes', 'Notes', 'ملاحظات', 'Figures are for all branches and exclude tax.', 'الأرقام لجميع الفروع ولا تشمل الضريبة.')),
         ], ['kind' => 'report']];
@@ -433,10 +458,10 @@ final class GuidelineStarters
     private function lines(int $count): array
     {
         $samples = [
-            ['Catering tray, large (12 people)', 'صينية ضيافة كبيرة (12 شخصًا)', '2', '85.000', '170.000'],
-            ['Catering tray, small (6 people)', 'صينية ضيافة صغيرة (6 أشخاص)', '1', '45.000', '45.000'],
-            ['Pastry box, assorted', 'علبة معجنات مشكلة', '3', '12.500', '37.500'],
-            ['Delivery, Amman', 'توصيل، عمّان', '1', '7.500', '7.500'],
+            ['Catering tray, large (12 people)', 'صينية ضيافة كبيرة (12 شخصًا)', '2', $this->n('85.00'), $this->n('170.00')],
+            ['Catering tray, small (6 people)', 'صينية ضيافة صغيرة (6 أشخاص)', '1', $this->n('45.00'), $this->n('45.00')],
+            ['Pastry box, assorted', 'علبة معجنات مشكلة', '3', $this->n('12.50'), $this->n('37.50')],
+            ['Delivery, Amman', 'توصيل، عمّان', '1', $this->n('7.50'), $this->n('7.50')],
         ];
         $rows = [];
         for ($n = 1; $n <= $count; $n++) {
@@ -460,18 +485,69 @@ final class GuidelineStarters
      * Subtotal, tax, total and the amount in words. The tax rate is the
      * template's own field: it comes from the accountant, not from here.
      *
-     * @param array{0: string, 1: string} $total
+     * @param array{0: string, 1: string}|null $total null for "Total" in the starter's currency
      * @return list<array<string, mixed>>
      */
-    private function totals(array $total = ['Total JOD', 'الإجمالي (دينار)']): array
+    private function totals(?array $total = null): array
     {
+        $total ??= ['Total ' . $this->currency, 'الإجمالي (' . $this->name()[2] . ')'];
         $table = $this->table(
             [['Subtotal', 'المجموع'], ['Sales tax', 'ضريبة المبيعات'], [$total[0], $total[1]]],
-            [[$this->f('subtotal', 'Subtotal', 'المجموع', '260.000'), $this->f('tax', 'Sales tax', 'ضريبة المبيعات', '41.600'), $this->f('total', 'Total', 'الإجمالي', '301.600', null, true)]],
+            [[$this->f('subtotal', 'Subtotal', 'المجموع', $this->n('260.00')), $this->f('tax', 'Sales tax', 'ضريبة المبيعات', $this->n('41.60')), $this->f('total', 'Total', 'الإجمالي', $this->n('301.60'), null, true)]],
             ['end', 'end', 'end'],
         );
 
-        return [$table, $this->para($this->f('amount_in_words', 'Amount in words', 'المبلغ كتابةً', 'Three hundred and one Jordanian dinars and six hundred fils', 'ثلاثمئة وواحد دينار أردني وستمئة فلس'))];
+        return [$table, $this->para($this->f('amount_in_words', 'Amount in words', 'المبلغ كتابةً', ...$this->words('301.60')))];
+    }
+
+    /** The sample's minor units in this currency, from a figure written to cents ("301.60"). */
+    private function minor(string $cents): int
+    {
+        [$whole, $fraction] = explode('.', $cents) + [1 => '00'];
+        $hundredths = (int) $whole * 100 + (int) str_pad(substr($fraction, 0, 2), 2, '0');
+        $per = Currency::minorUnitsPerMajor($this->currency);
+
+        // Every sample is whole cents, so a currency with 2 or more places holds it exactly.
+        return $per >= 100 ? $hundredths * intdiv($per, 100) : intdiv($hundredths, intdiv(100, $per));
+    }
+
+    /** A figure for a table cell, to the currency's decimals: "301.60", "301.600". */
+    private function n(string $cents): string
+    {
+        $exponent = Currency::exponentFor($this->currency);
+        $per = 10 ** $exponent;
+        $minor = $this->minor($cents);
+        $major = number_format(intdiv($minor, $per), 0, '.', ',');
+
+        return $exponent === 0 ? $major : $major . '.' . str_pad((string) ($minor % $per), $exponent, '0', STR_PAD_LEFT);
+    }
+
+    /** An amount with its currency, as CU.2 writes it: "$301.60", "JOD 301.600". */
+    private function m(string $cents): string
+    {
+        return Currency::display($this->minor($cents), $this->currency);
+    }
+
+    /**
+     * The amount in words in both languages (CU.3), or the written amount for
+     * a currency without words.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function words(string $cents): array
+    {
+        $minor = $this->minor($cents);
+
+        return [
+            AmountInWords::write($minor, $this->currency, 'en') ?? $this->m($cents),
+            AmountInWords::write($minor, $this->currency, 'ar') ?? $this->m($cents),
+        ];
+    }
+
+    /** @return array{0: string, 1: string, 2: string} */
+    private function name(): array
+    {
+        return self::NAMES[$this->currency] ?? [$this->currency, 'بعملة ' . $this->currency, $this->currency];
     }
 
     /**

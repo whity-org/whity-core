@@ -22,7 +22,7 @@ final class WorkspaceEmail
     /**
      * @param string                            $heading    The headline.
      * @param list<string>                      $paragraphs Body paragraphs, in order.
-     * @param list<array{0: string, 1: string}> $rows       Label and value pairs, such as ['Total', 'JOD 8.250'].
+     * @param list<array{0: string, 1: string}> $rows       Label and value pairs, such as ['Total', '$8.25'].
      * @param string|null                       $buttonLabel The one button, or null.
      * @param string|null                       $buttonUrl   Where it goes (https), required with a label.
      * @param string|null                       $note        The grey note, or null.

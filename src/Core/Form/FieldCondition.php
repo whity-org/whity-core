@@ -119,14 +119,6 @@ final class FieldCondition
         $byKey = self::indexByKey($fields);
 
         foreach ($byKey as $key => $field) {
-            $audience = (string) ($field['audience'] ?? FormFieldRepository::AUDIENCE_APPLICANT);
-
-            // Nothing can upload against a review yet, so this would never have an
-            // answer, and if required would block every review.
-            if ($audience === FormFieldRepository::AUDIENCE_STAFF && (string) ($field['field_type'] ?? '') === FieldType::FILE) {
-                throw new FormRejectedException("Staff field '{$key}' cannot be a file question");
-            }
-
             $rule = $field['visible_when'] ?? null;
             if (!is_array($rule)) {
                 continue;
@@ -137,11 +129,6 @@ final class FieldCondition
             }
             if (!isset($byKey[$controller])) {
                 throw new FormRejectedException("Field '{$key}' depends on '{$controller}', which is not on this form");
-            }
-            // The two are answered at different times by different people, so one
-            // could never read the other's answer when it is decided.
-            if ((string) ($byKey[$controller]['audience'] ?? FormFieldRepository::AUDIENCE_APPLICANT) !== $audience) {
-                throw new FormRejectedException("Field '{$key}' depends on '{$controller}', which is answered by another audience");
             }
             $controllerType = (string) ($byKey[$controller]['field_type'] ?? '');
             if (in_array($controllerType, [FieldType::FILE, FieldType::REPEATING, FieldType::SIGNATURE], true)) {

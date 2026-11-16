@@ -80,9 +80,8 @@ test.describe('Self-service profile management (WC-64)', () => {
     // The "logged in as" footer is the account-settings entry point (it fixes the
     // previously orphaned /settings page). Clicking it lands on Settings.
     await adminPage.shell.openAccountSettings();
-    await page.waitForURL('**/settings');
-    await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Profile' })).toBeVisible();
+    await page.waitForURL('**/settings/profile');
+    await expect(page.getByRole('heading', { name: 'Profile', level: 1 })).toBeVisible();
     await expect(page.getByLabel('Email Address')).toBeVisible();
   });
 
@@ -98,8 +97,8 @@ test.describe('Self-service profile management (WC-64)', () => {
     const session = await loginAs(browser, baseURL as string, throwaway.email, throwaway.password);
     try {
       const { page } = session;
-      await page.goto('/settings');
-      await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
+      await page.goto('/settings/profile');
+      await expect(page.getByRole('heading', { name: 'Profile', level: 1 })).toBeVisible();
 
       // Edit the email and supply the current password to authorize the change.
       await page.getByLabel('Email Address').fill(newEmail);
@@ -141,8 +140,8 @@ test.describe('Self-service profile management (WC-64)', () => {
     const session = await loginAs(browser, baseURL as string, throwaway.email, throwaway.password);
     try {
       const { page } = session;
-      await page.goto('/settings');
-      await expect(page.getByRole('heading', { name: 'My settings' })).toBeVisible();
+      await page.goto('/settings/profile');
+      await expect(page.getByRole('heading', { name: 'Profile', level: 1 })).toBeVisible();
 
       await page.getByLabel('New Password', { exact: true }).fill(newPassword);
       await page.getByLabel('Confirm New Password').fill(newPassword);
@@ -190,7 +189,7 @@ test.describe('Self-service profile management (WC-64)', () => {
     const session = await loginAs(browser, baseURL as string, throwaway.email, throwaway.password);
     try {
       const { page } = session;
-      await page.goto('/settings');
+      await page.goto('/settings/profile');
       await page.getByLabel('New Password', { exact: true }).fill('new-password-aa');
       await page.getByLabel('Confirm New Password').fill('new-password-bb');
       await page.getByLabel('Current Password').fill(throwaway.password);
@@ -213,7 +212,7 @@ test.describe('Self-service profile management (WC-64)', () => {
     const session = await loginAs(browser, baseURL as string, throwaway.email, throwaway.password);
     try {
       const { page } = session;
-      await page.goto('/settings');
+      await page.goto('/settings/profile');
       await page.getByLabel('New Password', { exact: true }).fill('does-not-matter-1');
       await page.getByLabel('Confirm New Password').fill('does-not-matter-1');
       await page.getByLabel('Current Password').fill('totally-wrong');

@@ -32,10 +32,12 @@ final class PlanPriceRepository
 {
     public const PERIOD_MONTH = 'month';
     public const PERIOD_YEAR = 'year';
+    /** Every six months (WHIT-1148): Whity for Salons sells month, six months and year. */
+    public const PERIOD_HALF_YEAR = 'half_year';
     /** A one-off charge: a perpetual licence, a setup fee. */
     public const PERIOD_ONCE = 'once';
 
-    public const PERIODS = [self::PERIOD_MONTH, self::PERIOD_YEAR, self::PERIOD_ONCE];
+    public const PERIODS = [self::PERIOD_MONTH, self::PERIOD_HALF_YEAR, self::PERIOD_YEAR, self::PERIOD_ONCE];
 
     public function __construct(private readonly PDO $db)
     {

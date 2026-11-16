@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { continueSignupPlugin } from '@/lib/signup-plugin';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useBranding } from '@/lib/branding-context';
@@ -265,7 +266,7 @@ export default function LoginPage() {
         } else {
           // Single-membership: session cookie already set — redirect in.
           await refreshAuth();
-          router.push('/dashboard');
+          router.push((await continueSignupPlugin()) ?? '/dashboard');
         }
       } else {
         const errorData = ((loginError_ ?? {}) as unknown) as { message?: string };
@@ -305,7 +306,7 @@ export default function LoginPage() {
       if (response.ok) {
         // Session issued for the chosen tenant — redirect in.
         await refreshAuth();
-        router.push('/dashboard');
+        router.push((await continueSignupPlugin()) ?? '/dashboard');
       } else {
         const errorData = ((selectError ?? {}) as unknown) as { message?: string };
         const message =
@@ -365,7 +366,7 @@ export default function LoginPage() {
       if (response.ok) {
         // 2FA successful - refresh auth state and redirect
         await refreshAuth();
-        router.push('/dashboard');
+        router.push((await continueSignupPlugin()) ?? '/dashboard');
       } else if (response.status === 401) {
         const errorMsg = backupCodeMode
           ? t('recovery.error.invalid', 'Invalid recovery code. Please try again.')
@@ -506,15 +507,9 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="text-sm font-medium">
-                  {t('login.password.label', 'Password')}
-                </label>
-                {/* WC-password-reset-2fa-recovery: self-service reset entry point. */}
-                <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
-                  {t('login.password.forgot', 'Forgot password?')}
-                </Link>
-              </div>
+              <label htmlFor="password" className="text-sm font-medium">
+                {t('login.password.label', 'Password')}
+              </label>
               <Input
                 id="password"
                 type="password"
@@ -538,6 +533,14 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={isFormDisabled}>
               {buttonText}
             </Button>
+
+            {/* WC-password-reset-2fa-recovery: self-service reset entry point,
+                under the button as TplSignInTwoColumn draws it (WHIT-1044). */}
+            <p className="text-center">
+              <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground hover:underline">
+                {t('login.password.forgotYour', 'Forgot your password?')}
+              </Link>
+            </p>
 
             {/* WC-235: self-service registration entry point. The prompt and
                 the link text are SEPARATE keys because they are separate

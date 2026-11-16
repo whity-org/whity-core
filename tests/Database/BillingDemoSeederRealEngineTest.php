@@ -208,12 +208,12 @@ final class BillingDemoSeederRealEngineTest extends TestCase
         self::assertGreaterThan(0, (int) $counts['retired']);
     }
 
-    /** Amounts are in JOD, the currency whose three decimal places started all this. */
+    /** Amounts are in US dollars, the default since design 3.5.1 (CU.1). */
     public function testAmountsAreInTheCurrencyThePlatformBillsIn(): void
     {
         $this->seeder->seed();
 
-        $statement = $this->pdo->query("SELECT count(*) FROM plan_prices WHERE currency <> 'JOD'");
+        $statement = $this->pdo->query("SELECT count(*) FROM plan_prices WHERE currency <> 'USD'");
         self::assertNotFalse($statement);
         self::assertSame(0, (int) $statement->fetchColumn());
     }

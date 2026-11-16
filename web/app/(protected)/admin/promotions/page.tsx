@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { api, type components } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
+import { useWorkspaceCurrency } from '@/lib/branding-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { PLANS_MANAGE } from '@/lib/capabilities';
@@ -240,13 +241,14 @@ function CreatePromotionDialog({ onClose, onSaved }: { onClose: () => void; onSa
   const [kind, setKind] = useState<'percent' | 'amount'>('percent');
   const [percent, setPercent] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('JOD');
+  const workspaceCurrency = useWorkspaceCurrency();
+  const [currency, setCurrency] = useState(workspaceCurrency);
   const [endsAt, setEndsAt] = useState('');
   const [maxRedemptions, setMaxRedemptions] = useState('');
   const [saving, setSaving] = useState(false);
 
   const percentValue = Number(percent);
-  // Typed in normal units ("5.000"); the API takes minor units.
+  // Typed in normal units ("5.00"); the API takes minor units.
   let amountValue = 0;
   if (amount.trim() !== '' && /^[A-Z]{3}$/.test(currency)) {
     try {

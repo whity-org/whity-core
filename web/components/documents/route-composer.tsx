@@ -622,7 +622,10 @@ export function RouteComposer({
    * separate calls, not built from the value, so the key extractor can see all
    * three — a computed key is a key no translator ever receives.
    */
-  const quorumLabel = (quorum: 'all' | 'any' | 'majority'): string => {
+  const quorumLabel = (quorum: 'all' | 'any' | 'majority' | 'first'): string => {
+    if (quorum === 'first') {
+      return t('routing.compose.template.quorum.first', 'the first answer decides');
+    }
     if (quorum === 'any') {
       return t('routing.compose.template.quorum.any', 'any one approval carries it');
     }

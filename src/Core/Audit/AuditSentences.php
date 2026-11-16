@@ -45,6 +45,7 @@ final class AuditSentences
      *   audit.how.agent = Through a connected agent
      *   audit.how.cli = From the command line
      *   audit.how.job = By a scheduled job
+     *   audit.sentence.agent_action_ran = {actor} did: {target}
      *   audit.sentence.agent_action_undone = {actor} undid an action by {target}
      *   audit.sentence.agent_assignment_created = {actor} assigned agent {target}
      *   audit.sentence.agent_assignment_grant_changed = {actor} changed what agent {target} may do
@@ -85,6 +86,7 @@ final class AuditSentences
      *   audit.sentence.billing_plan_changed = {actor} changed the plan
      *   audit.sentence.documents_comment_reopened = {actor} reopened a comment
      *   audit.sentence.documents_comment_resolved = {actor} resolved a comment
+     *   audit.sentence.documents_document_withdrawn = {actor} withdrew a document
      *   audit.sentence.documents_suggestion_created = {actor} suggested a change
      *   audit.sentence.email_verification_confirmed = {actor} confirmed an email address
      *   audit.sentence.email_verification_failed = An email confirmation failed
@@ -92,6 +94,9 @@ final class AuditSentences
      *   audit.sentence.mcp_resources_read = {actor} read data through a connected AI app
      *   audit.sentence.mcp_token_grant_changed = {actor} changed what a connected AI app may do
      *   audit.sentence.mcp_tools_call = {actor} used a tool through a connected AI app
+     *   audit.sentence.notification_delivery_failed = {actor}: a notification could not be sent
+     *   audit.sentence.notification_delivery_queued = {actor} queued a notification
+     *   audit.sentence.notification_delivery_sent = {actor} sent a notification
      *   audit.sentence.ou_created = {actor} created unit {target}
      *   audit.sentence.ou_deleted = {actor} deleted unit {target}
      *   audit.sentence.ou_role_assigned = {actor} gave unit {target} a role
@@ -109,11 +114,12 @@ final class AuditSentences
      *   audit.sentence.profile_email_verification_resent = {actor} asked for another confirmation email
      *   audit.sentence.role_created = {actor} created role {target}
      *   audit.sentence.role_deleted = {actor} deleted role {target}
-     *   audit.sentence.documents_document_withdrawn = {actor} withdrew a document
-     *   audit.sentence.notification_delivery_queued = {actor} queued a notification
-     *   audit.sentence.notification_delivery_sent = {actor} sent a notification
-     *   audit.sentence.notification_delivery_failed = {actor}: a notification could not be sent
      *   audit.sentence.role_updated = {actor} changed role {target}
+     *   audit.sentence.route_approved = {actor} approved {target}
+     *   audit.sentence.route_declined = {actor} declined to sign {target}
+     *   audit.sentence.route_rejected = {actor} did not approve {target}
+     *   audit.sentence.route_sent_back = {actor} sent back {target}
+     *   audit.sentence.route_signed = {actor} signed {target}
      *   audit.sentence.security_2fa_policy_created = {actor} added a two-step rule
      *   audit.sentence.security_2fa_policy_deleted = {actor} removed a two-step rule
      *   audit.sentence.security_2fa_policy_reminded = {actor} reminded {target} to set up two-step sign-in
@@ -150,6 +156,7 @@ final class AuditSentences
      * @var array<string, string>
      */
     private const TEMPLATES = [
+        'agent.action.ran' => '{actor} did: {target}',
         'agent.action.undone' => '{actor} undid an action by {target}',
         'agent.assignment.created' => '{actor} assigned agent {target}',
         'agent.assignment.grant_changed' => '{actor} changed what agent {target} may do',
@@ -190,6 +197,7 @@ final class AuditSentences
         'billing.plan_changed' => '{actor} changed the plan',
         'documents.comment.reopened' => '{actor} reopened a comment',
         'documents.comment.resolved' => '{actor} resolved a comment',
+        'documents.document.withdrawn' => '{actor} withdrew a document',
         'documents.suggestion.created' => '{actor} suggested a change',
         'email.verification.confirmed' => '{actor} confirmed an email address',
         'email.verification.failed' => 'An email confirmation failed',
@@ -197,6 +205,9 @@ final class AuditSentences
         'mcp.resources.read' => '{actor} read data through a connected AI app',
         'mcp.token.grant_changed' => '{actor} changed what a connected AI app may do',
         'mcp.tools.call' => '{actor} used a tool through a connected AI app',
+        'notification.delivery.failed' => '{actor}: a notification could not be sent',
+        'notification.delivery.queued' => '{actor} queued a notification',
+        'notification.delivery.sent' => '{actor} sent a notification',
         'ou.created' => '{actor} created unit {target}',
         'ou.deleted' => '{actor} deleted unit {target}',
         'ou.role_assigned' => '{actor} gave unit {target} a role',
@@ -214,11 +225,12 @@ final class AuditSentences
         'profile_email.verification_resent' => '{actor} asked for another confirmation email',
         'role.created' => '{actor} created role {target}',
         'role.deleted' => '{actor} deleted role {target}',
-        'documents.document.withdrawn' => '{actor} withdrew a document',
-        'notification.delivery.queued' => '{actor} queued a notification',
-        'notification.delivery.sent' => '{actor} sent a notification',
-        'notification.delivery.failed' => '{actor}: a notification could not be sent',
         'role.updated' => '{actor} changed role {target}',
+        'route.approved' => '{actor} approved {target}',
+        'route.declined' => '{actor} declined to sign {target}',
+        'route.rejected' => '{actor} did not approve {target}',
+        'route.sent_back' => '{actor} sent back {target}',
+        'route.signed' => '{actor} signed {target}',
         'security.2fa_policy.created' => '{actor} added a two-step rule',
         'security.2fa_policy.deleted' => '{actor} removed a two-step rule',
         'security.2fa_policy.reminded' => '{actor} reminded {target} to set up two-step sign-in',
@@ -256,7 +268,7 @@ final class AuditSentences
     private const AREA_PREFIXES = [
         'security' => ['auth.', 'security.', 'email.verification.', 'profile_email.'],
         'people' => ['tenant.invitation.', 'user.', 'user_group.', 'role.', 'ou.', 'delegation.', 'relation.'],
-        'documents' => ['documents.', 'document.', 'data_type.', 'forms.', 'form.'],
+        'documents' => ['documents.', 'document.', 'data_type.', 'forms.', 'form.', 'route.'],
         'agents' => ['agent.', 'mcp.'],
         'plugins' => ['plugin.'],
         'billing' => ['billing.', 'plan.', 'subscription.'],

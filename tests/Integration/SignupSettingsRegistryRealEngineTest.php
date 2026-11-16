@@ -37,7 +37,7 @@ final class SignupSettingsRegistryRealEngineTest extends TestCase
     public function testANewWorkspaceIsOff(): void
     {
         self::assertSame(
-            ['mode' => 'off', 'role_id' => null, 'allowed_domains' => [], 'customer_invites' => false, 'invites_per_customer' => 0, 'updated_at' => null],
+            ['mode' => 'off', 'role_id' => null, 'allowed_domains' => [], 'customer_invites' => false, 'invites_per_customer' => 0, 'route_template_id' => null, 'updated_at' => null],
             (new WorkspaceSignupSettings($this->pdo))->get(self::BAKERY)
         );
     }

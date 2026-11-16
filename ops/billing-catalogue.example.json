@@ -8,7 +8,7 @@
       "is_addon": false,
       "prices": [
         {
-          "currency": "JOD",
+          "currency": "USD",
           "amount": 0,
           "period": "month",
           "per_seat": false
@@ -34,14 +34,14 @@
       "sort_order": 20,
       "prices": [
         {
-          "currency": "JOD",
-          "amount": 8000,
+          "currency": "USD",
+          "amount": 800,
           "period": "month",
           "per_seat": true
         },
         {
-          "currency": "JOD",
-          "amount": 80000,
+          "currency": "USD",
+          "amount": 8000,
           "period": "year",
           "per_seat": true
         }

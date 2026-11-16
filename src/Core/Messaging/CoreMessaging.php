@@ -68,7 +68,7 @@ final class CoreMessaging
             $channels->registerCore(new WebChatChannel($settings));
         }
 
-        return new MessagingService(
+        $service = new MessagingService(
             $pdo,
             new ConversationRepository($pdo),
             new MessageRepository($pdo),
@@ -76,6 +76,17 @@ final class CoreMessaging
             $enqueue,
             $meters,
         );
+        // One chat (design 3.5, WHIT-1097): blocked senders and the workspace's bots.
+        $blocking = new \Whity\Core\Chat\ChatBlocking($pdo);
+        $bots = new \Whity\Core\Chat\ChatBots($pdo);
+        $service->useInboundRules(
+            static fn (int $tenantId, string $channel, string $address): bool => $blocking->isBlocked($tenantId, $channel, $address),
+            static function (MessagingService $messaging, int $tenantId, int $conversationId, bool $isNew) use ($bots): void {
+                $bots->onInbound($messaging, $tenantId, $conversationId, $isNew);
+            },
+        );
+
+        return $service;
     }
 
     /** The host part of our Message-IDs: the instance's own host, or a stable fallback. */

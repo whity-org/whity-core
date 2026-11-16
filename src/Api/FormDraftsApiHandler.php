@@ -123,7 +123,7 @@ final class FormDraftsApiHandler
             }
 
             $kept = [];
-            foreach (FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, $formId)) as $field) {
+            foreach ($this->fields->listForForm($tenantId, $formId) as $field) {
                 $key = (string) $field['field_key'];
                 if (array_key_exists($key, $data) && $field['field_type'] !== FieldType::FILE) {
                     $kept[$key] = $data[$key];

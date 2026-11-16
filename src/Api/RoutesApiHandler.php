@@ -126,6 +126,9 @@ final class RoutesApiHandler
                 if ($event['actor_profile_id'] !== null) {
                     $people[(int) $event['actor_profile_id']] = true;
                 }
+                if (($event['on_behalf_of_profile_id'] ?? null) !== null) {
+                    $people[(int) $event['on_behalf_of_profile_id']] = true;
+                }
             }
             foreach ($items as $item) {
                 $people[(int) $item['profile_id']] = true;

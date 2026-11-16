@@ -14,6 +14,9 @@ use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Identity\PasswordResetService;
 use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\Request;
+use Whity\Core\Security\GatedApproval;
+use Whity\Core\Security\IdentityCheck;
+use Whity\Core\Document\Signing\SigningChallengeRepository;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Database\Database;
 
@@ -35,6 +38,8 @@ use Whity\Database\Database;
  */
 final class PasswordResetApprovalsApiRealEngineTest extends TestCase
 {
+    public const GOOD_CODE = '123456';
+
     private const TENANT_A = 1;
     private const TENANT_B = 2;
 
@@ -236,6 +241,45 @@ final class PasswordResetApprovalsApiRealEngineTest extends TestCase
         self::assertSame(403, $res->getStatusCode());
     }
 
+    // ==================== confirm it's you (AG.1) ====================
+
+    public function testApproveNeedsTheApproverToConfirmItsThem(): void
+    {
+        $requester = $this->seedProfile('confirm@acme.test', self::TENANT_A);
+        $originalHash = (string) $this->col("SELECT password_hash FROM profiles WHERE id = {$requester}");
+        $requestId = $this->stageRequest($requester, 'needs-a-check');
+
+        TenantContext::setTenantId(self::TENANT_A);
+        foreach ([[], ['code' => ''], ['code' => '000000']] as $body) {
+            $res = $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A, $body), ['id' => (string) $requestId]);
+            self::assertSame(403, $res->getStatusCode());
+            self::assertStringContainsString('identity_check_failed', $res->getBody());
+        }
+        self::assertSame($originalHash, (string) $this->col("SELECT password_hash FROM profiles WHERE id = {$requester}"));
+        self::assertSame(0, $this->epochOf($requester));
+
+        $res = $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A), ['id' => (string) $requestId]);
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+    }
+
+    public function testWithoutTheCheckNothingIsApproved(): void
+    {
+        $requester = $this->seedProfile('nogate@acme.test', self::TENANT_A);
+        $requestId = $this->stageRequest($requester, 'no-gate-password');
+
+        TenantContext::setTenantId(self::TENANT_A);
+        $res = $this->makeHandler(false)->approve($this->req(self::ADMIN_A, self::TENANT_A), ['id' => (string) $requestId]);
+        self::assertSame(503, $res->getStatusCode());
+        self::assertSame(0, $this->epochOf($requester));
+    }
+
+    public function testStartingTheCheckNeedsTheRequestAndThePermission(): void
+    {
+        TenantContext::setTenantId(self::TENANT_A);
+        self::assertSame(422, $this->handler->identityCheck($this->req(self::ADMIN_A, self::TENANT_A, []))->getStatusCode());
+        self::assertSame(403, $this->handler->identityCheck($this->req(self::NOPERM_A, self::TENANT_A, ['request_id' => 1]))->getStatusCode());
+    }
+
     // ==================== helpers ====================
 
     private function stageRequest(int $profileId, string $password = 'a-staged-password-1'): int
@@ -282,13 +326,34 @@ final class PasswordResetApprovalsApiRealEngineTest extends TestCase
         return $profileId;
     }
 
-    private function makeHandler(): PasswordResetApprovalsApiHandler
+    private function makeHandler(bool $withGate = true): PasswordResetApprovalsApiHandler
     {
         $registry = new PermissionRegistry();
         $registry->registerCorePermissions();
         $roleChecker = new RoleChecker($this->databaseFor($this->pdo), $registry);
 
-        return new PasswordResetApprovalsApiHandler($this->service, $roleChecker, new AuditLogger($this->pdo, new NullLogger()));
+        return new PasswordResetApprovalsApiHandler($this->service, $roleChecker, new AuditLogger($this->pdo, new NullLogger()), null, $withGate ? $this->gate() : null);
+    }
+
+    /**
+     * The approver's own check is IdentityCheck's to prove (IdentityCheckTest);
+     * here a fixed code stands in, and only for a password reset's purpose.
+     */
+    private function gate(): GatedApproval
+    {
+        return new GatedApproval(new class ($this->pdo) extends IdentityCheck {
+            public function __construct(PDO $pdo)
+            {
+                parent::__construct($pdo, new SigningChallengeRepository($pdo));
+            }
+
+            public function verify(int $tenantId, int $profileId, string $purpose, ?string $code): ?string
+            {
+                return $code === PasswordResetApprovalsApiRealEngineTest::GOOD_CODE && str_starts_with($purpose, GatedApproval::PASSWORD_RESET . ':')
+                    ? self::TOTP
+                    : null;
+            }
+        });
     }
 
     private function databaseFor(PDO $pdo): Database
@@ -299,9 +364,15 @@ final class PasswordResetApprovalsApiRealEngineTest extends TestCase
         return $db;
     }
 
-    private function req(int $userId, int $tenantId): Request
+    /**
+     * Every request carries the approver's check by default ({@see GatedApproval});
+     * the tests about the check send their own body.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function req(int $userId, int $tenantId, array $body = ['code' => self::GOOD_CODE]): Request
     {
-        $request = new Request('GET', '/api/password-resets/pending', [], '');
+        $request = new Request('POST', '/api/password-resets/pending', [], (string) json_encode($body));
         $request->user = (object) ['profile_id' => $userId, 'active_tenant_id' => $tenantId];
 
         return $request;

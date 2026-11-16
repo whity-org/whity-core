@@ -33,6 +33,7 @@ final class WorkspaceSignupSettings
         SettingsRegistry::SIGNUP_ALLOWED_DOMAINS,
         SettingsRegistry::SIGNUP_CUSTOMER_INVITES,
         SettingsRegistry::SIGNUP_INVITES_PER_CUSTOMER,
+        SettingsRegistry::SIGNUP_ROUTE_TEMPLATE_ID,
     ];
 
     private readonly TenantSettingsRepository $store;
@@ -50,7 +51,7 @@ final class WorkspaceSignupSettings
      * workspace that never saved them reads the registry defaults: Off, no
      * role, every domain, no customer invites.
      *
-     * @return array{mode: string, role_id: int|null, allowed_domains: list<string>, customer_invites: bool, invites_per_customer: int, updated_at: string|null}
+     * @return array{mode: string, role_id: int|null, allowed_domains: list<string>, customer_invites: bool, invites_per_customer: int, route_template_id: int|null, updated_at: string|null}
      */
     public function get(int $tenantId): array
     {
@@ -70,6 +71,9 @@ final class WorkspaceSignupSettings
             'allowed_domains' => is_array($domains) ? array_values(array_filter($domains, 'is_string')) : [],
             'customer_invites' => $value(SettingsRegistry::SIGNUP_CUSTOMER_INVITES) === 'true',
             'invites_per_customer' => max(0, (int) $value(SettingsRegistry::SIGNUP_INVITES_PER_CUSTOMER)),
+            // Merge map A4: the route a join request travels on; null is the
+            // default one-step route.
+            'route_template_id' => (int) $value(SettingsRegistry::SIGNUP_ROUTE_TEMPLATE_ID) > 0 ? (int) $value(SettingsRegistry::SIGNUP_ROUTE_TEMPLATE_ID) : null,
             'updated_at' => $stored === [] ? null : $this->store->lastUpdatedAt($tenantId, self::KEYS),
         ];
     }
@@ -119,6 +123,12 @@ final class WorkspaceSignupSettings
             }
             throw $e;
         }
+    }
+
+    /** Merge map A4: the route template join requests travel on, or null for the default. */
+    public function saveRouteTemplate(int $tenantId, ?int $templateId): void
+    {
+        $this->store->set($tenantId, SettingsRegistry::SIGNUP_ROUTE_TEMPLATE_ID, (string) ($templateId ?? 0));
     }
 
     /** The role still exists and this workspace can use it: its own, or one shared by every workspace. */

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Document\Qr;
 
 use PDO;
+use Whity\Core\Security\PublicToken;
 
 /**
  * Minting, rotating, revoking and resolving a document's verification code
@@ -401,7 +402,7 @@ final class DocumentQrService
      */
     private static function newToken(): string
     {
-        return bin2hex(random_bytes(self::TOKEN_BYTES));
+        return PublicToken::make(self::TOKEN_BYTES);
     }
 
     /**

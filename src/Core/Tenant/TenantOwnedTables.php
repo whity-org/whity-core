@@ -123,13 +123,15 @@ final class TenantOwnedTables
         // ignores that read the tenant from the row they find.
         'calendar_staff' => '247_create_calendar.php',
         'calendar_working_hours' => '247_create_calendar.php',
-        'calendar_availability_exceptions' => '247_create_calendar.php',
         'calendar_events' => '247_create_calendar.php',
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_service_staff' => '248_create_calendar_bookings.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
         // Design 3.3: rooms a service needs, filtered by branch.
         'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
+        // Design 3.5: each person's own calendar view choices (CV.2, CV.4).
+        'calendar_view_preferences' => '278_create_calendar_view_preferences.php',
+        'calendar_event_people' => '284_extend_calendar_events.php',
 
         // WHIT-953 — contacts and their spreadsheet imports (design 3.3 A8).
         // Every query binds tenant_id.
@@ -146,11 +148,26 @@ final class TenantOwnedTables
         // the workspace from its slug first, then bind it like any other read.
         'conversations' => '243_create_conversations_and_messages.php',
         'messages' => '243_create_conversations_and_messages.php',
+        'conversation_contacts' => '289_one_conversation_per_customer.php',
         'webchat_visitors' => '245_create_webchat_and_messaging_settings.php',
-        'messaging_settings' => '245_create_webchat_and_messaging_settings.php',
         // Team chat (CH.1, CH.2): a team chat and its people and agents.
         'chats' => '253_create_team_chat.php',
         'chat_members' => '253_create_team_chat.php',
+        // One chat (UC.1): each person's pins and read marks on any conversation.
+        'chat_person_state' => '281_create_chat_person_state.php',
+        // Reactions on chat messages (UC.9).
+        'chat_message_reactions' => '282_add_chat_message_parts.php',
+        // Files, photos and voice sent in Chat (UC.10).
+        'chat_attachments' => '279_create_chat_attachments.php',
+        // Votes in chat polls (UC.5).
+        'chat_poll_votes' => '280_create_chat_poll_votes.php',
+        // Bots and blocked senders (UC.4, UC.12).
+        'chat_bots' => '283_create_chat_bots_and_blocking.php',
+        'chat_blocked_senders' => '283_create_chat_bots_and_blocking.php',
+        // Code plugins switched on per workspace (WHIT-1122).
+        'tenant_code_plugins' => '287_create_tenant_code_plugins.php',
+        // Cash payments for paid plugin plans (WHIT-1153).
+        'plugin_cash_payments' => '296_create_plugin_cash_payments.php',
 
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says
@@ -582,10 +599,6 @@ final class TenantOwnedTables
         // each document. Every statement binds `tenant_id` and the plugin slug,
         // so one plugin's tracking never answers for another plugin's document.
         'plugin_document_links' => '214_create_plugin_document_links.php',
-        // `form_submission_reviews` (migration 194) — the office's record on a
-        // submission. Every statement binds `tenant_id`, so a submission id from
-        // another tenant reads as not found.
-        'form_submission_reviews' => '194_add_form_staff_fields_and_reviews.php',
         // Convening (migrations 130/131/134) — deliberative bodies, who sits on
         // them, their meetings, the agenda each meeting carries, the decisions
         // taken, who was invited, and who actually turned up. All seven are

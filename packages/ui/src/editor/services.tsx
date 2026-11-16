@@ -12,7 +12,7 @@ export interface RecordView {
   /** "INV-1042 · Example Clinic" */
   title: string
   subtitle?: string
-  /** A formatted amount, e.g. "JOD 301.600". */
+  /** A formatted amount, e.g. "$301.60". */
   amount?: string
   status?: { label: string; tone: "success" | "warning" | "destructive" | "info" | "secondary" }
   /** Where the record opens. */
