@@ -5207,6 +5207,16 @@ $meetingInvitationRepository = new \Whity\Core\Convening\InvitationRepository($d
 // has nowhere to record them. Migration 134 carries the argument.
 $meetingAttendanceRepository = new \Whity\Core\Convening\AttendanceRepository($db->getPdo());
 
+// ADR 0018: one invite path for every event with people, meetings included.
+$calendarInvites = \Whity\Core\Calendar\CalendarServices::invites(
+    $db->getPdo(),
+    $notificationDispatcher,
+    $brandedEmailSender,
+    $settingsService,
+    $frontendUrls,
+    $logger,
+);
+
 $meetingService = new \Whity\Core\Convening\MeetingService(
     $conveningBodyRepository,
     $meetingRepository,
@@ -5214,7 +5224,8 @@ $meetingService = new \Whity\Core\Convening\MeetingService(
     new \Whity\Core\Convening\MeetingNotifications($notificationDispatcher),
     $meetingAttendanceRepository,
     // ADR 0018: a meeting's time, place and guests live on a calendar event.
-    new \Whity\Core\Convening\MeetingCalendar($db->getPdo())
+    new \Whity\Core\Convening\MeetingCalendar($db->getPdo()),
+    $calendarInvites
 );
 
 $decisionRecorder = new \Whity\Core\Convening\DecisionRecorder(
@@ -5268,6 +5279,7 @@ $calendarBookingService = \Whity\Core\Calendar\CalendarServices::bookingService(
     $queueService,
     $logger,
     $calendarPlugins,
+    $calendarInvites,
 );
 // SDK 1.98: a payment step settles held bookings, a sync plugin keeps outside
 // events, through these host services.

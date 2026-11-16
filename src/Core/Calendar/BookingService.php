@@ -45,6 +45,8 @@ final class BookingService
     public const MIN_MINUTES = 5;
     public const MAX_MINUTES = 1440;
 
+    private ?CalendarInvites $invites = null;
+
     /** @var list<ExternalBusySource> */
     private array $busySources = [];
 
@@ -68,6 +70,11 @@ final class BookingService
         private BookingMessenger $messenger = new NullBookingMessenger(),
         private readonly ?\Closure $clock = null,
     ) {
+    }
+
+    public function setInvites(CalendarInvites $invites): void
+    {
+        $this->invites = $invites;
     }
 
     public function addBusySource(ExternalBusySource $source): void
@@ -477,6 +484,8 @@ final class BookingService
             return $id;
         });
         $event = $this->calendar->findEvent($tenantId, $id) ?? throw CalendarRejectedException::notFound('Event');
+        // ADR 0018: people invited hear about it (in-app, push, email with an .ics).
+        $this->invites?->invited($tenantId, $id, array_column($event['people'], 'profile_id'));
         $this->announce(CalendarEventNames::EVENT_CREATED, ['id' => $id, 'tenant_id' => $tenantId, 'profile_id' => $profileId]);
 
         return ['event' => $event, 'overlapping_bookings' => $this->overlapping($tenantId, $profileId, $when)];
@@ -499,6 +508,19 @@ final class BookingService
             return true;
         });
         $this->announce(CalendarEventNames::EVENT_UPDATED, ['id' => $eventId, 'tenant_id' => $tenantId, 'profile_id' => $profileId]);
+        if ($this->invites !== null) {
+            $fresh = $this->calendar->findEvent($tenantId, $eventId);
+            if ($fresh !== null) {
+                $before = array_column($existing['people'], 'profile_id');
+                $added = array_values(array_diff(array_column($fresh['people'], 'profile_id'), $before));
+                $moved = $fresh['starts_at'] !== $existing['starts_at'] || $fresh['ends_at'] !== $existing['ends_at']
+                    || $fresh['location'] !== $existing['location'] || $fresh['room_id'] !== $existing['room_id'];
+                if ($moved && $before !== []) {
+                    $this->invites->changed($tenantId, $eventId);
+                }
+                $this->invites->invited($tenantId, $eventId, $added);
+            }
+        }
 
         return [
             'event' => $this->calendar->findEvent($tenantId, $eventId) ?? $existing,
@@ -510,6 +532,9 @@ final class BookingService
     {
         $existing = $this->calendar->findEvent($tenantId, $eventId) ?? throw CalendarRejectedException::notFound('Event');
         $this->calendar->cancelEvent($tenantId, $eventId);
+        if ($existing['people'] !== []) {
+            $this->invites?->cancelled($tenantId, $eventId);
+        }
         $this->announce(CalendarEventNames::EVENT_DELETED, ['id' => $eventId, 'tenant_id' => $tenantId, 'profile_id' => (int) $existing['profile_id']]);
     }
 

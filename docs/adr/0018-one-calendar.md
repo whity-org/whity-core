@@ -62,7 +62,7 @@ As a result, meetings did not block bookings (#1933). Meeting guests got no cale
 | T2 | WHIT-1109 | Kinds, event people, rooms and places on events, `/api/calendar/items`, free/busy for people invited and rooms held, answering an invitation | 284 |
 | T3 | WHIT-1110 | Time off and extra hours become events (copy keyed by `legacy_ref`) | 285 |
 | T4 | WHIT-1112 | Meetings scheduled as events; `MeetingBusySource` retires | 286 |
-| T5 | WHIT-1113 | One invite path and one reminder job | - |
+| T5 | WHIT-1113 | One invite path (`CalendarInvites`: notice, push, email with `.ics`; formal meetings keep their `convening.meeting.*` notice kinds). Staff reminders for events wait for the owner's lead time; booking reminders are unchanged | - |
 | T6 | WHIT-1114 | Task due dates and SDK `CalendarSource` | - |
 | T7 | WHIT-1115 | Meetings inside the calendar on the web, redirects from `/admin/x/convening-*`, one free-time picker | - |
 | T8 | (later) | Drop `meeting_invitations`, `meetings.scheduled_at/location` and closed exceptions, one release after their copies | ask |

@@ -42,6 +42,8 @@ final class MeetingService
         private readonly AttendanceRepository $attendance,
         // ADR 0018: the meeting's time, place and guests on the calendar.
         private readonly ?MeetingCalendar $calendar = null,
+        // ADR 0018: the one invite path (in-app, push, email with an .ics).
+        private readonly ?\Whity\Core\Calendar\CalendarInvites $invites = null,
     ) {
     }
 
@@ -116,7 +118,11 @@ final class MeetingService
         $updated = $this->requireMeeting($tenantId, $meetingId);
         $notified = 0;
 
-        if ($wasScheduled) {
+        $eventId = $this->calendar?->eventFor($tenantId, $meetingId);
+        if ($wasScheduled && $this->invites !== null && $eventId !== null) {
+            $this->invites->changed($tenantId, $eventId);
+            $notified = count($this->invitations->listForMeeting($tenantId, $meetingId));
+        } elseif ($wasScheduled) {
             $body = $this->requireBody($tenantId, (int) $updated['body_id']);
             $everyone = array_map(
                 static fn (array $i): int => (int) $i['profile_id'],
@@ -188,7 +194,12 @@ final class MeetingService
 
         // AFTER the write, and only to the people who are hearing about it for
         // the first time. See the class docblock.
-        $this->notifications->announceInvitations($tenantId, $newlyInvited, $meeting, $body);
+        $eventId = $this->calendar?->eventFor($tenantId, $meetingId);
+        if ($this->invites !== null && $eventId !== null) {
+            $this->invites->invited($tenantId, $eventId, $newlyInvited);
+        } else {
+            $this->notifications->announceInvitations($tenantId, $newlyInvited, $meeting, $body);
+        }
 
         return [
             'invited' => $newlyInvited,
@@ -349,7 +360,10 @@ final class MeetingService
         }
 
         $this->meetings->cancel($tenantId, $meetingId);
-        $this->calendar?->sync($tenantId, $meetingId);
+        $eventId = $this->calendar?->sync($tenantId, $meetingId);
+        if ($eventId !== null) {
+            $this->invites?->cancelled($tenantId, $eventId);
+        }
 
         return $this->requireMeeting($tenantId, $meetingId);
     }
