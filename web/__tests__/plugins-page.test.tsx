@@ -108,6 +108,7 @@ function mockPluginList(
   canOperate = true,
   removed: unknown[] = [],
   workspaceCode: unknown[] = [],
+  addonPlans: unknown[] = [],
 ): void {
   mockApiGet.mockImplementation((path: string) => {
     if (path === '/api/v1/plugins') {
@@ -118,6 +119,9 @@ function mockPluginList(
     }
     if (path === '/api/v1/workspace/code-plugins') {
       return Promise.resolve({ data: { data: workspaceCode } });
+    }
+    if (path === '/api/v1/billing/plans') {
+      return Promise.resolve({ data: { data: addonPlans }, response: { ok: true } });
     }
     return Promise.resolve({ data: { data: [] } });
   });
@@ -523,6 +527,39 @@ describe('PluginsPage rejected screens (#953)', () => {
       await waitFor(() =>
         expect(mockApiPost).toHaveBeenCalledWith('/api/v1/plugins/{name}/reinstall', {
           params: { path: { name: 'CakeOrders' } },
+        }),
+      );
+    });
+
+    it('offers a paid plugin a trial and Buy instead of the switch (WHIT-1127)', async () => {
+      const user = userEvent.setup();
+      setCapabilities(['plugins:read', 'plugins:enable', 'plugins:disable', 'billing:pay']);
+      mockPluginList(
+        [ACTIVE_PLUGIN],
+        false,
+        [],
+        [
+          {
+            name: 'FrontOffice', version: '0.8.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null,
+            state: 'off', reason: null, graceUntil: null, trialEndsAt: null, paid: true, product: 'plugin.front-office',
+            trialDays: 14, trialAvailable: true, mayTurnOn: false,
+          },
+        ],
+        [{ plan_key: 'plugin.front-office.monthly', is_addon: true, unit_amount: 2900, currency: 'USD', billing_period: 'month' }],
+      );
+      mockApiPost.mockResolvedValue({ data: { data: { name: 'FrontOffice', enabled: true, trialEndsAt: '2026-11-30 10:00:00' } } });
+
+      render(<PluginsPage />);
+      await screen.findByText('FrontOffice');
+
+      expect(screen.queryByRole('switch', { name: 'Use FrontOffice in this workspace' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Buy' })).toBeInTheDocument();
+      expect(screen.getByText(/a month for this workspace/)).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Start 14-day trial' }));
+      await waitFor(() =>
+        expect(mockApiPost).toHaveBeenCalledWith('/api/v1/workspace/code-plugins/{plugin}/trial', {
+          params: { path: { plugin: 'FrontOffice' } },
         }),
       );
     });

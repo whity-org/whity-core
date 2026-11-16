@@ -10947,6 +10947,16 @@ final class CoreApiSchemas
             'FrontendFeature' => self::object([
                 'id' => self::str(),
                 'plugin' => self::str(),
+                // WHIT-1127: only on a paid plugin's screens in grace or read-only.
+                'pluginAccess' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'state' => ['type' => 'string', 'enum' => ['on', 'read_only']],
+                        'reason' => self::str(true),
+                        'graceUntil' => self::str(true),
+                    ],
+                ],
                 'label' => self::str(),
                 'icon' => self::str(true),
                 'group' => self::str(),

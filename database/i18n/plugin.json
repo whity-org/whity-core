@@ -206,6 +206,10 @@
         "record.noRecord.description": "This address is missing the record it is about.",
         "record.noRecord.title": "No record named",
         "record.noRecordPage.description": "The '{id}' feature does not describe individual records, so there is nothing at this address.",
-        "record.noRecordPage.title": "No record page"
+        "record.noRecordPage.title": "No record page",
+        "access.grace": "This plugin’s access has ended. It keeps working until {date}, then becomes read-only. Someone who manages billing can buy it in Settings › Plugins.",
+        "access.licenceGrace": "Your platform’s licence for this plugin needs renewing soon.",
+        "access.readOnly": "Read-only: you can see everything here, but not change it. Nothing was deleted. Someone who manages billing can buy it again in Settings › Plugins.",
+        "access.unlicensed": "Read-only: your platform’s licence for this plugin has ended. Ask your platform operator."
     }
 }

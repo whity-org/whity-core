@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { api } from '@/lib/api/client';
 import type { components } from '@whity/api-client';
 import { useFetch } from '@/hooks/useFetch';
+import { useCapabilities } from '@/hooks/useCapabilities';
+import { BILLING_PAY } from '@/lib/capabilities';
+import { navigateExternal } from '@/lib/external-navigate';
+import { formatMoney } from '@whity/ui/money/currency';
 import { useToast } from '@/lib/toast-context';
 import { useNavigation } from '@/lib/navigation-context';
 import { useTranslation } from '@whity/features/i18n';
@@ -17,6 +21,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@whity/ui/sheet';
 
 type WorkspaceCodePlugin = components['schemas']['WorkspaceCodePlugin'];
+
+/** One price of a paid plugin's add-on plan, from /api/v1/billing/plans. */
+interface AddonPrice {
+  plan_key: string;
+  is_addon: boolean;
+  unit_amount: number;
+  currency: string;
+  billing_period: string;
+}
 type CodePluginAccess = components['schemas']['CodePluginAccess'];
 type Access = CodePluginAccess['access'];
 
@@ -40,6 +53,80 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
     const { data: response } = await api.GET('/api/v1/workspace/code-plugins');
     return response?.data ?? [];
   }, []);
+
+  // WHIT-1127: what a paid plugin costs, from the deployment's add-on plans.
+  const { hasPermission } = useCapabilities();
+  const canPay = hasPermission(BILLING_PAY);
+  const [buying, setBuying] = useState<string | null>(null);
+  const { data: addonPrices } = useFetch(async () => {
+    const { data: body, response: res } = await api.GET('/api/v1/billing/plans');
+    if (!res.ok) return [] as AddonPrice[];
+    return (((body as { data?: AddonPrice[] } | undefined)?.data ?? []) as AddonPrice[]).filter((plan) => plan.is_addon);
+  }, []);
+  const priceFor = (product: string | null | undefined): AddonPrice | null => {
+    if (!product) return null;
+    const prices = (addonPrices ?? []).filter((plan) => plan.plan_key.startsWith(`${product}.`));
+    return prices.find((plan) => plan.billing_period === 'month') ?? prices[0] ?? null;
+  };
+
+  const startTrial = async (plugin: WorkspaceCodePlugin) => {
+    setPending(plugin.name);
+    const { error: trialError } = await api.POST('/api/v1/workspace/code-plugins/{plugin}/trial', {
+      params: { path: { plugin: plugin.name } },
+    });
+    setPending(null);
+    if (trialError) {
+      addToast(trialError.error || t('plugins.paid.trialError', 'The trial could not be started. Try again.'), 'error');
+      return;
+    }
+    addToast(
+      t('plugins.paid.trialStarted', 'Your {days}-day trial of {name} has started.', { days: plugin.trialDays ?? 0, name: plugin.name }),
+      'success',
+    );
+    refetch();
+    void refreshNavigation();
+  };
+
+  const buy = async (plugin: WorkspaceCodePlugin, price: AddonPrice) => {
+    setBuying(plugin.name);
+    try {
+      const { data: body, response: res } = await api.POST('/api/v1/billing/checkout', {
+        body: { plan_key: price.plan_key, billing_period: price.billing_period } as never,
+      });
+      const url = (body as { data?: { url?: string } } | undefined)?.data?.url;
+      if (!res.ok || !url) {
+        addToast(t('billing.plans.error.start', 'Could not start checkout. Please try again.'), 'error');
+        return;
+      }
+      navigateExternal(url);
+    } finally {
+      setBuying(null);
+    }
+  };
+
+  const statusLine = (plugin: WorkspaceCodePlugin): string | null => {
+    if (!plugin.paid || !plugin.enabled) return null;
+    switch (plugin.reason) {
+      case 'trial':
+        return t('plugins.paid.trialUntil', 'Free trial until {date}', { date: dates.date(plugin.trialEndsAt ?? '') ?? '' });
+      case 'grace':
+        return t('plugins.paid.graceUntil', 'Its access has ended. It keeps working until {date}, then becomes read-only.', {
+          date: dates.date(plugin.graceUntil ?? '') ?? '',
+        });
+      case 'lapsed':
+        return t('plugins.paid.readOnly', 'Read-only: you can see everything, but not change it, until you buy it again. Nothing was deleted.');
+      case 'installation_unlicensed':
+        return t('plugins.paid.unlicensed', 'Read-only: your platform’s licence for this plugin has ended. Ask your platform operator.');
+      case 'installation_grace':
+        return t('plugins.paid.licenceGrace', 'Your platform’s licence for this plugin needs renewing soon.');
+      case 'entitled':
+        return t('plugins.paid.included', 'Included in your plan or bought for this workspace');
+      case 'free_for_all':
+        return t('plugins.paid.freeForAll', 'Free for every workspace on this platform');
+      default:
+        return null;
+    }
+  };
 
   const switchPlugin = async (plugin: WorkspaceCodePlugin, on: boolean) => {
     setPending(plugin.name);
@@ -105,6 +192,12 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
           {(data ?? []).map((plugin) => {
             const allowed = plugin.enabled ? canDisable : canEnable;
             const change = lastChange(plugin);
+            const status = statusLine(plugin);
+            const price = priceFor(plugin.product);
+            // A paid plugin this workspace can't turn on yet offers a trial or Buy instead of the switch.
+            const needsPurchase = plugin.paid && !plugin.mayTurnOn;
+            const offerBuy =
+              plugin.paid && canPay && price !== null && (needsPurchase || plugin.reason === 'trial' || plugin.reason === 'grace' || plugin.reason === 'lapsed');
             return (
               <li key={plugin.name} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
                 <div className="min-w-0 flex-1 space-y-1">
@@ -116,7 +209,21 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
                     {!plugin.canSwitch ? (
                       <Badge variant="secondary">{t('plugins.workspaceCode.alwaysOn', 'Always on')}</Badge>
                     ) : null}
+                    {plugin.paid ? <Badge variant="outline">{t('plugins.paid.badge', 'Paid')}</Badge> : null}
+                    {plugin.state === 'read_only' ? (
+                      <Badge variant="secondary">{t('plugins.paid.readOnlyBadge', 'Read-only')}</Badge>
+                    ) : null}
                   </div>
+                  {status ? (
+                    <p className={plugin.state === 'read_only' || plugin.reason === 'grace' ? 'text-warning-text' : 'text-muted-foreground'}>
+                      {status}
+                    </p>
+                  ) : null}
+                  {needsPurchase && price ? (
+                    <p className="text-muted-foreground">
+                      {t('plugins.paid.price', '{price} a month for this workspace', { price: formatMoney(price.unit_amount, price.currency) })}
+                    </p>
+                  ) : null}
                   {change ? <p className="text-muted-foreground">{change}</p> : null}
                 </div>
                 <div className="flex items-center gap-3">
@@ -125,7 +232,17 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
                       {t('plugins.workspaceCode.history', 'History')}
                     </Button>
                   ) : null}
-                  {plugin.canSwitch ? (
+                  {needsPurchase && plugin.trialAvailable && canEnable ? (
+                    <Button variant="outline" size="sm" disabled={pending === plugin.name} onClick={() => void startTrial(plugin)}>
+                      {t('plugins.paid.startTrial', 'Start {days}-day trial', { days: plugin.trialDays ?? 0 })}
+                    </Button>
+                  ) : null}
+                  {offerBuy && price ? (
+                    <Button variant="outline" size="sm" disabled={buying === plugin.name} onClick={() => void buy(plugin, price)}>
+                      {t('plugins.paid.buy', 'Buy')}
+                    </Button>
+                  ) : null}
+                  {plugin.canSwitch && !needsPurchase ? (
                     <Switch
                       checked={plugin.enabled}
                       disabled={!allowed || pending === plugin.name}
