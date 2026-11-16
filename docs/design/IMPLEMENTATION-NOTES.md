@@ -1,5 +1,157 @@
 # Implementation notes
 
+# Design 3.5 working plan (16 Nov 2026)
+
+The working plan for design system 3.5, checked against `develop` at `66b67adf` on 16 Nov 2026 (WHIT-1092). This is step 1 of `START-HERE.md`: organise, no feature code. The 3.5 files were unpacked with 3.5.1 in WHIT-1085 (#1988), together with `START-HERE.md` moved here and the snippet's two new rules in `CLAUDE.md`. 3.5 adds two milestones to `PLAN.md`: **A16** (the calendar, like Google Calendar, CV.1–CV.11) and **A17** (one chat, UC.1–UC.13). Both have their own sessions building them. The 3.4 plan below is kept as it was; where this section disagrees with it, this section is newer.
+
+How it was checked: the code on `origin/develop`, the merged pull requests by WHIT id, whity-web and whity-id at their `origin/main`. "Done" means merged and meeting the milestone's main "done when" in code. No screen was compared with its screenshots here, and nothing marked "unverified" was checked live.
+
+## Is the folder complete
+
+Every card named in `13-app-map.md` and `PLAN.md` (228 names in backticks, 244 card-like names in all) has its folder in `components/` and both screenshots. The names without a folder are not cards: `PluginDocumentThemesInterface` and `WhityDocument` (code), `DocAmount` (a part of `Doc`) and `TplSettings*` (all the settings cards). Every folder in `components/` has its light and dark screenshot.
+
+Three replaced cards are still shipped and still named in the app map: `TplMessagesInbox` and `PwMessages` (replaced by the `TplChat*` cards) and `PwCalendar` (replaced by `TplCalendarPhone`). See Q35.1.
+
+## A16 The calendar, like Google Calendar (CV.1–CV.11)
+
+Starts from the ADR 0017 calendar (#1819–#1828), its extras (rooms, branches, requests, check-in: #1838, #1851), the `TplCalendarStaff` pass (#1994), the phone pass for `PwCalendar` (#1965, WHIT-1067) and the kit's time grid (#1841). Today it has Day, Week and Month, colour by status, overlaps side by side and nothing to drag.
+
+| Decision | Now | Evidence |
+| --- | --- | --- |
+| CV.1 the rail on calendar screens | Missing | `web/components/sidebar.tsx`: the rail follows the width and the person's toggle, never the route |
+| CV.2 left panel (mini month, people and rooms, Also show) | Missing | `calendar-screen.tsx` has a "Whose calendar" select and a branch select; nothing is remembered |
+| CV.3 the bar | Partial | Today, ‹ › and the range exist; no Colour by; setup is underlined tabs (`calendar-nav.tsx`), not the gear |
+| CV.4 Colour by person, service or room | Missing | Colour means status only (`calendar-grid.tsx` `toneClass`) |
+| CV.5 the booking block | Partial | Start edge, dashed pending, grey events exist; overlaps sit side by side (`web/lib/calendar/layout.ts`), not cascaded; time off and cancelled bookings aren't drawn |
+| CV.6 grid and details | Partial | 48px an hour, weekend shading, All day, now line; the grid draws all 24 hours, not opening to closing; details open in a full sheet, not beside the booking, with no Message |
+| CV.7 views and keys | Partial | Day, Week, Month only; no 4 days, Year or D/X/W/M/Y; the view is not kept |
+| CV.8 click or drag to create | Missing | Only New booking and its dialogs |
+| CV.9 drag, resize, ask first, Undo, conflicts | Missing (server partial) | Move takes a start only (`CalendarApiHandler.php`, `BookingService.php`); always emails; a busy person is a hard refusal; room locks and the `.ics` sequence exist (migration 273) |
+| CV.10 without dragging | Partial | Move in the sheet with the slot picker; no keys, no press and hold |
+| CV.11 the phone | Partial, to the old card | Built for `PwCalendar`: Day first, Week as day cards, Month as counts; no 3-day grid, drawer, floating + Booking |
+
+**Where the cards land.** `TplCalendarWeek`, `TplCalendarViews`, `TplCalendarEditing`: `/calendar`, `web/components/calendar/calendar-screen.tsx`, split into a left panel, the bar, details beside a booking, quick booking and a drag hook; `layout.ts` gains 4 days, Year and the cascade. `TplCalendarPhone`: the same screen under 640px, replacing `AgendaList`. `TplCalendarStaff`: unchanged pages, reached from the gear.
+
+**Server work.**
+- **Per-person settings** (view, Colour by, people and rooms shown, Also show, the panel open or closed): a tenant-scoped `calendar_preferences (tenant_id, profile_id, …)` with `GET/PUT /api/calendar/me/preferences`. Not profile columns: those are the same in every workspace.
+- **Moving and resizing:** `move` takes an end (resize), "Email the new time" and "Book anyway" (a busy person); Undo needs the old time restored with one message to the customer.
+
+**Order and estimate** (about 15–17 days): server (2); rail, left panel, bar, Colour by (3); grid to opening hours, cascade, block styles, details beside a booking (2); 4 days, Year, keys (2); click or drag to create, quick booking (2); drag, resize, ask first, Undo, conflicts, keys (3); phone (2); light, dark and Arabic pass (1–2).
+
+## A17 One chat (UC.1–UC.13)
+
+Starts from team chat (#1845, #1855, `src/Core/Chat`, migration 253), customer Messages (#1821, #1824, `src/Core/Messaging`) and chat push (#1980); Chat is already the phone's fourth tab. Chat and Messages already share one pair of tables (`conversations.kind` customer or team, `messages.chat_meta`), but have two services, two sets of routes and two screens.
+
+| Decision | Now | Evidence |
+| --- | --- | --- |
+| UC.1 one list | Missing | `/chat` lists team chats only (`ChatRepository`), `/admin/messages` customers; no redirect, pins or tabs |
+| UC.2 three panes | Partial | 300px / conversation / 320px from 1280px; below that the right pane is hidden, not opened over |
+| UC.3 customer chats | Partial, in Messages | Assign, close, note, channel badge; no orders, bookings or files; no channel to send by |
+| UC.4 bots and agents | Partial | Agents done (CH.1–CH.2); no bots, no Settings › Chat |
+| UC.5 blocks in messages | Partial | Proposal cards only |
+| UC.6 threads | Missing | |
+| UC.7 bubbles or rows | Missing | No per-person preference |
+| UC.8 details and search in a chat | Partial | Members panel; search over chat names only; no media, files, links, Mute |
+| UC.9 actions | Missing | No reactions, pins, copy, forward, task, edit or delete |
+| UC.10 mentions, files, voice | Partial | People and agent mentions; no @everyone, no attachments |
+| UC.11 delivery and reading | Partial | Read marks per member; customer messages carry sent, delivered, read; no ticks, Seen by, typing or unread line; polling every 5 s |
+| UC.12 edit, delete, blocking | Missing | |
+| UC.13 the phone | Partial | Chat tab; Messages one pane at a time (`PwMessages`) |
+
+**Where the cards land.** `TplChatHub`, `TplChatCompact`, `TplChatParts`, `TplChatPhone`: `/chat`, `web/components/chat/chat-screen.tsx` (1,178 lines, to split into list, conversation, right pane, composer and message), with the customer thread from `admin/messages/page.tsx` folded in; `/admin/messages` redirects. Bots and blocking: Settings › Chat (Q35.6). `TplChatBox` and `TplSettingsMessages` already match (WHIT-1044, `12578df2`).
+
+**Server work.**
+- **The merged model:** one list endpoint (team chats by membership, customer conversations by `messages.read`); pins and mute per person (`conversation_prefs (profile_id, conversation_id, pinned, muted)`, since customer conversations have no members); reactions; `messages.parent_id` for threads; `edited_at`, `deleted_at`; attachments with tenant storage; block payloads in `chat_meta`; a channel per message if one customer chat spans channels (Q35.2).
+- **Bots:** a per-workspace rules table (away reply, welcome menu, hand-over), bot authors on messages, a hook for plugin bots (order status, stock), Settings › Chat beside `messaging_settings`.
+- **Blocking:** `messaging_blocks` (tenant, channel, address, reason, reported, by), checked in `ingest` and the public chat; list and unblock.
+- **Read receipts per channel:** team chats have read marks but no Seen by endpoint; typing needs a short-lived store (or the focus beat); customer channels already store delivered and read (`applyStatus`), to pass through, with a `reportsReading` capability per `MessageChannel`.
+
+The A17 session's plan is WHIT-1093 to WHIT-1099 on migrations 278–282.
+
+**Order and estimate** (about 22–26 days): one list, pins, customer chats in `/chat`, redirects (4–5); replies, threads, reactions, edit and delete, Seen by, typing, search, @everyone, bubbles or rows (5–6); attachments, albums, voice (3–4); blocks in messages (3–4); bots, blocking, new chat and group (3); phone (2); card pass (1–2).
+
+## A14 and A15 work replaced by A16 and A17
+
+- **`TplMessagesInbox`** (A15) and **`PwMessages`** (A14): built (WHIT-939, the WHIT-1044 card pass). Replaced by the `TplChat*` cards; nothing more is to be done to them. Their open diffs (`PwMessages`' tabs, filter and search, its screenshot pass with conversations) are **not** to be fixed: A17 replaces the screen. The Messaging server underneath carries over.
+- **`PwCalendar`** (A14): built (WHIT-1005, WHIT-1067). Replaced by `TplCalendarPhone`; its remaining work is A16's phone step, to the new card.
+- **`TplCalendarStaff`** (A15): its pass is done (#1994) and it stays, as the booking sheet and setup.
+
+## Milestone status (16 Nov 2026)
+
+| Milestone | Status | Evidence | Still open |
+| --- | --- | --- | --- |
+| M0 Survey | Done | #1409, M0 notes below | — |
+| M1 Foundation | Done | Before #1416; tokens v3, 163 icons, `design-system-rules.test.ts` | Screenshot pass |
+| M2 Editor core | Done | #1416 | Screenshot pass |
+| M3 Rich blocks | Done | Between M2 and M4 | Screenshot pass |
+| M4 Templates (M4b, M4c) | Done | #1434, `TemplateIssuing.php` | Screenshot pass |
+| M4d Document themes | Done | #1471, #1958, #1961, #1996 | Plugin document themes (M7) |
+| M5 Comments and suggestions | Done | #1519, migrations 183–186 | Screenshot pass |
+| M6 Agents | Partial | #1850, #1860 | Routines (E.32): a column only, no scheduler or screen; no @agent in comments |
+| M7 Plugin and saved blocks | Partial | #1875, #1861–#1874, #1924 | `PluginDocumentThemesInterface`; `SavedBlockVersionChange` not shown; required parts don't block issuing; "Delete and keep copies" |
+| M8 Arabic, type, accessibility | Done | #1852, #1856 | A recorded keyboard audit of every menu action |
+| A0 Ease of use | Done | #1546 | — |
+| A1 Home, People, Inbox | Done, with diffs | #1561, #1572, #1575, #1588, #1880 | Inbox tabs against `TplInbox`; Users table width; no bell or help in the top bar |
+| A2 Forms | Done | #1569 and follow-ups | — |
+| A3 Documents and routing | Done | #1570, #1638 | — |
+| A4 AI and agents | Done | #1564 | — |
+| A5 Plugin store | Done | #1562 | The move into Whity ID (unverified) |
+| A6 Workspace, billing, settings | Done | #1563, #1993, #1996 | Settings frame #2007 open |
+| A7 Quick wins | Done | #1835, #1843, #1866, #1854, #1849; whity-plugins #29 | Plugin side unreleased; 72 mm print unverified |
+| A8 Contacts and import | Done | #1858, #1864; whity-plugins #30 | The 24-hour undo window unverified |
+| A9 Custom fields | Done (contacts) | #1862 | Closed as contacts-only (Q35.4, owner); other record types and the flow condition move with flows |
+| A10 Tasks and boards | Done in code | #1842, #1844, #1863 | Against a live Taskaat project, unverified |
+| A11 Receiving, waste, bank | Done in the plugin | whity-plugins #24, #26, #36 | Front Office unreleased; R29 follow-ups (English API errors, an id shown, two filled buttons) |
+| A12 Reports, agent notifications | Done | whity-plugins #28; #1859 | WhatsApp is the paid plugin's (unverified) |
+| A13 Lottie and Animations | Done | #1836, #1869 | Business moments ship with plugins |
+| A14 Web app on a phone | Done, with diffs | `86549ca0`, `9024020c`, #1962–#1970, #1997; web push #1976–#1980 (the owner approved the web push plan on 15 Nov, so #1978 and #1979 merged with approval) | Create opens the page; no Find or Version history; "Choose all" covers the screen only; 360px and live push unverified; `PwMessages` and `PwCalendar` replaced (above) |
+| A15 Screens with no card | Done, with diffs | #1958, #1961, #1964, #1966, #1984, #1986, #1973, #1971, #1947; passes #1985–#1995 | #2007; API-limited diffs (WHIT-1044 notes); `MsgCustomerMessages`, `TplWhityAgent`, `TplWhityIdMore` in their repositories, unverified; E.23a leftovers (M7) |
+| P1 Form printouts | Partial | #1916, #1917, #1922, #1923, #1925, #1957 | Customise in the editor and `DocFormBlocks`; "Conditionally approved"; AAU page-for-page check waits on AAU's tenant |
+| A16 Calendar | In progress | #2012–#2014 merged; #2016, #2018 queued | Most CV gaps above are built by its session: per-person view settings in `calendar_view_preferences` (migration 278, `GET/PUT /api/v1/calendar/my-view`); move takes `duration_minutes`, `notify` and `book_anyway`; Undo restores the old time and length. Still to change for Q35.7 and Q35.8: no resizing customer bookings, and the warning when "Email the new time" is unticked |
+| A17 One chat | Open | Above | UC.1–UC.13 (its own session, WHIT-1093–1099) |
+| W1 whity.dev | Done in code | whity-web `1880670`, #11–#13 (US dollars, checked live 16 Nov) | 390px check |
+| W2 health.whity.dev | Done in code | #1848, #1894 | Deployment unverified |
+| W3 id.whity.dev | Partial | whity-id #40, #41, #43 | The phone-approval page; no release tag |
+| W4 brand, W5 docs | Done in code | whity-web `1880670` | Docs search and kit links unverified |
+| W6 Company pages and footer | Done in code | whity-web pages; `PublicContactApiHandler` | The lawyer's privacy text |
+| W7 Installer | Partial | `install.sh` #1848, #1987 | The server install the owner chose (Q35.3, answered): #2008, #2009, whity-web #14. `PLAN.md`'s W7 text still describes the local install and is superseded; it is the design team's file, so it is asked of them below |
+| W8 Launch check | Partial | whity-web `scripts/claims-0.2.29.py`, `security.txt`, `llms.txt` | Claims checked on 12 Nov are stale (Q35.5); broken links unverified |
+| E1 The fifteen emails | Done in code | #1837, #1859, #1868; whity-plugins #31, #33 | Gmail, Outlook and Apple Mail, light and dark, unverified |
+| E2 The ten 3.4 emails | Done in code | #1946–#1959, #1975 | No refund line, no "Moved by"; mail clients and reply threading unverified |
+
+What is open, in short: A16 and A17 (both being built); P1's editor customisation and "Conditionally approved"; M6 routines and M7's plugin themes (deferred until after A16 and A17, Q35.14); M7's E.23a leftovers; W3's phone approval; W7's server install; W8's claims; and the screenshot passes that M1–M8 and A0–A13 never had.
+
+The 3.4 status table below is out of date: A14's `Pw*` work, web push, P1 and E2 merged on 14–15 Nov.
+
+## Questions for the owner (3.5)
+
+| # | Question | Default if no answer |
+| --- | --- | --- |
+| Q35.1 | **Answered (owner, 16 Nov: "Approve all, as recommended"):** drop the replaced cards from the app map; asked of the design team below. The question was: the app map still lists the replaced cards: row "Messages inbox `/admin/messages`" (`TplMessagesInbox`, `PwMessages`), the phone paragraph's `PwCalendar`, and SU's "calendar on a phone → `PwCalendar`", while rows A03a and A04 say they're replaced. Row A04 also still says "day, week, month". | Build to A03a and A04 and the CV/UC decisions; ask the brand team to tidy the app map |
+| Q35.2 | **Answered (owner): yes, one chat across channels.** "Merge messages and chat, and all similar systems"; the unify session designs it. The question was: one chat across channels: the done-when has a WhatsApp reply and an email reply landing in the same conversation, but today a conversation is one channel, and UC.1 shows one channel badge per chat. One conversation with a channel picker, or separate rows in one list? | One conversation per customer, a channel per message, the reply going back by the channel it came in on |
+| Q35.3 | **Answered (owner): the server install.** The question was: `PLAN.md` W7 describes the local install; on 16 Nov you chose a server install (`npm i -g whity`). Should the plan text follow? | Treat W7 as the server install |
+| Q35.4 | **Answered (owner, 16 Nov: "Approve all, as recommended"):** A9 closes as contacts-only; custom fields on other records move with flows. The question was: A9's done-when needs a flow condition, and flows aren't built; custom fields exist on contacts only. Close A9 for contacts and move the rest to flows? | Yes |
+| Q35.5 | **Answered (owner, 16 Nov: "Approve all, as recommended"):** "coming soon" stays until Front Office is released. The question was: whity.dev and the docs say Money and Stock are "coming soon", but Front Office (A11, A12) is built and not released. Which should the sites say? | "Coming soon" until Front Office is in the store |
+| Q35.6 | **Answered (owner, 16 Nov: "Approve all, as recommended"):** the default. The question was: names: UC.4 and UC.12 say Settings › Chat, but the app map and `TplSettingsMessages` say Settings › Messages at `/admin/settings/messages`; UC.7 says Account › Preferences › Chat, but personal settings are now My settings (WHIT-1081). | Settings › Chat at `/admin/settings/chat`, the old path redirecting; the chat preference under My settings |
+| Q35.7 | **Answered (owner, 16 Nov): no resizing of customer bookings**; events and time off only. A16 had allowed it and is changing it. The question was: resizing a customer booking (CV.9): a booking's length comes from its service. Does resizing apply to bookings (and their price), or only to events and time off? | Events and time off only; a booking moves but keeps its length |
+| Q35.8 | **Answered (owner, 16 Nov): "Email the new time" can be unticked, with a warning** that the customer's calendar won't update; A16 is adding the warning. The question was: unticking "Email the new time" (CV.9) leaves the customer's calendar file out of date, against SU.8. Keep the tick? | Keep it, ticked by default, with a line saying their calendar won't update |
+| Q35.9 | **Answered (owner, 16 Nov): the default**, as built (A16). The question was: the grid runs opening to closing (CV.6), but staff can book outside hours. Where do those show? | The grid stretches to include them that day |
+| Q35.10 | **Answered (owner, 16 Nov): the default**, as built (A16: colours repeat after six, in list order). The question was: colour by person (CV.4): more people than colours in the series. Repeat, and keep each person's colour fixed? | Repeat in order, each person's colour fixed by their position in the workspace |
+| Q35.11 | **Answered (owner): keep the default.** The question was: who sees customer chats in the one list: everyone with `messages.read`, as today, or only those assigned? | `messages.read`, with an Assigned to me tab |
+| Q35.12 | **Answered (owner): keep the defaults.** The question was: things core can't do alone: voice "with its text" (no speech-to-text in core), order-status and stock bots (Front Office), payment links (Whity Pay), Turn into a task (Taskaat). | Browser speech recognition; bots from plugins; Payment link only with Whity Pay; Task when Taskaat is connected |
+| Q35.13 | **Answered (owner, 16 Nov: "Approve all, as recommended"):** the default. The question was: WhatsApp and SMS are paid plugins: is A17's done-when checked with them installed? WhatsApp can't delete a sent message, but UC.12 only exempts email and SMS. | Check with the plugins; exempt WhatsApp too |
+| Q35.14 | **Answered (owner, 16 Nov: "Approve all, as recommended"):** deferred; ticket them after A16 and A17. The question was: M6 routines (E.32) and M7 plugin document themes were never built and have no tickets. Deferred on purpose? | Deferred; ticket them after A16 and A17 |
+| Q35.15 | **Answered (owner, 16 Nov): the default**, as built (A16). The question was: `TplCalendarPhone`'s 3-day grid replaces `PwCalendar`'s week as day cards, finished days ago. Confirm the change? | Build `TplCalendarPhone` |
+
+**Also decided (owner, 16 Nov):** the calendar, meetings and the other time systems merge into one solution, like chat and messages ("calendar, meetings, etc need to merge under one solution"). The unify session (local_db3206f4) designs both merges; A16 and A17 build on what it decides.
+
+For the design team: `PLAN.md` W7 should describe the server install the owner chose; the app map should drop the replaced cards (`TplMessagesInbox`, `PwMessages`, `PwCalendar`) and row A04 should list 4 days and Year (Q35.1).
+
+Every 3.5 question is now answered.
+
+For the team (no owner decision): several WHIT ids were used for two different pieces of work (WHIT-1003, -1027, -1030, -1034). They stay as they are, but from now on a WHIT id names one piece of work only; a status check by ticket id is unreliable for those four. whity-web's brand and docs sites ship weight-700 font files against the no-700 rule; swapped in whity-web (WHIT-1092).
+
+
 # Owner decision: the installer is a server install, and it is `whity install` (16 Nov 2026)
 
 **Decision.** The owner chose the server install `SiteInstallerTerminal` draws ("Server install"),
@@ -129,10 +281,10 @@ Status: **done** (built and merged), **partial** (some of it is built, or built 
 | `PwLists` | Partial: `DataTable` `phoneLayout="stack"` (WHIT-1001) | `packages/ui/src/data-table.tsx` | Sort (the header is hidden on phones), Select with the bulk bar in place of the tab bar, filters as a sheet, search and the main button at the bottom |
 | `PwSettings` | Partial: sub-nav as a sideways row (WHIT-999) | The settings layout | The menu as its own page, Last opened, the path on deep pages, the save bar above the tab bar |
 | `PwLibrary` | Partial: "Folders · All documents" button (WHIT-1005) | `web/app/(protected)/admin/document-library/` | Folders sheet with the unit filter, collections as chips, list or grid, search split by title and text |
-| `PwCalendar` | Partial: Day by default when narrow (WHIT-1005) | `web/components/calendar/calendar-screen.tsx` | Week as day cards, month as counts with the day under it, sub-pages from the title |
+| `PwCalendar` (replaced by `TplCalendarPhone` in 3.5, A16) | Partial: Day by default when narrow (WHIT-1005) | `web/components/calendar/calendar-screen.tsx` | Week as day cards, month as counts with the day under it, sub-pages from the title |
 | `PwEditor` | Partial: header on two lines, toolbar scrolls sideways (WHIT-1005) | `packages/features/src/document-editor/`, `packages/ui/src/editor/` | Full screen without the tab bar, mode sheet, toolbar docked on the keyboard, More tools and the publish check as sheets |
 | `PwBuilders` | Missing: the canvases at phone width | `admin/document-route-templates/[id]`, `admin/roles/[id]`; `packages/ui/src/screen-too-small.tsx` is built and unused, a ready seam | Read-only routes as numbered sentences, permissions as lists, Open on a computer |
-| `PwMessages` | Done (WHIT-939: one pane at a time below 768px) | `/admin/messages` | The screenshot pass |
+| `PwMessages` (replaced by `TplChatPhone` in 3.5, A17) | Done (WHIT-939: one pane at a time below 768px) | `/admin/messages` | The screenshot pass |
 | `PwInstall` (PW.11) | Partial: manifest and service worker per host and language (WHIT-957, #1733) | `web/components/pwa/`, `web/lib/pwa/` | The install offer once, in the browser only (Android prompt, iPhone three steps), the splash from branding; the notifications ask once. **No web push exists**: VAPID keys, a push subscriptions table (migration), a sender behind `src/Core/Notification` (**Q24**) |
 
 Order: `PwNav` first (every other phone screen sits on it), then `PwShortSidebar`, `PwLists`, `PwSettings`, `PwLibrary`, `PwCalendar`, `PwEditor`, `PwBuilders`, `PwInstall` (server first). Estimate: PwNav 2, PwLists 2, PwEditor 2, PwInstall 2 (1 server, 1 web), the rest 1 each: **12-13 PRs**. Each is done at 390 wide in light, dark and Arabic, with nothing scrolling sideways at 360.
@@ -141,7 +293,7 @@ Order: `PwNav` first (every other phone screen sits on it), then `PwShortSidebar
 
 | Card | Now | Lands in / exists at | Server work |
 | --- | --- | --- | --- |
-| `TplMessagesInbox`, `TplChatBox`, `TplSettingsMessages` | Done before the card (WHIT-939) | `/admin/messages`, `/chat/[workspace]`, `/messages`, `/admin/settings/messages` | — |
+| `TplMessagesInbox` (replaced by the `TplChat*` cards in 3.5, A17), `TplChatBox`, `TplSettingsMessages` | Done before the card (WHIT-939) | `/admin/messages`, `/chat/[workspace]`, `/messages`, `/admin/settings/messages` | — |
 | `TplApprovalsDecided` | Done before the card (Decided tab, `edit-proposal-dialog.tsx`, WHIT-809) | `/admin/approvals` | — |
 | `TplImpactPlan` | **Missing** | `web/components/agents/proposals.ts` and the approvals list | **Yes**: an impact plan on Whity Builder's publish and rollback proposals (kinds, records touched, tests); none in `src/` today |
 | `TplAgentCredential` | **Partial**: the token is shown once from My agents' Connect dialog (WHIT-810) | `admin/my-agents`, `agent-grant-screen.tsx` | **Yes**: refuse a starting grant above the issuer's own permissions |
