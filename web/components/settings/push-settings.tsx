@@ -109,6 +109,11 @@ export function PushSettings() {
       ],
       label: t('settings.push.kind.meetings', 'Meeting invitations and changes'),
     },
+    {
+      id: 'reminders',
+      types: ['calendar.event.reminder'],
+      label: t('settings.push.kind.reminders', 'Reminders 15 minutes before meetings and events'),
+    },
     ...pluginKinds,
   ];
 

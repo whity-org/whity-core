@@ -44,6 +44,8 @@ final class MeetingService
         private readonly ?MeetingCalendar $calendar = null,
         // ADR 0018: the one invite path (in-app, push, email with an .ics).
         private readonly ?\Whity\Core\Calendar\CalendarInvites $invites = null,
+        // ADR 0018: reminders before the meeting, like any event.
+        private readonly ?\Whity\Core\Calendar\EventReminders $reminders = null,
     ) {
     }
 
@@ -119,6 +121,9 @@ final class MeetingService
         $notified = 0;
 
         $eventId = $this->calendar?->eventFor($tenantId, $meetingId);
+        if ($eventId !== null) {
+            $this->reminders?->schedule($tenantId, $eventId);
+        }
         if ($wasScheduled && $this->invites !== null && $eventId !== null) {
             $this->invites->changed($tenantId, $eventId);
             $notified = count($this->invitations->listForMeeting($tenantId, $meetingId));

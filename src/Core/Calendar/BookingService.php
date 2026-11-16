@@ -43,6 +43,8 @@ final class BookingService
 {
     private ?CalendarInvites $invites = null;
 
+    private ?EventReminders $reminders = null;
+
     /** @var list<ExternalBusySource> */
     private array $busySources = [];
 
@@ -71,6 +73,12 @@ final class BookingService
     public function setInvites(CalendarInvites $invites): void
     {
         $this->invites = $invites;
+    }
+
+    /** Staff reminders before events (ADR 0018). */
+    public function setReminders(EventReminders $reminders): void
+    {
+        $this->reminders = $reminders;
     }
 
     public function addBusySource(ExternalBusySource $source): void
@@ -482,6 +490,7 @@ final class BookingService
         $event = $this->calendar->findEvent($tenantId, $id) ?? throw CalendarRejectedException::notFound('Event');
         // ADR 0018: people invited hear about it (in-app, push, email with an .ics).
         $this->invites?->invited($tenantId, $id, array_column($event['people'], 'profile_id'));
+        $this->reminders?->schedule($tenantId, $id);
         $this->announce(CalendarEventNames::EVENT_CREATED, ['id' => $id, 'tenant_id' => $tenantId, 'profile_id' => $profileId]);
 
         return ['event' => $event, 'overlapping_bookings' => $this->overlapping($tenantId, $profileId, $when)];
@@ -504,6 +513,7 @@ final class BookingService
             return true;
         });
         $this->announce(CalendarEventNames::EVENT_UPDATED, ['id' => $eventId, 'tenant_id' => $tenantId, 'profile_id' => $profileId]);
+        $this->reminders?->schedule($tenantId, $eventId);
         if ($this->invites !== null) {
             $fresh = $this->calendar->findEvent($tenantId, $eventId);
             if ($fresh !== null) {

@@ -13,6 +13,7 @@ use Whity\Core\Calendar\BookingRepository;
 use Whity\Core\Calendar\BookingService;
 use Whity\Core\Calendar\CalendarInvites;
 use Whity\Core\Calendar\CalendarRepository;
+use Whity\Core\Calendar\EventReminders;
 use Whity\Core\Calendar\Interval;
 use Whity\Core\Calendar\ServiceRepository;
 use Whity\Core\Mail\BrandedEmailSender;
@@ -44,6 +45,8 @@ final class CalendarInvitesRealEngineTest extends TestCase
     private PDO $pdo;
     private BookingService $service;
     private CalendarRepository $calendar;
+    private EventReminders $reminders;
+    private DateTimeImmutable $now;
 
     /** @var list<OutgoingEmail> */
     private array $sent = [];
@@ -107,6 +110,9 @@ final class CalendarInvitesRealEngineTest extends TestCase
             clock: static fn (): DateTimeImmutable => new DateTimeImmutable('2026-11-15 04:00:00', new DateTimeZone('UTC')),
         );
         $this->service->setInvites(new CalendarInvites($this->pdo, $this->calendar, $dispatcher, $sender, $settings, 'https://app.example.test/calendar'));
+        $this->now = new DateTimeImmutable('2026-11-15 04:00:00', new DateTimeZone('UTC'));
+        $this->reminders = new EventReminders($this->pdo, $this->calendar, new QueueService(new JobRepository($this->pdo)), $dispatcher, clock: fn (): DateTimeImmutable => $this->now);
+        $this->service->setReminders($this->reminders);
     }
 
     public function testEveryoneInvitedGetsANoticeAndAnInvitationTheirCalendarAccepts(): void
@@ -182,6 +188,60 @@ final class CalendarInvitesRealEngineTest extends TestCase
 
         self::assertSame([], $this->recipients());
         self::assertSame([[11, 'calendar.event.invited']], $this->notices());
+    }
+
+    public function testAReminderIsQueuedFifteenMinutesBeforeAndGoesToThoseComing(): void
+    {
+        $id = $this->create([11, 12]);
+        $this->calendar->answerEvent(1, $id, 12, 'declined');
+
+        $jobs = $this->pdo->query("SELECT payload FROM jobs WHERE name = 'core.calendar.event_reminder'");
+        self::assertNotFalse($jobs);
+        $payloads = array_map(static fn (string $p): array => (array) json_decode($p, true), $jobs->fetchAll(PDO::FETCH_COLUMN));
+        self::assertSame([['tenant_id' => 1, 'event_id' => $id, 'starts_at' => '2026-11-16T07:00:00Z']], $payloads);
+
+        $early = $this->reminders->send(1, $id, '2026-11-16T07:00:00Z');
+        self::assertIsArray($early, 'not yet');
+        self::assertSame('2026-11-16 06:45:00', $early['due']->format('Y-m-d H:i:s'));
+
+        $this->now = new DateTimeImmutable('2026-11-16 06:45:00', new DateTimeZone('UTC'));
+        $before = count($this->notices());
+        self::assertSame('sent', $this->reminders->send(1, $id, '2026-11-16T07:00:00Z'));
+        $sent = array_slice($this->notices(), $before);
+        self::assertSame([[11, 'calendar.event.reminder'], [13, 'calendar.event.reminder']], $sent, 'baker 11 and the organiser; baker 12 declined');
+        self::assertSame('already', $this->reminders->send(1, $id, '2026-11-16T07:00:00Z'), 'never twice');
+    }
+
+    public function testAMovedEventRemindsAtItsNewTimeOnly(): void
+    {
+        $id = $this->create([11]);
+        $this->service->updateEvent(1, $id, 'Menu tasting', '', $this->when('2026-11-16T12:00:00+03:00', '2026-11-16T13:00:00+03:00'), false, true);
+        $this->now = new DateTimeImmutable('2026-11-16 09:00:00', new DateTimeZone('UTC'));
+
+        self::assertSame('moved', $this->reminders->send(1, $id, '2026-11-16T07:00:00Z'));
+        self::assertSame('sent', $this->reminders->send(1, $id, '2026-11-16T09:00:00Z'));
+    }
+
+    public function testEmailRemindersOnlyForPeopleWhoTurnedThemOn(): void
+    {
+        $this->pdo->exec("INSERT INTO user_notification_preferences (tenant_id, profile_id, type, channel, enabled) VALUES (1, 11, 'calendar.event.reminder', 'email', true)");
+        $id = $this->create([11, 12]);
+        $this->now = new DateTimeImmutable('2026-11-16 06:50:00', new DateTimeZone('UTC'));
+        $this->reminders->send(1, $id, '2026-11-16T07:00:00Z');
+
+        $rows = $this->pdo->query("SELECT n.recipient_profile_id, d.channel FROM notification_deliveries d JOIN notifications n ON n.id = d.notification_id WHERE n.type = 'calendar.event.reminder' AND d.channel = 'email'");
+        self::assertNotFalse($rows);
+        self::assertSame(['11'], array_map(static fn (array $r): string => (string) $r['recipient_profile_id'], $rows->fetchAll(PDO::FETCH_ASSOC)));
+    }
+
+    public function testTimeOffNeverReminds(): void
+    {
+        $id = $this->calendar->addException(1, 13, 'off', $this->when('2026-11-16T10:00:00+03:00', '2026-11-16T11:00:00+03:00'), '', 13);
+        $this->reminders->schedule(1, $id);
+
+        $jobs = $this->pdo->query("SELECT COUNT(*) FROM jobs WHERE name = 'core.calendar.event_reminder'");
+        self::assertNotFalse($jobs);
+        self::assertSame(0, (int) $jobs->fetchColumn());
     }
 
     /** @param list<int> $people */
