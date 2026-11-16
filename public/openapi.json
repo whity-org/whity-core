@@ -9300,7 +9300,7 @@
                         "name": "kinds",
                         "in": "query",
                         "required": false,
-                        "description": "Which kinds, comma-separated: booking, event, meeting, time_off, external. All when omitted.",
+                        "description": "Which kinds, comma-separated: booking, event, meeting, time_off, external, task_due. All but task_due when omitted; tasks due come from Taskaat only when named, and only with tasks:read.",
                         "schema": {
                             "type": "string"
                         }
@@ -9337,10 +9337,18 @@
                                             "items": {
                                                 "$ref": "#/components/schemas/CalendarItem"
                                             }
+                                        },
+                                        "unavailable": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "description": "Kinds that could not be read just now (task_due when Taskaat did not answer); everything else is complete."
                                         }
                                     },
                                     "required": [
-                                        "data"
+                                        "data",
+                                        "unavailable"
                                     ]
                                 }
                             }
@@ -77517,7 +77525,8 @@
                             "event",
                             "meeting",
                             "time_off",
-                            "external"
+                            "external",
+                            "task_due"
                         ]
                     },
                     "title": {
@@ -77598,6 +77607,30 @@
                                 "type": "null"
                             }
                         ]
+                    },
+                    "task": {
+                        "oneOf": [
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "short_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "required": [
+                                    "id",
+                                    "short_id"
+                                ]
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "The Taskaat task, for kind task_due."
                     },
                     "can": {
                         "type": "object",

@@ -10761,7 +10761,7 @@ final class CoreApiSchemas
             ], ['response']),
             'CalendarItem' => self::object([
                 'id' => self::str() + ['description' => 'The kind and the record: "booking:7", "event:12", "time_off:5".'],
-                'kind' => self::str() + ['enum' => ['booking', 'event', 'meeting', 'time_off', 'external']],
+                'kind' => self::str() + ['enum' => ['booking', 'event', 'meeting', 'time_off', 'external', 'task_due']],
                 'title' => self::str() + ['description' => 'What it is. Someone else\'s time off reads "Away" and their synced events "Busy".'],
                 'starts_at' => self::str(),
                 'ends_at' => self::str(),
@@ -10779,6 +10779,10 @@ final class CoreApiSchemas
                     'meeting_id' => self::int(true),
                     'external_ref' => self::str(true),
                 ], ['id', 'notes', 'meeting_id', 'external_ref']), ['type' => 'null']]],
+                'task' => ['oneOf' => [self::object([
+                    'id' => self::str(),
+                    'short_id' => self::str(true),
+                ], ['id', 'short_id']), ['type' => 'null']], 'description' => 'The Taskaat task, for kind task_due.'],
                 'can' => self::object([
                     'open' => self::bool(),
                     'move' => self::bool(),
@@ -19006,12 +19010,15 @@ final class CoreApiSchemas
                 'tags' => ['calendar'],
                 'parameters' => array_merge($range, [
                     self::queryParam('people', 'string', 'Whose calendars, as comma-separated profile ids (people invited count). All when omitted.'),
-                    self::queryParam('kinds', 'string', 'Which kinds, comma-separated: booking, event, meeting, time_off, external. All when omitted.'),
+                    self::queryParam('kinds', 'string', 'Which kinds, comma-separated: booking, event, meeting, time_off, external, task_due. All but task_due when omitted; tasks due come from Taskaat only when named, and only with tasks:read.'),
                     self::queryParam('cancelled', 'string', '1 to include cancelled bookings.'),
                     self::queryParam('unit_id', 'integer', 'Only bookings in this branch.'),
                 ]),
                 'responses' => [
-                    200 => self::jsonResponse('The items, oldest start first', self::listEnvelope('CalendarItem')),
+                    200 => self::jsonResponse('The items, oldest start first', self::object([
+                        'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarItem')],
+                        'unavailable' => ['type' => 'array', 'items' => self::str(), 'description' => 'Kinds that could not be read just now (task_due when Taskaat did not answer); everything else is complete.'],
+                    ], ['data', 'unavailable'])),
                     422 => self::errorResponse('A bad range, id list or kind'),
                 ] + self::authErrors(),
             ]),

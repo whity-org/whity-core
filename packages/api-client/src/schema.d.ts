@@ -11762,7 +11762,7 @@ export interface components {
             /** @description The kind and the record: "booking:7", "event:12", "time_off:5". */
             id: string;
             /** @enum {string} */
-            kind: "booking" | "event" | "meeting" | "time_off" | "external";
+            kind: "booking" | "event" | "meeting" | "time_off" | "external" | "task_due";
             /** @description What it is. Someone else's time off reads "Away" and their synced events "Busy". */
             title: string;
             starts_at: string;
@@ -11782,6 +11782,11 @@ export interface components {
                 notes: string;
                 meeting_id: number | null;
                 external_ref: string | null;
+            } | null;
+            /** @description The Taskaat task, for kind task_due. */
+            task?: {
+                id: string;
+                short_id: string | null;
             } | null;
             can: {
                 open: boolean;
@@ -27247,7 +27252,7 @@ export interface operations {
                 to: string;
                 /** @description Whose calendars, as comma-separated profile ids (people invited count). All when omitted. */
                 people?: string;
-                /** @description Which kinds, comma-separated: booking, event, meeting, time_off, external. All when omitted. */
+                /** @description Which kinds, comma-separated: booking, event, meeting, time_off, external, task_due. All but task_due when omitted; tasks due come from Taskaat only when named, and only with tasks:read. */
                 kinds?: string;
                 /** @description 1 to include cancelled bookings. */
                 cancelled?: string;
@@ -27268,6 +27273,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["CalendarItem"][];
+                        /** @description Kinds that could not be read just now (task_due when Taskaat did not answer); everything else is complete. */
+                        unavailable: string[];
                     };
                 };
             };
