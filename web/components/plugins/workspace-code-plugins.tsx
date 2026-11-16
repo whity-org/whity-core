@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
 import type { components } from '@whity/api-client';
 import { useFetch } from '@/hooks/useFetch';
@@ -46,6 +48,13 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
   const dates = useDateDisplay();
   const { addToast } = useToast();
   const { refresh: refreshNavigation } = useNavigation();
+  // WHIT-1148: a plugin with a guided setup opens it as soon as it is on.
+  const router = useRouter();
+  const openSetup = (plugin: WorkspaceCodePlugin) => {
+    if (plugin.onboarding) {
+      router.push(`/admin/setup/${encodeURIComponent(plugin.name)}`);
+    }
+  };
   const [pending, setPending] = useState<string | null>(null);
   const [historyFor, setHistoryFor] = useState<string | null>(null);
 
@@ -85,6 +94,7 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
     );
     refetch();
     void refreshNavigation();
+    openSetup(plugin);
   };
 
   const buy = async (plugin: WorkspaceCodePlugin, price: AddonPrice) => {
@@ -153,6 +163,9 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
     );
     refetch();
     void refreshNavigation();
+    if (on) {
+      openSetup(plugin);
+    }
   };
 
   const lastChange = (plugin: WorkspaceCodePlugin): string | null => {
@@ -227,6 +240,11 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
                   {change ? <p className="text-muted-foreground">{change}</p> : null}
                 </div>
                 <div className="flex items-center gap-3">
+                  {plugin.onboarding && plugin.enabled && plugin.state !== 'read_only' ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/admin/setup/${encodeURIComponent(plugin.name)}`}>{t('plugins.workspaceCode.setUp', 'Set up')}</Link>
+                    </Button>
+                  ) : null}
                   {plugin.canSwitch ? (
                     <Button variant="outline" size="sm" onClick={() => setHistoryFor(plugin.name)}>
                       {t('plugins.workspaceCode.history', 'History')}

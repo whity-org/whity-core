@@ -600,6 +600,136 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     /** @var array<string, array{entitlement: string, product: string, trialDays: int}>|null */
     private ?array $paidAccess = null;
 
+    /**
+     * Each plugin's validated guided setup (SDK 1.109), by plugin key.
+     *
+     * @var array<string, array<string, mixed>|null>
+     */
+    private array $onboardings = [];
+
+    /**
+     * The names of loaded plugins that offer a guided setup (SDK 1.109).
+     *
+     * @return list<string>
+     */
+    public function pluginsWithOnboarding(): array
+    {
+        $names = [];
+        foreach ($this->onboardings as $pluginKey => $onboarding) {
+            if ($onboarding !== null && isset($this->registeredPlugins[$pluginKey])) {
+                $names[] = (string) $onboarding['plugin'];
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * Guided setups of the plugins visible in the current workspace (SDK 1.109).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getOnboardings(): array
+    {
+        $out = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $onboarding = $this->onboardings[$pluginKey] ?? null;
+            if ($onboarding === null || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive() || $this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+            $out[] = $onboarding;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Validate a plugin's guided setup: a GET status route of its own, and
+     * each step's blocks checked as a blocks screen (endpoint ownership and
+     * versioning included). Invalid steps are dropped; with none left there
+     * is no setup.
+     *
+     * @param array<string, string|null> $registeredGetRoutes
+     * @param array<string, string|null> $registeredWriteRoutes
+     * @return array<string, mixed>|null
+     */
+    private function collectOnboarding(PluginInterface $plugin, string $pluginKey, array $registeredGetRoutes, array $registeredWriteRoutes): ?array
+    {
+        if (!$plugin instanceof \Whity\Sdk\PluginOnboardingInterface) {
+            return null;
+        }
+        try {
+            // Read untyped: a plugin's array is runtime data whatever its
+            // declared shape, so every field is checked here.
+            /** @var array<string, mixed> $declared */
+            $declared = $plugin->getOnboarding();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'getOnboarding');
+
+            return null;
+        }
+
+        $name = $plugin->getName();
+        $permission = $declared['permission'] ?? null;
+        $status = $declared['status'] ?? null;
+        $ownPermissions = $plugin->getPermissions();
+        if (!is_string($permission) || !in_array($permission, $ownPermissions, true) || !is_string($status) || !array_key_exists($status, $registeredGetRoutes)) {
+            $this->logWarning("[Plugin:{$pluginKey}] getOnboarding(): needs one of its own permissions and one of its own GET routes as status; no setup offered.");
+
+            return null;
+        }
+
+        $slug = \Whity\Sdk\PluginNamespace::slug($name) ?? 'plugin';
+        $steps = [];
+        $dropped = [];
+        $declaredSteps = is_array($declared['steps'] ?? null) ? $declared['steps'] : [];
+        foreach ($declaredSteps as $step) {
+            if (!is_array($step)) {
+                continue;
+            }
+            $stepId = is_string($step['id'] ?? null) ? $step['id'] : '';
+            if (preg_match('/^[a-z][a-z0-9-]{0,40}$/', $stepId) !== 1) {
+                $this->logWarning("[Plugin:{$pluginKey}] getOnboarding(): a step has no valid id; dropped.");
+                continue;
+            }
+            // Checked as a pseudo screen, never registered as one.
+            $normalized = $this->validateFrontendFeature(
+                ['id' => $slug . '-setup-' . $stepId, 'label' => $step['title'] ?? $stepId, 'screen' => 'blocks', 'requiredPermission' => $permission, 'blocks' => $step['blocks'] ?? null],
+                $name,
+                $pluginKey,
+                $ownPermissions,
+                $registeredGetRoutes,
+                $registeredWriteRoutes,
+                $dropped,
+            );
+            if ($normalized === null) {
+                continue;
+            }
+            $steps[] = [
+                'id' => $stepId,
+                'title' => $step['title'] ?? $stepId,
+                'description' => $step['description'] ?? null,
+                'blocks' => $normalized['blocks'] ?? [],
+            ];
+        }
+        if ($steps === []) {
+            return null;
+        }
+
+        return [
+            'plugin' => $name,
+            'title' => $declared['title'] ?? $name,
+            'description' => $declared['description'] ?? null,
+            'permission' => $permission,
+            'status' => $this->router->versionedPath($status),
+            'steps' => $steps,
+        ];
+    }
+
     private string $paidAccessFingerprint = '';
 
     /**
@@ -653,6 +783,49 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         }
 
         return $this->paidAccess = $paid;
+    }
+
+    /**
+     * The plugins this one declares it depends on that are loaded here, by
+     * name (WHIT-1148): turning it on in a workspace turns them on too.
+     *
+     * @return list<string>
+     */
+    public function workspaceDependenciesOf(string $pluginName): array
+    {
+        $loaded = [];
+        foreach ($this->registeredPlugins as $info) {
+            $loaded[$info['plugin']->getName()] = $info['plugin'];
+        }
+        $plugin = $loaded[$pluginName] ?? null;
+        if (!$plugin instanceof \Whity\Sdk\PluginRequirementsInterface) {
+            return [];
+        }
+        try {
+            $declared = array_keys($plugin->getPluginDependencies());
+        } catch (Throwable) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map('strval', $declared), static fn (string $name): bool => isset($loaded[$name])));
+    }
+
+    /**
+     * The loaded plugins that depend on this one, by name.
+     *
+     * @return list<string>
+     */
+    public function dependentsOf(string $pluginName): array
+    {
+        $dependents = [];
+        foreach ($this->registeredPlugins as $info) {
+            $name = $info['plugin']->getName();
+            if ($name !== $pluginName && in_array($pluginName, $this->workspaceDependenciesOf($name), true)) {
+                $dependents[] = $name;
+            }
+        }
+
+        return $dependents;
     }
 
     /**
@@ -4294,6 +4467,11 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             $registeredGetRoutes,
             $registeredWriteRoutes
         );
+
+        // 4b. The plugin's guided setup (SDK 1.109, WHIT-1148): each step is
+        //     checked exactly like a blocks screen, so its forms may only post
+        //     to the plugin's own routes.
+        $this->onboardings[$pluginKey] = $this->collectOnboarding($plugin, $pluginKey, $registeredGetRoutes, $registeredWriteRoutes);
 
         // 5. Collect the plugin's optional theme-override route (WC-242),
         //    same error-boundary + ownership-verification philosophy as (4).

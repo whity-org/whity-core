@@ -19,7 +19,10 @@ namespace Whity\Sdk\Setup;
  * would: the same validation, the same audit, and only what that person's own
  * permissions allow. Nothing more is possible through here than the person
  * could do by hand. Only the routes in {@see self::ROUTES} are reachable:
- * calendar settings, services, staff and hours; workspace settings; and forms.
+ * calendar settings, services, staff and hours; workspace settings (name,
+ * contact details, colour); forms; and, since 1.109, the people in the
+ * workspace and inviting staff, for a guided setup
+ * ({@see \Whity\Sdk\PluginOnboardingInterface}).
  *
  * Without a workspace or a person in scope (a job, the CLI) every call answers
  * 403 and changes nothing.
@@ -48,6 +51,11 @@ interface WorkspaceSetup
         'PUT /api/forms/{id}/fields',
         'POST /api/forms/{id}/publish',
         'POST /api/forms/{id}/public-link',
+        // 1.109 (WHIT-1148): staff for a guided setup.
+        'GET /api/users',
+        'GET /api/invitations',
+        'POST /api/invitations',
+        'GET /api/branding',
     ];
 
     /**

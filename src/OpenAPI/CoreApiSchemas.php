@@ -5616,7 +5616,7 @@ final class CoreApiSchemas
                 'plan_id' => self::int(),
                 'currency' => self::str(),
                 'unit_amount' => self::int(),
-                'billing_period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
                 'is_per_seat' => self::bool(),
                 'is_per_device' => self::bool(),
                 'is_active' => self::bool(),
@@ -5942,7 +5942,7 @@ final class CoreApiSchemas
             // here would invite a client to act on one.
             'CheckoutStartRequest' => self::object([
                 'plan_key' => self::str(),
-                'billing_period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
             ], ['plan_key']),
             // Only a destination. The session reference is a capability token
             // and is deliberately not returned — the browser needs somewhere to
@@ -5962,7 +5962,7 @@ final class CoreApiSchemas
                 'description' => self::str(true),
                 'unit_amount' => self::int(),
                 'currency' => self::str(),
-                'billing_period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
                 'is_per_seat' => self::bool(),
                 'is_per_device' => self::bool(),
                 'is_addon' => self::bool(),
@@ -6003,7 +6003,7 @@ final class CoreApiSchemas
             'PlanPriceCreateRequest' => self::object([
                 'currency' => self::str(),
                 'unit_amount' => self::int(),
-                'billing_period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
                 'is_per_seat' => self::bool(),
                 // At most ONE of these. Both set is refused with 422 rather
                 // than accepted, because the billing run would have to choose a
@@ -19415,6 +19415,12 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Not a plugin this workspace can use'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/workspace/onboarding', 'plugins:read', [
+                'summary' => 'List the guided setups of the plugins on in this workspace',
+                'description' => 'Each plugin\'s step-by-step setup the caller may run, in the caller\'s language, with the plugin route that says which steps are done (SDK 1.109).',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('The guided setups', 'WorkspaceOnboardingListResponse')] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/plugins/workspace-access', 'plugins:read', [
                 'summary' => 'List who can use each installed plugin',
                 'description' => 'Operator only (the system workspace).',
@@ -19479,6 +19485,8 @@ final class CoreApiSchemas
                 'trialDays' => self::int(),
                 'trialAvailable' => self::bool(),
                 'mayTurnOn' => self::bool() + ['description' => 'Free, included in the plan or an add-on, free for every workspace, or in a trial'],
+                'onboarding' => self::bool() + ['description' => 'It has a guided setup at /admin/setup/{plugin}'],
+                'dependsOn' => ['type' => 'array', 'items' => self::str(), 'description' => 'Plugins turned on with it in this workspace'],
             ], ['name', 'version', 'access', 'canSwitch', 'enabled', 'state', 'paid', 'trialAvailable', 'mayTurnOn']),
             'WorkspaceCodePluginListResponse' => self::listEnvelope('WorkspaceCodePlugin'),
             'WorkspaceCodePluginSwitchResponse' => self::object([
@@ -19491,6 +19499,19 @@ final class CoreApiSchemas
                     'by' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
                 ], ['action', 'at'])],
             ], ['data']),
+            'WorkspaceOnboarding' => self::object([
+                'plugin' => self::str(),
+                'title' => self::str(true),
+                'description' => self::str(true),
+                'status' => self::str() + ['description' => 'The plugin\'s GET route answering {data: {steps: {<id>: bool}}}'],
+                'steps' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::str(),
+                    'title' => self::str(true),
+                    'description' => self::str(true),
+                    'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
+                ], ['id', 'blocks'])],
+            ], ['plugin', 'status', 'steps']),
+            'WorkspaceOnboardingListResponse' => self::listEnvelope('WorkspaceOnboarding'),
             'WorkspaceCodePluginTrialResponse' => self::object([
                 'data' => self::object(['name' => self::str(), 'enabled' => self::bool(), 'trialEndsAt' => ['type' => 'string', 'nullable' => true]], ['name', 'enabled']),
             ], ['data']),

@@ -11008,6 +11008,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspace/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the guided setups of the plugins on in this workspace
+         * @description Each plugin's step-by-step setup the caller may run, in the caller's language, with the plugin route that says which steps are done (SDK 1.109).
+         */
+        get: operations["get_api_v1_workspace_onboarding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -12661,7 +12681,7 @@ export interface components {
         CheckoutStartRequest: {
             plan_key: string;
             /** @enum {string} */
-            billing_period?: "month" | "year" | "once";
+            billing_period?: "month" | "half_year" | "year" | "once";
         };
         CheckoutStartResponse: {
             data: {
@@ -17191,7 +17211,7 @@ export interface components {
             currency: string;
             unit_amount: number;
             /** @enum {string} */
-            billing_period: "month" | "year" | "once";
+            billing_period: "month" | "half_year" | "year" | "once";
             is_per_seat: boolean;
             is_per_device: boolean;
             is_active: boolean;
@@ -17202,7 +17222,7 @@ export interface components {
             currency: string;
             unit_amount: number;
             /** @enum {string} */
-            billing_period: "month" | "year" | "once";
+            billing_period: "month" | "half_year" | "year" | "once";
             is_per_seat?: boolean;
             is_per_device?: boolean;
         };
@@ -17829,7 +17849,7 @@ export interface components {
             unit_amount: number;
             currency: string;
             /** @enum {string} */
-            billing_period: "month" | "year" | "once";
+            billing_period: "month" | "half_year" | "year" | "once";
             is_per_seat?: boolean;
             is_per_device?: boolean;
             is_addon: boolean;
@@ -20125,6 +20145,10 @@ export interface components {
             trialAvailable: boolean;
             /** @description Free, included in the plan or an add-on, free for every workspace, or in a trial */
             mayTurnOn: boolean;
+            /** @description It has a guided setup at /admin/setup/{plugin} */
+            onboarding?: boolean;
+            /** @description Plugins turned on with it in this workspace */
+            dependsOn?: string[];
         };
         WorkspaceCodePluginHistoryResponse: {
             data: {
@@ -20152,6 +20176,24 @@ export interface components {
                 enabled: boolean;
                 trialEndsAt?: string | null;
             };
+        };
+        WorkspaceOnboarding: {
+            plugin: string;
+            title?: string | null;
+            description?: string | null;
+            /** @description The plugin's GET route answering {data: {steps: {<id>: bool}}} */
+            status: string;
+            steps: {
+                id: string;
+                title?: string | null;
+                description?: string | null;
+                blocks: {
+                    [key: string]: unknown;
+                }[];
+            }[];
+        };
+        WorkspaceOnboardingListResponse: {
+            data: components["schemas"]["WorkspaceOnboarding"][];
         };
         WorkspacePlugin: {
             /** @description The name in lower case, used in routes */
@@ -79118,6 +79160,71 @@ export interface operations {
             };
             /** @description Already had its trial, or the plugin offers none */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_workspace_onboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The guided setups */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceOnboardingListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

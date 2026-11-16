@@ -75206,6 +75206,83 @@
                     }
                 ]
             }
+        },
+        "/api/v1/workspace/onboarding": {
+            "get": {
+                "operationId": "get_api_v1_workspace_onboarding",
+                "summary": "List the guided setups of the plugins on in this workspace",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Each plugin's step-by-step setup the caller may run, in the caller's language, with the plugin route that says which steps are done (SDK 1.109).",
+                "responses": {
+                    "200": {
+                        "description": "The guided setups",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspaceOnboardingListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -81034,6 +81111,7 @@
                         "type": "string",
                         "enum": [
                             "month",
+                            "half_year",
                             "year",
                             "once"
                         ]
@@ -96758,6 +96836,7 @@
                         "type": "string",
                         "enum": [
                             "month",
+                            "half_year",
                             "year",
                             "once"
                         ]
@@ -96802,6 +96881,7 @@
                         "type": "string",
                         "enum": [
                             "month",
+                            "half_year",
                             "year",
                             "once"
                         ]
@@ -99168,6 +99248,7 @@
                         "type": "string",
                         "enum": [
                             "month",
+                            "half_year",
                             "year",
                             "once"
                         ]
@@ -107526,6 +107607,17 @@
                     "mayTurnOn": {
                         "type": "boolean",
                         "description": "Free, included in the plan or an add-on, free for every workspace, or in a trial"
+                    },
+                    "onboarding": {
+                        "type": "boolean",
+                        "description": "It has a guided setup at /admin/setup/{plugin}"
+                    },
+                    "dependsOn": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Plugins turned on with it in this workspace"
                     }
                 },
                 "required": [
@@ -107641,6 +107733,75 @@
                             "name",
                             "enabled"
                         ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspaceOnboarding": {
+                "type": "object",
+                "properties": {
+                    "plugin": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "The plugin's GET route answering {data: {steps: {<id>: bool}}}"
+                    },
+                    "steps": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "title": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "blocks": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": true
+                                    }
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "blocks"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "plugin",
+                    "status",
+                    "steps"
+                ]
+            },
+            "WorkspaceOnboardingListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/WorkspaceOnboarding"
+                        }
                     }
                 },
                 "required": [

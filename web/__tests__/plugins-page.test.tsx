@@ -44,8 +44,10 @@ jest.mock('@/lib/plugin-features-context', () => ({
 jest.mock('@/lib/toast-context', () => ({
   useToast: jest.fn(),
 }));
+const mockRouterPush = jest.fn();
 jest.mock('next/navigation', () => ({
   usePathname: () => '/admin/plugins',
+  useRouter: () => ({ push: mockRouterPush }),
 }));
 
 const mockUseCapabilities = useCapabilities as jest.MockedFunction<
@@ -562,6 +564,26 @@ describe('PluginsPage rejected screens (#953)', () => {
           params: { path: { plugin: 'FrontOffice' } },
         }),
       );
+    });
+
+    it('opens the guided setup once a plugin that has one is turned on (WHIT-1148)', async () => {
+      const user = userEvent.setup();
+      setCapabilities(['plugins:read', 'plugins:enable', 'plugins:disable']);
+      mockPluginList([ACTIVE_PLUGIN], false, [], [
+        {
+          name: 'Salons', version: '0.1.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null,
+          state: 'off', reason: null, graceUntil: null, trialEndsAt: null, paid: false, product: null,
+          trialDays: 0, trialAvailable: false, mayTurnOn: true, onboarding: true, dependsOn: ['Appointments'],
+        },
+      ]);
+      mockApiPost.mockResolvedValue({ data: { data: { name: 'Salons', enabled: true } } });
+      mockRouterPush.mockClear();
+
+      render(<PluginsPage />);
+      await screen.findByText('Salons');
+      await user.click(screen.getByRole('switch', { name: 'Use Salons in this workspace' }));
+
+      await waitFor(() => expect(mockRouterPush).toHaveBeenCalledWith('/admin/setup/Salons'));
     });
 
     it('shows a workspace nothing removed', async () => {

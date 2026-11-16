@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.108).
+ * SDK identity (v1.109).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1307,12 +1307,20 @@ namespace Whity\Sdk;
  * can prepare a workspace when it is turned on (WHIT-1129).
  *
  * Purely additive.)
+ *
+ * 1.109 (GUIDED SETUP: {@see PluginOnboardingInterface} lets a plugin declare a step-by-step
+ * setup, each step a block screen with a status route saying which steps are done; core draws it
+ * as a stepper and opens it right after the plugin is turned on. {@see Setup\WorkspaceSetup} also
+ * reaches the workspace's people and staff invitations. A plugin's declared dependencies are
+ * turned on with it in a workspace (WHIT-1148).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.108.0';
+    public const VERSION = '1.109.0';
 
     /**
      * Static identity only — never instantiated.
