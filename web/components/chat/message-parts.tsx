@@ -16,7 +16,8 @@
  *   it; they open Seen by.
  */
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@whity/ui/sheet';
 import { Avatar } from '@whity/ui/avatar';
 import { Button } from '@whity/ui/button';
 import { Icon } from '@whity/ui/icon';
@@ -72,7 +73,7 @@ export function MessageBody({ text, mentions, highlight }: { text: string; menti
   const names = new Set(mentions.map((m) => `@${m.name}`.toLowerCase()));
   const term = highlight?.trim().toLowerCase() ?? '';
   return (
-    <p dir="auto" className="text-start text-base whitespace-pre-wrap break-words">
+    <p dir="auto" className="text-start text-base whitespace-pre-wrap break-words max-sm:text-lg">
       {parts.map((p, i) =>
         names.has(p.toLowerCase()) ? (
           <span key={i} className="font-medium text-primary">
@@ -322,6 +323,10 @@ export function MessageItem({
   const sentAt = time(message.created_at);
   const bubbles = layout === 'bubbles';
   const deleted = message.deleted;
+  // UC.13: on a phone, press and hold opens the actions; swiping a message replies.
+  const [sheet, setSheet] = useState(false);
+  const touch = useTouchActions(() => !deleted && setSheet(true), () => !deleted && actions.onReply(message));
+  const sheetEl = !deleted && <ActionSheet t={t} open={sheet} onOpenChange={setSheet} message={message} actions={actions} inThread={inThread} />;
 
   const body = deleted ? (
     <p className="flex items-center gap-1.5 text-muted-foreground italic">
@@ -371,7 +376,7 @@ export function MessageItem({
       inThread={inThread}
       className={cn(
         // Hover, or keyboard focus inside the message; a click leaves no bar behind.
-        'absolute -top-9 z-10 hidden group-hover:flex group-has-[:focus-visible]:flex has-[[aria-expanded=true]]:flex',
+        'absolute -top-9 z-10 hidden group-hover:flex group-has-[:focus-visible]:flex has-[[aria-expanded=true]]:flex [@media(hover:none)]:!hidden',
         bubbles && mine ? 'end-0' : 'start-10'
       )}
     />
@@ -379,7 +384,12 @@ export function MessageItem({
 
   if (bubbles) {
     return (
-      <div id={`chat-msg-${message.id}`} className={cn('group relative flex gap-2', mine ? 'justify-end' : 'justify-start')}>
+      <div
+        id={`chat-msg-${message.id}`}
+        {...touch.handlers}
+        style={touch.style}
+        className={cn('group relative flex gap-2 select-text', mine ? 'justify-end' : 'justify-start')}
+      >
         {!mine && <Avatar name={author?.name ?? ''} kind={isAgent ? 'agent' : 'person'} size={32} className="mt-auto" />}
         <div className={cn('grid max-w-[min(32.5rem,85%)] justify-items-start', mine && 'justify-items-end')}>
           <div
@@ -404,12 +414,18 @@ export function MessageItem({
           <Reactions t={t} message={message} onReact={(e) => actions.onReact(message, e)} />
           {thread}
         </div>
+        {sheetEl}
       </div>
     );
   }
 
   return (
-    <div id={`chat-msg-${message.id}`} className="group relative grid grid-cols-[2rem_minmax(0,1fr)] gap-2.5 rounded-control px-1 py-1 hover:bg-muted/50">
+    <div
+      id={`chat-msg-${message.id}`}
+      {...touch.handlers}
+      style={touch.style}
+      className="group relative grid grid-cols-[2rem_minmax(0,1fr)] gap-2.5 rounded-control px-1 py-1 hover:bg-muted/50"
+    >
       <Avatar name={author?.name ?? ''} kind={isAgent ? 'agent' : 'person'} size={32} />
       <div className="min-w-0">
         <div className="mb-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -423,7 +439,156 @@ export function MessageItem({
         {thread}
       </div>
       {bar}
+      {sheetEl}
     </div>
+  );
+}
+
+/**
+ * Press and hold for half a second opens the actions; a sideways swipe of
+ * more than 64px replies. Touch and pen only: a mouse has the hover bar.
+ */
+function useTouchActions(onHold: () => void, onSwipe: () => void) {
+  const start = useRef<{ x: number; y: number; at: number } | null>(null);
+  const timer = useRef(0);
+  const [dx, setDx] = useState(0);
+  const moved = useRef(0);
+  const clear = () => {
+    window.clearTimeout(timer.current);
+    start.current = null;
+    moved.current = 0;
+    setDx(0);
+  };
+  return {
+    style: dx !== 0 ? { transform: `translateX(${dx}px)`, transition: 'none' } : undefined,
+    handlers: {
+      onPointerDown: (e: ReactPointerEvent) => {
+        if (e.pointerType === 'mouse') return;
+        start.current = { x: e.clientX, y: e.clientY, at: Date.now() };
+        timer.current = window.setTimeout(() => {
+          if (start.current) {
+            onHold();
+            clear();
+          }
+        }, 500);
+      },
+      onPointerMove: (e: ReactPointerEvent) => {
+        const s = start.current;
+        if (!s) return;
+        const x = e.clientX - s.x;
+        const y = e.clientY - s.y;
+        if (Math.abs(y) > 12 && Math.abs(y) > Math.abs(x)) {
+          clear();
+          return;
+        }
+        if (Math.abs(x) > 8) window.clearTimeout(timer.current);
+        moved.current = x;
+        setDx(Math.max(-80, Math.min(80, x)));
+      },
+      onPointerUp: () => {
+        if (start.current && Math.abs(moved.current) > 64) onSwipe();
+        clear();
+      },
+      onPointerCancel: clear,
+      onContextMenu: (e: React.MouseEvent) => {
+        // A long press on a phone shows our actions, not the browser's menu.
+        if (start.current) e.preventDefault();
+      },
+    },
+  };
+}
+
+/** The phone's actions for a message (UC.13): six reactions on top, then the actions. */
+function ActionSheet({
+  t,
+  open,
+  onOpenChange,
+  message,
+  actions,
+  inThread,
+}: {
+  t: TranslateFn;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  message: ChatMessage;
+  actions: MessageActions;
+  inThread: boolean;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const run = (fn: () => void) => {
+    onOpenChange(false);
+    fn();
+  };
+  const row = 'flex h-12 w-full items-center gap-3 rounded-control px-2 text-start text-lg hover:bg-muted';
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" closeLabel={t('action.close', 'Close')} className="gap-2 rounded-t-2xl pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <SheetHeader className="sr-only">
+            <SheetTitle>{t('msg.actions', 'Message actions')}</SheetTitle>
+            <SheetDescription>{message.body.slice(0, 80)}</SheetDescription>
+          </SheetHeader>
+          <div aria-hidden="true" className="mx-auto h-1 w-10 rounded-full bg-border" />
+          <div className="flex justify-between px-2 py-2">
+            {MORE_REACTIONS.slice(0, 6).map((e) => (
+              <button key={e} type="button" className="grid size-12 place-items-center rounded-full text-2xl hover:bg-muted" aria-label={t('msg.reactWith', 'React with {emoji}', { emoji: e })} onClick={() => run(() => actions.onReact(message, e))}>
+                <span aria-hidden="true">{e}</span>
+              </button>
+            ))}
+          </div>
+          <button type="button" className={row} onClick={() => run(() => actions.onReply(message))}>
+            <Icon name="undo" size={20} />
+            {t('msg.reply', 'Reply')}
+          </button>
+          {!inThread && (
+            <button type="button" className={row} onClick={() => run(() => actions.onThread(message))}>
+              <Icon name="comment" size={20} />
+              {t('msg.replyThread', 'Reply in thread')}
+            </button>
+          )}
+          <button type="button" className={row} onClick={() => run(() => actions.onPin(message, !message.pinned))}>
+            <Icon name="star" size={20} />
+            {message.pinned ? t('msg.unpin', 'Unpin') : t('msg.pin', 'Pin to the top')}
+          </button>
+          <button type="button" className={row} onClick={() => run(() => actions.onCopy(message))}>
+            <Icon name="copy" size={20} />
+            {t('msg.copy', 'Copy text')}
+          </button>
+          {message.can_edit && (
+            <button type="button" className={row} onClick={() => run(() => actions.onEdit(message))}>
+              <Icon name="edit" size={20} />
+              {t('msg.edit', 'Edit')}
+            </button>
+          )}
+          {message.can_delete && (
+            <button
+              type="button"
+              className={cn(row, 'text-destructive')}
+              onClick={() => {
+                onOpenChange(false);
+                setConfirmDelete(true);
+              }}
+            >
+              <Icon name="delete" size={20} />
+              {t('msg.delete', 'Delete')}
+            </button>
+          )}
+        </SheetContent>
+      </Sheet>
+      <ConfirmAction
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title={t('delete.title', 'Delete this message?')}
+        description={t(
+          'delete.body',
+          'Everyone in this chat will see “This message was deleted”. You can delete for everyone up to 2 days after sending.'
+        )}
+        confirmLabel={t('delete.confirm', 'Delete for everyone')}
+        cancelLabel={t('delete.keep', 'Keep it')}
+        variant="destructive"
+        onConfirm={() => actions.onDelete(message)}
+      />
+    </>
   );
 }
 

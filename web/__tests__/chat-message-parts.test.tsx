@@ -9,13 +9,25 @@
 
 import React from 'react';
 import userEvent from '@testing-library/user-event';
-import { render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 jest.mock('@whity/features/datetime', () => ({
   useDateDisplay: () => ({ dateTime: (v: string | null) => v, time: (v: string | null) => (v ? '09:15' : null), date: (v: string | null) => v }),
 }));
 
 import { MessageItem, TypingLine, type MessageActions } from '@/components/chat/message-parts';
+
+// jsdom has no PointerEvent: a MouseEvent that carries pointerType, so touches have coordinates.
+if (typeof window.PointerEvent === 'undefined') {
+  class TestPointerEvent extends MouseEvent {
+    pointerType: string;
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init);
+      this.pointerType = init.pointerType ?? 'mouse';
+    }
+  }
+  (window as unknown as { PointerEvent: unknown }).PointerEvent = TestPointerEvent;
+}
 import type { ChatMessage } from '@/lib/chat-wire';
 
 const t = (_key: string, fallback: string, values?: Record<string, string | number>) =>
@@ -155,4 +167,32 @@ test('typing names the people typing', () => {
   expect(screen.getByText('Awss is typing…')).toBeInTheDocument();
   rerender(<TypingLine t={t} names={['Awss Haddad', 'Emad Nasser']} />);
   expect(screen.getByText('Awss and Emad are typing…')).toBeInTheDocument();
+});
+
+test('on a phone, press and hold opens the actions, with six reactions', () => {
+  jest.useFakeTimers();
+  const a = actions();
+  render(<MessageItem t={t} message={message()} layout="bubbles" myId={AMRO} readMarks={marks} actions={a} />);
+
+  fireEvent.pointerDown(document.getElementById('chat-msg-20') as HTMLElement, { pointerType: 'touch', clientX: 50, clientY: 50 });
+  act(() => {
+    jest.advanceTimersByTime(600);
+  });
+  jest.useRealTimers();
+
+  expect(screen.getAllByRole('button', { name: /^React with/ }).length).toBeGreaterThanOrEqual(6);
+  fireEvent.click(screen.getAllByRole('button', { name: 'Reply in thread' }).pop() as HTMLElement);
+  expect(a.onThread).toHaveBeenCalled();
+});
+
+test('on a phone, swiping a message sideways replies to it', () => {
+  const a = actions();
+  render(<MessageItem t={t} message={message()} layout="bubbles" myId={AMRO} readMarks={marks} actions={a} />);
+  const el = document.getElementById('chat-msg-20') as HTMLElement;
+
+  fireEvent.pointerDown(el, { pointerType: 'touch', clientX: 50, clientY: 50 });
+  fireEvent.pointerMove(el, { pointerType: 'touch', clientX: 130, clientY: 52 });
+  fireEvent.pointerUp(el, { pointerType: 'touch', clientX: 130, clientY: 52 });
+
+  expect(a.onReply).toHaveBeenCalled();
 });

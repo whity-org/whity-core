@@ -1065,3 +1065,17 @@ All answered on 29 Oct 2026 (above). Kept here as asked, for the record.
     - `docs/design/fonts/` ships 700 weights and Geist Mono 600, which stage 9 says are no longer declared. M1 won't copy them.
 13. **Responsive states have no cards.** Every editor card is 1280px wide, but the design changes layout at 1280, 1024 and 768 (outline closes, rail becomes a drawer, toolbar scrolls). Those can only be checked against the text, not a screenshot. Should cards be added, or is the text enough?
 14. **Branch and commit names.** CONTRIBUTING wants `type/WC-XX-…` branches and `WC-XX:` commits. Is there a ticket for the editor, and should later milestones follow that (`feature/WC-XX-editor-m1`), or keep `design/editor-mN`?
+
+## One chat (A17, design 3.5): owner's answers, 16 Nov 2026
+
+The owner kept all five defaults ("Keep defaults"):
+
+| Question | Answer |
+| --- | --- |
+| Voice "with its text" | The browser's own speech recognition while recording, where it exists; no server transcription. Elsewhere the voice goes without words. |
+| Order-status and stock bots | They come from plugins (Front Office has the data). Core has the away reply, the welcome message and hand-over. |
+| Payment links in chat | Only when Whity Pay is installed. |
+| Who sees customer chats | People with `messages.read`, as Messages had; team chats by membership. |
+| Typing and seen | The existing 5-second polling, no websocket. |
+
+Built as WHIT-1093 to WHIT-1099 (#2011, #2017, #2019, #2020, #2022, #2023), migrations 279 to 283; #2011 and #2017 merged first as 281 and 282 and ran on app.whity.dev before the final numbers were set, so they keep them. Still to build for A17's "done when": one conversation per customer across channels (a WhatsApp reply and an email reply in the same conversation), payment links, booking times and forms in customer chats, and Forward and Turn into a task.
