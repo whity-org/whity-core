@@ -242,6 +242,36 @@ final class ChatPushRealEngineTest extends TestCase
         self::assertSame('Example Bakery · Amro Saleh mentioned you in #Ramadan boxes', $ahmad->received[0]['title']);
     }
 
+    public function testAMentionReachesTheInboxEvenWithoutADevice(): void
+    {
+        $chat = $this->group();
+        // Emad has no device; Ahmad has one.
+        $ahmad = $this->device(self::AHMAD);
+
+        $this->say(self::AMRO, $chat, 'Please check', [['type' => 'person', 'id' => self::EMAD], ['type' => 'person', 'id' => self::AHMAD]]);
+        $this->drain();
+
+        // N4: both get a chat.mention notice for the Inbox's Mentions tab.
+        $told = $this->pdo->query("SELECT recipient_profile_id FROM notifications WHERE type = 'chat.mention' ORDER BY recipient_profile_id");
+        self::assertNotFalse($told);
+        self::assertEqualsCanonicalizing([self::AHMAD, self::EMAD], array_map('intval', $told->fetchAll(\PDO::FETCH_COLUMN)));
+        // Ahmad's device still gets the push.
+        self::assertCount(1, $ahmad->received);
+    }
+
+    public function testAPlainLineMakesNoInboxNotice(): void
+    {
+        $chat = $this->group();
+        $this->device(self::AHMAD);
+
+        $this->say(self::AMRO, $chat, 'Morning');
+        $this->drain();
+
+        $rows = $this->pdo->query("SELECT COUNT(*) FROM notifications WHERE type = 'chat.message' AND id IN (SELECT notification_id FROM notification_deliveries WHERE channel = 'in_app')");
+        self::assertNotFalse($rows);
+        self::assertSame(0, (int) $rows->fetchColumn(), 'chat lines live in Chat, not the Inbox');
+    }
+
     public function testADirectChatIsNamedForThePersonAndInTheirLanguage(): void
     {
         $this->pdo->exec("UPDATE profiles SET language_code = 'ar' WHERE id = " . self::AHMAD);

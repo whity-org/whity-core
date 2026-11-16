@@ -83153,10 +83153,34 @@
                     },
                     "mentions": {
                         "type": "array",
+                        "maxItems": 50,
                         "items": {
-                            "type": "integer"
+                            "oneOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "person",
+                                                "agent",
+                                                "everyone"
+                                            ]
+                                        },
+                                        "id": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "type"
+                                    ]
+                                }
+                            ]
                         },
-                        "description": "Profile ids @mentioned; members who can read the document are told in-app"
+                        "description": "The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox \u203a Mentions and a push"
                     }
                 },
                 "required": [
@@ -83259,10 +83283,34 @@
                     },
                     "mentions": {
                         "type": "array",
+                        "maxItems": 50,
                         "items": {
-                            "type": "integer"
+                            "oneOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "person",
+                                                "agent",
+                                                "everyone"
+                                            ]
+                                        },
+                                        "id": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "type"
+                                    ]
+                                }
+                            ]
                         },
-                        "description": "Profile ids @mentioned; members who can read the document are told in-app"
+                        "description": "The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox \u203a Mentions and a push"
                     }
                 },
                 "required": [
