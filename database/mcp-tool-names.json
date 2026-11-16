@@ -383,6 +383,10 @@
     "en": "Get a customer or supplier",
     "ar": "عرض عميل أو مورد"
   },
+  "get_api_contacts_id_activity": {
+    "en": "See what a customer did: bookings, chats, forms and join requests",
+    "ar": "عرض نشاط العميل: الحجوزات والمحادثات والنماذج وطلبات الانضمام"
+  },
   "get_api_contacts_imports": {
     "en": "List contact imports",
     "ar": "عرض عمليات استيراد جهات الاتصال"

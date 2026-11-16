@@ -2560,6 +2560,26 @@ export interface paths {
         patch: operations["patch_api_v1_contacts_id"];
         trace?: never;
     };
+    "/api/v1/contacts/{id}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What a customer did here: their bookings, chats, forms and requests to join
+         * @description Newest first, up to 50 of each. A section shows only to someone who may read that kind of record (bookings: calendar:read; chats: messages:reply; forms: forms:read; join requests: signup:manage). A service's or form's name comes in both languages.
+         */
+        get: operations["get_api_v1_contacts_id_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contacts/{id}/archive": {
         parameters: {
             query?: never;
@@ -33330,6 +33350,108 @@ export interface operations {
             };
             /** @description A value that doesn't look right */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_contacts_id_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            bookings?: {
+                                id: number;
+                                title: string | {
+                                    [key: string]: string;
+                                };
+                                status: string;
+                                at: string;
+                            }[];
+                            chats?: {
+                                id: number;
+                                title: string | {
+                                    [key: string]: string;
+                                };
+                                status: string;
+                                at: string;
+                            }[];
+                            forms?: {
+                                id: number;
+                                title: string | {
+                                    [key: string]: string;
+                                };
+                                status: string;
+                                at: string;
+                            }[];
+                            join_requests?: {
+                                id: number;
+                                title: string | {
+                                    [key: string]: string;
+                                };
+                                status: string;
+                                at: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

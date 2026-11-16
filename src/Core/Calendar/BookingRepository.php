@@ -50,10 +50,10 @@ final class BookingRepository
             'INSERT INTO calendar_bookings (tenant_id, service_id, profile_id, customer_profile_id, customer_name,
                     customer_email, customer_phone, customer_note, starts_at, ends_at, blocks_from, blocks_until,
                     status, hold_expires_at, source, price_minor, currency, reminder_due_at, created_by_profile_id,
-                    room_id, created_at, updated_at)
+                    room_id, contact_id, created_at, updated_at)
              VALUES (:tenant_id, :service_id, :profile_id, :customer_profile_id, :customer_name, :customer_email,
                     :customer_phone, :customer_note, :starts_at, :ends_at, :blocks_from, :blocks_until, :status,
-                    :hold_expires_at, :source, :price_minor, :currency, :reminder_due_at, :created_by, :room_id, :now, :now)
+                    :hold_expires_at, :source, :price_minor, :currency, :reminder_due_at, :created_by, :room_id, :contact_id, :now, :now)
              RETURNING id'
         );
         $stmt->execute([
@@ -77,6 +77,14 @@ final class BookingRepository
             ':reminder_due_at' => $v['reminder_due_at'] !== null ? Interval::toDb($v['reminder_due_at']) : null,
             ':created_by' => $v['created_by_profile_id'],
             ':room_id' => $v['room_id'] ?? null,
+            // Contacts is the one customer record: the booking points at it.
+            ':contact_id' => (new \Whity\Core\Contacts\CustomerContacts($this->db))->forCustomer(
+                $tenantId,
+                (string) $v['customer_name'],
+                (string) $v['customer_email'],
+                (string) $v['customer_phone'],
+                $v['customer_profile_id'] !== null ? (int) $v['customer_profile_id'] : null,
+            ),
             ':now' => Interval::toDb(new DateTimeImmutable()),
         ]);
 
