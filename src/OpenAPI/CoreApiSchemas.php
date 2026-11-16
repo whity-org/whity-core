@@ -12716,6 +12716,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/password-resets/identity-check', 'password_resets:approve', [
+                // AG.1: only the approver confirms it's them; an agent never starts the check.
+                'mcp' => ['expose' => false],
                 'summary' => 'Start the approver\'s "confirm it\'s you" check for a password reset: names it, and sends a code by email when that is the check',
                 'tags' => ['auth'],
                 'request' => self::object([
@@ -13575,6 +13577,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/2fa-recovery/identity-check', 'two_factor_recovery:approve', [
+                // AG.1: only the approver confirms it's them; an agent never starts the check.
+                'mcp' => ['expose' => false],
                 'summary' => 'Start the admin\'s "confirm it\'s you" check: names it, and sends a code by email when that is the check',
                 'tags' => ['auth'],
                 'request' => 'IdentityCheckRequest',
