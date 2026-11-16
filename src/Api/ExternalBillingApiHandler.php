@@ -869,7 +869,7 @@ final class ExternalBillingApiHandler
             return null;
         }
 
-        $months = ['month' => 1, 'quarter' => 3, 'year' => 12][(string) $chosen['billing_period']] ?? null;
+        $months = ['month' => 1, 'quarter' => 3, 'half_year' => 6, 'year' => 12][(string) $chosen['billing_period']] ?? null;
 
         return $months === null ? null : ((int) $chosen['unit_amount']) / $months;
     }

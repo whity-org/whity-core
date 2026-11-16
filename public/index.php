@@ -2353,12 +2353,13 @@ $router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versio
 $router->register('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}/activate', [$tenantPluginVersionsHandler, 'activate'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_PUBLISH);
 
 // Installed code plugins, switched on per workspace (WHIT-1122).
-$workspaceCodePluginsHandler = new \Whity\Api\WorkspaceCodePluginsApiHandler($pluginLoader, $codePluginActivation, $db->getPdo(), $auditLogger);
+$workspaceCodePluginsHandler = new \Whity\Api\WorkspaceCodePluginsApiHandler($pluginLoader, $codePluginActivation, $db->getPdo(), $auditLogger, $roleChecker, static fn (): string => $serverLabels->languageCode());
 $router->register('GET', '/api/workspace/code-plugins', [$workspaceCodePluginsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/enable', [$workspaceCodePluginsHandler, 'enable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
 $router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/disable', [$workspaceCodePluginsHandler, 'disable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_DISABLE);
 $router->register('GET', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/history', [$workspaceCodePluginsHandler, 'history'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/trial', [$workspaceCodePluginsHandler, 'trial'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
+$router->register('GET', '/api/workspace/onboarding', [$workspaceCodePluginsHandler, 'onboarding'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('GET', '/api/plugins/workspace-access', [$workspaceCodePluginsHandler, 'accessList'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('PUT', '/api/plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/workspace-access', [$workspaceCodePluginsHandler, 'setAccess'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
 

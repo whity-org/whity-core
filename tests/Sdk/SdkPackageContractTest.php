@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.108.0',
+            '1.109.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.108 ADDS Setup\\WorkspaceSetup: packs set a workspace up through core routes as the acting person (WHIT-1129). '
+            'SDK 1.109 ADDS PluginOnboardingInterface and more WorkspaceSetup routes: guided setups (WHIT-1148). '
+            . 'SDK 1.108 ADDS Setup\\WorkspaceSetup: packs set a workspace up through core routes as the acting person (WHIT-1129). '
             . 'SDK 1.107 ADDS PluginAccessInterface, PluginWorkspaceLifecycleInterface and Billing\\WorkspaceAddons: paid plugins switched on per workspace (WHIT-1125). '
             . 'SDK 1.106 ADDS Auth\Jwt\IssuerTokenVerifier, JwsVerifier, JwksCache and HttpsJson: one Whity ID token verifier for the host, plugins and services (WHIT-1026). '
             . 'SDK 1.105 ADDS Events::MEMBERSHIP_CUSTOMER_INVITING and the invitation form of membership.customer_joined: customers invite their own team (#1872, WHIT-996). '

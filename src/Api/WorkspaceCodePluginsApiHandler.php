@@ -23,6 +23,7 @@ use Whity\Http\JsonBody;
  *   POST /api/workspace/code-plugins/{plugin}/enable      plugins:enable
  *   POST /api/workspace/code-plugins/{plugin}/disable     plugins:disable
  *   POST /api/workspace/code-plugins/{plugin}/trial       plugins:enable (WHIT-1125)
+ *   GET  /api/workspace/onboarding                        plugins:read (WHIT-1148)
  *   GET  /api/workspace/code-plugins/{plugin}/history     plugins:read
  *   GET  /api/plugins/workspace-access                    plugins:read, operator only
  *   PUT  /api/plugins/{plugin}/workspace-access {access, freeForAll?}
@@ -48,13 +49,71 @@ final class WorkspaceCodePluginsApiHandler
         private readonly CodePluginActivation $activation,
         private readonly PDO $db,
         private readonly ?AuditLogger $audit = null,
+        // WHIT-1148: who may see a plugin's guided setup, and in which language.
+        private readonly ?\Whity\Auth\RoleChecker $roles = null,
+        private readonly ?\Closure $language = null,
     ) {
+    }
+
+    /**
+     * GET /api/workspace/onboarding: the guided setups (SDK 1.109) of the
+     * plugins on in this workspace that the caller may run, in their language.
+     */
+    public function onboarding(Request $request): Response
+    {
+        return $this->inWorkspace(function (int $tenantId) use ($request): Response {
+            $profileId = self::profileId($request);
+            $language = $this->language !== null ? (string) ($this->language)() : 'en';
+            $data = [];
+            foreach ($this->loader->getOnboardings() as $onboarding) {
+                $permission = (string) $onboarding['permission'];
+                if ($this->roles !== null && ($profileId === null || !$this->roles->hasPermissionForProfile($profileId, $permission, $tenantId))) {
+                    continue;
+                }
+                $steps = [];
+                foreach ($onboarding['steps'] as $step) {
+                    $steps[] = [
+                        'id' => $step['id'],
+                        'title' => self::text($step['title'], $language),
+                        'description' => self::text($step['description'] ?? null, $language),
+                        'blocks' => array_map(
+                            static fn (array $block): array => \Whity\Sdk\Frontend\Blocks\BlockText::resolve($block, $language),
+                            $step['blocks'],
+                        ),
+                    ];
+                }
+                $data[] = [
+                    'plugin' => $onboarding['plugin'],
+                    'title' => self::text($onboarding['title'], $language),
+                    'description' => self::text($onboarding['description'] ?? null, $language),
+                    'status' => $onboarding['status'],
+                    'steps' => $steps,
+                ];
+            }
+
+            return Response::json(['data' => $data]);
+        });
+    }
+
+    /** `{en, ar}` in the reader's language, English when that one is missing. */
+    private static function text(mixed $value, string $language): ?string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+        if (!is_array($value)) {
+            return null;
+        }
+        $text = $value[$language] ?? $value['en'] ?? null;
+
+        return is_string($text) ? $text : null;
     }
 
     public function list(Request $request): Response
     {
         return $this->inWorkspace(function (int $tenantId): Response {
             $rows = $this->activation->workspaceRows($tenantId);
+            $onboarding = $this->loader->pluginsWithOnboarding();
             $data = [];
             foreach ($this->activePlugins() as $name => $version) {
                 $access = $this->activation->accessOf($name);
@@ -82,6 +141,9 @@ final class WorkspaceCodePluginsApiHandler
                     'trialDays' => $paid['trialDays'] ?? 0,
                     'trialAvailable' => $this->activation->trialAvailable($name, $tenantId),
                     'mayTurnOn' => $this->activation->mayTurnOn($name, $tenantId),
+                    // WHIT-1148: it has a guided setup, and what it needs here.
+                    'onboarding' => in_array($name, $onboarding, true),
+                    'dependsOn' => $this->loader->workspaceDependenciesOf($name),
                 ];
             }
 
@@ -117,8 +179,13 @@ final class WorkspaceCodePluginsApiHandler
             if (!$this->activation->trialAvailable($name, $tenantId)) {
                 return Response::error('This workspace has already had its trial, or the plugin offers none', 409, ['reason' => 'trial_unavailable']);
             }
+            $blocked = $this->dependencyRefusal($name, $tenantId);
+            if ($blocked !== null) {
+                return $blocked;
+            }
 
             $profileId = self::profileId($request);
+            $this->turnOnDependencies($name, $tenantId, $profileId);
             $this->activation->startTrial($tenantId, $name, $profileId);
             $state = $this->activation->stateFor($name, $tenantId);
             $this->audit?->record(self::AUDIT_TRIAL, [
@@ -271,7 +338,26 @@ final class WorkspaceCodePluginsApiHandler
                 ]);
             }
 
+            if ($enabled) {
+                $blocked = $this->dependencyRefusal($name, $tenantId);
+                if ($blocked !== null) {
+                    return $blocked;
+                }
+            } else {
+                // A plugin another one here needs stays on (WHIT-1148).
+                $needing = array_values(array_filter(
+                    $this->loader->dependentsOf($name),
+                    fn (string $dependent): bool => $this->activation->isVisible($dependent, $tenantId),
+                ));
+                if ($needing !== []) {
+                    return Response::error('Other plugins here need this one; turn them off first', 409, ['reason' => 'required_by', 'plugins' => $needing]);
+                }
+            }
+
             $profileId = self::profileId($request);
+            if ($enabled) {
+                $this->turnOnDependencies($name, $tenantId, $profileId);
+            }
             $this->activation->setEnabled($tenantId, $name, $enabled, $profileId);
             $this->audit?->record($enabled ? self::AUDIT_ENABLED : self::AUDIT_DISABLED, [
                 'tenant_id' => $tenantId,
@@ -283,6 +369,46 @@ final class WorkspaceCodePluginsApiHandler
 
             return Response::json(['data' => ['name' => $name, 'enabled' => $enabled]]);
         });
+    }
+
+    /**
+     * Why the plugins this one depends on can't be turned on here, or null
+     * (WHIT-1148). A dependency the operator keeps to the platform, or a paid
+     * one this workspace can't use yet, stops the switch.
+     */
+    private function dependencyRefusal(string $name, int $tenantId): ?Response
+    {
+        foreach ($this->loader->workspaceDependenciesOf($name) as $dependency) {
+            if ($this->activation->isVisible($dependency, $tenantId)) {
+                continue;
+            }
+            if ($this->activation->accessOf($dependency) === CodePluginActivation::OPERATOR) {
+                return Response::error("{$name} needs {$dependency}, which this platform doesn't offer to workspaces", 409, ['reason' => 'dependency_unavailable', 'plugin' => $dependency]);
+            }
+            if (!$this->activation->mayTurnOn($dependency, $tenantId)) {
+                return Response::error("{$name} needs {$dependency} first", 402, ['reason' => 'dependency_needs_purchase', 'plugin' => $dependency]);
+            }
+        }
+
+        return null;
+    }
+
+    /** Turn on, for this workspace, what the plugin depends on and is still off. */
+    private function turnOnDependencies(string $name, int $tenantId, ?int $profileId): void
+    {
+        foreach ($this->loader->workspaceDependenciesOf($name) as $dependency) {
+            if ($this->activation->isVisible($dependency, $tenantId)) {
+                continue;
+            }
+            $this->activation->setEnabled($tenantId, $dependency, true, $profileId);
+            $this->audit?->record(self::AUDIT_ENABLED, [
+                'tenant_id' => $tenantId,
+                'actor_user_id' => $profileId,
+                'target_type' => 'code_plugin',
+                'metadata' => ['plugin' => $dependency, 'for' => $name],
+            ]);
+            $this->loader->notifyWorkspaceSwitch($dependency, $tenantId, true);
+        }
     }
 
     /**

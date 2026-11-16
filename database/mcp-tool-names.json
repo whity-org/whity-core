@@ -1006,6 +1006,10 @@
     "en": "See who turned a plugin on or off, and when",
     "ar": "معرفة من شغّل الإضافة أو أوقفها ومتى"
   },
+  "get_api_workspace_onboarding": {
+    "en": "List the guided setups of the plugins on in this workspace",
+    "ar": "عرض الإعداد الموجَّه للإضافات العاملة في مساحة العمل"
+  },
   "get_api_workspace_plugins": {
     "ar": "عرض إضافات مساحة العمل"
   },
