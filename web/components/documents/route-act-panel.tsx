@@ -131,6 +131,7 @@ import {
   type RouteVerdictName,
 } from './routing-wire';
 import { SignPanel } from './sign-panel';
+import { RoutePersonValue } from './route-person-value';
 import { Lottie } from '@whity/ui/lottie';
 
 /**
@@ -729,13 +730,22 @@ export function RouteActPanel({
                   <span className="ms-1 text-muted-foreground">{t('routing.act.values.optional', '(optional)')}</span>
                 )}
               </label>
-              <Input
-                id={`route-value-${route.id}-${input.key}`}
-                value={values[input.key] ?? ''}
-                maxLength={input.max_length}
-                aria-required={input.required}
-                onChange={(e) => setValues((current) => ({ ...current, [input.key]: e.target.value }))}
-              />
+              {input.type === 'person' ? (
+                <RoutePersonValue
+                  id={`route-value-${route.id}-${input.key}`}
+                  value={values[input.key] ?? ''}
+                  required={input.required}
+                  onChange={(value) => setValues((current) => ({ ...current, [input.key]: value }))}
+                />
+              ) : (
+                <Input
+                  id={`route-value-${route.id}-${input.key}`}
+                  value={values[input.key] ?? ''}
+                  maxLength={input.max_length}
+                  aria-required={input.required}
+                  onChange={(e) => setValues((current) => ({ ...current, [input.key]: e.target.value }))}
+                />
+              )}
             </div>
           ))}
         </fieldset>

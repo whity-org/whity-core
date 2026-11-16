@@ -47,7 +47,6 @@ final class MyFormSubmissionApiRealEngineTest extends TestCase
         $fields = new FormFieldRepository($this->pdo);
         $this->formId = $forms->create(self::TENANT, 'supplier_request', ['en' => 'Supplier request'], null, null, null);
         $fields->create(self::TENANT, $this->formId, 'supplier', 'text', ['en' => 'Supplier'], null, false, [], [], null, null, null);
-        $fields->create(self::TENANT, $this->formId, 'decision', 'text', ['en' => 'Decision'], null, false, [], [], null, null, null, null, FormFieldRepository::AUDIENCE_STAFF);
 
         $this->submissions = new FormSubmissionRepository($this->pdo);
         $this->api = new FormSubmissionsApiHandler(
@@ -84,15 +83,6 @@ final class MyFormSubmissionApiRealEngineTest extends TestCase
         $body = json_decode((string) $response->getBody(), true);
         self::assertSame(['supplier' => 'Example Mill'], $body['data']['data']);
         self::assertSame(['supplier'], array_column($body['data']['fields'], 'field_key'));
-    }
-
-    public function testAStaffAnswerIsNotShownToTheSender(): void
-    {
-        $id = $this->submissions->create(self::TENANT, $this->formId, 1, self::SENDER, null, ['supplier' => 'a', 'decision' => 'refused']);
-
-        $response = $this->show($id);
-
-        self::assertStringNotContainsString('refused', (string) $response->getBody());
     }
 
     public function testAFileAnswerDoesNotGiveAwayWhereItIsStored(): void

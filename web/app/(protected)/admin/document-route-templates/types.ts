@@ -81,6 +81,7 @@ export interface RouteTemplateStepInputWire {
   label_ar?: string | null;
   required?: boolean;
   max_length?: number;
+  type?: 'text' | 'person';
 }
 
 export interface RouteTemplateEdgeWire {
@@ -133,6 +134,7 @@ export function toFlowGraph(wire: RouteTemplateGraphWire): RouteFlowGraph {
           labelAr: input.label_ar ?? null,
           required: input.required !== false,
           maxLength: input.max_length ?? 100,
+          type: input.type === 'person' ? 'person' : 'text',
         })),
         excludeNamedIn: s.exclude_named_in ?? [],
         canvasX: s.canvas_x,
@@ -185,6 +187,7 @@ export function toGraphRequest(graph: RouteFlowGraph): {
               label_ar: input.labelAr?.trim() ? input.labelAr.trim() : null,
               required: input.required,
               max_length: input.maxLength,
+              type: input.type === 'person' ? 'person' : 'text',
             })),
       // WHIT-1018: always sent, so a save never stops leaving people out.
       exclude_named_in: s.kind === 'finalise' ? [] : (s.excludeNamedIn ?? []),

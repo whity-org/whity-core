@@ -175,6 +175,15 @@ final class DocumentRouter
      */
     private ?array $expectedSignVersion = null;
 
+    /**
+     * Merge map A3: the people the act in progress names at its step, by key
+     * (the supervisor at pre-check). The next step's recusal is worked out
+     * before the act's values are stored, so it reads them from here.
+     *
+     * @var array<string, int>
+     */
+    private array $namingNow = [];
+
     private readonly RouteFinalisationRepository $finalisations;
 
     private readonly RouteStepValueRepository $stepValues;
@@ -535,6 +544,7 @@ final class DocumentRouter
     ): array {
         $routeId = (int) $route['id'];
         [$documentId, $subjectType, $subjectId] = self::routeSubject($route);
+        $this->namingNow = [];
 
         $this->assertOpen($tenantId, $documentId, $subjectType, $subjectId);
 
@@ -630,6 +640,18 @@ final class DocumentRouter
                 $entered = RouteStepInputs::accept(RouteStepInputs::decode($step['inputs'] ?? []), $values);
             } catch (InvalidArgumentException $e) {
                 throw RoutingRejectedException::because($e->getMessage());
+            }
+            // Merge map A3: a person named at a step is someone in this workspace.
+            foreach (RouteStepInputs::decode($step['inputs'] ?? []) as $input) {
+                if ($input['type'] === RouteStepInputs::TYPE_PERSON
+                    && isset($entered[$input['key']])
+                    && !$this->isActiveMember($tenantId, (int) $entered[$input['key']])
+                ) {
+                    throw RoutingRejectedException::because("Choose someone in this workspace for “{$input['label']}”.");
+                }
+                if ($input['type'] === RouteStepInputs::TYPE_PERSON && isset($entered[$input['key']])) {
+                    $this->namingNow[$input['key']] = (int) $entered[$input['key']];
+                }
             }
         }
 
@@ -808,6 +830,7 @@ final class DocumentRouter
             // WHIT-1016: kept with the act that entered them, so the trail
             // event names who entered each value and when.
             $this->stepValues->record($tenantId, $routeId, (int) $step['id'], $eventId, $actorId, $entered);
+            $this->namingNow = [];
 
             if ($decided !== null) {
                 // The step is settled, so the people still holding it are being
@@ -1437,6 +1460,16 @@ final class DocumentRouter
      * route's final document now that it has committed. Does nothing when the
      * route is not waiting for one.
      */
+    private function isActiveMember(int $tenantId, int $profileId): bool
+    {
+        $stmt = $this->db->prepare(
+            "SELECT 1 FROM memberships WHERE tenant_id = :tenant_id AND profile_id = :profile_id AND status = 'active' LIMIT 1"
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
     public function finalisePending(int $tenantId, int $routeId): void
     {
         if ($this->db->inTransaction()) {
@@ -2315,6 +2348,10 @@ final class DocumentRouter
         foreach ($keys as $key) {
             foreach ($provider->peopleNamedIn($tenantId, $subjectId, [$key]) as $profileId) {
                 $named[$profileId] ??= $key;
+            }
+            // Merge map A3: named by the act that is opening this step.
+            if (isset($this->namingNow[$key])) {
+                $named[$this->namingNow[$key]] ??= $key;
             }
         }
 

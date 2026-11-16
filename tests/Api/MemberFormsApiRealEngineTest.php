@@ -356,18 +356,6 @@ final class MemberFormsApiRealEngineTest extends TestCase
         self::assertSame(201, $response->getStatusCode());
     }
 
-    public function testAMemberIsNotAskedAStaffQuestion(): void
-    {
-        $formId = $this->publishedForm();
-        $this->open($formId);
-        $this->fields->create(self::TENANT, $formId, 'decision', 'text', ['en' => 'Decision'], null, true, [], [], null, null, 2, null, 'staff');
-
-        $rendered = self::data($this->members->render($this->asCaller(self::MEMBER), ['id' => (string) $formId]));
-
-        self::assertSame(['supplier'], array_column($rendered['fields'], 'field_key'));
-        self::assertSame(201, $this->submitAs(self::MEMBER, $formId)->getStatusCode());
-    }
-
     public function testAMemberCannotUploadToAFormThatIsNotOpen(): void
     {
         $formId = $this->publishedForm();

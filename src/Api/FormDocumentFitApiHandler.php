@@ -98,7 +98,7 @@ final class FormDocumentFitApiHandler
         }
 
         $questions = [];
-        foreach (FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, (int) $form['id'])) as $field) {
+        foreach ($this->fields->listForForm($tenantId, (int) $form['id']) as $field) {
             $questions[(string) $field['field_key']] = $field;
         }
 
@@ -168,7 +168,7 @@ final class FormDocumentFitApiHandler
         }
 
         $fields = $this->fields->listForForm($tenantId, (int) $form['id']);
-        if (FormFieldRepository::applicantFields($fields) === []) {
+        if ($fields === []) {
             return Response::error('Add a question to the form first.', 422, ['code' => 'no_questions']);
         }
 

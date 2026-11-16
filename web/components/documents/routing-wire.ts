@@ -213,6 +213,8 @@ export interface RouteStepInput {
   label_ar: string | null;
   required: boolean;
   max_length: number;
+  /** Merge map A3: `person` is someone in the workspace, sent as their user id. */
+  type?: 'text' | 'person';
 }
 
 /** WHIT-1016: a value entered on a route, each key's latest. */

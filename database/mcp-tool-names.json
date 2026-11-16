@@ -597,9 +597,6 @@
     "en": "Print a form response in the automatic layout",
     "ar": "طباعة ردّ على نموذج بالتخطيط التلقائي"
   },
-  "get_api_form_submissions_id_review": {
-    "ar": "عرض ما سجّله المكتب عن إجابة"
-  },
   "get_api_forms": {
     "en": "List the forms in your workspace",
     "ar": "عرض النماذج"
@@ -1473,9 +1470,6 @@
   "post_api_entity_tags": {
     "en": "Put a tag on an item",
     "ar": "وضع وسم على عنصر"
-  },
-  "post_api_form_submissions_id_review": {
-    "ar": "تسجيل قرار المكتب في إجابة"
   },
   "post_api_forms": {
     "en": "Create a new form",

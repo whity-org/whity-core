@@ -2214,30 +2214,6 @@ final class CoreApiSchemas
                     503 => self::errorResponse('PDFs are turned off, or the render service is unavailable'),
                 ] + self::authErrors(),
             ]),
-            self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/review', 'forms:read', [
-                'summary' => 'What the office recorded about a submission',
-                'description' => 'The current review, every earlier one, and the staff fields they answer. '
-                    . 'The applicant has no route to this.',
-                'tags' => ['forms'],
-                'responses' => [
-                    200 => self::jsonResponse('The review and its history', 'FormSubmissionReviewDetailResponse'),
-                    404 => self::errorResponse('Submission not found'),
-                ] + self::authErrors(),
-            ]),
-            self::permissionRoute('POST', '/api/form-submissions/{id:\d+}/review', 'forms:review', [
-                'summary' => 'Record the office\'s decision on a submission',
-                'description' => 'Checked against the form\'s staff fields as a submission is checked against '
-                    . 'its own, and sent whole. Each save is a new row and the newest is current, so changing '
-                    . 'a decision leaves the old one readable. The submission itself is never changed. Works '
-                    . 'on a closed form. `meta.ignored_keys` names answers that matched no staff field.',
-                'tags' => ['forms'],
-                'request' => 'FormSubmissionCreateRequest',
-                'responses' => [
-                    201 => self::jsonResponse('The recorded review', 'FormSubmissionReviewResponse'),
-                    404 => self::errorResponse('Submission not found'),
-                    422 => self::errorResponse('The form has no staff fields, or an answer failed validation'),
-                ] + self::authErrors(),
-            ]),
             [
                 'method' => 'GET',
                 'path' => '/api/me/form-submissions',
@@ -9413,7 +9389,6 @@ final class CoreApiSchemas
                 'section_key' => self::str(true),
                 'position' => self::int(),
                 'visible_when' => SchemaBuilder::ref('FormFieldCondition'),
-                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff']],
                 'multi_valued' => self::bool(),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
@@ -9534,22 +9509,6 @@ final class CoreApiSchemas
                 'secret' => self::str(true),
                 'allow_without_bot_check' => ['type' => 'boolean'],
             ], []),
-            'FormSubmissionReview' => self::object([
-                'id' => self::int(),
-                'submission_id' => self::int(),
-                'data' => ['type' => 'object', 'additionalProperties' => true],
-                'recorded_by_profile_id' => self::int(true),
-                'recorded_at' => self::str(),
-            ], ['id', 'submission_id', 'data', 'recorded_at']),
-            'FormSubmissionReviewResponse' => self::object([
-                'data' => SchemaBuilder::ref('FormSubmissionReview'),
-                'meta' => self::object(['ignored_keys' => ['type' => 'array', 'items' => ['type' => 'string']]], []),
-            ], ['data']),
-            'FormSubmissionReviewDetailResponse' => self::dataEnvelope(self::object([
-                'current' => SchemaBuilder::ref('FormSubmissionReview') + ['nullable' => true],
-                'history' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSubmissionReview')],
-                'fields' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormField')],
-            ], ['current', 'history', 'fields'])),
             'FormSectionText' => self::object([
                 'key' => self::str(),
                 'title' => self::localizedText(),
@@ -9649,7 +9608,6 @@ final class CoreApiSchemas
                 'prefill_source' => self::str(true) + ['description' => 'Fill the field in advance from the submitter\'s profile; sources are listed in the field list\'s `meta.prefill_sources`.'],
                 'section_key' => self::name() + ['description' => 'Section to group the field under; fields sharing a key form one section.'],
                 'visible_when' => SchemaBuilder::ref('FormFieldCondition') + ['description' => 'Show this question only when another answer matches; null means always.'],
-                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff'], 'description' => 'Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review.'],
                 // Absent means the server appends it after the current maximum.
                 'position' => self::int() + ['description' => 'Position in the form; omitted appends it at the end.'],
             ], ['field_key', 'field_type', 'label']),
@@ -9680,7 +9638,6 @@ final class CoreApiSchemas
                 'prefill_source' => self::str(true) + ['description' => 'Profile detail to prefill from; null for none.'],
                 'section_key' => self::name() + ['description' => 'Section to group the field under.'],
                 'visible_when' => SchemaBuilder::ref('FormFieldCondition') + ['description' => 'Show this question only when another answer matches; null means always.'],
-                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff'], 'description' => 'Who answers it. A staff field is never shown to the applicant.'],
                 'position' => self::int() + ['description' => 'New position in the form.'],
             ], []) + ['minProperties' => 1],
             // `prefill` is keyed by FIELD KEY, not by source: two fields may name
