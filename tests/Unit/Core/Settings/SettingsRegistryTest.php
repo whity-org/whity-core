@@ -137,7 +137,7 @@ final class SettingsRegistryTest extends TestCase
              // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
              'signup.mode', 'signup.role_id', 'signup.allowed_domains', 'signup.customer_invites',
              // WHIT-1043.
-             'signup.invites_per_customer'],
+             'signup.invites_per_customer', 'signup.route_template_id'],
             SettingsRegistry::keys()
         );
     }
@@ -471,7 +471,8 @@ final class SettingsRegistryTest extends TestCase
         // 117 since WHIT-960: website.plans and website.contact_workspace.
         // 120 since design 3.4 (P1): company.name_ar and company.address_ar.
         // 124 since WHIT-1035: the four signup.* keys; 125 since WHIT-1043.
-        self::assertCount(125, $describe);
+        // 126 since merge map A4: signup.route_template_id.
+        self::assertCount(126, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

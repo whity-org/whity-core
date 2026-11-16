@@ -63070,7 +63070,7 @@
                 "tags": [
                     "signup"
                 ],
-                "description": "Creates the customer membership with the current starting role. A rejected request can be approved later.",
+                "description": "Creates the customer membership with the current starting role. A rejected request can be approved later. A request on its route is answered there: your step's approval, which decides it unless the workspace's route has more steps (202).",
                 "parameters": [
                     {
                         "name": "id",
@@ -63091,6 +63091,9 @@
                                 }
                             }
                         }
+                    },
+                    "202": {
+                        "description": "Your step is answered; the route has more to decide"
                     },
                     "401": {
                         "description": "Missing or invalid authentication",
@@ -63188,6 +63191,9 @@
                             }
                         }
                     },
+                    "202": {
+                        "description": "Your step is answered; the route has more to decide"
+                    },
                     "401": {
                         "description": "Missing or invalid authentication",
                         "content": {
@@ -63220,6 +63226,16 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The request's route refused the answer (for example, it is not your step)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -101556,6 +101572,11 @@
                         "type": "integer",
                         "description": "How many people one customer may invite; 0 is no limit (WHIT-1043)."
                     },
+                    "route_template_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The route template join requests travel on; null is the default, one step for everyone who can manage sign-ups."
+                    },
                     "eligible_roles": {
                         "type": "array",
                         "items": {
@@ -101645,6 +101666,11 @@
                     "invites_per_customer": {
                         "type": "integer",
                         "description": "How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043)."
+                    },
+                    "route_template_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "One of this workspace's route templates for join requests to travel on, or null for the default: one step for everyone who can manage sign-ups."
                     }
                 }
             },

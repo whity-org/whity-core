@@ -887,6 +887,8 @@ final class DocumentRouter
             $number = $this->numberOnFinalApproval($tenantId, $documentId, $routeId);
             // WHIT-1017: and what the subject itself earns, such as a reference.
             $this->subjectOnFinalApproval($tenantId, $subjectType, $subjectId, $routeId);
+            // Merge map A4: and what it does when turned down.
+            $this->subjectOnFinalRejection($tenantId, $subjectType, $subjectId, $routeId);
 
             if ($ownTransaction) {
                 $this->db->commit();
@@ -1530,6 +1532,21 @@ final class DocumentRouter
             return;
         }
         $provider->approved($tenantId, $subjectId, $routeId);
+    }
+
+    /**
+     * Merge map A4: tell a subject that cares that its route finished not
+     * approved (nothing left open, and the last verdict a rejection).
+     */
+    private function subjectOnFinalRejection(int $tenantId, string $subjectType, int $subjectId, int $routeId): void
+    {
+        $provider = $this->subjects?->get($subjectType);
+        if (!$provider instanceof RouteSubjectRejectedInterface
+            || $this->recipients->hasOpenOnRoute($tenantId, $routeId)
+            || $this->events->latestVerdictOnRoute($routeId, $tenantId) !== RouteVerdict::REJECTED) {
+            return;
+        }
+        $provider->rejected($tenantId, $subjectId, $routeId);
     }
 
     private function numberOnFinalApproval(int $tenantId, ?int $documentId, int $routeId): ?string
