@@ -16,6 +16,7 @@ import { Button } from '@whity/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
 import { Icon } from '@whity/ui/icon';
 import { Input } from '@whity/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { Textarea } from '@whity/ui/textarea';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { useDateDisplay, zonedInstant } from '@whity/features/datetime';
@@ -186,8 +187,6 @@ export function CustomerBlockDialog({
     }
   };
 
-  const select = 'h-10 w-full rounded-control border border-input bg-card px-3 text-sm';
-
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-[30rem]" closeLabel={t('action.close', 'Close')}>
@@ -197,16 +196,21 @@ export function CustomerBlockDialog({
         </DialogHeader>
         {kind === 'booking_times' && (
           <div className="grid gap-3">
-            <label className="grid gap-1.5 text-sm">
-              {t('cblock.serviceLabel', 'Service')}
-              <select className={select} value={serviceId} onChange={(e) => setServiceId(Number(e.target.value))}>
-                {options.services.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="grid gap-1.5 text-sm">
+              <span id="cblock-service">{t('cblock.serviceLabel', 'Service')}</span>
+              <Select value={String(serviceId)} onValueChange={(v) => setServiceId(Number(v))}>
+                <SelectTrigger aria-labelledby="cblock-service" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.services.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid gap-2">
               <span className="text-sm">{t('cblock.times', 'Times to suggest')}</span>
               <span className="text-xs text-muted-foreground">{t('cblock.zone', 'In {zone}, the time zone your booking page uses.', { zone: options.time_zone })}</span>
@@ -228,16 +232,21 @@ export function CustomerBlockDialog({
           </div>
         )}
         {kind === 'form' && (
-          <label className="grid gap-1.5 text-sm">
-            {t('cblock.formLabelPick', 'Form')}
-            <select className={select} value={formId} onChange={(e) => setFormId(Number(e.target.value))}>
-              {options.forms.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.title}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="grid gap-1.5 text-sm">
+            <span id="cblock-form">{t('cblock.formLabelPick', 'Form')}</span>
+            <Select value={String(formId)} onValueChange={(v) => setFormId(Number(v))}>
+              <SelectTrigger aria-labelledby="cblock-form" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {options.forms.map((f) => (
+                  <SelectItem key={f.id} value={String(f.id)}>
+                    {f.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
         {kind === 'payment' && (
           <div className="grid gap-3">

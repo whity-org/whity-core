@@ -90,7 +90,10 @@ final class ChatApiHandler
             try {
                 $message = $this->messaging->reply($t, $conversation, $v->profileId, $built['text'], false, 'staff.reply', ['block' => $built['block']]);
             } catch (MessagingException $e) {
-                return Response::error($e->getMessage(), 422);
+                // Its plain sentence, written for people; the detail stays in the log.
+                error_log('[ChatApiHandler] customer block not sent: ' . $e->getMessage());
+
+                return Response::error($e->plain(), 422);
             }
 
             return Response::json(['data' => MessagesPresenter::message($message)], 201);

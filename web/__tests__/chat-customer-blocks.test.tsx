@@ -49,6 +49,13 @@ function bodyOf(call: unknown[]): Record<string, unknown> {
   return JSON.parse(String((call[1] as RequestInit).body)) as Record<string, unknown>;
 }
 
+// Radix Select needs Pointer Capture and scrollIntoView, which jsdom lacks.
+beforeAll(() => {
+  window.HTMLElement.prototype.hasPointerCapture = jest.fn();
+  window.HTMLElement.prototype.releasePointerCapture = jest.fn();
+  window.HTMLElement.prototype.scrollIntoView = jest.fn();
+});
+
 beforeEach(() => mockApiFetch.mockReset());
 
 test('a payment link is made in Whity Pay first, then sent with its amount and words', async () => {
@@ -100,7 +107,8 @@ test('asking for a form sends the form picked', async () => {
   const onSent = jest.fn();
   render(<CustomerBlockDialog t={t} kind="form" conversationId={5} customerName="Ahmad" options={options} currency="USD" onClose={jest.fn()} onSent={onSent} />);
 
-  await userEvent.selectOptions(screen.getByLabelText('Form'), '2');
+  await userEvent.click(screen.getByRole('combobox', { name: 'Form' }));
+  await userEvent.click(await screen.findByRole('option', { name: 'Allergy check' }));
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
 
   await waitFor(() => expect(onSent).toHaveBeenCalled());
