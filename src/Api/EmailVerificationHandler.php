@@ -10,6 +10,8 @@ use Whity\Core\Identity\EmailVerificationService;
 use Whity\Core\Identity\ProfileEmailRepository;
 use Whity\Core\Identity\TenantEmailDomainPolicyService;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimited;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
@@ -37,11 +39,6 @@ final class EmailVerificationHandler
 {
     /** System tenant that owns cross-tenant / system-level audit records. */
     private const SYSTEM_TENANT_ID = 0;
-
-    /** Resend throttle: fixed window + per-email and per-IP ceilings. */
-    private const WINDOW_SECONDS = 3600;
-    private const EMAIL_MAX      = 5;
-    private const IP_MAX         = 20;
 
     public function __construct(
         private readonly EmailVerificationService $service,
@@ -74,25 +71,21 @@ final class EmailVerificationHandler
         $emailKey = 'emailverify:req:email:' . hash('sha256', $email);
         $ipKey    = $ip !== null ? 'emailverify:req:ip:' . $ip : null;
 
-        if ($this->store->count($emailKey) >= self::EMAIL_MAX
-            || ($ipKey !== null && $this->store->count($ipKey) >= self::IP_MAX)
+        $emailRule = RateLimits::emailVerificationPerEmail();
+        $ipRule    = RateLimits::emailVerificationPerAddress();
+        if ($emailRule->blocked($this->store, $emailKey) !== null
+            || ($ipKey !== null && $ipRule->blocked($this->store, $ipKey) !== null)
         ) {
-            $retryAfter = max(
+            return RateLimited::response(max(
                 $this->store->ttl($emailKey),
-                $ipKey !== null ? $this->store->ttl($ipKey) : 0,
-                1
-            );
-
-            return Response::error(
-                'Too many verification requests. Please try again later.',
-                429
-            )->withHeaders(['Retry-After' => (string) $retryAfter]);
+                $ipKey !== null ? $this->store->ttl($ipKey) : 0
+            ));
         }
 
         // Count this attempt against both windows before doing any work.
-        $this->store->increment($emailKey, self::WINDOW_SECONDS);
+        $emailRule->record($this->store, $emailKey);
         if ($ipKey !== null) {
-            $this->store->increment($ipKey, self::WINDOW_SECONDS);
+            $ipRule->record($this->store, $ipKey);
         }
 
         $row = $this->emails->findByEmail($email);

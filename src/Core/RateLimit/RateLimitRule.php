@@ -169,4 +169,71 @@ final class RateLimitRule
     {
         return new self('platform', static fn (Request $r): string => 'all', $limit, $window);
     }
+
+    /**
+     * A limit counted against a key the caller builds (merge map plumbing,
+     * WHIT-1158): an address, an email, a form, a person. The handler's own
+     * counters were each written by hand; they now all go through these three
+     * calls, read their numbers from {@see RateLimits}, and answer with one
+     * message ({@see RateLimited}). A keyed rule resolves to no request
+     * dimension, so the middleware skips it.
+     */
+    public static function keyed(string $name, int $limit, int $window): self
+    {
+        return new self($name, static fn (Request $r): ?string => null, $limit, $window);
+    }
+
+    /**
+     * Refuse when the key is already at the limit; count nothing. For the
+     * places that count only some outcomes (a failure, a send) afterwards.
+     *
+     * @phpstan-impure
+     */
+    public function blocked(\Whity\Core\Store\SharedStoreInterface $store, string $key): ?\Whity\Core\Response
+    {
+        if ($store->count($key) >= $this->limit) {
+            return RateLimited::response($store->ttl($key));
+        }
+
+        return null;
+    }
+
+    /**
+     * Count one against the key, for this rule's window. Returns the new count.
+     *
+     * @phpstan-impure
+     */
+    public function record(\Whity\Core\Store\SharedStoreInterface $store, string $key): int
+    {
+        return $store->increment($key, $this->window);
+    }
+
+    /**
+     * Count one, then refuse if that went over the limit.
+     *
+     * @phpstan-impure
+     */
+    public function hit(\Whity\Core\Store\SharedStoreInterface $store, string $key): ?\Whity\Core\Response
+    {
+        if ($this->record($store, $key) > $this->limit) {
+            return RateLimited::response($store->ttl($key));
+        }
+
+        return null;
+    }
+
+    /**
+     * Refuse at the limit, otherwise count one: the common check-then-count.
+     *
+     * @phpstan-impure
+     */
+    public function take(\Whity\Core\Store\SharedStoreInterface $store, string $key): ?\Whity\Core\Response
+    {
+        $refused = $this->blocked($store, $key);
+        if ($refused === null) {
+            $this->record($store, $key);
+        }
+
+        return $refused;
+    }
 }

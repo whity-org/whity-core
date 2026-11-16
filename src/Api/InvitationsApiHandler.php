@@ -9,6 +9,8 @@ use Whity\Auth\RoleChecker;
 use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Identity\InvitationMailer;
 use Whity\Core\Identity\InvitationService;
+use Whity\Core\RateLimit\RateLimited;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -46,11 +48,6 @@ use Whity\Http\JsonBody;
  */
 final class InvitationsApiHandler
 {
-    /** Throttle: fixed window plus per-tenant and per-actor ceilings. */
-    private const WINDOW_SECONDS = 3600;
-    private const TENANT_MAX = 100;
-    private const ACTOR_MAX = 50;
-
     public function __construct(
         private readonly PDO $db,
         private readonly InvitationService $service,
@@ -302,17 +299,16 @@ final class InvitationsApiHandler
         $tenantKey = 'invite:issue:tenant:' . $tenantId;
         $actorKey = 'invite:issue:actor:' . $actorId;
 
-        if ($this->store->count($tenantKey) >= self::TENANT_MAX
-            || $this->store->count($actorKey) >= self::ACTOR_MAX
+        $tenantRule = RateLimits::invitationsPerWorkspace();
+        $actorRule = RateLimits::invitationsPerPerson();
+        if ($tenantRule->blocked($this->store, $tenantKey) !== null
+            || $actorRule->blocked($this->store, $actorKey) !== null
         ) {
-            $retryAfter = max($this->store->ttl($tenantKey), $this->store->ttl($actorKey), 1);
-
-            return Response::error('Too many invitations sent. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) $retryAfter]);
+            return RateLimited::response(max($this->store->ttl($tenantKey), $this->store->ttl($actorKey)));
         }
 
-        $this->store->increment($tenantKey, self::WINDOW_SECONDS);
-        $this->store->increment($actorKey, self::WINDOW_SECONDS);
+        $tenantRule->record($this->store, $tenantKey);
+        $actorRule->record($this->store, $actorKey);
 
         return null;
     }
