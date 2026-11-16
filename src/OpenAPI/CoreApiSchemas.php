@@ -12022,8 +12022,11 @@ final class CoreApiSchemas
                 'code' => ['type' => 'string', 'description' => 'The code from the approver\'s authenticator, or the one emailed by the identity check'],
             ], ['code']),
             'IdentityCheckResponse' => self::dataEnvelope(self::object([
-                'method' => ['type' => 'string', 'enum' => ['totp', 'email_code']],
+                'method' => ['type' => 'string', 'enum' => ['totp', 'email_code', 'fresh_sign_in']],
                 'email_hint' => self::str(true),
+                // fresh_sign_in (WHIT-1147): where to sign in again, and the purpose to name there.
+                'provider_key' => self::str(true),
+                'purpose' => self::str(true),
             ], ['method', 'email_hint'])),
             // OR.1: "I'm away".
             'AwayPeriod' => self::object([
