@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import type { ChatAttachment, ChatAgentMember, ChatDetail, ChatInboxItem, ChatLayout, ChatMember, ChatMention, ChatMessage, ChatMode, ChatReadMark, ChatSummary } from '@/lib/chat-wire';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@whity/ui/dropdown-menu';
 import { PollDialog, RecordDialog } from './blocks';
+import { LinkedRecord } from './discuss-in-chat';
 import { PendingFiles, VoiceRecorder, attachmentsLine, fileSize, type PendingFile } from './attachments';
 import { ComposerBanner, MessageBody, MessageItem, NewLine, PinnedBar, TypingLine, type MessageActions } from './message-parts';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -1216,6 +1217,7 @@ function Thread({
       }}
     >
       <div className={cn('flex min-h-full flex-col justify-end', layout === 'bubbles' ? 'gap-3' : 'gap-1.5')}>
+        {chat.link && <LinkedRecord link={chat.link} className="mb-1" />}
         {messages.length === 0 && <p className="self-center text-sm text-muted-foreground">{t('thread.empty', 'No messages yet. Say hello.')}</p>}
         {messages.map((m) => (
           <Fragment key={m.id}>
