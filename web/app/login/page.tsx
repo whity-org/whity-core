@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { continueSignupPlugin } from '@/lib/signup-plugin';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useBranding } from '@/lib/branding-context';
@@ -265,7 +266,7 @@ export default function LoginPage() {
         } else {
           // Single-membership: session cookie already set — redirect in.
           await refreshAuth();
-          router.push('/dashboard');
+          router.push((await continueSignupPlugin()) ?? '/dashboard');
         }
       } else {
         const errorData = ((loginError_ ?? {}) as unknown) as { message?: string };
@@ -305,7 +306,7 @@ export default function LoginPage() {
       if (response.ok) {
         // Session issued for the chosen tenant — redirect in.
         await refreshAuth();
-        router.push('/dashboard');
+        router.push((await continueSignupPlugin()) ?? '/dashboard');
       } else {
         const errorData = ((selectError ?? {}) as unknown) as { message?: string };
         const message =
@@ -365,7 +366,7 @@ export default function LoginPage() {
       if (response.ok) {
         // 2FA successful - refresh auth state and redirect
         await refreshAuth();
-        router.push('/dashboard');
+        router.push((await continueSignupPlugin()) ?? '/dashboard');
       } else if (response.status === 401) {
         const errorMsg = backupCodeMode
           ? t('recovery.error.invalid', 'Invalid recovery code. Please try again.')

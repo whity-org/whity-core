@@ -265,6 +265,24 @@ final class BookingRealEngineTest extends TestCase
         self::assertSame(2, $usage->count(1, $now));
     }
 
+    /** WHIT-1156: a walk-in gives only a phone; the same number twice is one customer, however it is written. */
+    public function testAPhoneOnlyBookingCountsOncePerNumber(): void
+    {
+        $usage = new CustomerUsage($this->pdo, new EntitlementService(new TenantEntitlementRepository($this->pdo)), $this->settings);
+        $now = new DateTimeImmutable('2026-11-15 10:00:00', new DateTimeZone('UTC'));
+        foreach ([
+            ['customer_email' => '', 'customer_phone' => '+962 79 000 0001', 'customer_name' => 'Ahmad Khalil'],
+            ['customer_email' => '', 'customer_phone' => '962790000001', 'customer_name' => 'Ahmad'],
+            ['customer_email' => '', 'customer_phone' => '0790000002', 'customer_name' => 'Emad Nasser'],
+            ['customer_email' => '', 'customer_phone' => '', 'customer_name' => 'No contact'],
+        ] as $i => $who) {
+            $booking = $this->service->book(1, $this->request(sprintf('2026-11-16T%02d:00:00+03:00', 10 + $i), 11, $who));
+            $usage->onBookingConfirmed(['id' => $booking['id'], 'tenant_id' => 1]);
+        }
+        // Ahmad once (two spellings of one number), Emad, and the booking with neither.
+        self::assertSame(3, $usage->count(1, $now));
+    }
+
     public function testThePersonsLockSerialisesTwoConnections(): void
     {
         if ($this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'pgsql') {
