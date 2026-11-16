@@ -663,6 +663,10 @@
     "en": "See your notification preferences",
     "ar": "عرض تفضيلات إشعاراتك"
   },
+  "get_api_me_notification_summary": {
+    "en": "See your notifications in each of your workspaces",
+    "ar": "عرض إشعاراتك في كل مساحات عملك"
+  },
   "get_api_me_notifications": {
     "en": "See your notifications",
     "ar": "عرض إشعاراتك"

@@ -9,6 +9,7 @@
 import { useTranslation } from '@whity/features/i18n';
 import { PushSettings } from '@/components/settings/push-settings';
 import { MySettingsHeader } from '@/components/settings/scope';
+import { OtherWorkspacesNotifications } from '@/components/settings/other-workspaces-notifications';
 
 export default function NotificationSettingsPage() {
   const t = useTranslation('auth');
@@ -20,6 +21,7 @@ export default function NotificationSettingsPage() {
         scope="workspace"
       />
       <PushSettings />
+      <OtherWorkspacesNotifications />
     </div>
   );
 }

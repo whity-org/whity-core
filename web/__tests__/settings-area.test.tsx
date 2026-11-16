@@ -321,5 +321,25 @@ describe('SettingsArea: the phone menu search reads the settings index (WHIT-108
     await userEvent.type(search, 'logo');
     expect(screen.getByTestId('settings-menu-row-branding')).toBeInTheDocument();
     expect(screen.queryByTestId('settings-menu-row-notifications')).toBeNull();
+
+    // The workspace currency (CU.4) is on General, in either language.
+    for (const word of ['currency', 'عملة']) {
+      await userEvent.clear(search);
+      await userEvent.type(search, word);
+      expect(screen.getByTestId('settings-menu-row-general')).toBeInTheDocument();
+    }
+  });
+});
+
+describe('SettingsArea: the cards’ frame (TplSettings*)', () => {
+  it('puts "Settings › Page" above both columns, linking back to Settings', async () => {
+    mockPathname = '/admin/settings/branding';
+    mockGet.mockResolvedValue(tabs(['general', 'branding']));
+    render(<SettingsArea>page</SettingsArea>);
+    const crumb = await screen.findByTestId('settings-breadcrumb');
+    expect(crumb).toHaveTextContent('SettingsBranding');
+    expect(within(crumb).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings');
+    // The sub-nav no longer carries its own "Settings" heading.
+    expect(within(screen.getByTestId('settings-area-nav')).queryByText('Settings', { selector: 'p' })).toBeNull();
   });
 });
