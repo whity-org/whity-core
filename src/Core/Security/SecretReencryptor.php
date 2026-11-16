@@ -82,8 +82,7 @@ final class SecretReencryptor
             $json[$ref->field] = $fresh;
             $fresh = (string) json_encode($json, JSON_UNESCAPED_SLASHES);
         }
-        // Unscoped by design (maintenance): one row, found by its id, and only
-        // while it still holds what was read.
+        // @tenant-guard-ignore: instance maintenance after a key rotation; one row by its id, and only while it still holds what was read
         $stmt = $this->db->prepare(
             "UPDATE {$ref->table} SET {$ref->column} = :fresh WHERE {$ref->idColumn} = :id AND {$ref->column} = :stored"
         );
@@ -95,7 +94,7 @@ final class SecretReencryptor
     /** @return list<array{0: int|string, 1: string}> */
     private function values(SecretRef $ref): array
     {
-        // Unscoped by design (maintenance): every workspace's secrets rotate.
+        // @tenant-guard-ignore: instance maintenance after a key rotation; every workspace's secrets move to the new key, each row found by its own id
         $sql = match ($ref->kind) {
             SecretRef::COLUMN => "SELECT {$ref->idColumn} AS id, {$ref->column} AS value FROM {$ref->table} WHERE {$ref->column} IS NOT NULL AND {$ref->column} <> ''",
             SecretRef::WORKSPACE_SETTING => "SELECT id, value FROM tenant_settings WHERE setting_key LIKE :key AND value <> ''",
