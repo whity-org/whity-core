@@ -16,7 +16,7 @@
 
 import React from 'react';
 import userEvent from '@testing-library/user-event';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 
 const mockApiClient = jest.fn();
 jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
@@ -150,7 +150,7 @@ describe('InboxPage', () => {
     await waitFor(() => expect(screen.getByText('Purchase order 9912')).toBeInTheDocument());
 
     // A tab per source, each carrying its own count.
-    const tabs = screen.getAllByRole('tab');
+    const tabs = within(screen.getByRole('tablist', { name: 'Inbox sources' })).getAllByRole('tab');
     expect(tabs).toHaveLength(2);
     expect(screen.getByText('5')).toBeInTheDocument();
 
@@ -189,7 +189,62 @@ describe('InboxPage', () => {
     render(<InboxPage />);
     await waitFor(() => expect(screen.getByText('Purchase order 9912')).toBeInTheDocument());
 
-    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.queryByRole('tablist', { name: 'Inbox sources' })).not.toBeInTheDocument();
+  });
+
+  it('has the three tabs of the design: Waiting for me, Mentions, Updates', async () => {
+    wire([ROUTING_SOURCE], [routingItem()]);
+
+    render(<InboxPage />);
+    await waitFor(() => expect(screen.getByText('Purchase order 9912')).toBeInTheDocument());
+
+    const top = within(screen.getByRole('tablist', { name: 'Inbox' })).getAllByRole('tab');
+    expect(top.map((tab) => tab.textContent)).toEqual(['Waiting for me', 'Mentions', 'Updates']);
+  });
+
+  it('lists agents asking the person as one more source, opening Approvals', async () => {
+    const base = mockApiClient.getMockImplementation();
+    wire([ROUTING_SOURCE], [routingItem()]);
+    const wired = mockApiClient.getMockImplementation();
+    mockApiClient.mockImplementation((url: string, init?: unknown) => {
+      if (url.startsWith('/api/v1/me/agent-proposals')) {
+        return jsonResponse(200, { data: [{ id: 7, summary: 'Reorder flour', agent: { name: 'Stock assistant' }, createdAt: '2026-11-16T08:00:00Z', status: 'waiting' }] });
+      }
+      return (wired ?? base)!(url, init);
+    });
+
+    render(<InboxPage />);
+    const strip = await screen.findByRole('tablist', { name: 'Inbox sources' });
+    await userEvent.click(within(strip).getByRole('tab', { name: /Agents asking you/ }));
+
+    await userEvent.click(await screen.findByTestId('inbox-proposal-7'));
+    expect(push).toHaveBeenCalledWith('/admin/approvals');
+  });
+
+  it('shows Mentions from the notices, and opening one marks it read', async () => {
+    wire([ROUTING_SOURCE], [routingItem()]);
+    const wired = mockApiClient.getMockImplementation();
+    const calls: string[] = [];
+    mockApiClient.mockImplementation((url: string, init?: unknown) => {
+      calls.push(url);
+      if (url.startsWith('/api/v1/me/notifications?') && url.includes('tab=mentions')) {
+        return jsonResponse(200, {
+          data: [{ id: 41, type: 'chat.mention', subject: 'Awss mentioned you', body: 'Can you check the order?', data: { url: '/chat?c=12' }, read: false, created_at: '2026-11-16T08:00:00Z' }],
+          pagination: pagination(1),
+          unread: { mentions: 1, updates: 0 },
+          unread_count: 1,
+        });
+      }
+      if (url === '/api/v1/me/notifications/41/read') return jsonResponse(204, {});
+      return wired!(url, init);
+    });
+
+    render(<InboxPage />);
+    await userEvent.click(screen.getByTestId('inbox-tab-mentions'));
+    await userEvent.click(await screen.findByTestId('inbox-notice-41'));
+
+    await waitFor(() => expect(calls).toContain('/api/v1/me/notifications/41/read'));
+    expect(push).toHaveBeenCalledWith('/chat?c=12');
   });
 
   it('defaults to open items and can include history', async () => {

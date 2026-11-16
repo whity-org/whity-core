@@ -5739,6 +5739,12 @@ $inboxSourceRegistry->registerCoreSource(
     \Whity\Core\Messaging\MessagesInboxSource::KEY,
     new \Whity\Core\Messaging\MessagesInboxSource($messagingService->conversations())
 );
+// Merge map C3: an agent's chat lines held for the person ("Ask first") wait
+// in Waiting for me too, and open their chat, where they are decided.
+$inboxSourceRegistry->registerCoreSource(
+    \Whity\Core\Chat\HeldLinesInboxSource::KEY,
+    new \Whity\Core\Chat\HeldLinesInboxSource($db->getPdo())
+);
 $messagingSettings = new \Whity\Core\Messaging\MessagingSettings($db->getPdo(), $secretStore);
 $messagesHandler = new \Whity\Api\MessagesApiHandler($messagingService, $messagingSettings);
 $router->register('GET',   '/api/messages/conversations',                 [$messagesHandler, 'list'],   null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_READ);
