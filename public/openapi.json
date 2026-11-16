@@ -90029,12 +90029,22 @@
                     "equals": {
                         "description": "Text, a number, or true or false, compared with the answer."
                     },
+                    "notEquals": {
+                        "description": "Text, a number, or true or false. Shown when the question is answered with anything else; an unanswered question hides it."
+                    },
                     "in": {
                         "type": "array",
                         "items": {
                             "type": "string"
                         },
                         "maxItems": 100
+                    },
+                    "answered": {
+                        "type": "boolean",
+                        "enum": [
+                            true
+                        ],
+                        "description": "Shown when the question has any answer: a ticked checkbox, a non-empty list, a table with a row."
                     }
                 },
                 "required": [

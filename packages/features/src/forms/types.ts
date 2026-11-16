@@ -104,9 +104,21 @@ export interface FieldValidation {
   maxRows?: number
 }
 
+type ConditionValue = string | number | boolean
+
+/**
+ * "Show this question only if ...": exactly one operator besides `field`.
+ * `notEquals` waits for an answer, like `equals`; `answered` asks once the
+ * controller holds any answer (a checkbox once it is ticked).
+ */
 export type FieldCondition =
-  | { field: string; equals: string | number | boolean; in?: undefined }
-  | { field: string; in: string[]; equals?: undefined }
+  | { field: string; equals: ConditionValue; notEquals?: undefined; in?: undefined; answered?: undefined }
+  | { field: string; notEquals: ConditionValue; equals?: undefined; in?: undefined; answered?: undefined }
+  | { field: string; in: string[]; equals?: undefined; notEquals?: undefined; answered?: undefined }
+  | { field: string; answered: true; equals?: undefined; notEquals?: undefined; in?: undefined }
+
+/** How the builder offers a rule: `in` is edited as `equals` on its first value. */
+export type ConditionOperator = "equals" | "notEquals" | "answered"
 
 export type FieldAudience = "applicant" | "staff"
 

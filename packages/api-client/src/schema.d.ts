@@ -15356,7 +15356,14 @@ export interface components {
             field: string;
             /** @description Text, a number, or true or false, compared with the answer. */
             equals?: unknown;
+            /** @description Text, a number, or true or false. Shown when the question is answered with anything else; an unanswered question hides it. */
+            notEquals?: unknown;
             in?: string[];
+            /**
+             * @description Shown when the question has any answer: a ticked checkbox, a non-empty list, a table with a row.
+             * @enum {boolean}
+             */
+            answered?: true;
         } | null;
         FormFieldCreateRequest: {
             /** @description Permanent key the answers are stored under: a lower-case letter, then letters, digits or `_`. */
