@@ -12262,6 +12262,118 @@
                 }
             }
         },
+        "/api/v1/chat/chats/discuss": {
+            "post": {
+                "operationId": "post_api_v1_chat_chats_discuss",
+                "summary": "Open the chat about a board, a meeting or a record, starting it if new",
+                "tags": [
+                    "chat"
+                ],
+                "description": "One group chat per linked board, meeting or record, named after it. You join it if you are not in it yet. 201 when the chat was started, 200 when it was already there; `created` says the same.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChatDiscussRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The chat it already had",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatDiscussResponse"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "The chat, just started",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatDiscussResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The link is not a board, a meeting or a record with an id and a name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/chat/chats/{id}": {
             "get": {
                 "operationId": "get_api_v1_chat_chats_id",
@@ -79017,6 +79129,67 @@
                         "required": [
                             "people",
                             "agents"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "ChatDiscussRequest": {
+                "type": "object",
+                "properties": {
+                    "link": {
+                        "$ref": "#/components/schemas/ChatLink"
+                    }
+                },
+                "required": [
+                    "link"
+                ]
+            },
+            "ChatDiscussResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Chat"
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "members": {
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#/components/schemas/ChatMember"
+                                        }
+                                    },
+                                    "messages": {
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#/components/schemas/ChatMessage"
+                                        }
+                                    },
+                                    "has_earlier": {
+                                        "type": "boolean"
+                                    },
+                                    "my_member_id": {
+                                        "type": "integer"
+                                    },
+                                    "last_read_message_id": {
+                                        "type": "integer"
+                                    },
+                                    "created": {
+                                        "type": "boolean",
+                                        "description": "True when this call started the chat."
+                                    }
+                                },
+                                "required": [
+                                    "members",
+                                    "messages",
+                                    "created"
+                                ]
+                            }
                         ]
                     }
                 },

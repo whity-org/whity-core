@@ -5803,6 +5803,8 @@ $router->register('GET',    '/api/chat/bots',                                   
 $router->register('PUT',    '/api/chat/bots/{kind:[a-z]+}',                     [$chatHandler, 'bots'],          null);
 $router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null);
 $router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null);
+// Merge map C2: "Discuss in chat" opens the record's one chat, or starts it.
+$router->register('POST',   '/api/chat/chats/discuss',                          [$chatHandler, 'discuss'],       null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null);
 $router->register('PATCH',  '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'update'],        null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'messages'],      null);

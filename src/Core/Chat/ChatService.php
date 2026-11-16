@@ -225,6 +225,33 @@ final class ChatService
         return $id;
     }
 
+    /**
+     * "Discuss in chat" from a board, a meeting or a record (merge map C2,
+     * WHIT-1135): the one group chat linked to it, started if new and named
+     * after it. The viewer joins it if they aren't in it yet, so everyone who
+     * opens the record's chat talks in the same place.
+     *
+     * @param array<string, mixed> $link
+     * @return array{id: int, created: bool}
+     */
+    public function discuss(int $tenantId, ChatViewer $viewer, array $link): array
+    {
+        $this->personOnly($viewer);
+        $link = self::link($link);
+        if ($link === null) {
+            throw new ChatException('A chat can be linked to a board, a meeting or a record, with its id and name.');
+        }
+        $existing = $this->repo->findLinked($tenantId, $link['type'], $link['id']);
+        if ($existing !== null) {
+            $this->rejoin($tenantId, $existing, $viewer->profileId);
+
+            return ['id' => $existing, 'created' => false];
+        }
+        $title = mb_substr($link['label'], 0, self::MAX_TITLE);
+
+        return ['id' => $this->createGroup($tenantId, $viewer, $title, [], $link), 'created' => true];
+    }
+
     /** The direct chat between the viewer and another person, started if new. */
     public function directWithPerson(int $tenantId, ChatViewer $viewer, int $profileId): int
     {
