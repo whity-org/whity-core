@@ -78873,6 +78873,10 @@
                     },
                     "description": {
                         "type": "string"
+                    },
+                    "channel": {
+                        "type": "string",
+                        "description": "Send by this channel (one from the conversation's send_by). Default: where the customer last wrote."
                     }
                 },
                 "required": [

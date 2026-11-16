@@ -134,7 +134,10 @@ export function CustomerBlockDialog({
   currency,
   onClose,
   onSent,
+  sendBy = null,
 }: {
+  /** UC.3: the channel the reply goes by; null is where the customer last wrote. */
+  sendBy?: string | null;
   t: TranslateFn;
   kind: Kind;
   conversationId: number;
@@ -162,22 +165,24 @@ export function CustomerBlockDialog({
         ? formId > 0
         : description.trim() !== '' && /^\d+(\.\d{1,3})?$/.test(amount.trim());
 
+  const by = sendBy ? { channel: sendBy } : {};
   const send = async () => {
     setBusy(true);
     setError(null);
     try {
       if (kind === 'payment') {
         const link = await api.createPayment(amount.trim(), currency, description.trim());
-        await api.sendCustomerBlock(conversationId, { type: 'payment', text: words, url: link.url, reference: link.reference, amount: amount.trim(), currency, description: description.trim() });
+        await api.sendCustomerBlock(conversationId, { type: 'payment', text: words, url: link.url, reference: link.reference, amount: amount.trim(), currency, description: description.trim(), ...by });
       } else if (kind === 'booking_times') {
         await api.sendCustomerBlock(conversationId, {
           type: 'booking_times',
           text: words,
           service_id: serviceId,
           times: times.filter((x) => x !== '').map((x) => wallTimeIn(x, options.time_zone)),
+          ...by,
         });
       } else {
-        await api.sendCustomerBlock(conversationId, { type: 'form', text: words, form_id: formId });
+        await api.sendCustomerBlock(conversationId, { type: 'form', text: words, form_id: formId, ...by });
       }
       onSent();
     } catch (e) {

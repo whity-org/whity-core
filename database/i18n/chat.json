@@ -127,6 +127,7 @@
         "customer.openContact": "Open contact",
         "customer.replyTo": "Reply to {name} by {channel}",
         "customer.sendBy": "Send by {channel}",
+        "customer.sendByPick": "Send by",
         "customer.since": "Customer since {date}",
         "customer.subject": "Subject",
         "customer.visitor": "Website visitor",

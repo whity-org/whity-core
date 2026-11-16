@@ -28,6 +28,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from '@whity/ui/dropdown-menu';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { Checkbox } from '@whity/ui/checkbox';
@@ -153,6 +155,8 @@ export function CustomerChat({
   const currency = useWorkspaceCurrency();
   const blockOptions = useCustomerBlockOptions(id, canReply);
   const [blockKind, setBlockKind] = useState<'booking_times' | 'form' | 'payment' | null>(null);
+  // UC.3: the channel a reply goes by; null follows the customer to where they last wrote.
+  const [chosenChannel, setChosenChannel] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -185,6 +189,11 @@ export function CustomerChat({
 
   const conversation = detail.data;
   const messages = useMemo(() => conversation?.messages ?? [], [conversation]);
+  // UC.3: what a reply goes by. A chosen channel the customer no longer has falls back to their last.
+  const sendBy = conversation?.send_by ?? [];
+  const sendByKey = sendBy.some((s) => s.channel === chosenChannel) ? chosenChannel : (sendBy[0]?.channel ?? null);
+  // A message names its channel only when this conversation has more than one.
+  const manyChannels = new Set(messages.map((m) => m.channel).filter(Boolean)).size > 1 || sendBy.length > 1;
   const lastId = messages.length > 0 ? messages[messages.length - 1].id : 0;
 
   if (newFrom === null && messages.length > 0) {
@@ -230,7 +239,7 @@ export function CustomerChat({
       const options = { params: { path: { id } }, body: { body: text } };
       const { response, error } =
         mode === 'reply'
-          ? await api.POST('/api/v1/messages/conversations/{id}/replies', options)
+          ? await api.POST('/api/v1/messages/conversations/{id}/replies', { ...options, body: { body: text, ...(sendByKey ? { channel: sendByKey } : {}) } })
           : await api.POST('/api/v1/messages/conversations/{id}/notes', options);
       if (!response.ok) {
         // Nothing is lost: the words stay in the box to try again.
@@ -267,7 +276,8 @@ export function CustomerChat({
   const retry = async (message: Message): Promise<void> => {
     const { response, error } = await api.POST('/api/v1/messages/conversations/{id}/replies', {
       params: { path: { id } },
-      body: { body: message.body },
+      // Again on the channel it was meant for.
+      body: { body: message.body, ...(message.channel ? { channel: message.channel } : {}) },
     });
     if (!response.ok) {
       addToast(await errorText(rebuilt(response, error), t('messages.error.send', 'Your message was not sent. Please try again.')), 'error');
@@ -312,7 +322,7 @@ export function CustomerChat({
 
   const name = contactLabel(conversation) || t('messages.visitor', 'Website visitor');
   const address = displayAddress(conversation.contact.address);
-  const channel = channelName(conversation.channel, t);
+  const channel = channelName(sendByKey ?? conversation.channel, t);
   const firstName = name.split(' ')[0];
   const mine = myId !== null && conversation.assignee?.id === myId;
   const unreadCount = newFrom ? messages.filter((m) => m.id >= newFrom && m.kind === 'inbound').length : 0;
@@ -425,6 +435,7 @@ export function CustomerChat({
               onRetry={canReply ? () => void retry(message) : undefined}
               onCopy={() => copy(message)}
               blockText={tc}
+              showChannel={manyChannels}
             />
           ))}
           <div ref={bottom} />
@@ -481,11 +492,36 @@ export function CustomerChat({
                   </button>
                 ))}
               </div>
-              <span className="ms-auto text-sm text-muted-foreground">
-                {mode === 'reply'
-                  ? tc('customer.sendBy', 'Send by {channel}', { channel })
-                  : t('messages.composer.noteOnly', 'Only your team sees this')}
-              </span>
+              {mode === 'reply' && sendBy.length > 1 ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="ms-auto gap-1.5 font-normal">
+                      {tc('customer.sendByPick', 'Send by')}
+                      <span className="font-medium">{channel}</span>
+                      <Icon name="chevron-down" size={14} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuRadioGroup value={sendByKey ?? ''} onValueChange={setChosenChannel}>
+                      {sendBy.map((s) => (
+                        <DropdownMenuRadioItem key={s.channel} value={s.channel} className="gap-2">
+                          <Icon name={channelIcon(s.channel)} size={16} />
+                          <span>{channelName(s.channel, t)}</span>
+                          <span dir="ltr" className="text-muted-foreground">
+                            {displayAddress(s.address)}
+                          </span>
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <span className="ms-auto text-sm text-muted-foreground">
+                  {mode === 'reply'
+                    ? tc('customer.sendBy', 'Send by {channel}', { channel })
+                    : t('messages.composer.noteOnly', 'Only your team sees this')}
+                </span>
+              )}
             </div>
             <div
               className={cn(
@@ -568,6 +604,7 @@ export function CustomerChat({
           t={tc}
           kind={blockKind}
           conversationId={id}
+          sendBy={sendByKey}
           customerName={firstName}
           options={blockOptions}
           currency={currency}
@@ -626,8 +663,11 @@ function CustomerMessageItem({
   onRetry,
   onCopy,
   blockText,
+  showChannel = false,
 }: {
   blockText: TranslateFn;
+  /** Name the message's channel: the conversation spans more than one (C5). */
+  showChannel?: boolean;
   message: Message;
   customerName: string;
   /** When above zero, the "n new" line goes above this message. */
@@ -695,6 +735,13 @@ function CustomerMessageItem({
             <p className="text-xs text-muted-foreground">{t('messages.attachments', '{n} attachment(s) not shown', { n: message.attachments_not_shown })}</p>
           )}
           <p className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
+            {showChannel && message.channel && !note && (
+              <span className="me-1 inline-flex items-center gap-1">
+                <Icon name={channelIcon(message.channel)} size={12} />
+                {channelName(message.channel, t)}
+                <span aria-hidden="true">·</span>
+              </span>
+            )}
             {at}
             {!inbound && !note && <Ticks status={message.status} t={t} />}
           </p>
