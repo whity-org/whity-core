@@ -879,6 +879,7 @@ Owner's answers: Day, 4 days, Week, Month and Year; a Google-style left panel; s
 | CV.9 | Moving and resizing | Drag in 15-minute steps, across days; pull the bottom edge to change the length; the time shows in a dark label. A customer's booking asks first with “Email the new time” ticked; then Undo for 10 seconds. A busy person warns with Book anyway; a taken room, closed branch or a 409 sends it back and says why |
 | CV.10 | Without dragging | Every change also works from Move in the details and with the keys (arrows move the selected booking, Enter saves, Esc cancels); on touch, press and hold half a second |
 | CV.11 | On a phone | Day, 3 days (the phone's Week) and Month with the chosen day's list; ☰ opens a drawer with views, Colour by, People, Rooms; bookings open a sheet with Call; + Booking floats on its plane; tap an empty time for New booking; press and hold to move, letting go asks first. 14px on the grid, 17px elsewhere, 56px an hour |
+| CV.12 | One calendar | **Owner (16 Nov 2026, merge map):** bookings, team events, meetings, time off and synced events share one calendar and one free/busy (ADR 0018). Also show adds Meetings (on) and Tasks due (off; read from Taskaat, never busy). Meetings with only a start last 60 minutes. Colleagues see titles of what they can open, "Away" for someone else's time off and "Busy" for their synced events. Time off is recorded, not approved. Invoice and form dates stay off the calendar |
 
 ## One chat (version 3.5, 14 November 2026)
 

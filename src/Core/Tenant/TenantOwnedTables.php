@@ -132,6 +132,7 @@ final class TenantOwnedTables
         'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
         // Design 3.5: each person's own calendar view choices (CV.2, CV.4).
         'calendar_view_preferences' => '278_create_calendar_view_preferences.php',
+        'calendar_event_people' => '284_extend_calendar_events.php',
 
         // WHIT-953 — contacts and their spreadsheet imports (design 3.3 A8).
         // Every query binds tenant_id.

@@ -20,7 +20,7 @@ final class ViewPreferences
 {
     public const VIEWS = ['day', 'four_days', 'week', 'month', 'year', 'three_days'];
     public const COLOUR_BY = ['person', 'service', 'room'];
-    public const ALSO_SHOW = ['team_events', 'time_off', 'cancelled'];
+    public const ALSO_SHOW = ['team_events', 'time_off', 'cancelled', 'meetings', 'tasks_due'];
     /** The most ids a hidden list may hold: far beyond any real team. */
     private const MAX_IDS = 500;
 

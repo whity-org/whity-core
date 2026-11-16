@@ -8,9 +8,11 @@ use DateTimeImmutable;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Calendar\BookingRepository;
 use Whity\Core\Calendar\BookingService;
+use Whity\Core\Calendar\CalendarItems;
 use Whity\Core\Calendar\CalendarRejectedException;
 use Whity\Core\Calendar\CalendarRepository;
 use Whity\Core\Calendar\CalendarSettings;
+use Whity\Core\Calendar\EventPlace;
 use Whity\Core\Calendar\Interval;
 use Whity\Core\Calendar\RoomRepository;
 use Whity\Core\Calendar\ServiceRepository;
@@ -45,6 +47,9 @@ use Whity\Mcp\Auth\McpPrincipal;
  */
 final class CalendarApiHandler
 {
+    /** The most people one event invites (ADR 0018). */
+    public const MAX_EVENT_PEOPLE = 200;
+
     private const MAX_RANGE_DAYS = 62;
     /** Year asks for a whole year; a leap year and a clock change fit. */
     private const MAX_COUNT_DAYS = 367;
@@ -550,6 +555,64 @@ final class CalendarApiHandler
 
     // ── events ──────────────────────────────────────────────────────────
 
+    /**
+     * GET /api/calendar/items?from&to[&people=1,2][&kinds=booking,meeting][&cancelled=1][&unit_id]
+     *
+     * Everything on the calendar in one list with one shape (ADR 0018):
+     * bookings, events, meetings, time off and synced events, each with a
+     * `kind`, an `id` of the form "booking:7", who is invited and what the
+     * viewer may do with it (`can`). Someone else's time off reads "Away" and
+     * their synced events "Busy".
+     */
+    public function items(Request $request): Response
+    {
+        return $this->run($request, 'items', function (int $tenantId, int $actor) use ($request): Response {
+            [$from, $to] = $this->range($request);
+            $q = $this->query($request);
+            $people = self::idList($q['people'] ?? '', 'people');
+            $kinds = array_values(array_filter(explode(',', $q['kinds'] ?? ''), static fn (string $k): bool => $k !== ''));
+            foreach ($kinds as $kind) {
+                if (!in_array($kind, CalendarItems::KINDS, true)) {
+                    throw new CalendarRejectedException('kinds are ' . implode(', ', CalendarItems::KINDS), 422);
+                }
+            }
+            $manages = $actor > 0 && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::CALENDAR_MANAGE, $tenantId);
+            $items = (new CalendarItems($this->bookings, $this->calendar))->between(
+                $tenantId,
+                $actor,
+                $from,
+                $to,
+                $people,
+                $kinds,
+                ($q['cancelled'] ?? '') === '1',
+                $manages,
+                $this->optionalInt($request, 'unit_id'),
+            );
+
+            return Response::json(['data' => $items]);
+        });
+    }
+
+    /** @return list<int> */
+    private static function idList(string $raw, string $name): array
+    {
+        if ($raw === '') {
+            return [];
+        }
+        $ids = [];
+        foreach (explode(',', $raw) as $part) {
+            if (preg_match('/^\d+$/', $part) !== 1) {
+                throw new CalendarRejectedException("{$name} is a comma-separated list of ids", 422);
+            }
+            $ids[] = (int) $part;
+        }
+        if (count($ids) > self::MAX_EVENT_PEOPLE) {
+            throw new CalendarRejectedException("Ask for at most " . self::MAX_EVENT_PEOPLE . " {$name} at a time", 422);
+        }
+
+        return array_values(array_unique($ids));
+    }
+
     public function listEvents(Request $request): Response
     {
         return $this->run($request, 'events', function (int $tenantId) use ($request): Response {
@@ -567,7 +630,11 @@ final class CalendarApiHandler
             $profileId = $this->staffOr404($tenantId, is_int($body['profile_id'] ?? null) ? $body['profile_id'] : $actor);
             $this->assertOwnOrManage($tenantId, $actor, $profileId);
             [$title, $notes, $when, $allDay, $busy] = $this->eventValues($body);
-            $result = $this->booking->createEvent($tenantId, $profileId, $title, $notes, $when, $allDay, $busy, $actor);
+            $result = $this->booking->createEvent(
+                $tenantId, $profileId, $title, $notes, $when, $allDay, $busy, $actor,
+                place: $this->eventPlace($tenantId, $body) ?? new EventPlace(),
+                people: $this->eventPeople($tenantId, $body),
+            );
 
             return Response::json(['data' => $result['event'], 'overlapping_bookings' => $result['overlapping_bookings']], 201);
         });
@@ -579,12 +646,17 @@ final class CalendarApiHandler
         return $this->run($request, 'events', function (int $tenantId, int $actor) use ($request, $params): Response {
             $existing = $this->calendar->findEvent($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Event');
             $this->assertOwnOrManage($tenantId, $actor, (int) $existing['profile_id']);
-            [$title, $notes, $when, $allDay, $busy] = $this->eventValues(JsonBody::parsed($request) + [
+            $body = JsonBody::parsed($request);
+            [$title, $notes, $when, $allDay, $busy] = $this->eventValues($body + [
                 'title' => $existing['title'], 'notes' => $existing['notes'],
                 'starts_at' => $existing['starts_at'], 'ends_at' => $existing['ends_at'],
                 'all_day' => $existing['all_day'], 'busy' => $existing['busy'],
             ]);
-            $result = $this->booking->updateEvent($tenantId, (int) $existing['id'], $title, $notes, $when, $allDay, $busy);
+            $result = $this->booking->updateEvent(
+                $tenantId, (int) $existing['id'], $title, $notes, $when, $allDay, $busy,
+                place: $this->eventPlace($tenantId, $body + ['room_id' => $existing['room_id'], 'location' => $existing['location']], array_key_exists('room_id', $body) || array_key_exists('location', $body)),
+                people: $this->eventPeople($tenantId, $body),
+            );
 
             return Response::json(['data' => $result['event'], 'overlapping_bookings' => $result['overlapping_bookings']]);
         });
@@ -602,7 +674,80 @@ final class CalendarApiHandler
         });
     }
 
+    /**
+     * POST /api/calendar/events/{id}/answer `{ "response": "accepted" }`: an
+     * invited person says whether they'll come (ADR 0018). Declining frees
+     * their time. Only someone invited can answer, and only for themselves.
+     *
+     * @param array<string, string> $params
+     */
+    public function answerEvent(Request $request, array $params): Response
+    {
+        return $this->run($request, 'events', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $response = JsonBody::parsed($request)['response'] ?? null;
+            if (!is_string($response) || !in_array($response, ['accepted', 'declined', 'tentative'], true)) {
+                throw new CalendarRejectedException('response is accepted, declined or tentative', 422);
+            }
+            $existing = $this->calendar->findEvent($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Event');
+            if ($actor <= 0 || !$this->calendar->answerEvent($tenantId, (int) $existing['id'], $actor, $response)) {
+                throw CalendarRejectedException::notFound('Invitation');
+            }
+
+            return Response::json(['data' => $this->calendar->findEvent($tenantId, (int) $existing['id'])]);
+        });
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * Where an event happens, from `room_id` and `location` (ADR 0018). Null
+     * when the body says nothing about it and `$required` is false.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function eventPlace(int $tenantId, array $body, bool $required = true): ?EventPlace
+    {
+        if (!$required) {
+            return null;
+        }
+        $roomId = $body['room_id'] ?? null;
+        if ($roomId !== null && (!is_int($roomId) || $this->roomRepo()->find($tenantId, $roomId) === null)) {
+            throw CalendarRejectedException::notFound('Room');
+        }
+        $location = $body['location'] ?? '';
+        if (!is_string($location) || mb_strlen($location) > EventPlace::LOCATION_MAX) {
+            throw new CalendarRejectedException('location is text, up to ' . EventPlace::LOCATION_MAX . ' characters', 422);
+        }
+
+        return new EventPlace($roomId, trim($location));
+    }
+
+    /**
+     * Who is invited, from `people` (staff of this workspace), or null when
+     * the body doesn't say.
+     *
+     * @param array<string, mixed> $body
+     * @return list<int>|null
+     */
+    private function eventPeople(int $tenantId, array $body): ?array
+    {
+        if (!array_key_exists('people', $body)) {
+            return null;
+        }
+        $raw = $body['people'];
+        if (!is_array($raw) || count($raw) > self::MAX_EVENT_PEOPLE) {
+            throw new CalendarRejectedException('people is a list of up to ' . self::MAX_EVENT_PEOPLE . ' people', 422);
+        }
+        $people = [];
+        foreach ($raw as $id) {
+            if (!is_int($id)) {
+                throw new CalendarRejectedException('people is a list of people\'s ids', 422);
+            }
+            $people[] = $this->staffOr404($tenantId, $id);
+        }
+
+        return array_values(array_unique($people));
+    }
 
     /** @param callable(int, int): Response $work */
     private function run(Request $request, string $area, callable $work): Response

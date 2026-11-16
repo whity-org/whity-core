@@ -1453,6 +1453,43 @@ export interface paths {
         patch: operations["patch_api_v1_calendar_events_id"];
         trace?: never;
     };
+    "/api/v1/calendar/events/{id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Say whether you'll come to an event you are invited to */
+        post: operations["post_api_v1_calendar_events_id_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everything on the calendar in a range, in one list
+         * @description Bookings, events, meetings, time off and synced events with one shape (ADR 0018). `can` says what you may do with each. Someone else's time off reads "Away" and their synced events "Busy".
+         */
+        get: operations["get_api_v1_calendar_items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/my-view": {
         parameters: {
             query?: never;
@@ -11654,6 +11691,30 @@ export interface components {
             busy: boolean;
             status: string;
             external_ref?: string | null;
+            /**
+             * @description A team event or everyday meeting, a formal meeting, time off, or one synced from an outside calendar.
+             * @enum {string}
+             */
+            kind: "event" | "meeting" | "time_off" | "external";
+            room_id?: number | null;
+            location?: string;
+            meeting_id?: number | null;
+            /** @description Who is invited besides the organiser (profile_id). */
+            people: components["schemas"]["CalendarEventPerson"][];
+        };
+        CalendarEventAnswerRequest: {
+            /**
+             * @description Whether you'll come. Declining frees your time.
+             * @enum {string}
+             */
+            response: "accepted" | "declined" | "tentative";
+        };
+        CalendarEventPerson: {
+            profile_id: number;
+            /** @enum {string} */
+            role: "required" | "optional";
+            /** @enum {string} */
+            response: "invited" | "accepted" | "declined" | "tentative";
         };
         CalendarEventRequest: {
             /** @description Whose calendar. Default: yours. */
@@ -11670,6 +11731,12 @@ export interface components {
             all_day?: boolean;
             /** @description Blocks bookings. Default true. */
             busy?: boolean;
+            /** @description Staff invited besides the organiser; they are busy for it unless they decline. Sending it replaces the list. */
+            people?: number[];
+            /** @description The room it is held in, which it blocks. */
+            room_id?: number | null;
+            /** @description Where, in words: a place or a video link. */
+            location?: string;
         };
         CalendarEventResponse: {
             data: components["schemas"]["CalendarEvent"];
@@ -11686,6 +11753,38 @@ export interface components {
         CalendarHoursRequest: {
             /** @description Every working-hours row for the week; the list replaces what is there. */
             hours: components["schemas"]["CalendarHours"][];
+        };
+        CalendarItem: {
+            /** @description The kind and the record: "booking:7", "event:12", "time_off:5". */
+            id: string;
+            /** @enum {string} */
+            kind: "booking" | "event" | "meeting" | "time_off" | "external";
+            /** @description What it is. Someone else's time off reads "Away" and their synced events "Busy". */
+            title: string;
+            starts_at: string;
+            ends_at: string;
+            all_day: boolean;
+            busy: boolean;
+            status: string;
+            /** @description Whose calendar it is on: the booked person, or the event's organiser. */
+            organiser_id: number;
+            people: components["schemas"]["CalendarEventPerson"][];
+            room_id: number | null;
+            location: string;
+            /** @description The booking, for kind booking. */
+            booking: components["schemas"]["CalendarBooking"] | null;
+            event: {
+                id: number;
+                notes: string;
+                meeting_id: number | null;
+                external_ref: string | null;
+            } | null;
+            can: {
+                open: boolean;
+                move: boolean;
+                resize: boolean;
+                cancel: boolean;
+            };
         };
         CalendarRoom: {
             id: number;
@@ -11871,7 +11970,7 @@ export interface components {
             /** @description Service ids unticked in the panel. */
             hidden_services?: number[];
             /** @description What else the calendar shows besides bookings. */
-            also_show?: ("team_events" | "time_off" | "cancelled")[];
+            also_show?: ("team_events" | "time_off" | "cancelled" | "meetings" | "tasks_due")[];
             /** @description The person opened the app's sidebar on the calendar, so it stays open there. */
             sidebar_open?: boolean;
         };
@@ -27008,6 +27107,186 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_events_id_answer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarEventAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description The event */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarEvent"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such event, or you are not invited */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description An unknown answer */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_items: {
+        parameters: {
+            query: {
+                /** @description Start of the range, ISO 8601 with an offset, such as `2026-11-16T00:00:00+03:00`. */
+                from: string;
+                /** @description End of the range (exclusive), with an offset. At most 62 days after `from`. */
+                to: string;
+                /** @description Whose calendars, as comma-separated profile ids (people invited count). All when omitted. */
+                people?: string;
+                /** @description Which kinds, comma-separated: booking, event, meeting, time_off, external. All when omitted. */
+                kinds?: string;
+                /** @description 1 to include cancelled bookings. */
+                cancelled?: string;
+                /** @description Only bookings in this branch. */
+                unit_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The items, oldest start first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarItem"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A bad range, id list or kind */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
