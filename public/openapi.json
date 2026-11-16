@@ -90696,6 +90696,27 @@
                     "plugin": {
                         "type": "string"
                     },
+                    "pluginAccess": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "on",
+                                    "read_only"
+                                ]
+                            },
+                            "reason": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "graceUntil": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        }
+                    },
                     "label": {
                         "type": "string"
                     },

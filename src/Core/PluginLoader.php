@@ -562,6 +562,25 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     }
 
     /**
+     * What a paid plugin's screens should say about its access in the current
+     * workspace, or null when there is nothing to say.
+     *
+     * @return array{state: string, reason: ?string, graceUntil: ?string}|null
+     */
+    private function screenAccessNote(string $pluginName): ?array
+    {
+        if ($this->workspaceActivation === null || $this->workspaceActivation->paidAccessOf($pluginName) === null) {
+            return null;
+        }
+        $state = $this->workspaceActivation->stateFor($pluginName);
+        if (!in_array($state['reason'], ['grace', 'lapsed', 'installation_unlicensed', 'installation_grace'], true)) {
+            return null;
+        }
+
+        return ['state' => $state['state'], 'reason' => $state['reason'], 'graceUntil' => $state['graceUntil']];
+    }
+
+    /**
      * Is this plugin paused for the workspace: off, or read-only because its
      * paid access ended (WHIT-1125)? Its hooks, jobs and notifications stop.
      */
@@ -5409,7 +5428,14 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                 continue;
             }
 
+            // A paid plugin in grace or read-only says so on its own screens
+            // (WHIT-1127); the people using it are rarely the ones who buy it.
+            $access = $this->screenAccessNote($info['plugin']->getName());
+
             foreach ($info['frontendFeatures'] as $feature) {
+                if ($access !== null) {
+                    $feature['pluginAccess'] = $access;
+                }
                 $features[] = $feature;
             }
         }

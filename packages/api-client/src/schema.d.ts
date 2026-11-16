@@ -15621,6 +15621,12 @@ export interface components {
         FrontendFeature: {
             id: string;
             plugin: string;
+            pluginAccess?: {
+                /** @enum {string} */
+                state?: "on" | "read_only";
+                reason?: string | null;
+                graceUntil?: string | null;
+            } | null;
             label: string;
             icon: string | null;
             group: string;
