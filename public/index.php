@@ -2080,6 +2080,9 @@ $router->register('DELETE', '/api/users/{id:\d+}/memberships/{membershipId:\d+}'
 // catalogue and role grants hide other workspaces' plugin permissions.
 $tenantPluginRepository = new \Whity\Core\Plugin\Tenant\TenantPluginRepository($db->getPdo());
 $tenantManifestHost = new \Whity\Core\Plugin\Tenant\TenantManifestHost($tenantPluginRepository, $permissionRegistry, $logger);
+// WHIT-1122: installed code plugins, switched on per workspace.
+$codePluginActivation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($db->getPdo());
+$pluginLoader->setWorkspaceActivation($codePluginActivation);
 
 $rolesHandler = new RolesApiHandler(
     $db->getPdo(),
@@ -2360,6 +2363,15 @@ $router->register('POST', '/api/workspace-plugins/test', [$tenantPluginVersionsH
 $router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions', [$tenantPluginVersionsHandler, 'versions'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}', [$tenantPluginVersionsHandler, 'version'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}/activate', [$tenantPluginVersionsHandler, 'activate'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_PUBLISH);
+
+// Installed code plugins, switched on per workspace (WHIT-1122).
+$workspaceCodePluginsHandler = new \Whity\Api\WorkspaceCodePluginsApiHandler($pluginLoader, $codePluginActivation, $db->getPdo(), $auditLogger);
+$router->register('GET', '/api/workspace/code-plugins', [$workspaceCodePluginsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/enable', [$workspaceCodePluginsHandler, 'enable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
+$router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/disable', [$workspaceCodePluginsHandler, 'disable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_DISABLE);
+$router->register('GET', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/history', [$workspaceCodePluginsHandler, 'history'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('GET', '/api/plugins/workspace-access', [$workspaceCodePluginsHandler, 'accessList'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('PUT', '/api/plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/workspace-access', [$workspaceCodePluginsHandler, 'setAccess'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
 
 // Health monitoring endpoint (WC-4). Registered UNVERSIONED so load-balancer
 // probes that target GET /api/health never break regardless of the API version.
@@ -6770,7 +6782,7 @@ if ($isWorker) {
         // are gated behind development/DEBUG. Decision is computed once per
         // iteration and captured by the request closure below.
         $logLifecycle = WorkerRuntime::shouldLogLifecycle($_ENV);
-        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry, $publicFormGate) {
+        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry, $publicFormGate, $codePluginActivation) {
             try {
                 // Dispatch request start hook
                 if ($logLifecycle) {
@@ -6890,6 +6902,7 @@ if ($isWorker) {
                 \Whity\Core\Http\AfterResponse::reset();
                 // WHIT-760: the workspace-plugin reads are per request too.
                 $tenantManifestHost->resetRequest();
+                $codePluginActivation->resetRequest();
                 // WHIT-742: and the workspace record types the field registry read from them.
                 $documentFieldRegistry->resetRequest();
                 // DB session hygiene (WC-21/PR #84): after the response is sent,
@@ -7027,6 +7040,7 @@ if ($isWorker) {
         RoleChecker::clearCache();
         \Whity\Core\Http\AfterResponse::reset();
         $tenantManifestHost->resetRequest();
+        $codePluginActivation->resetRequest();
         $documentFieldRegistry->resetRequest();
     }
 }
