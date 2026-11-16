@@ -33,7 +33,7 @@ final class CashPayments
 
     /**
      * @return array<string, mixed> the payment as stored
-     * @throws \InvalidArgumentException naming what is wrong
+     * @throws CashPaymentRejected naming what is wrong
      */
     public function record(
         int $tenantId,
@@ -47,28 +47,28 @@ final class CashPayments
         ?int $profileId,
     ): array {
         if ($tenantId <= 0) {
-            throw new \InvalidArgumentException('Choose the workspace that paid.');
+            throw new CashPaymentRejected('Choose the workspace that paid.');
         }
         $months = $this->monthsOf($planKey);
         if ($quantity < 1 || $quantity > 1000) {
-            throw new \InvalidArgumentException('Quantity: a number from 1 to 1000.');
+            throw new CashPaymentRejected('Quantity: a number from 1 to 1000.');
         }
         if ($amountMinor < 0) {
-            throw new \InvalidArgumentException('The amount can\'t be negative.');
+            throw new CashPaymentRejected('The amount can\'t be negative.');
         }
         if (preg_match('/^[A-Z]{3}$/', $currency) !== 1) {
-            throw new \InvalidArgumentException('Currency: a three-letter code such as JOD.');
+            throw new CashPaymentRejected('Currency: a three-letter code such as JOD.');
         }
         $receiptNumber = trim($receiptNumber);
         if ($receiptNumber === '' || mb_strlen($receiptNumber) > 64) {
-            throw new \InvalidArgumentException('Write the receipt number (at most 64 characters).');
+            throw new CashPaymentRejected('Write the receipt number (at most 64 characters).');
         }
         $paid = \DateTimeImmutable::createFromFormat('!Y-m-d', $paidOn, new \DateTimeZone('UTC'));
         if ($paid === false || $paid->format('Y-m-d') !== $paidOn) {
-            throw new \InvalidArgumentException('The date paid must be a date like 2026-11-16.');
+            throw new CashPaymentRejected('The date paid must be a date like 2026-11-16.');
         }
         if ($this->receiptExists($tenantId, $receiptNumber)) {
-            throw new \InvalidArgumentException('That receipt number is already recorded for this workspace.');
+            throw new CashPaymentRejected('That receipt number is already recorded for this workspace.');
         }
 
         // Starts when paid, or when the current cash cover for this plugin ends.
@@ -105,20 +105,20 @@ final class CashPayments
 
     /**
      * @return array<string, mixed>
-     * @throws \InvalidArgumentException when it doesn't exist, is voided already, or no reason is given
+     * @throws CashPaymentRejected when it doesn't exist, is voided already, or no reason is given
      */
     public function void(int $id, string $reason, ?int $profileId): array
     {
         $reason = trim($reason);
         if ($reason === '') {
-            throw new \InvalidArgumentException('Say why it is voided.');
+            throw new CashPaymentRejected('Say why it is voided.');
         }
         $row = $this->byId($id);
         if ($row === null) {
-            throw new \InvalidArgumentException('No such cash payment.');
+            throw new CashPaymentRejected('No such cash payment.');
         }
         if ($row['voided_at'] !== null) {
-            throw new \InvalidArgumentException('It is already voided.');
+            throw new CashPaymentRejected('It is already voided.');
         }
         $stmt = $this->db->prepare(
             'UPDATE plugin_cash_payments SET voided_at = CURRENT_TIMESTAMP, voided_by_profile_id = :profile, void_reason = :reason
@@ -255,7 +255,7 @@ final class CashPayments
         $stmt->execute();
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         if ($rows === [] || !DbBool::of($rows[0]['is_addon']) || !str_starts_with($planKey, 'plugin.')) {
-            throw new \InvalidArgumentException('Choose one of the paid plugins\' plans.');
+            throw new CashPaymentRejected('Choose one of the paid plugins\' plans.');
         }
         foreach ($rows as $row) {
             $months = self::MONTHS[(string) ($row['billing_period'] ?? '')] ?? null;
@@ -263,7 +263,7 @@ final class CashPayments
                 return $months;
             }
         }
-        throw new \InvalidArgumentException('That plan has no monthly, 6-month or yearly price.');
+        throw new CashPaymentRejected('That plan has no monthly, 6-month or yearly price.');
     }
 
     private function receiptExists(int $tenantId, string $receipt): bool

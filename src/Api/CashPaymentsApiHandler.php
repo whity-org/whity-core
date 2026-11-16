@@ -66,8 +66,8 @@ final class CashPaymentsApiHandler
                 is_string($body['paidOn'] ?? null) ? $body['paidOn'] : '',
                 self::profileId($request),
             );
-        } catch (\InvalidArgumentException $e) {
-            return Response::error($e->getMessage(), 422, ['reason' => 'invalid_cash_payment']);
+        } catch (\Whity\Core\Billing\Cash\CashPaymentRejected $e) {
+            return Response::error($e->clientMessage, 422, ['reason' => 'invalid_cash_payment']);
         } catch (Throwable $e) {
             error_log('[CashPaymentsApiHandler] ' . $e->getMessage());
 
@@ -101,8 +101,8 @@ final class CashPaymentsApiHandler
         $reason = JsonBody::parsed($request)['reason'] ?? null;
         try {
             $payment = $this->payments->void((int) ($params['id'] ?? 0), is_string($reason) ? $reason : '', self::profileId($request));
-        } catch (\InvalidArgumentException $e) {
-            return Response::error($e->getMessage(), 422, ['reason' => 'invalid_void']);
+        } catch (\Whity\Core\Billing\Cash\CashPaymentRejected $e) {
+            return Response::error($e->clientMessage, 422, ['reason' => 'invalid_void']);
         }
 
         $this->audit?->record(self::AUDIT_VOIDED, [
@@ -120,14 +120,14 @@ final class CashPaymentsApiHandler
      * An amount as people write it (`15`, `15.000`) in the currency's minor
      * units, with the currency's own decimals.
      *
-     * @throws \InvalidArgumentException
+     * @throws \Whity\Core\Billing\Cash\CashPaymentRejected
      */
     public static function minor(string $amount, string $currency): int
     {
         $amount = trim($amount);
         $exponent = Currency::exponentFor($currency);
         if (preg_match('/^\d+(?:\.(\d+))?$/', $amount, $m) !== 1 || strlen($m[1] ?? '') > $exponent) {
-            throw new \InvalidArgumentException("Write the amount like 15 or 15.000, with at most {$exponent} decimals for {$currency}.");
+            throw new \Whity\Core\Billing\Cash\CashPaymentRejected("Write the amount like 15 or 15.000, with at most {$exponent} decimals for {$currency}.");
         }
         [$whole, $fraction] = array_pad(explode('.', $amount, 2), 2, '');
 

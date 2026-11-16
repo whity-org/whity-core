@@ -164,8 +164,8 @@ export function CashPayments({ addonPlanKeys }: { addonPlanKeys: string[] }) {
                 </p>
                 <p className="text-muted-foreground">
                   {t('billing.cash.covers', 'Paid {paid} · covers until {until}', {
-                    paid: dates.date(payment.paid_on) ?? payment.paid_on,
-                    until: dates.date(payment.period_end) ?? payment.period_end,
+                    paid: dates.date(payment.paid_on) ?? '—',
+                    until: dates.date(payment.period_end) ?? '—',
                   })}
                 </p>
                 {payment.voided_at ? (
