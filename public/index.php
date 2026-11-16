@@ -6190,7 +6190,10 @@ CorePrompts::register($promptRegistry);
 // Collected from the grants as they stand at boot and on every reload, and asked
 // again on every call, so a revoke applies at once.
 $agentContextGrants = new \Whity\Core\Plugin\Trust\AgentContextGrants($db->getPdo(), new \Whity\Core\Plugin\Trust\CodePluginVerification($db->getPdo(), $storeMarks), $auditLogger);
-$agentContextGranted = static fn (string $plugin): bool => $agentContextGrants->isGranted($plugin);
+// Asked on every call: granted agent context by the operator, and on for the
+// caller's workspace (WHIT-1123).
+$agentContextGranted = static fn (string $plugin): bool => $agentContextGrants->isGranted($plugin)
+    && !$pluginLoader->isPluginOffForWorkspace($plugin);
 $agentContextGrantedNow = static function () use ($agentContextGrants): \Closure {
     $names = array_flip($agentContextGrants->granted());
 
@@ -6302,6 +6305,7 @@ $mcpToolCatalogue = static function () use ($toolDeriver, $authoredMcpTools): ar
 $mcpToolsAdminHandler = new McpToolsAdminHandler($toolDeriver, $roleChecker, $authoredMcpTools, $mcpEnabledPluginAlwaysOn);
 $router->register('GET', '/api/admin/mcp/tools', [$mcpToolsAdminHandler, 'list'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 $mcpToolsListHandler = new ToolsListHandler($toolDeriver, $roleChecker, $tokenValidator, $authoredMcpTools);
+$mcpToolsListHandler->setWorkspaceGate($pluginLoader);
 $mcpServerEnabled = (bool) filter_var($_ENV['MCP_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
 // WHIT-784: an agent's Ask-first call is stored for its person to approve.
 $agentProposals = new \Whity\Core\Agent\AgentProposalRepository(
@@ -6339,6 +6343,7 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
 $mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters);
+$mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.
@@ -6673,6 +6678,12 @@ $pluginLoader->setInboxSources($inboxSourceRegistry);
 $pluginLoader->setMessageChannels($messageChannelRegistry);
 // A plugin's booking payment step and calendar busy times (SDK 1.98, ADR 0017).
 $pluginLoader->setCalendarPlugins($calendarPlugins);
+// WHIT-1123: what plugins add to these registries disappears in a workspace
+// that has the plugin off.
+$agentPresetRegistry->setWorkspaceGate($pluginLoader);
+$calendarPlugins->setWorkspaceGate($pluginLoader);
+$inboxSourceRegistry->setWorkspaceGate($pluginLoader);
+$messageChannelRegistry->setWorkspaceGate($pluginLoader);
 // WHIT-1011: plugin SERVICE routes accept a client-credentials token from the
 // trusted issuer (SERVICE_TOKEN_ISSUER, else MCP_OAUTH_ISSUER) for a client on
 // SERVICE_TOKEN_CLIENTS. Off, so no service route opens, until both are set.

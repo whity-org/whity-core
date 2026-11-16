@@ -26,6 +26,12 @@ final class PluginBusySource implements ExternalBusySource
     ) {
     }
 
+    /** The plugin's name, for the per-workspace switch (WHIT-1123). */
+    public function plugin(): string
+    {
+        return $this->plugin;
+    }
+
     public function busyTimes(int $tenantId, int $profileId, DateTimeImmutable $fromUtc, DateTimeImmutable $toUtc): array
     {
         $started = microtime(true);
