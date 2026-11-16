@@ -93,6 +93,17 @@ final class RouteQuorumTest extends TestCase
         self::assertTrue(RouteQuorum::approvalImpossible(RouteQuorum::ANY, 0, 0, 3));
     }
 
+    public function testUnderFirstTheFirstAnswerDecidesEitherWay(): void
+    {
+        // Three people may answer; the first one does.
+        self::assertTrue(RouteQuorum::approvalCarried(RouteQuorum::FIRST, 1, 2, 3), 'the first approval lets it through');
+        self::assertFalse(RouteQuorum::approvalImpossible(RouteQuorum::FIRST, 1, 2, 3));
+        self::assertTrue(RouteQuorum::approvalImpossible(RouteQuorum::FIRST, 0, 2, 3), 'the first refusal settles it, unlike any');
+        self::assertFalse(RouteQuorum::approvalCarried(RouteQuorum::FIRST, 0, 2, 3));
+        self::assertFalse(RouteQuorum::approvalCarried(RouteQuorum::FIRST, 0, 3, 3), 'nobody has answered yet');
+        self::assertFalse(RouteQuorum::approvalImpossible(RouteQuorum::FIRST, 0, 3, 3));
+    }
+
     public function testUnderMajorityTheEdgeFiresWhenTheOtherSideBecomesArithmeticallyImpossible(): void
     {
         // 5 people, 3 needed. Two approvals and two refusals leaves one person

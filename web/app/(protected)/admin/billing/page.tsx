@@ -1,6 +1,7 @@
 'use client';
 
 import { Affiliates } from './affiliates';
+import { CashPayments } from './cash-payments';
 import { TierFeatures } from './tier-features';
 import { TierLifecycle } from './tier-lifecycle';
 import { useState } from 'react';
@@ -79,16 +80,17 @@ interface PlanPrice {
  * The billing periods, and the labels for them.
  *
  * The select builds its key by interpolation, which no static scanner can read,
- * so the three reachable keys are declared here and the extractor takes them
- * from this block. There are exactly three and they are a closed set — nothing
+ * so the reachable keys are declared here and the extractor takes them
+ * from this block. They are a closed set — nothing
  * about them is genuinely dynamic, so declaring beats suppressing.
  *
  * @i18n-keys admin
  *   billing.price.period.month = Month
+ *   billing.price.period.half_year = 6 months
  *   billing.price.period.year = Year
  *   billing.price.period.once = One-off
  */
-const PERIODS = ['month', 'year', 'once'] as const;
+const PERIODS = ['month', 'half_year', 'year', 'once'] as const;
 
 /** The plans route answered 403: not a failed load, and not an empty catalogue. */
 const FORBIDDEN = 'forbidden';
@@ -293,7 +295,7 @@ export default function BillingPage() {
                                   body: {
                                     currency: price.currency,
                                     unit_amount: price.unit_amount,
-                                    billing_period: price.billing_period as 'once' | 'month' | 'year',
+                                    billing_period: price.billing_period as 'once' | 'month' | 'half_year' | 'year',
                                     is_per_seat: price.is_per_seat,
                                   },
                                 });
@@ -332,6 +334,11 @@ export default function BillingPage() {
         question: what this instance sells, and what it costs to sell it.
       */}
       {!loading && !error && canManage && <Affiliates />}
+
+      {/* WHIT-1153: customers who pay for a plugin in cash. */}
+      {!loading && !error && canManage && (
+        <CashPayments addonPlanKeys={(data ?? []).map((entry) => entry.plan.plan_key)} />
+      )}
 
       {creatingPlan && (
         <CreatePlanDialog
@@ -483,7 +490,7 @@ function AddPriceDialog({
                 body: {
                   currency,
                   unit_amount: parsed,
-                  billing_period: period as 'once' | 'month' | 'year',
+                  billing_period: period as 'once' | 'month' | 'half_year' | 'year',
                   is_per_seat: perSeat,
                 },
               });

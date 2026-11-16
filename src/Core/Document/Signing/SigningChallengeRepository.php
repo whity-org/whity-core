@@ -143,6 +143,51 @@ final class SigningChallengeRepository
         return $id !== null && $this->consume($tenantId, $id, gmdate('Y-m-d H:i:s'));
     }
 
+    /**
+     * Record that the approver has just signed in again at their identity provider to confirm
+     * one gated approval (WHIT-1147). Bound to that approval's purpose key, not to a route, and
+     * used once within {@see FRESH_SIGN_IN_TTL}.
+     */
+    public function recordGateFreshSignIn(int $tenantId, int $profileId, string $purposeKey): void
+    {
+        $now = time();
+        $this->db->prepare(
+            'UPDATE signing_challenges SET consumed_at = :now
+              WHERE tenant_id = :tenant_id AND profile_id = :profile_id AND method = :method
+                AND route_id = 0 AND content_hash = :content_hash AND consumed_at IS NULL'
+        )->execute([
+            ':now' => gmdate('Y-m-d H:i:s', $now),
+            ':tenant_id' => $tenantId,
+            ':profile_id' => $profileId,
+            ':method' => self::FRESH_SIGN_IN,
+            ':content_hash' => $purposeKey,
+        ]);
+        $this->insert($tenantId, $profileId, self::FRESH_SIGN_IN, 0, $purposeKey, null, $now + self::FRESH_SIGN_IN_TTL, $now);
+    }
+
+    /** Use the fresh sign-in waiting for this gated approval. True only when there was one. */
+    public function consumeGateFreshSignIn(int $tenantId, int $profileId, string $purposeKey): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT id FROM signing_challenges
+              WHERE tenant_id = :tenant_id AND profile_id = :profile_id AND method = :method
+                AND route_id = 0 AND content_hash = :content_hash
+                AND consumed_at IS NULL AND expires_at > :now
+              ORDER BY id DESC LIMIT 1'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':profile_id' => $profileId,
+            ':method' => self::FRESH_SIGN_IN,
+            ':content_hash' => $purposeKey,
+            ':now' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $id = $stmt->fetchColumn();
+        $stmt->closeCursor();
+
+        return $id !== false && $this->consume($tenantId, (int) $id, gmdate('Y-m-d H:i:s'));
+    }
+
     private function insert(
         int $tenantId,
         int $profileId,

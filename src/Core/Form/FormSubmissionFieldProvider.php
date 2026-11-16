@@ -173,8 +173,6 @@ final class FormSubmissionFieldProvider implements DocumentFieldProvider
     /** @return list<array<string, mixed>> */
     private function fields(int $tenantId): array
     {
-        return FormFieldRepository::applicantFields(
-            (new FormFieldRepository($this->db))->listForForm($tenantId, (int) $this->form['id'])
-        );
+        return (new FormFieldRepository($this->db))->listForForm($tenantId, (int) $this->form['id']);
     }
 }

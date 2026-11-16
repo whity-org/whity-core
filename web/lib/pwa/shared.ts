@@ -35,6 +35,9 @@ export type AppInstall = {
   version: string;
 };
 
+/** This host's manifest in each language (relative: resolved against the manifest itself). */
+export const MANIFEST_URLS = { en: '/manifest.webmanifest', ar: '/manifest.webmanifest?lang=ar' } as const;
+
 /** The icons the icon route draws, and their pixel sizes. */
 export const APP_ICONS = {
   '180': { size: 180, maskable: false },
@@ -98,6 +101,15 @@ export function buildManifest(install: AppInstall, lang: 'en' | 'ar'): Record<st
     orientation: 'any',
     background_color: LAUNCH_BACKGROUND,
     theme_color: install.themeColor,
+    // WHIT-1155: lets the site ask the browser whether this app is installed
+    // (navigator.getInstalledRelatedApps, Chrome on Android). Both languages'
+    // manifests are listed: either may be the one that was installed. Never
+    // prefer them over the site itself.
+    related_applications: [
+      { platform: 'webapp', url: MANIFEST_URLS.en },
+      { platform: 'webapp', url: MANIFEST_URLS.ar },
+    ],
+    prefer_related_applications: false,
     icons: [
       icon('192', 'any'),
       icon('512', 'any'),

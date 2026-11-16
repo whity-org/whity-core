@@ -11,7 +11,7 @@ use Whity\Core\Identity\TwoFactorRecoveryService;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Request;
 use Whity\Core\Response;
-use Whity\Core\Security\IdentityCheck;
+use Whity\Core\Security\GatedApproval;
 use Whity\Http\PaginationParams;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\JsonBody;
@@ -30,7 +30,7 @@ use Whity\Http\JsonBody;
  *
  * TWO ADMINS (AG.1). Clearing someone's two-step takes two different admins,
  * and the person asking can never approve their own. Each approval first
- * confirms the admin is who they say ({@see IdentityCheck}: their
+ * confirms the admin is who they say ({@see GatedApproval}: their
  * authenticator code, or a code emailed to them). The first approval only
  * records itself; the second clears the two-step and sends the reset link.
  *
@@ -40,14 +40,13 @@ use Whity\Http\JsonBody;
  */
 final class TwoFactorRecoveryApprovalsApiHandler
 {
-    private const WHAT = 'approving a two-step reset';
 
     public function __construct(
         private readonly TwoFactorRecoveryService $service,
         private readonly RoleChecker $roleChecker,
         private readonly AuditLogger $audit,
         private readonly ?PasswordResetMailer $resetMailer = null,
-        private readonly ?IdentityCheck $identity = null,
+        private readonly ?GatedApproval $gate = null,
     ) {}
 
     /**
@@ -87,21 +86,12 @@ final class TwoFactorRecoveryApprovalsApiHandler
         if ($ctx instanceof Response) {
             return $ctx;
         }
-        if ($this->identity === null) {
-            return Response::error('Confirming it is you is not available, so nothing can be approved', 503);
-        }
-
-        $purpose = self::purposeFrom(JsonBody::parsed($request));
-        if ($purpose === null) {
+        $subject = self::subjectFrom(JsonBody::parsed($request));
+        if ($subject === null) {
             return Response::error('A request_id or profile_id is required', 422);
         }
 
-        $started = $this->identity->start($ctx['tenantId'], $ctx['userId'], $purpose, self::WHAT);
-        if ($started === null) {
-            return Response::error('Too many codes were sent, or your account has no email address. Wait a few minutes and try again.', 429);
-        }
-
-        return Response::json(['data' => $started], 200);
+        return GatedApprovalHttp::start($this->gate, $ctx['tenantId'], $ctx['userId'], GatedApproval::TWO_FACTOR_RECOVERY, $subject);
     }
 
     /**
@@ -298,22 +288,13 @@ final class TwoFactorRecoveryApprovalsApiHandler
      * @param array{tenantId:int,userId:int} $ctx
      * @param array<string, mixed>           $body
      */
-    private function confirmIdentity(array $ctx, string $purpose, array $body): string|Response
+    private function confirmIdentity(array $ctx, string $subject, array $body): string|Response
     {
-        if ($this->identity === null) {
-            return Response::error('Confirming it is you is not available, so nothing can be approved', 503);
-        }
-        $code = is_string($body['code'] ?? null) ? $body['code'] : null;
-        $method = $this->identity->verify($ctx['tenantId'], $ctx['userId'], $purpose, $code);
-        if ($method === null) {
-            return Response::error('Confirm it is you first: that code is not correct or has expired.', 403, ['reason' => 'identity_check_failed']);
-        }
-
-        return $method;
+        return GatedApprovalHttp::confirm($this->gate, $ctx['tenantId'], $ctx['userId'], GatedApproval::TWO_FACTOR_RECOVERY, $subject, $body);
     }
 
     /** @param array<string, mixed> $body */
-    private static function purposeFrom(array $body): ?string
+    private static function subjectFrom(array $body): ?string
     {
         if (isset($body['request_id']) && is_numeric($body['request_id']) && (int) $body['request_id'] > 0) {
             return 'request:' . (int) $body['request_id'];

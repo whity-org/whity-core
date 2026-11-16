@@ -99,7 +99,14 @@ export function PushSettings() {
     },
     {
       id: 'meetings',
-      types: ['convening.meeting.invited', 'convening.meeting.updated'],
+      types: [
+        'convening.meeting.invited',
+        'convening.meeting.updated',
+        'convening.meeting.cancelled',
+        'calendar.event.invited',
+        'calendar.event.updated',
+        'calendar.event.cancelled',
+      ],
       label: t('settings.push.kind.meetings', 'Meeting invitations and changes'),
     },
     ...pluginKinds,

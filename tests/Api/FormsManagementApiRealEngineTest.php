@@ -184,14 +184,13 @@ final class FormsManagementApiRealEngineTest extends TestCase
     public function testAnAuthorCanPreviewADraftAndItSaysSo(): void
     {
         $id = $this->form();
-        $this->fields->create(self::TENANT, $id, 'decision', 'text', ['en' => 'Decision'], null, false, [], [], null, null, 2, null, 'staff');
 
         $data = self::body($this->api->preview(new Request('GET', '/x'), ['id' => (string) $id]))['data'];
 
         self::assertIsArray($data);
         self::assertTrue($data['preview']);
         self::assertFalse($data['accepts_submissions']);
-        // As a person filling it in would see it, so not the staff question.
+        // As a person filling it in would see it.
         self::assertSame(['supplier'], array_column($data['fields'], 'field_key'));
     }
 

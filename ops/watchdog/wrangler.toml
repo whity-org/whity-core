@@ -82,6 +82,11 @@ custom_domain = true
 # itself — the 2026-09-09 outage was three hours of the web tier answering 200
 # while everything behind it failed. Importing them would also collide with the
 # state keys those probes already own.
+# `id` IS WHITY ID (WHIT-1146), the sign-in service installations and the
+# owner's apps rely on. It runs on its own host and database, so nothing above
+# says anything about it. Its /health answers 503 when its database, queue,
+# scheduler or backups are unwell, which is the signal to alert on.
+#
 COMPONENTS_URL = "https://app.whity.dev/api/v1/status"
 
 PROBE_TARGETS = '''[
@@ -89,6 +94,7 @@ PROBE_TARGETS = '''[
   {"name":"web",  "url":"https://app.whity.dev/"},
   {"name":"site", "url":"https://whity.dev/"},
   {"name":"docs", "url":"https://docs.whity.dev/"},
+  {"name":"id",   "url":"https://id.whity.dev/health"},
 
   {"name":"database",  "component":"database"},
   {"name":"queue",     "component":"queue"},

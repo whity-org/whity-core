@@ -229,6 +229,36 @@ final class QueueWorkCommand implements CliCommand
                 new \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob($pdo, static fn (): ?\Whity\Core\PluginLoader => $loaded->loader, $auditLogger, $this->logger),
                 false
             );
+            // WHIT-1153: reminders before a cash payment's cover ends. Internal.
+            $cashRecipients = new \Whity\Core\Mail\WorkspaceRecipients(
+                $pdo,
+                new \Whity\Auth\RoleChecker(\Whity\Database\Database::withFactory(static fn (): \PDO => $pdo), new \Whity\Core\RBAC\PermissionRegistry()),
+            );
+            $registry->register(
+                \Whity\Core\Billing\Cash\CashRemindersJob::NAME,
+                new \Whity\Core\Billing\Cash\CashRemindersJob(
+                    new \Whity\Core\Billing\Cash\CashPayments($pdo),
+                    static function (int $tenantId, string $subject, \Whity\Core\Mail\EmailContent $content) use ($cashRecipients, $workerSender): int {
+                        $sent = 0;
+                        foreach ($cashRecipients->holding($tenantId, \Whity\Core\RBAC\CorePermissions::BILLING_PAY) as $address) {
+                            // Whity's own email: the instance's brand (tenant 0).
+                            $sent += $workerSender->send(0, $address, $subject, $content) ? 1 : 0;
+                        }
+
+                        return $sent;
+                    },
+                    static fn (int $tenantId): string => $workerSender->language($tenantId),
+                    static function (string $planKey) use ($pdo): string {
+                        $stmt = $pdo->prepare('SELECT name FROM plans WHERE plan_key = :k');
+                        $stmt->execute([':k' => $planKey]);
+                        $name = $stmt->fetchColumn();
+
+                        return is_string($name) && $name !== '' ? $name : $planKey;
+                    },
+                    rtrim(\Whity\Core\Http\FrontendUrls::fromEnv()->base(), '/') . '/billing',
+                ),
+                false
+            );
             // WHIT-1014: the Whity store's Verified marks for code plugins. Internal.
             $registry->register(
                 \Whity\Core\Queue\Jobs\RefreshStoreMarksJob::NAME,
@@ -239,7 +269,22 @@ final class QueueWorkCommand implements CliCommand
                 )),
                 false
             );
-            $runner ??= new JobRunner($repo, $registry, $this->logger);
+            if ($runner === null) {
+                $runner = new JobRunner($repo, $registry, $this->logger);
+                // WHIT-1123: a plugin's jobs don't run where it is off.
+                $activation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($pdo);
+                // WHIT-1125: and pause while a paid plugin is read-only there.
+                $activation->usePaidAccess(static fn (): array => $loaded->loader?->getPaidAccess() ?? []);
+                $entitlements = new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo));
+                $activation->useEntitlements(static function (int $tenantId, string $key) use ($entitlements): bool {
+                    try {
+                        return $entitlements->isGranted($tenantId, $key);
+                    } catch (\Throwable) {
+                        return false;
+                    }
+                });
+                $runner->setWorkspaceActivation($activation);
+            }
         }
         $this->repo = $repo;
         $this->runner = $runner;

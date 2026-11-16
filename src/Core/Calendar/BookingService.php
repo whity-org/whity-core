@@ -41,6 +41,8 @@ use Whity\Core\Settings\SettingsService;
  */
 final class BookingService
 {
+    private ?CalendarInvites $invites = null;
+
     /** @var list<ExternalBusySource> */
     private array $busySources = [];
 
@@ -49,6 +51,9 @@ final class BookingService
     private ?QueueService $queue = null;
 
     private ?CalendarPlugins $plugins = null;
+
+    /** C4: reminders by text, through Messages. */
+    private ?BookingTextReminders $textReminders = null;
 
     private string $manageUrlBase = '';
 
@@ -64,6 +69,11 @@ final class BookingService
         private BookingMessenger $messenger = new NullBookingMessenger(),
         private readonly ?\Closure $clock = null,
     ) {
+    }
+
+    public function setInvites(CalendarInvites $invites): void
+    {
+        $this->invites = $invites;
     }
 
     public function addBusySource(ExternalBusySource $source): void
@@ -83,6 +93,12 @@ final class BookingService
     }
 
     /** Plugins' payment step and busy times (SDK 1.98), read at call time. */
+    /** Reminders by text (C4); left unset, the app's Messages is used when a reminder goes. */
+    public function setTextReminders(BookingTextReminders $textReminders): void
+    {
+        $this->textReminders = $textReminders;
+    }
+
     public function setPlugins(CalendarPlugins $plugins): void
     {
         $this->plugins = $plugins;
@@ -153,13 +169,22 @@ final class BookingService
      *   service_id: int, profile_id: ?int, starts_at: DateTimeImmutable,
      *   customer_profile_id: ?int, customer_name: string, customer_email: string,
      *   customer_phone: string, customer_note: string, source: string,
-     *   created_by_profile_id: ?int, enforce_hours: bool, public: bool
+     *   created_by_profile_id: ?int, enforce_hours: bool, public: bool,
+     *   book_anyway?: bool, within_hours?: bool, notify?: bool
      * } $request
      * @return array<string, mixed> the booking
      */
     public function book(int $tenantId, array $request): array
     {
         $service = $this->service($tenantId, $request['service_id'], $request['public']);
+        // Staff only: Book anyway, keep to the hours, and whether the customer
+        // is emailed (CV.8, CV.9). A booking's length is always its service's:
+        // the length goes with the price, so staff change the service instead
+        // (owner, Q35.7).
+        $staffOnly = !$request['public'];
+        $bookAnyway = $staffOnly && ($request['book_anyway'] ?? false);
+        $checkHours = $request['enforce_hours'] || ($staffOnly && ($request['within_hours'] ?? false));
+        $notify = !$staffOnly || ($request['notify'] ?? true);
         $settings = $this->settingsFor($tenantId);
         $now = $this->now();
         $start = $request['starts_at'];
@@ -177,6 +202,7 @@ final class BookingService
         $asRequest = $request['public'] && ($service['needs_approval'] || !$settings->instantBooking);
         $step = $asRequest ? null : $this->plugins?->paymentStep();
         $room = $this->roomLock($tenantId, $service);
+        $why = null;
         foreach ($candidates as $candidate) {
             // Asked before the lock: a plugin never runs while a person's
             // calendar is held. A step that fails refuses the booking rather
@@ -192,8 +218,9 @@ final class BookingService
                 }
             }
             $hold = $requirement !== null ? $now->modify('+' . $settings->paymentHoldMinutes . ' minutes') : null;
-            $id = $this->underLock([[$tenantId, $candidate]], function () use ($tenantId, $candidate, $service, $settings, $request, $start, $end, $block, $now, $hold, $asRequest): ?int {
-                if (!$this->isFree($tenantId, $candidate, $service, $settings, $start, $now, null, $request['enforce_hours'])) {
+            $id = $this->underLock([[$tenantId, $candidate]], function () use ($tenantId, $candidate, $service, $settings, $request, $start, $end, $block, $now, $hold, $asRequest, $bookAnyway, $checkHours, &$why): ?int {
+                $why = $this->whyNotFree($tenantId, $candidate, $service, $settings, $start, $now, null, $checkHours, $bookAnyway);
+                if ($why !== null) {
                     return null;
                 }
 
@@ -231,24 +258,33 @@ final class BookingService
                 }
                 $this->announceBooking(CalendarEventNames::BOOKING_CREATED, $tenantId, $booking);
                 $this->announceBooking(CalendarEventNames::BOOKING_CONFIRMED, $tenantId, $booking);
-                $this->tell('confirmed', $tenantId, $booking);
+                if ($notify) {
+                    $this->tell('confirmed', $tenantId, $booking);
+                }
 
                 return $booking;
             }
         }
 
-        throw CalendarRejectedException::taken();
+        // One person asked for: say why that person's time is not free, so
+        // staff can choose Book anyway. Anyone, or a customer: the plain 409.
+        throw $staffOnly && count($candidates) === 1 && is_string($why) ? CalendarRejectedException::notFree($why) : CalendarRejectedException::taken();
     }
 
     /**
      * Move a booking to a new start, and optionally to another person.
      *
+     * Design 3.5 (CV.9): staff may also choose Book anyway when the person is
+     * busy, keep it inside the person's hours (`withinHours`, a drag on the
+     * grid), and untick "Email the new time" (`notify` false). Its length
+     * stays its service's (owner, Q35.7).
+     *
      * @return array<string, mixed>
      */
-    public function move(int $tenantId, int $bookingId, DateTimeImmutable $start, ?int $profileId, bool $enforceHours): array
+    public function move(int $tenantId, int $bookingId, DateTimeImmutable $start, ?int $profileId, bool $enforceHours, bool $notify = true, bool $bookAnyway = false, bool $withinHours = false): array
     {
         $before = $this->bookings->find($tenantId, $bookingId);
-        $booking = $this->moveUnderLock($tenantId, $bookingId, $start, $profileId, $enforceHours);
+        $booking = $this->moveUnderLock($tenantId, $bookingId, $start, $profileId, $enforceHours, $bookAnyway, $withinHours);
         // E2 `booking-moved`: the email says what the time was.
         $booking['previous_starts_at'] = is_string($before['starts_at'] ?? null) ? Interval::toApi(Interval::fromDb($before['starts_at'])) : null;
         if ($booking['status'] === BookingRepository::STATUS_REQUESTED) {
@@ -262,7 +298,9 @@ final class BookingService
             return $booking;
         }
         $this->announceBooking(CalendarEventNames::BOOKING_RESCHEDULED, $tenantId, $booking);
-        $this->tell('rescheduled', $tenantId, $booking);
+        if ($notify) {
+            $this->tell('rescheduled', $tenantId, $booking);
+        }
 
         return $booking;
     }
@@ -363,7 +401,7 @@ final class BookingService
      *
      * @return array<string, mixed>
      */
-    private function moveUnderLock(int $tenantId, int $bookingId, DateTimeImmutable $start, ?int $profileId, bool $enforceHours): array
+    private function moveUnderLock(int $tenantId, int $bookingId, DateTimeImmutable $start, ?int $profileId, bool $enforceHours, bool $bookAnyway = false, bool $withinHours = false): array
     {
         $current = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
         if (!in_array($current['status'], BookingRepository::LIVE, true)) {
@@ -371,6 +409,10 @@ final class BookingService
         }
         $isRequest = $current['status'] === BookingRepository::STATUS_REQUESTED;
         $service = $this->service($tenantId, (int) $current['service_id'], false);
+        // A move keeps the booking's own length, so one made before the
+        // service's length changed keeps the time it was booked for.
+        $kept = (int) round((Interval::fromDb((string) $current['ends_at'])->getTimestamp() - Interval::fromDb((string) $current['starts_at'])->getTimestamp()) / 60);
+        $service = self::withLength($service, $kept > 0 && $kept !== $service['duration_minutes'] ? $kept : null);
         $settings = $this->settingsFor($tenantId);
         $now = $this->now();
         $from = (int) $current['profile_id'];
@@ -386,8 +428,10 @@ final class BookingService
         sort($locks);
         $end = $start->modify('+' . $service['duration_minutes'] . ' minutes');
         $block = Availability::blockFor($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes']);
-        $moved = $this->underLock(array_map(static fn (int $p): array => [$tenantId, $p], $locks), function () use ($tenantId, $bookingId, $to, $service, $settings, $start, $end, $block, $now, $enforceHours, $isRequest): bool {
-            if (!$this->isFree($tenantId, $to, $service, $settings, $start, $now, $bookingId, $enforceHours)) {
+        $why = null;
+        $moved = $this->underLock(array_map(static fn (int $p): array => [$tenantId, $p], $locks), function () use ($tenantId, $bookingId, $to, $service, $settings, $start, $end, $block, $now, $enforceHours, $isRequest, $bookAnyway, $withinHours, &$why): bool {
+            $why = $this->whyNotFree($tenantId, $to, $service, $settings, $start, $now, $bookingId, $enforceHours || $withinHours, $bookAnyway);
+            if ($why !== null) {
                 return false;
             }
             $this->bookings->move($tenantId, $bookingId, $to, $start, $end, $block, $isRequest ? null : $this->reminderDue($start, $settings, $now));
@@ -395,7 +439,7 @@ final class BookingService
             return true;
         }, $this->roomLock($tenantId, $service));
         if (!$moved) {
-            throw CalendarRejectedException::taken();
+            throw is_string($why) ? CalendarRejectedException::notFree($why) : CalendarRejectedException::taken();
         }
 
         return $this->afterWrite($tenantId, $bookingId);
@@ -428,28 +472,60 @@ final class BookingService
      * the same moment sees them; an event may sit over an existing booking
      * (it is the person's own choice) and the answer lists those bookings.
      *
+     * People invited (ADR 0018) see it on their calendar and are busy for it
+     * unless they decline; a room it is held in is blocked for it.
+     *
+     * @param list<int>|null $people who is invited besides the organiser
      * @return array{event: array<string, mixed>, overlapping_bookings: list<int>}
      */
-    public function createEvent(int $tenantId, int $profileId, string $title, string $notes, Interval $when, bool $allDay, bool $busy, ?int $actor, ?string $externalRef = null): array
+    public function createEvent(int $tenantId, int $profileId, string $title, string $notes, Interval $when, bool $allDay, bool $busy, ?int $actor, ?string $externalRef = null, ?EventPlace $place = null, ?array $people = null, ?string $kind = null): array
     {
-        $id = $this->underLock([[$tenantId, $profileId]], fn (): int => $this->calendar->insertEvent($tenantId, $profileId, $title, $notes, $when, $allDay, $busy, $externalRef, $actor));
+        $id = $this->underLock([[$tenantId, $profileId]], function () use ($tenantId, $profileId, $title, $notes, $when, $allDay, $busy, $externalRef, $actor, $place, $people, $kind): int {
+            $id = $this->calendar->insertEvent($tenantId, $profileId, $title, $notes, $when, $allDay, $busy, $externalRef, $actor, $place, $kind);
+            if ($people !== null) {
+                $this->calendar->setEventPeople($tenantId, $id, $people, $profileId);
+            }
+
+            return $id;
+        });
         $event = $this->calendar->findEvent($tenantId, $id) ?? throw CalendarRejectedException::notFound('Event');
+        // ADR 0018: people invited hear about it (in-app, push, email with an .ics).
+        $this->invites?->invited($tenantId, $id, array_column($event['people'], 'profile_id'));
         $this->announce(CalendarEventNames::EVENT_CREATED, ['id' => $id, 'tenant_id' => $tenantId, 'profile_id' => $profileId]);
 
         return ['event' => $event, 'overlapping_bookings' => $this->overlapping($tenantId, $profileId, $when)];
     }
 
-    /** @return array{event: array<string, mixed>, overlapping_bookings: list<int>} */
-    public function updateEvent(int $tenantId, int $eventId, string $title, string $notes, Interval $when, bool $allDay, bool $busy): array
+    /**
+     * @param list<int>|null $people who is invited besides the organiser; null keeps the list
+     * @return array{event: array<string, mixed>, overlapping_bookings: list<int>}
+     */
+    public function updateEvent(int $tenantId, int $eventId, string $title, string $notes, Interval $when, bool $allDay, bool $busy, ?EventPlace $place = null, ?array $people = null): array
     {
         $existing = $this->calendar->findEvent($tenantId, $eventId) ?? throw CalendarRejectedException::notFound('Event');
         $profileId = (int) $existing['profile_id'];
-        $this->underLock([[$tenantId, $profileId]], function () use ($tenantId, $eventId, $title, $notes, $when, $allDay, $busy): bool {
-            $this->calendar->updateEvent($tenantId, $eventId, $title, $notes, $when, $allDay, $busy);
+        $this->underLock([[$tenantId, $profileId]], function () use ($tenantId, $eventId, $title, $notes, $when, $allDay, $busy, $place, $people, $profileId): bool {
+            $this->calendar->updateEvent($tenantId, $eventId, $title, $notes, $when, $allDay, $busy, $place);
+            if ($people !== null) {
+                $this->calendar->setEventPeople($tenantId, $eventId, $people, $profileId);
+            }
 
             return true;
         });
         $this->announce(CalendarEventNames::EVENT_UPDATED, ['id' => $eventId, 'tenant_id' => $tenantId, 'profile_id' => $profileId]);
+        if ($this->invites !== null) {
+            $fresh = $this->calendar->findEvent($tenantId, $eventId);
+            if ($fresh !== null) {
+                $before = array_column($existing['people'], 'profile_id');
+                $added = array_values(array_diff(array_column($fresh['people'], 'profile_id'), $before));
+                $moved = $fresh['starts_at'] !== $existing['starts_at'] || $fresh['ends_at'] !== $existing['ends_at']
+                    || $fresh['location'] !== $existing['location'] || $fresh['room_id'] !== $existing['room_id'];
+                if ($moved && $before !== []) {
+                    $this->invites->changed($tenantId, $eventId);
+                }
+                $this->invites->invited($tenantId, $eventId, $added);
+            }
+        }
 
         return [
             'event' => $this->calendar->findEvent($tenantId, $eventId) ?? $existing,
@@ -461,6 +537,9 @@ final class BookingService
     {
         $existing = $this->calendar->findEvent($tenantId, $eventId) ?? throw CalendarRejectedException::notFound('Event');
         $this->calendar->cancelEvent($tenantId, $eventId);
+        if ($existing['people'] !== []) {
+            $this->invites?->cancelled($tenantId, $eventId);
+        }
         $this->announce(CalendarEventNames::EVENT_DELETED, ['id' => $eventId, 'tenant_id' => $tenantId, 'profile_id' => (int) $existing['profile_id']]);
     }
 
@@ -482,7 +561,7 @@ final class BookingService
         $settings = $this->settingsFor($tenantId);
         $start = Interval::fromDb((string) $row['starts_at']);
         $done = $this->underLock([[$tenantId, (int) $row['profile_id']]], function () use ($tenantId, $bookingId, $row, $service, $settings, $start, $paymentRef): bool {
-            if (!$this->isFree($tenantId, (int) $row['profile_id'], $service, $settings, $start, $this->now(), $bookingId, false)) {
+            if ($this->whyNotFree($tenantId, (int) $row['profile_id'], $service, $settings, $start, $this->now(), $bookingId, false) !== null) {
                 return false;
             }
 
@@ -617,13 +696,12 @@ final class BookingService
         }
         $booking = $this->bookingOrFail($tenantId, $bookingId);
         $this->tell('remind', $tenantId, $booking);
-        // Other channels a plugin adds (design 3.3: WhatsApp is paid).
-        foreach ($this->plugins?->reminderChannels() ?? [] as $channel) {
-            try {
-                $channel->remind($tenantId, $booking);
-            } catch (Throwable $e) {
-                error_log('[calendar] the ' . $channel->name() . ' reminder failed: ' . $e->getMessage());
-            }
+        // C4: and by text on every channel a plugin adds (design 3.3: WhatsApp
+        // is paid), through the one way Whity messages customers.
+        try {
+            ($this->textReminders ??= BookingTextReminders::fromApp($this->settings))->remind($tenantId, $booking);
+        } catch (Throwable $e) {
+            error_log('[calendar] the text reminders failed: ' . $e->getMessage());
         }
 
         return 'sent';
@@ -729,19 +807,27 @@ final class BookingService
     }
 
     /**
-     * The check made INSIDE the lock.
+     * The check made INSIDE the lock: null when the time is free, otherwise
+     * why not (design 3.5, CV.9): the room is taken, the person is busy, or
+     * it is outside their hours. `$bookAnyway` lets a busy PERSON through
+     * (staff chose "Book anyway"); a taken room or closed hours never pass.
      *
      * @param array<string, mixed> $service
      */
-    private function isFree(int $tenantId, int $profileId, array $service, CalendarSettings $settings, DateTimeImmutable $start, DateTimeImmutable $now, ?int $exceptBookingId, bool $enforceHours): bool
+    private function whyNotFree(int $tenantId, int $profileId, array $service, CalendarSettings $settings, DateTimeImmutable $start, DateTimeImmutable $now, ?int $exceptBookingId, bool $enforceHours, bool $bookAnyway = false): ?string
     {
         $block = Availability::blockFor($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes']);
-        $busy = $this->busyFor($tenantId, $profileId, $block->start->modify('-1 day'), $block->end->modify('+1 day'), $now, $exceptBookingId, $service['room_id'] ?? null);
-        if (Availability::clashes($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes'], $busy)) {
-            return false;
+        $from = $block->start->modify('-1 day');
+        $to = $block->end->modify('+1 day');
+        $roomId = $service['room_id'] ?? null;
+        if (is_int($roomId) && Availability::clashes($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes'], $this->rooms()->busy($tenantId, $roomId, $from, $to, $now, $exceptBookingId))) {
+            return CalendarRejectedException::ROOM_TAKEN;
+        }
+        if (!$bookAnyway && Availability::clashes($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes'], $this->busyFor($tenantId, $profileId, $from, $to, $now, $exceptBookingId))) {
+            return CalendarRejectedException::PERSON_BUSY;
         }
         if (!$enforceHours) {
-            return true;
+            return null;
         }
         $windows = Availability::openWindows(
             $this->calendar->hours($tenantId, $profileId),
@@ -751,7 +837,24 @@ final class BookingService
             $start->modify('+2 days'),
         );
 
-        return Availability::withinWindows($start, $service['duration_minutes'], $windows);
+        return Availability::withinWindows($start, $service['duration_minutes'], $windows) ? null : CalendarRejectedException::CLOSED;
+    }
+
+    /**
+     * The service as this booking uses it: the length it was booked for, when
+     * that differs from the service's today.
+     *
+     * @param array<string, mixed> $service
+     * @return array<string, mixed>
+     */
+    private static function withLength(array $service, ?int $minutes): array
+    {
+        if ($minutes === null) {
+            return $service;
+        }
+        $service['duration_minutes'] = $minutes;
+
+        return $service;
     }
 
     /**

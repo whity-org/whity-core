@@ -40,7 +40,8 @@ jest.mock('@/lib/api/client', () => ({
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
 jest.mock('@/lib/capabilities-context', () => ({ useCapabilitiesContext: () => ({ has: () => true }) }));
-jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+const mockPush = jest.fn();
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.mock('next/link', () => ({
   __esModule: true,
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
@@ -123,6 +124,16 @@ describe('WaitingForYou', () => {
     await waitFor(() =>
       expect(mockApiClient).toHaveBeenCalledWith('/api/v1/me/agent-proposals/1/approve', expect.objectContaining({ method: 'POST' })),
     );
+  });
+
+  it('opens a Needs verifying proposal on Approvals instead of approving it here (AG.1)', async () => {
+    serve([{ key: 'proposal:1', kind: 'proposal', at: '2026-11-01 09:00:00', proposal: { ...proposal(1, '2026-11-01 09:00:00'), tier: 3 } }]);
+    render(<WaitingForYou />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Open' }));
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(mockPush).toHaveBeenCalledWith('/admin/approvals');
+    expect(mockApiClient).not.toHaveBeenCalledWith('/api/v1/me/agent-proposals/1/approve', expect.anything());
   });
 
   it('does not say nothing is waiting when a source failed', async () => {

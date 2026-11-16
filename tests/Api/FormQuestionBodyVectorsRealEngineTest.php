@@ -57,6 +57,11 @@ final class FormQuestionBodyVectorsRealEngineTest extends TestCase
             $row = json_decode((string) $response->getBody(), true)['data'][0];
             $row['help_text'] = $row['help_text_i18n'] === [] ? null : $row['help_text_i18n'];
             foreach ($sent as $property => $value) {
+                // Every question is the applicant's now: the server accepts
+                // `audience: applicant` and no longer sends it back.
+                if ($property === 'audience') {
+                    continue;
+                }
                 self::assertEquals($value, $row[$property], "{$kind}.{$property}");
             }
         }

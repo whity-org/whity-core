@@ -80,6 +80,7 @@ export function RouteReadOnly({ name, graph, rules, roles, groups }: RouteReadOn
     const quorum = effectiveQuorum(step, graph);
     if (quorum === 'any') return t('routeTemplates.quorum.any', 'any one may approve');
     if (quorum === 'majority') return t('routeTemplates.quorum.majority', 'a majority must approve');
+    if (quorum === 'first') return t('routeTemplates.quorum.first', 'the first answer decides');
     return t('routeTemplates.quorum.all', 'all must approve');
   };
 

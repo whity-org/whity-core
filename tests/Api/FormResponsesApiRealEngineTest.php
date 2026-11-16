@@ -60,7 +60,6 @@ final class FormResponsesApiRealEngineTest extends TestCase
         $this->fields->create(self::TENANT, $this->formId, 'imports', 'checkbox', ['en' => 'Imports'], null, false, [], [], null, null, 4);
         $this->fields->create(self::TENANT, $this->formId, 'crates', 'number', ['en' => 'Crates'], null, false, [], [], null, null, 5);
         $this->fields->create(self::TENANT, $this->formId, 'paper', 'file', ['en' => 'Paper'], null, false, [], ['maxFiles' => 3], null, null, 6);
-        $this->fields->create(self::TENANT, $this->formId, 'decision', 'text', ['en' => 'Decision'], null, false, [], [], null, null, 7, null, 'staff');
 
         TenantContext::reset();
         TenantContext::setTenantId(self::TENANT);
@@ -172,9 +171,9 @@ final class FormResponsesApiRealEngineTest extends TestCase
         self::assertSame('-5', $this->exportRows()[1][8]);
     }
 
-    public function testChoicesAreWordedAndStaffAnswersAreLeftOut(): void
+    public function testChoicesAreWorded(): void
     {
-        $this->respond(['supplier' => 'Example Mill', 'kind' => 'flour', 'kinds' => ['flour', 'milk'], 'imports' => true, 'decision' => 'secret']);
+        $this->respond(['supplier' => 'Example Mill', 'kind' => 'flour', 'kinds' => ['flour', 'milk'], 'imports' => true]);
 
         $rows = $this->exportRows();
 
@@ -183,7 +182,6 @@ final class FormResponsesApiRealEngineTest extends TestCase
             $rows[0],
         );
         self::assertSame(['Example Mill', 'Flour', 'Flour, Milk', 'Yes'], array_slice($rows[1], 4, 4));
-        self::assertStringNotContainsString('secret', implode(',', $rows[1]));
     }
 
     public function testFileAnswersDoNotLeakTheStorageKey(): void

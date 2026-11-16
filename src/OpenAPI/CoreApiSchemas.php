@@ -205,6 +205,8 @@ final class CoreApiSchemas
         'POST /api/me/notifications/{id:\d+}/read',
         'GET /api/me/notification-preferences',
         'PUT /api/me/notification-preferences',
+        // WHIT-1081: the caller's own notification state per workspace, read-only.
+        'GET /api/me/notification-summary',
         'GET /api/me/inbox/sources',
         'GET /api/me/inbox',
         // WHIT-859: only ever the caller's own rows. It held `forms:submit` until members
@@ -2212,30 +2214,6 @@ final class CoreApiSchemas
                     503 => self::errorResponse('PDFs are turned off, or the render service is unavailable'),
                 ] + self::authErrors(),
             ]),
-            self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/review', 'forms:read', [
-                'summary' => 'What the office recorded about a submission',
-                'description' => 'The current review, every earlier one, and the staff fields they answer. '
-                    . 'The applicant has no route to this.',
-                'tags' => ['forms'],
-                'responses' => [
-                    200 => self::jsonResponse('The review and its history', 'FormSubmissionReviewDetailResponse'),
-                    404 => self::errorResponse('Submission not found'),
-                ] + self::authErrors(),
-            ]),
-            self::permissionRoute('POST', '/api/form-submissions/{id:\d+}/review', 'forms:review', [
-                'summary' => 'Record the office\'s decision on a submission',
-                'description' => 'Checked against the form\'s staff fields as a submission is checked against '
-                    . 'its own, and sent whole. Each save is a new row and the newest is current, so changing '
-                    . 'a decision leaves the old one readable. The submission itself is never changed. Works '
-                    . 'on a closed form. `meta.ignored_keys` names answers that matched no staff field.',
-                'tags' => ['forms'],
-                'request' => 'FormSubmissionCreateRequest',
-                'responses' => [
-                    201 => self::jsonResponse('The recorded review', 'FormSubmissionReviewResponse'),
-                    404 => self::errorResponse('Submission not found'),
-                    422 => self::errorResponse('The form has no staff fields, or an answer failed validation'),
-                ] + self::authErrors(),
-            ]),
             [
                 'method' => 'GET',
                 'path' => '/api/me/form-submissions',
@@ -2994,8 +2972,11 @@ final class CoreApiSchemas
         return [
             self::permissionRoute('GET', '/api/audit-logs', 'audit:read', [
                 'summary' => 'List the tenant\'s audit entries (newest first, paginated)',
+                'description' => 'Besides the audit log, the list reads what agents did with their tools (`agent.action.ran`) and the decisions people made on routes '
+                    . '(`route.approved`, `route.rejected`, `route.signed`, `route.declined`, `route.sent_back`). A target filter, or `source=audit`, reads the audit log alone. The CSV export is the audit log.',
                 'tags' => ['audit-logs'],
                 'parameters' => [
+                    self::queryParam('source', 'string', '`audit` for the audit log alone; otherwise everything'),
                     self::queryParam('action', 'string', 'Exact action match (e.g. users:create)'),
                     self::queryParam('actor', 'integer', 'Filter by actor user id'),
                     self::queryParam('agent', 'string', 'Filter by agent principal, as listed by /api/audit-logs/facets'),
@@ -3231,8 +3212,10 @@ final class CoreApiSchemas
                 'requiredPermission' => null,
                 'schema' => [
                     'summary' => 'List the caller\'s in-app notifications (newest first, paginated) + unread count',
+                    'description' => 'The Inbox\'s Mentions and Updates tabs (M.43): `tab=mentions` is someone naming you in a chat or a comment; `tab=updates` is every other notice except those whose item is already in Waiting for me (GET /api/me/waiting). Without a tab, every notice. `unread` counts each tab.',
                     'tags' => ['notifications'],
                     'parameters' => [
+                        self::queryParam('tab', 'string', 'mentions or updates; every notice when omitted'),
                         self::queryParam('unread', 'boolean', 'Restrict to unread notifications when truthy'),
                         self::queryParam('page', 'integer', '1-indexed page (default 1)'),
                         self::queryParam('per_page', 'integer', 'Page size (default 25, max 100)'),
@@ -3308,6 +3291,19 @@ final class CoreApiSchemas
                     'responses' => [
                         200 => self::jsonResponse('The caller\'s updated preferences', 'NotificationPreferencesResponse'),
                         422 => self::errorResponse('Invalid preferences, or an attempt to disable a transactional type'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/notification-summary',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The caller\'s notifications in each workspace they belong to: push devices, and whether email and push are on, off or on for some kinds (read-only)',
+                    'tags' => ['notifications'],
+                    'responses' => [
+                        200 => self::jsonResponse('One row per workspace the caller is an active member of', 'NotificationSummaryResponse'),
                     ] + self::authErrors(),
                 ],
             ],
@@ -4613,6 +4609,9 @@ final class CoreApiSchemas
 
         $auditEntry = self::object([
             'id' => self::int(),
+            // Merge map plumbing: which record the entry is. Ids repeat across
+            // sources, so a client keys rows by source and id.
+            'source' => ['type' => 'string', 'enum' => ['audit', 'agents', 'routes'], 'description' => 'audit (the audit log), agents (what an agent did with a tool) or routes (a decision on a route).'],
             'tenantId' => self::int(),
             'actorUserId' => self::int(true),
             'action' => self::str(),
@@ -5617,7 +5616,7 @@ final class CoreApiSchemas
                 'plan_id' => self::int(),
                 'currency' => self::str(),
                 'unit_amount' => self::int(),
-                'billing_period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
                 'is_per_seat' => self::bool(),
                 'is_per_device' => self::bool(),
                 'is_active' => self::bool(),
@@ -5943,7 +5942,7 @@ final class CoreApiSchemas
             // here would invite a client to act on one.
             'CheckoutStartRequest' => self::object([
                 'plan_key' => self::str(),
-                'billing_period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
             ], ['plan_key']),
             // Only a destination. The session reference is a capability token
             // and is deliberately not returned — the browser needs somewhere to
@@ -5963,7 +5962,7 @@ final class CoreApiSchemas
                 'description' => self::str(true),
                 'unit_amount' => self::int(),
                 'currency' => self::str(),
-                'billing_period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
                 'is_per_seat' => self::bool(),
                 'is_per_device' => self::bool(),
                 'is_addon' => self::bool(),
@@ -5981,8 +5980,45 @@ final class CoreApiSchemas
                 'currency' => self::str(),
                 'paid_at' => self::str(true),
                 'issued_at' => self::str(true),
+                // WHIT-1153: present on a payment made in cash.
+                'source' => ['type' => 'string', 'enum' => ['cash'], 'description' => 'cash: recorded by the operator, not paid through a provider'],
+                'plan_key' => self::str() + ['description' => 'Cash only: the plugin plan paid for'],
+                'quantity' => self::int() + ['description' => 'Cash only: how many seats'],
+                'covers_until' => self::str() + ['description' => 'Cash only: the end of what it pays for'],
             ], ['number', 'status', 'total_minor', 'currency']),
             'BillingReceiptListResponse' => self::listEnvelope('BillingReceipt'),
+            'CashPayment' => self::object([
+                'id' => self::int(),
+                'tenant_id' => self::int(),
+                'plan_key' => self::str(),
+                'quantity' => self::int(),
+                'amount_minor' => self::int(),
+                'currency' => self::str(),
+                'receipt_number' => self::str(),
+                'note' => self::str(true),
+                'paid_on' => self::str(),
+                'period_start' => self::str(),
+                'period_end' => self::str(),
+                'recorded_by' => self::str(true),
+                'recorded_at' => self::str(),
+                'voided_at' => self::str(true),
+                'void_reason' => self::str(true),
+            ], ['id', 'tenant_id', 'plan_key', 'quantity', 'amount_minor', 'currency', 'receipt_number', 'paid_on', 'period_start', 'period_end']),
+            'CashPaymentListResponse' => self::listEnvelope('CashPayment'),
+            'CashPaymentResponse' => self::dataEnvelope(SchemaBuilder::ref('CashPayment')),
+            'CashPaymentCreateRequest' => self::object([
+                'workspace' => self::int() + ['description' => 'The workspace that paid'],
+                'planKey' => self::str() + ['description' => 'A paid plugin plan, such as plugin.salons.monthly'],
+                'quantity' => self::int() + ['description' => 'How many seats (chairs); 1 when the plugin is not sold per seat'],
+                'amount' => self::str() + ['description' => 'The amount paid, as written: 15 or 15.000'],
+                'currency' => self::str() + ['description' => 'Three letters; JOD when left out'],
+                'receiptNumber' => self::str() + ['description' => 'The paper receipt\'s number; once per workspace'],
+                'note' => self::str() + ['description' => 'Anything worth keeping'],
+                'paidOn' => self::str() + ['description' => 'The date paid, like 2026-11-16'],
+            ], ['workspace', 'planKey', 'amount', 'receiptNumber', 'paidOn']),
+            'CashPaymentVoidRequest' => self::object([
+                'reason' => self::str() + ['description' => 'Why it is voided'],
+            ], ['reason']),
             'BillingQuantityRequest' => self::object([
                 'quantity' => self::int(),
             ], ['quantity']),
@@ -6004,7 +6040,7 @@ final class CoreApiSchemas
             'PlanPriceCreateRequest' => self::object([
                 'currency' => self::str(),
                 'unit_amount' => self::int(),
-                'billing_period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
                 'is_per_seat' => self::bool(),
                 // At most ONE of these. Both set is refused with 422 rather
                 // than accepted, because the billing run would have to choose a
@@ -6418,7 +6454,7 @@ final class CoreApiSchemas
                 // it fans out to many people. NULL is not "no quorum": it defers
                 // to the tenant's `documents.routing_approval_quorum` setting,
                 // which defaults to `all`.
-                'decision_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority'], 'nullable' => true],
+                'decision_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority', 'first'], 'nullable' => true],
                 // #1054. WHETHER ANYBODY HERE IS ASKED TO ACT. `delivery` means
                 // the people this step reaches are TOLD: their inbox item is
                 // closed by the event that created it and the document carries
@@ -6498,7 +6534,7 @@ final class CoreApiSchemas
                 // step is the least likely person in the tenant to hold it - so
                 // without this a client could not tell an approver whether their
                 // single approval carries the gate or is one of four hundred.
-                'default_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority']],
+                'default_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority', 'first']],
                 // WHIT-1016: what people entered at the steps that ask for
                 // values, each key's latest. On the route lists; absent on the
                 // response that issues a route, where nothing is entered yet.
@@ -6551,7 +6587,7 @@ final class CoreApiSchemas
                         'decision' => self::bool(true),
                         'decision_quorum' => [
                             'type' => 'string',
-                            'enum' => ['all', 'any', 'majority'],
+                            'enum' => ['all', 'any', 'majority', 'first'],
                             'nullable' => true,
                         ],
                         // Targets are named by 1-BASED POSITION in this same
@@ -6651,6 +6687,9 @@ final class CoreApiSchemas
                 // resubmits.
                 'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true],
                 'occurred_at' => self::str(),
+                // Merge map A2: the person who was away, when the actor decided
+                // for them ("Awss Haddad for Amro Saleh"). Null otherwise.
+                'on_behalf_of_profile_id' => self::int(true),
                 // WHIT-922, on the audit page only: the hash of the entry before
                 // this one on the document, and this entry's own. Null on
                 // entries written before the chain began.
@@ -6952,10 +6991,38 @@ final class CoreApiSchemas
                 'body' => self::str(),
                 'author' => ['oneOf' => [SchemaBuilder::ref('ChatAuthor'), ['type' => 'null']]],
                 'mentions' => ['type' => 'array', 'items' => self::object([
-                    'type' => ['type' => 'string', 'enum' => ['person', 'agent']],
+                    'type' => ['type' => 'string', 'enum' => ['person', 'agent', 'everyone']],
                     'id' => self::int(),
                     'name' => self::str(),
                 ], ['type', 'id', 'name'])],
+                // UC.6–UC.12 (WHIT-1094).
+                'reply_to' => ['oneOf' => [self::object([
+                    'id' => self::int(),
+                    'author_name' => self::str(),
+                    'body' => self::str() + ['description' => 'The first 160 characters; empty when it was deleted.'],
+                    'deleted' => self::bool(),
+                ], ['id', 'author_name', 'body', 'deleted']), ['type' => 'null']]],
+                'thread_root_id' => ['oneOf' => [self::int(), ['type' => 'null']], 'description' => 'Set on a reply in a thread: the message it is under.'],
+                'in_chat' => self::bool() + ['description' => 'False for a thread reply that was not also sent to the chat.'],
+                'thread' => ['oneOf' => [self::object([
+                    'count' => self::int(),
+                    'last_at' => self::str(true),
+                    'people' => ['type' => 'array', 'items' => self::str()],
+                ], ['count']), ['type' => 'null']]],
+                'reactions' => ['type' => 'array', 'items' => self::object([
+                    'emoji' => self::str(),
+                    'count' => self::int(),
+                    'mine' => self::bool(),
+                    'people' => ['type' => 'array', 'items' => self::str()],
+                ], ['emoji', 'count', 'mine'])],
+                'attachments' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatAttachment'), 'description' => 'Photos (an album when several), videos, files and voice (UC.10).'],
+                'block' => ['oneOf' => [SchemaBuilder::ref('ChatBlock'), ['type' => 'null']], 'description' => 'A poll, or a Whity record with its live status (UC.5).'],
+                'forwarded_from' => self::str(true) + ['description' => 'Forwarded from another chat: who wrote it there (UC.9).'],
+                'pinned' => self::bool(),
+                'edited' => self::bool(),
+                'deleted' => self::bool() + ['description' => 'Shown as "This message was deleted"; the body is empty.'],
+                'can_edit' => self::bool(),
+                'can_delete' => self::bool() + ['description' => 'Your own message, sent less than 2 days ago.'],
                 'status' => ['type' => 'string', 'enum' => ['posted', 'held', 'declined'], 'description' => 'held: an agent\'s line waiting for the person it works for.'],
                 'waiting_for' => ['oneOf' => [SchemaBuilder::ref('ChatPerson'), ['type' => 'null']]],
                 'can_decide' => self::bool(),
@@ -7020,6 +7087,22 @@ final class CoreApiSchemas
                 'agent_id' => self::int() + ['description' => 'For a direct chat with one of your agents.'],
                 'link' => SchemaBuilder::ref('ChatLink'),
             ], []),
+            'ChatDiscussRequest' => self::object([
+                'link' => SchemaBuilder::ref('ChatLink'),
+            ], ['link']),
+            'ChatDiscussResponse' => self::dataEnvelope([
+                'allOf' => [
+                    SchemaBuilder::ref('Chat'),
+                    self::object([
+                        'members' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMember')],
+                        'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMessage')],
+                        'has_earlier' => self::bool(),
+                        'my_member_id' => self::int(),
+                        'last_read_message_id' => self::int(),
+                        'created' => self::bool() + ['description' => 'True when this call started the chat.'],
+                    ], ['members', 'messages', 'created']),
+                ],
+            ]),
             'ChatUpdateRequest' => self::object([
                 'title' => self::str() + ['description' => 'A group\'s new name.'],
                 'link' => ['oneOf' => [SchemaBuilder::ref('ChatLink'), ['type' => 'null']], 'description' => 'What the chat is about, or null to remove the link.'],
@@ -7034,11 +7117,73 @@ final class CoreApiSchemas
             'ChatPostRequest' => self::object([
                 'body' => self::str() + ['description' => 'The message, in plain words, at most 4000 characters.'],
                 'mentions' => ['type' => 'array', 'items' => self::object([
-                    'type' => ['type' => 'string', 'enum' => ['person', 'agent']],
+                    'type' => ['type' => 'string', 'enum' => ['person', 'agent', 'everyone']],
                     'id' => self::int(),
-                ], ['type', 'id']), 'description' => 'People (user id) and agents (agent id) in the chat this message mentions.'],
+                ], ['type', 'id']), 'description' => 'People (user id) and agents (agent id) in the chat this message mentions; everyone in a group.'],
                 'style' => ['type' => 'string', 'enum' => ['message', 'line'], 'description' => 'Agents: line for a short status or hand-off line.'],
+                'reply_to' => self::int() + ['description' => 'A message in this chat that this one answers; it is quoted above it.'],
+                'thread_root' => self::int() + ['description' => 'Reply in the thread under this message.'],
+                'also_to_chat' => self::bool() + ['description' => 'With thread_root: also show the reply in the chat.'],
+                'attachments' => ['type' => 'array', 'items' => self::int(), 'description' => 'Files you uploaded to this chat and have not sent yet; the body may then be empty.'],
+                'block' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A poll ({type: poll, question, options[2-10], multiple, closes_at}) or a record ({type: record, record: booking|document, id}); the body may then be empty.'],
             ], ['body']),
+            'ChatBlock' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'type poll: question, options [{text, votes, mine, people}], multiple, voters, closes_at, closed. type record: record (booking or document), id, title, status, href, and its times or number; missing when it no longer exists.'],
+            'ChatVoteRequest' => self::object([
+                'choices' => ['type' => 'array', 'items' => self::int(), 'description' => 'The answers you pick, by position; empty takes your vote back.'],
+            ], ['choices']),
+            'ChatRecordsResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('ChatBlock')]),
+            'ChatAttachment' => self::object([
+                'id' => self::int(),
+                'kind' => ['type' => 'string', 'enum' => ['image', 'video', 'file', 'voice']],
+                'content_type' => self::str(),
+                'byte_size' => self::int(),
+                'filename' => self::str(true),
+                'width' => ['oneOf' => [self::int(), ['type' => 'null']]],
+                'height' => ['oneOf' => [self::int(), ['type' => 'null']]],
+                'duration_ms' => ['oneOf' => [self::int(), ['type' => 'null']]],
+                'transcript' => self::str(true) + ['description' => 'A voice message\'s words.'],
+                'message_id' => ['oneOf' => [self::int(), ['type' => 'null']], 'description' => 'Empty until the message it goes on is sent.'],
+                'url' => self::str() + ['description' => 'Where its bytes are read, signed in.'],
+            ], ['id', 'kind', 'content_type', 'byte_size', 'url']),
+            'ChatAttachmentResponse' => self::dataEnvelope(SchemaBuilder::ref('ChatAttachment')),
+            'ChatAttachmentsResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('ChatAttachment')]),
+            'ChatTranscriptRequest' => self::object([
+                'transcript' => self::str() + ['description' => 'The words of the voice message, at most 4000 characters.'],
+            ], ['transcript']),
+            'ChatTranscriptResponse' => self::dataEnvelope(self::object(['id' => self::int(), 'transcript' => self::str()], ['id', 'transcript'])),
+            'ChatEditRequest' => self::object([
+                'body' => self::str() + ['description' => 'The new words, at most 4000 characters.'],
+            ], ['body']),
+            'ChatReactRequest' => self::object([
+                'emoji' => self::str() + ['description' => 'One emoji. Sending one you already gave takes it back.'],
+            ], ['emoji']),
+            'ChatPinMessageRequest' => self::object([
+                'pinned' => self::bool() + ['description' => 'False unpins; true by default.'],
+            ], []),
+            'ChatPreferencesRequest' => self::object([
+                'layout' => ['type' => 'string', 'enum' => ['bubbles', 'rows']],
+            ], ['layout']),
+            'ChatMessagesResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('ChatMessage')]),
+            'ChatThreadResponse' => self::dataEnvelope(self::object([
+                'root' => SchemaBuilder::ref('ChatMessage'),
+                'replies' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMessage')],
+            ], ['root', 'replies'])),
+            'ChatStateResponse' => self::dataEnvelope(self::object([
+                'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMessage'), 'description' => 'New lines after `after`.'],
+                'changed' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMessage'), 'description' => 'Lines edited, deleted, reacted to, pinned or replied to since `since`.'],
+                'read_marks' => ['type' => 'array', 'items' => self::object([
+                    'member_id' => self::int(),
+                    'profile_id' => self::int(),
+                    'name' => self::str(),
+                    'last_read_message_id' => self::int(),
+                ], ['member_id', 'profile_id', 'name', 'last_read_message_id'])],
+                'typing' => ['type' => 'array', 'items' => self::str(), 'description' => 'Names of the people typing now.'],
+                'pinned' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMessage')],
+                'now' => self::str(true) + ['description' => 'Pass back as `since` on the next poll.'],
+            ], ['messages', 'changed', 'read_marks', 'typing', 'pinned'])),
+            'ChatPreferencesResponse' => self::dataEnvelope(self::object([
+                'layout' => ['type' => 'string', 'enum' => ['bubbles', 'rows']],
+            ], ['layout'])),
             'ChatShareProposalRequest' => self::object([
                 'proposal_id' => self::int() + ['description' => 'One of your waiting proposals (from an Ask-first call).'],
                 'body' => self::str() + ['description' => 'What to say with it; the proposal\'s summary when empty.'],
@@ -7046,6 +7191,98 @@ final class CoreApiSchemas
             'ChatReadRequest' => self::object([
                 'message_id' => self::int() + ['description' => 'The newest message you have read.'],
             ], ['message_id']),
+            // One chat (UC.1, WHIT-1093): team chats and customer conversations in one list.
+            'ChatInboxItem' => self::object([
+                'id' => self::int() + ['description' => 'The conversation id; /chat?c=<id> opens it whatever its kind.'],
+                'kind' => ['type' => 'string', 'enum' => ['team', 'customer']],
+                'type' => ['type' => 'string', 'enum' => ['group', 'direct', 'customer']],
+                'title' => self::str(true),
+                'pinned' => self::bool(),
+                'unread' => self::int(),
+                'with' => ['oneOf' => [SchemaBuilder::ref('ChatMember'), ['type' => 'null']]],
+                'people_count' => self::int(),
+                'agents_count' => self::int(),
+                'link' => ['oneOf' => [SchemaBuilder::ref('ChatLink'), ['type' => 'null']]],
+                'channel' => self::str() + ['description' => 'Customer conversations: email, webchat or a plugin channel.'],
+                'status' => ['type' => 'string', 'enum' => ['open', 'pending', 'closed']],
+                'subject' => self::str(true),
+                'contact' => self::object(['name' => self::str(true), 'address' => self::str()], ['address']),
+                'customer' => ['oneOf' => [SchemaBuilder::ref('MessagingPerson'), ['type' => 'null']]],
+                'assignee' => ['oneOf' => [SchemaBuilder::ref('MessagingPerson'), ['type' => 'null']]],
+                'waiting_since' => self::str(true) + ['description' => 'The customer wrote last and nobody has answered since.'],
+                'last_message' => ['oneOf' => [['type' => 'object', 'additionalProperties' => true], ['type' => 'null']]],
+                'last_message_at' => self::str(true),
+                'created_at' => self::str(true),
+            ], ['id', 'kind', 'type', 'pinned', 'unread']),
+            'ChatInboxResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatInboxItem')],
+                'customers' => self::bool() + ['description' => 'Whether the list includes customer conversations (messages.read).'],
+            ], ['data', 'customers']),
+            'ChatForwardRequest' => self::object([
+                'chat_id' => self::int() + ['description' => 'The chat to forward to; you must be in it.'],
+            ], ['chat_id']),
+            'ChatCustomerBlock' => self::object([
+                'type' => ['type' => 'string', 'enum' => ['booking_times', 'form', 'payment']],
+                'url' => self::str() + ['description' => 'The link the customer got.'],
+                'service' => self::object(['id' => self::int(), 'name' => self::str(), 'minutes' => self::int()], ['id', 'name', 'minutes']),
+                'times' => ['type' => 'array', 'items' => self::str()],
+                'time_zone' => self::str() + ['description' => 'The calendar\'s zone, which the customer\'s text uses.'],
+                'form' => self::object(['id' => self::int(), 'title' => self::str()], ['id', 'title']),
+                'description' => self::str(),
+                'amount' => self::str() + ['description' => 'In normal units, as a decimal string.'],
+                'currency' => self::str(),
+                'reference' => self::str(true),
+            ], ['type', 'url']),
+            'ChatCustomerBlockOptionsResponse' => self::dataEnvelope(self::object([
+                'booking_page' => self::bool(),
+                'time_zone' => self::str() + ['description' => 'The calendar\'s zone: times are picked in it.'],
+                'services' => ['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str(), 'minutes' => self::int()], ['id', 'name', 'minutes'])],
+                'forms' => ['type' => 'array', 'items' => self::object(['id' => self::int(), 'title' => self::str()], ['id', 'title'])],
+            ], ['booking_page', 'time_zone', 'services', 'forms'])),
+            'ChatCustomerBlockRequest' => self::object([
+                'type' => ['type' => 'string', 'enum' => ['booking_times', 'form', 'payment']],
+                'text' => self::str() + ['description' => 'Your words above the link.'],
+                'service_id' => self::int(),
+                'times' => ['type' => 'array', 'items' => self::str(), 'description' => 'Up to six future times (ISO 8601).'],
+                'form_id' => self::int(),
+                'url' => self::str() + ['description' => 'A payment link (https), from Whity Pay.'],
+                'reference' => self::str(),
+                'amount' => self::str(),
+                'currency' => self::str(),
+                'description' => self::str(),
+                'channel' => self::str() + ['description' => 'Send by this channel (one from the conversation\'s send_by). Default: where the customer last wrote.'],
+            ], ['type']),
+            'ChatMuteRequest' => self::object([
+                'muted' => self::bool() + ['description' => 'False unmutes; true by default.'],
+            ], []),
+            'ChatBlockRequest' => self::object([
+                'report_spam' => self::bool() + ['description' => 'Also report them as spam where the channel takes reports.'],
+            ], []),
+            'ChatBlockedSender' => self::object([
+                'id' => self::int(),
+                'channel' => self::str(),
+                'address' => self::str(),
+                'name' => self::str(true),
+                'reported_spam' => self::bool(),
+                'blocked_by' => self::str(true),
+                'created_at' => self::str(true),
+            ], ['id', 'channel', 'address', 'reported_spam']),
+            'ChatBlockedSenderResponse' => self::dataEnvelope(['oneOf' => [SchemaBuilder::ref('ChatBlockedSender'), ['type' => 'null']]]),
+            'ChatBlockedSendersResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('ChatBlockedSender')]),
+            'ChatBot' => self::object([
+                'kind' => ['type' => 'string', 'enum' => ['away', 'welcome', 'handover']],
+                'enabled' => self::bool(),
+                'settings' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'away: text, timezone, days (1 Monday to 7 Sunday), from, to. welcome: text. handover: people (ids, in turn).'],
+            ], ['kind', 'enabled', 'settings']),
+            'ChatBotRequest' => self::object([
+                'enabled' => self::bool(),
+                'settings' => ['type' => 'object', 'additionalProperties' => true],
+            ], ['enabled']),
+            'ChatBotResponse' => self::dataEnvelope(SchemaBuilder::ref('ChatBot')),
+            'ChatBotsResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('ChatBot')]),
+            'ChatPinRequest' => self::object([
+                'pinned' => self::bool() + ['description' => 'False unpins; true by default.'],
+            ], []),
             'ChatFocusRequest' => self::object([
                 'focused' => self::bool() + ['description' => 'True while the chat is open in a focused window; false when it stops.'],
             ], []),
@@ -7079,10 +7316,12 @@ final class CoreApiSchemas
                 'status' => ['type' => 'string', 'enum' => ['received', 'queued', 'sent', 'delivered', 'read', 'failed', 'cancelled', 'noted']],
                 'status_detail' => self::str(true),
                 'attachments_not_shown' => self::int(),
+                'block' => ['oneOf' => [SchemaBuilder::ref('ChatCustomerBlock'), ['type' => 'null']], 'description' => 'Booking times, a form or a payment link the team sent (UC.5). Only the team sees it; the customer got words and the link.'],
                 // Set while an agent's reply is held; it can be cancelled until then.
                 'send_after' => self::str(true),
                 'sent_at' => self::str(true),
                 'created_at' => self::str(),
+                'channel' => self::str(true) + ['description' => 'The channel this message came or went on; one conversation can span channels (C5).'],
             ], ['id', 'conversation_id', 'kind', 'body', 'status', 'created_at']),
             'MessagingConversationListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingConversation')],
@@ -7093,7 +7332,10 @@ final class CoreApiSchemas
             'MessagingConversationDetailResponse' => self::dataEnvelope([
                 'allOf' => [
                     SchemaBuilder::ref('MessagingConversation'),
-                    self::object(['messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingMessage')]], ['messages']),
+                    self::object([
+                        'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingMessage')],
+                        'send_by' => ['type' => 'array', 'items' => self::object(['channel' => self::str(), 'address' => self::str()], ['channel', 'address']), 'description' => 'The channels a reply can go on (UC.3): those the customer wrote on, the last first.'],
+                    ], ['messages']),
                 ],
             ]),
             'MessagingConversationResponse' => self::dataEnvelope(SchemaBuilder::ref('MessagingConversation')),
@@ -8274,11 +8516,11 @@ final class CoreApiSchemas
                 'anchor_block_id' => self::str() + ['description' => 'The id of the block the commented text is in'],
                 'quote' => self::str() + ['description' => 'The commented text, at most 2000 characters'],
                 'body' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The first message as the contract Inline[] (text, field, break, math), not empty'],
-                'mentions' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Profile ids @mentioned; members who can read the document are told in-app'],
+                'mentions' => ['type' => 'array', 'maxItems' => 50, 'items' => ['oneOf' => [['type' => 'integer'], self::object(['type' => self::str() + ['enum' => ['person', 'agent', 'everyone']], 'id' => self::int()], ['type'])]], 'description' => 'The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox › Mentions and a push'],
             ], ['anchor_block_id', 'quote', 'body']),
             'DocumentCommentMessageCreateRequest' => self::object([
                 'body' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The reply as the contract Inline[] (text, field, break, math), not empty'],
-                'mentions' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Profile ids @mentioned; members who can read the document are told in-app'],
+                'mentions' => ['type' => 'array', 'maxItems' => 50, 'items' => ['oneOf' => [['type' => 'integer'], self::object(['type' => self::str() + ['enum' => ['person', 'agent', 'everyone']], 'id' => self::int()], ['type'])]], 'description' => 'The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox › Mentions and a push'],
             ], ['body']),
             'DocumentMentionablePerson' => self::object([
                 'kind' => ['type' => 'string', 'enum' => ['person'], 'description' => 'Always person'],
@@ -9210,7 +9452,6 @@ final class CoreApiSchemas
                 'section_key' => self::str(true),
                 'position' => self::int(),
                 'visible_when' => SchemaBuilder::ref('FormFieldCondition'),
-                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff']],
                 'multi_valued' => self::bool(),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
@@ -9331,22 +9572,6 @@ final class CoreApiSchemas
                 'secret' => self::str(true),
                 'allow_without_bot_check' => ['type' => 'boolean'],
             ], []),
-            'FormSubmissionReview' => self::object([
-                'id' => self::int(),
-                'submission_id' => self::int(),
-                'data' => ['type' => 'object', 'additionalProperties' => true],
-                'recorded_by_profile_id' => self::int(true),
-                'recorded_at' => self::str(),
-            ], ['id', 'submission_id', 'data', 'recorded_at']),
-            'FormSubmissionReviewResponse' => self::object([
-                'data' => SchemaBuilder::ref('FormSubmissionReview'),
-                'meta' => self::object(['ignored_keys' => ['type' => 'array', 'items' => ['type' => 'string']]], []),
-            ], ['data']),
-            'FormSubmissionReviewDetailResponse' => self::dataEnvelope(self::object([
-                'current' => SchemaBuilder::ref('FormSubmissionReview') + ['nullable' => true],
-                'history' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSubmissionReview')],
-                'fields' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormField')],
-            ], ['current', 'history', 'fields'])),
             'FormSectionText' => self::object([
                 'key' => self::str(),
                 'title' => self::localizedText(),
@@ -9446,7 +9671,6 @@ final class CoreApiSchemas
                 'prefill_source' => self::str(true) + ['description' => 'Fill the field in advance from the submitter\'s profile; sources are listed in the field list\'s `meta.prefill_sources`.'],
                 'section_key' => self::name() + ['description' => 'Section to group the field under; fields sharing a key form one section.'],
                 'visible_when' => SchemaBuilder::ref('FormFieldCondition') + ['description' => 'Show this question only when another answer matches; null means always.'],
-                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff'], 'description' => 'Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review.'],
                 // Absent means the server appends it after the current maximum.
                 'position' => self::int() + ['description' => 'Position in the form; omitted appends it at the end.'],
             ], ['field_key', 'field_type', 'label']),
@@ -9477,7 +9701,6 @@ final class CoreApiSchemas
                 'prefill_source' => self::str(true) + ['description' => 'Profile detail to prefill from; null for none.'],
                 'section_key' => self::name() + ['description' => 'Section to group the field under.'],
                 'visible_when' => SchemaBuilder::ref('FormFieldCondition') + ['description' => 'Show this question only when another answer matches; null means always.'],
-                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff'], 'description' => 'Who answers it. A staff field is never shown to the applicant.'],
                 'position' => self::int() + ['description' => 'New position in the form.'],
             ], []) + ['minProperties' => 1],
             // `prefill` is keyed by FIELD KEY, not by source: two fields may name
@@ -10345,6 +10568,7 @@ final class CoreApiSchemas
                 'time_zone' => self::str(),
             ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
             'CalendarSettings' => self::object([
+                'booking_page_url' => self::str(true) + ['description' => 'The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only.'],
                 'time_zone' => self::str() + ['description' => 'The workspace time zone (IANA).'],
                 'booking_page_enabled' => self::bool(),
                 'min_notice_minutes' => self::int(),
@@ -10502,12 +10726,35 @@ final class CoreApiSchemas
                 'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
                 'customer' => ['allOf' => [SchemaBuilder::ref('CalendarBookingCustomer')], 'description' => 'Who the booking is for: an existing customer by profile_id, or a name with an email or phone.'],
                 'keep_to_hours' => self::bool() + ['description' => 'Refuse a time outside working hours. Always on for agents.'],
+                'notify' => self::bool() + ['description' => 'Email the customer a confirmation. Default true.'],
+                'book_anyway' => self::bool() + ['description' => 'Book even though the person is busy then (a taken room or closed hours still refuse). Never for agents.'],
+                'within_hours' => self::bool() + ['description' => 'Refuse a time outside the person\'s working hours, without the booking window\'s notice rules.'],
             ], ['service_id', 'starts_at', 'customer']),
             'CalendarBookingMoveRequest' => self::object([
                 'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
                 'profile_id' => self::int() + ['description' => 'Move to another person. Default: the same one.'],
                 'keep_to_hours' => self::bool() + ['description' => 'Refuse a time outside working hours. Always on for agents.'],
+                'notify' => self::bool() + ['description' => 'Email the customer the new time. Default true.'],
+                'book_anyway' => self::bool() + ['description' => 'Move even though the person is busy then (a taken room or closed hours still refuse). Never for agents.'],
+                'within_hours' => self::bool() + ['description' => 'Refuse a time outside the person\'s working hours, without the booking window\'s notice rules.'],
             ], ['starts_at']),
+            'CalendarDayCount' => self::object([
+                'date' => self::str() + ['description' => 'The workspace\'s calendar date, YYYY-MM-DD.'],
+                'profile_id' => self::int(),
+                'room_id' => self::int(true),
+                'service_id' => self::int(),
+                'count' => self::int(),
+            ], ['date', 'profile_id', 'room_id', 'service_id', 'count']),
+            'CalendarViewChoices' => self::object([
+                'view' => self::str() + ['enum' => ['day', 'four_days', 'week', 'month', 'year', 'three_days'], 'description' => 'The view last chosen: Day, 4 days, Week, Month, Year, or 3 days on a phone.'],
+                'colour_by' => self::str() + ['enum' => ['person', 'service', 'room'], 'description' => 'What colours mean for this person: the person, the service, or the room or branch.'],
+                'date' => self::str() + ['description' => 'The date in view, YYYY-MM-DD.'],
+                'hidden_people' => ['type' => 'array', 'items' => self::int(), 'description' => 'Staff profile ids unticked in the panel.'],
+                'hidden_rooms' => ['type' => 'array', 'items' => self::int(), 'description' => 'Room ids unticked in the panel.'],
+                'hidden_services' => ['type' => 'array', 'items' => self::int(), 'description' => 'Service ids unticked in the panel.'],
+                'also_show' => ['type' => 'array', 'items' => self::str() + ['enum' => ['team_events', 'time_off', 'cancelled', 'meetings', 'tasks_due']], 'description' => 'What else the calendar shows besides bookings.'],
+                'sidebar_open' => self::bool() + ['description' => 'The person opened the app\'s sidebar on the calendar, so it stays open there.'],
+            ], []),
             'CalendarBookingCancelRequest' => self::object([
                 'reason' => self::str() + ['maxLength' => 500, 'description' => 'Why, in a few words; shown to the customer.'],
             ], []),
@@ -10522,7 +10769,52 @@ final class CoreApiSchemas
                 'busy' => self::bool(),
                 'status' => self::str(),
                 'external_ref' => self::str(true),
-            ], ['id', 'profile_id', 'title', 'starts_at', 'ends_at', 'all_day', 'busy', 'status']),
+                // ADR 0018: one events table.
+                'kind' => self::str() + ['enum' => ['event', 'meeting', 'time_off', 'external', 'open_hours'], 'description' => 'A team event or everyday meeting, a formal meeting, time off, one synced from an outside calendar, or extra working hours (never shown on the calendar).'],
+                'room_id' => self::int(true),
+                'location' => self::str(),
+                'meeting_id' => self::int(true),
+                'people' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarEventPerson'), 'description' => 'Who is invited besides the organiser (profile_id).'],
+            ], ['id', 'profile_id', 'title', 'starts_at', 'ends_at', 'all_day', 'busy', 'status', 'kind', 'people']),
+            'CalendarEventPerson' => self::object([
+                'profile_id' => self::int(),
+                'role' => self::str() + ['enum' => ['required', 'optional']],
+                'response' => self::str() + ['enum' => ['invited', 'accepted', 'declined', 'tentative']],
+            ], ['profile_id', 'role', 'response']),
+            'CalendarEventAnswerRequest' => self::object([
+                'response' => self::str() + ['enum' => ['accepted', 'declined', 'tentative'], 'description' => 'Whether you\'ll come. Declining frees your time.'],
+            ], ['response']),
+            'CalendarItem' => self::object([
+                'id' => self::str() + ['description' => 'The kind and the record: "booking:7", "event:12", "time_off:5".'],
+                'kind' => self::str() + ['enum' => ['booking', 'event', 'meeting', 'time_off', 'external', 'task_due']],
+                'title' => self::str() + ['description' => 'What it is. Someone else\'s time off reads "Away" and their synced events "Busy".'],
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'all_day' => self::bool(),
+                'busy' => self::bool(),
+                'status' => self::str(),
+                'organiser_id' => self::int() + ['description' => 'Whose calendar it is on: the booked person, or the event\'s organiser.'],
+                'people' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarEventPerson')],
+                'room_id' => self::int(true),
+                'location' => self::str(),
+                'booking' => ['oneOf' => [SchemaBuilder::ref('CalendarBooking'), ['type' => 'null']], 'description' => 'The booking, for kind booking.'],
+                'event' => ['oneOf' => [self::object([
+                    'id' => self::int(),
+                    'notes' => self::str(),
+                    'meeting_id' => self::int(true),
+                    'external_ref' => self::str(true),
+                ], ['id', 'notes', 'meeting_id', 'external_ref']), ['type' => 'null']]],
+                'task' => ['oneOf' => [self::object([
+                    'id' => self::str(),
+                    'short_id' => self::str(true),
+                ], ['id', 'short_id']), ['type' => 'null']], 'description' => 'The Taskaat task, for kind task_due.'],
+                'can' => self::object([
+                    'open' => self::bool(),
+                    'move' => self::bool(),
+                    'resize' => self::bool(),
+                    'cancel' => self::bool(),
+                ], ['open', 'move', 'resize', 'cancel']),
+            ], ['id', 'kind', 'title', 'starts_at', 'ends_at', 'all_day', 'busy', 'status', 'organiser_id', 'people', 'room_id', 'location', 'booking', 'event', 'can']),
             'CalendarEventRequest' => self::object([
                 'profile_id' => self::int() + ['description' => 'Whose calendar. Default: yours.'],
                 'title' => self::str() + ['maxLength' => 200, 'description' => 'What it is.'],
@@ -10531,6 +10823,9 @@ final class CoreApiSchemas
                 'ends_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
                 'all_day' => self::bool() + ['description' => 'Shown as an all-day event.'],
                 'busy' => self::bool() + ['description' => 'Blocks bookings. Default true.'],
+                'people' => ['type' => 'array', 'items' => self::int(), 'maxItems' => 200, 'description' => 'Staff invited besides the organiser; they are busy for it unless they decline. Sending it replaces the list.'],
+                'room_id' => self::int(true) + ['description' => 'The room it is held in, which it blocks.'],
+                'location' => self::str() + ['maxLength' => 255, 'description' => 'Where, in words: a place or a video link.'],
             ], []),
             'CalendarEventResponse' => self::object([
                 'data' => SchemaBuilder::ref('CalendarEvent'),
@@ -10669,6 +10964,16 @@ final class CoreApiSchemas
             'FrontendFeature' => self::object([
                 'id' => self::str(),
                 'plugin' => self::str(),
+                // WHIT-1127: only on a paid plugin's screens in grace or read-only.
+                'pluginAccess' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'state' => ['type' => 'string', 'enum' => ['on', 'read_only']],
+                        'reason' => self::str(true),
+                        'graceUntil' => self::str(true),
+                    ],
+                ],
                 'label' => self::str(),
                 'icon' => self::str(true),
                 'group' => self::str(),
@@ -10850,7 +11155,11 @@ final class CoreApiSchemas
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationEntry')],
                 'pagination' => SchemaBuilder::ref('Pagination'),
                 'unread_count' => self::int(),
-            ], ['data', 'pagination', 'unread_count']),
+                'unread' => self::object([
+                    'mentions' => self::int(),
+                    'updates' => self::int(),
+                ], ['mentions', 'updates']),
+            ], ['data', 'pagination', 'unread_count', 'unread']),
             'UnreadCountResponse' => self::object([
                 'unread_count' => self::int(),
             ], ['unread_count']),
@@ -10884,6 +11193,16 @@ final class CoreApiSchemas
                 'public_key' => self::str(),
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('PushDevice')],
             ], ['public_key', 'data']),
+            'NotificationSummaryWorkspace' => self::object([
+                'tenant_id' => self::int(),
+                'current' => self::bool(),
+                'push_devices' => self::int(),
+                'email' => ['type' => 'string', 'enum' => ['on', 'off', 'some']],
+                'push' => ['type' => 'string', 'enum' => ['on', 'off', 'some']],
+            ], ['tenant_id', 'current', 'push_devices', 'email', 'push']),
+            'NotificationSummaryResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationSummaryWorkspace')],
+            ], ['data']),
             'PushSubscriptionRequest' => self::object([
                 'endpoint' => self::str(),
                 'keys' => self::object(['p256dh' => self::str(), 'auth' => self::str()], ['p256dh', 'auth']),
@@ -11585,6 +11904,7 @@ final class CoreApiSchemas
                 'allowed_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'customer_invites' => self::bool(),
                 'invites_per_customer' => self::int() + ['description' => 'How many people one customer may invite; 0 is no limit (WHIT-1043).'],
+                'route_template_id' => self::int(true) + ['description' => 'The route template join requests travel on; null is the default, one step for everyone who can manage sign-ups.'],
                 'eligible_roles' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupEligibleRole')],
                 'pending_count' => self::int(),
                 'workspace_slug' => self::str(true),
@@ -11617,6 +11937,9 @@ final class CoreApiSchemas
                 ],
                 'invites_per_customer' => self::int() + [
                     'description' => 'How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043).',
+                ],
+                'route_template_id' => self::int(true) + [
+                    'description' => 'One of this workspace\'s route templates for join requests to travel on, or null for the default: one step for everyone who can manage sign-ups.',
                 ],
             ], []),
             'TeamInvitationItem' => self::object([
@@ -11700,9 +12023,15 @@ final class CoreApiSchemas
                 'request_id' => ['type' => 'integer', 'description' => 'The two-step reset request about to be approved'],
                 'profile_id' => ['type' => 'integer', 'description' => 'The person a reset is about to be started for, when there is no request'],
             ], []),
+            'GatedApprovalRequest' => self::object([
+                'code' => ['type' => 'string', 'description' => 'The code from the approver\'s authenticator, or the one emailed by the identity check'],
+            ], ['code']),
             'IdentityCheckResponse' => self::dataEnvelope(self::object([
-                'method' => ['type' => 'string', 'enum' => ['totp', 'email_code']],
+                'method' => ['type' => 'string', 'enum' => ['totp', 'email_code', 'fresh_sign_in']],
                 'email_hint' => self::str(true),
+                // fresh_sign_in (WHIT-1147): where to sign in again, and the purpose to name there.
+                'provider_key' => self::str(true),
+                'purpose' => self::str(true),
             ], ['method', 'email_hint'])),
             // OR.1: "I'm away".
             'AwayPeriod' => self::object([
@@ -12712,10 +13041,29 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('Requests awaiting approval', 'PendingPasswordResetListResponse'),
                 ] + self::authErrors(),
             ]),
-            self::permissionRoute('POST', '/api/password-resets/{id:\d+}/approve', 'password_resets:approve', [
-                'summary' => 'Apply the staged password (tenant-scoped)',
+            self::permissionRoute('POST', '/api/password-resets/identity-check', 'password_resets:approve', [
+                // AG.1: only the approver confirms it's them; an agent never starts the check.
+                'mcp' => ['expose' => false],
+                'summary' => 'Start the approver\'s "confirm it\'s you" check for a password reset: names it, and sends a code by email when that is the check',
                 'tags' => ['auth'],
+                'request' => self::object([
+                    'request_id' => ['type' => 'integer', 'description' => 'The password-reset request about to be approved'],
+                ], ['request_id']),
                 'responses' => [
+                    200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                    422 => self::errorResponse('A request_id is required'),
+                    429 => self::errorResponse('Too many codes were sent lately'),
+                    503 => self::errorResponse('Confirming it is you is not available'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/password-resets/{id:\d+}/approve', 'password_resets:approve', [
+                // AG.1: approved only by a person who confirms it's them, never by an agent.
+                'mcp' => ['expose' => false],
+                'summary' => 'Apply the staged password once the approver has confirmed it is them (tenant-scoped)',
+                'tags' => ['auth'],
+                'request' => 'GatedApprovalRequest',
+                'responses' => [
+                    503 => self::errorResponse('Confirming it is you is not available'),
                     200 => self::jsonResponse('Approved', 'ApprovalStatusResponse'),
                     404 => self::errorResponse('No pending password-reset request found for that id'),
                 ] + self::authErrors(),
@@ -12785,6 +13133,19 @@ final class CoreApiSchemas
                 'responses' => [
                     201 => self::jsonResponse('The chat', 'ChatDetailResponse'),
                     422 => self::errorResponse('No name, someone who is not in this workspace, or an agent that does not work for you'),
+                ] + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/chats/discuss', [
+                'mcp' => $personOnly,
+                'summary' => 'Open the chat about a board, a meeting or a record, starting it if new',
+                'description' => 'One group chat per linked board, meeting or record, named after it. You join it if you are not in it yet. '
+                    . '201 when the chat was started, 200 when it was already there; `created` says the same.',
+                'tags' => ['chat'],
+                'request' => 'ChatDiscussRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The chat it already had', 'ChatDiscussResponse'),
+                    201 => self::jsonResponse('The chat, just started', 'ChatDiscussResponse'),
+                    422 => self::errorResponse('The link is not a board, a meeting or a record with an id and a name'),
                 ] + self::authErrors(),
             ]),
             self::ungatedRoute('GET', '/api/chat/chats/{id:\d+}', [
@@ -12891,6 +13252,208 @@ final class CoreApiSchemas
                     409 => self::errorResponse('The message is not waiting'),
                 ] + $notFound + self::authErrors(),
             ]),
+            self::ungatedRoute('GET', '/api/chat/inbox', [
+                'mcp' => $personOnly,
+                'summary' => 'The one Chat list: your team chats and the workspace\'s customer conversations',
+                'description' => 'Customer conversations are included for people who may read them (messages.read): open and waiting ones, '
+                    . 'closed ones for 30 days, and any you pinned. Newest activity first.',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('The list', 'ChatInboxResponse')] + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/inbox/{id:\d+}/pin', [
+                'mcp' => $personOnly,
+                'summary' => 'Pin a chat or customer conversation to the top of your list, or unpin it',
+                'tags' => ['chat'],
+                'request' => 'ChatPinRequest',
+                'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/inbox/{id:\d+}/read', [
+                'mcp' => $personOnly,
+                'summary' => 'Mark a customer conversation read up to a message, for you',
+                'tags' => ['chat'],
+                'request' => 'ChatReadRequest',
+                'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
+            ]),
+            // The parts of a message (UC.6–UC.12, WHIT-1094).
+            self::ungatedRoute('PATCH', '/api/chat/messages/{id:\d+}', [
+                'mcp' => $personOnly,
+                'summary' => 'Edit your own message; "edited" shows on it',
+                'tags' => ['chat'],
+                'request' => 'ChatEditRequest',
+                'responses' => [200 => self::jsonResponse('The message', 'ChatMessageResponse'), 403 => self::errorResponse('Not your message')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('DELETE', '/api/chat/messages/{id:\d+}', [
+                'mcp' => $personOnly,
+                'summary' => 'Delete your own message for everyone, up to 2 days after sending it',
+                'description' => 'It stays in the chat as "This message was deleted".',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('The message', 'ChatMessageResponse'), 403 => self::errorResponse('Not your message'), 422 => self::errorResponse('Older than 2 days')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/messages/{id:\d+}/reactions', [
+                'mcp' => $personOnly,
+                'summary' => 'React to a message with an emoji, or take your reaction back',
+                'tags' => ['chat'],
+                'request' => 'ChatReactRequest',
+                'responses' => [200 => self::jsonResponse('The message', 'ChatMessageResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/messages/{id:\d+}/pin', [
+                'mcp' => $personOnly,
+                'summary' => 'Pin a message to the top of its chat for everyone in it, or unpin it',
+                'tags' => ['chat'],
+                'request' => 'ChatPinMessageRequest',
+                'responses' => [200 => self::jsonResponse('The message', 'ChatMessageResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/messages/{id:\d+}/thread', [
+                'summary' => 'A message and the replies in its thread',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('The thread', 'ChatThreadResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/chats/{id:\d+}/search', [
+                'summary' => 'Search a chat\'s messages by words and by who wrote them',
+                'tags' => ['chat'],
+                'parameters' => [self::queryParam('q', 'string', 'Words in the message'), self::queryParam('from', 'integer', 'Only messages this person wrote')],
+                'responses' => [200 => self::jsonResponse('Matching messages, newest first', 'ChatMessagesResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/chats/{id:\d+}/state', [
+                'mcp' => $personOnly,
+                'summary' => 'What an open chat polls for: new and changed lines, read marks, typing and pins',
+                'tags' => ['chat'],
+                'parameters' => [self::queryParam('after', 'integer', 'The newest message id you have'), self::queryParam('since', 'string', 'The `now` of your last poll')],
+                'responses' => [200 => self::jsonResponse('The chat\'s state', 'ChatStateResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/typing', [
+                'mcp' => $personOnly,
+                'summary' => 'Say you are typing in this chat (every few seconds while you type)',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
+            ]),
+            // Blocks inside messages (UC.5, WHIT-1096).
+            self::ungatedRoute('POST', '/api/chat/messages/{id:\d+}/vote', [
+                'mcp' => $personOnly,
+                'summary' => 'Vote in a poll, or change your vote',
+                'tags' => ['chat'],
+                'request' => 'ChatVoteRequest',
+                'responses' => [200 => self::jsonResponse('The message', 'ChatMessageResponse'), 422 => self::errorResponse('Closed, or more answers than the poll takes')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/records', [
+                'mcp' => $personOnly,
+                'summary' => 'Find a booking or a document to put in a message',
+                'tags' => ['chat'],
+                'parameters' => [self::queryParam('type', 'string', 'booking or document'), self::queryParam('q', 'string', 'Words in its name')],
+                'responses' => [200 => self::jsonResponse('Records', 'ChatRecordsResponse')] + self::authErrors(),
+            ]),
+            // Files, photos and voice (UC.10, WHIT-1095).
+            self::ungatedRoute('POST', '/api/chat/chats/{id:\d+}/attachments', [
+                'mcp' => $personOnly,
+                'summary' => 'Upload a photo, video, voice message or file to a chat, to send with your next message',
+                'description' => 'multipart/form-data with the file in `file`, up to 25 MB. Photos, videos, voice (webm, ogg, mp4, mp3), PDF, Word, Excel, PowerPoint, text, CSV and zip; the type is read from the file itself.',
+                'tags' => ['chat'],
+                'parameters' => [
+                    self::queryParam('duration_ms', 'integer', 'A voice message or video: its length'),
+                    self::queryParam('width', 'integer', 'A photo: its width'),
+                    self::queryParam('height', 'integer', 'A photo: its height'),
+                ],
+                'responses' => [201 => self::jsonResponse('The file, not sent yet', 'ChatAttachmentResponse'), 422 => self::errorResponse('Empty, too large or not a type Chat takes')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('PATCH', '/api/chat/attachments/{id:\d+}', [
+                'mcp' => $personOnly,
+                'summary' => 'Set the words of a voice message you have not sent yet',
+                'tags' => ['chat'],
+                'request' => 'ChatTranscriptRequest',
+                'responses' => [200 => self::jsonResponse('The words', 'ChatTranscriptResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/attachments/{id:\d+}', [
+                'mcp' => $personOnly,
+                'summary' => 'Read a file sent in a chat you are in',
+                'tags' => ['chat'],
+                'responses' => [200 => ['description' => 'The file\'s bytes, with its type']] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/chats/{id:\d+}/media', [
+                'summary' => 'A chat\'s photos and files, newest first',
+                'tags' => ['chat'],
+                'parameters' => [self::queryParam('kind', 'string', 'photos or files; both when empty')],
+                'responses' => [200 => self::jsonResponse('Photos and files', 'ChatAttachmentsResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/preferences', [
+                'mcp' => $personOnly,
+                'summary' => 'Your chat layout: bubbles or compact rows',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('Your preference', 'ChatPreferencesResponse')] + self::authErrors(),
+            ]),
+            self::ungatedRoute('PUT', '/api/chat/preferences', [
+                'mcp' => $personOnly,
+                'summary' => 'Choose bubbles or compact rows for your chats',
+                'tags' => ['chat'],
+                'request' => 'ChatPreferencesRequest',
+                'responses' => [200 => self::jsonResponse('Your preference', 'ChatPreferencesResponse')] + self::authErrors(),
+            ]),
+            // Forward and customer blocks (UC.5, UC.9, UC.10; WHIT-1106).
+            self::ungatedRoute('POST', '/api/chat/messages/{id:\d+}/forward', [
+                'mcp' => $personOnly,
+                'summary' => 'Forward a message, with its files, poll or record, to another chat you are in',
+                'tags' => ['chat'],
+                'request' => 'ChatForwardRequest',
+                'responses' => [201 => self::jsonResponse('The copy, in the other chat', 'ChatMessageResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/inbox/{id:\d+}/block-options', [
+                'mcp' => $personOnly,
+                'summary' => 'What a customer chat can send: booking times (services) and forms (messages.reply)',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('Services and forms', 'ChatCustomerBlockOptionsResponse'), 403 => self::errorResponse('Needs messages.reply')] + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/inbox/{id:\d+}/send-block', [
+                'mcp' => $personOnly,
+                'summary' => 'Send a customer booking times, a form or a payment link: they get words and the link (messages.reply)',
+                'tags' => ['chat'],
+                'request' => 'ChatCustomerBlockRequest',
+                'responses' => [201 => self::jsonResponse('The reply', 'MessagingMessageResponse'), 403 => self::errorResponse('Needs messages.reply'), 422 => self::errorResponse('Not something that can be sent')] + $notFound + self::authErrors(),
+            ]),
+            // Mute, blocking and bots (UC.4, UC.8, UC.12; WHIT-1097).
+            self::ungatedRoute('POST', '/api/chat/inbox/{id:\d+}/mute', [
+                'mcp' => $personOnly,
+                'summary' => 'Mute a chat for yourself, or unmute it; mentions still reach you',
+                'tags' => ['chat'],
+                'request' => 'ChatMuteRequest',
+                'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/inbox/{id:\d+}/block', [
+                'mcp' => $personOnly,
+                'summary' => 'Whether a customer conversation\'s contact is blocked, and since when',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('The block, or null', 'ChatBlockedSenderResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/inbox/{id:\d+}/block', [
+                'mcp' => $personOnly,
+                'summary' => 'Block a customer conversation\'s number or address: what they send is dropped (messages.manage)',
+                'tags' => ['chat'],
+                'request' => 'ChatBlockRequest',
+                'responses' => [201 => self::jsonResponse('The block', 'ChatBlockedSenderResponse'), 403 => self::errorResponse('Needs messages.manage')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/blocked', [
+                'mcp' => $personOnly,
+                'summary' => 'Everyone the workspace blocked (messages.manage)',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('Blocked senders', 'ChatBlockedSendersResponse'), 403 => self::errorResponse('Needs messages.manage')] + self::authErrors(),
+            ]),
+            self::ungatedRoute('DELETE', '/api/chat/blocked/{id:\d+}', [
+                'mcp' => $personOnly,
+                'summary' => 'Unblock a sender (messages.manage)',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse'), 403 => self::errorResponse('Needs messages.manage')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/bots', [
+                'mcp' => $personOnly,
+                'summary' => 'The workspace\'s bots: away reply, welcome and hand-over (messages.manage)',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('Bots', 'ChatBotsResponse'), 403 => self::errorResponse('Needs messages.manage')] + self::authErrors(),
+            ]),
+            self::ungatedRoute('PUT', '/api/chat/bots/{kind:[a-z]+}', [
+                'mcp' => $personOnly,
+                'summary' => 'Turn a bot on or off and set its rule (messages.manage)',
+                'tags' => ['chat'],
+                'request' => 'ChatBotRequest',
+                'responses' => [200 => self::jsonResponse('The bot', 'ChatBotResponse'), 403 => self::errorResponse('Needs messages.manage'), 422 => self::errorResponse('Not a bot Chat has')] + self::authErrors(),
+            ]),
             self::ungatedRoute('GET', '/api/chat/directory', [
                 'summary' => 'Find people and agents to add to a chat or mention',
                 'tags' => ['chat'],
@@ -12973,10 +13536,13 @@ final class CoreApiSchemas
             self::permissionRoute('POST', '/api/messages/conversations/{id:\d+}/replies', 'messages:reply', [
                 'mcp' => $cancelHeld,
                 'summary' => 'Reply to the customer in a conversation',
-                'description' => 'Sent on the conversation\'s channel from a background job. An agent\'s reply waits five minutes '
+                'description' => 'Sent from a background job on the channel the customer last wrote on, or on `channel` when it names another they have (`send_by`). An agent\'s reply waits five minutes '
                     . 'and can be cancelled in that time.',
                 'tags' => ['messages'],
-                'request' => 'MessagingBodyRequest',
+                'request' => self::object([
+                    'body' => self::str() + ['description' => 'The text, in plain words.'],
+                    'channel' => self::str() + ['description' => 'Send by this channel (one from the conversation\'s send_by). Default: where the customer last wrote.'],
+                ], ['body']),
                 'responses' => [
                     201 => self::jsonResponse('The queued reply', 'MessagingMessageResponse'),
                 ] + $refused + self::authErrors(),
@@ -13340,10 +13906,12 @@ final class CoreApiSchemas
             self::permissionRoute('POST', '/api/signup/requests/{id:\d+}/approve', 'signup:manage', [
                 'summary' => 'Let a waiting person join as a customer',
                 'description' => 'Creates the customer membership with the current starting role. A '
-                    . 'rejected request can be approved later.',
+                    . 'rejected request can be approved later. A request on its route is answered there: '
+                    . 'your step\'s approval, which decides it unless the workspace\'s route has more steps (202).',
                 'tags' => ['signup'],
                 'responses' => [
                     200 => self::jsonResponse('Approved', 'SignupDecisionResponse'),
+                    202 => ['description' => 'Your step is answered; the route has more to decide'],
                     404 => self::errorResponse('No request waiting for a decision has that id'),
                     409 => self::errorResponse('The starting role is missing or unsafe, or the person is suspended or invited here'),
                 ] + self::authErrors(),
@@ -13353,6 +13921,8 @@ final class CoreApiSchemas
                 'tags' => ['signup'],
                 'responses' => [
                     200 => self::jsonResponse('Rejected', 'SignupDecisionResponse'),
+                    202 => ['description' => 'Your step is answered; the route has more to decide'],
+                    409 => self::errorResponse('The request\'s route refused the answer (for example, it is not your step)'),
                     404 => self::errorResponse('No pending request has that id'),
                 ] + self::authErrors(),
             ]),
@@ -13536,6 +14106,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/2fa-recovery/{id:\d+}/approve', 'two_factor_recovery:approve', [
+                // AG.1: approved only by a person who confirms it's them, never by an agent.
+                'mcp' => ['expose' => false],
                 'summary' => 'Approve a two-step reset: the first admin\'s approval is recorded, a second admin\'s clears the two-step and sends a reset link',
                 'description' => 'Two different admins must approve, and the person asking can never approve their own (AG.1). Each approval first confirms the admin is who they say with a code.',
                 'tags' => ['auth'],
@@ -13557,6 +14129,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/2fa-recovery/identity-check', 'two_factor_recovery:approve', [
+                // AG.1: only the approver confirms it's them; an agent never starts the check.
+                'mcp' => ['expose' => false],
                 'summary' => 'Start the admin\'s "confirm it\'s you" check: names it, and sends a code by email when that is the check',
                 'tags' => ['auth'],
                 'request' => 'IdentityCheckRequest',
@@ -13575,6 +14149,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/2fa-recovery/force-reset', 'two_factor_recovery:approve', [
+                // AG.1: approved only by a person who confirms it's them, never by an agent.
+                'mcp' => ['expose' => false],
                 'summary' => 'Start a two-step reset for a named profile with no prior request; it counts as the first approval (tenant-scoped)',
                 'tags' => ['auth'],
                 'request' => 'ForceResetRequest',
@@ -13989,6 +14565,33 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('What this tenant has paid', 'BillingReceiptListResponse'),
                     502 => self::errorResponse('The billing service refused the request'),
                     503 => self::errorResponse('The billing service is temporarily unreachable'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/billing/cash-payments', 'plans:manage', [
+                'summary' => 'List a workspace\'s cash payments',
+                'description' => 'Operator only. ?workspace=<id>.',
+                'tags' => ['billing'],
+                'parameters' => [self::queryParam('workspace', 'integer', 'The workspace.')],
+                'responses' => [200 => self::jsonResponse('Its cash payments, newest first', 'CashPaymentListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/billing/cash-payments', 'plans:manage', [
+                'summary' => 'Record a cash payment for a paid plugin plan',
+                'description' => 'Operator only. Covers the workspace from the date paid, or the end of its current cash cover if later, for the plan\'s period.',
+                'tags' => ['billing'],
+                'request' => 'CashPaymentCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('Recorded', 'CashPaymentResponse'),
+                    422 => self::errorResponse('Something is missing or wrong; the message says what'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/billing/cash-payments/{id:\d+}/void', 'plans:manage', [
+                'summary' => 'Void a cash payment, saying why',
+                'tags' => ['billing'],
+                'parameters' => [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'The cash payment.', 'schema' => ['type' => 'integer']]],
+                'request' => 'CashPaymentVoidRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Voided', 'CashPaymentResponse'),
+                    422 => self::errorResponse('No reason, no such payment, or already voided'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/billing/quantity', 'billing:pay', [
@@ -15644,7 +16247,7 @@ final class CoreApiSchemas
                         . '`unavailable` and the rest is still served. There are no pages: the rest is on Inbox and Approvals.',
                     'tags' => ['inbox'],
                     'parameters' => [
-                        self::queryParam('limit', 'integer', 'How many rows (default 6, max 50)'),
+                        self::queryParam('limit', 'integer', 'How many rows (default 6, max 200: the Inbox reads the whole list)'),
                     ],
                     'responses' => [
                         200 => self::jsonResponse('The oldest rows and the totals', 'WaitingListResponse'),
@@ -16112,6 +16715,8 @@ final class CoreApiSchemas
             'request' => $editable
                 ? self::object([
                     'arguments' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Edited arguments to run with instead of the agent\'s (optional).'],
+                    // AG.1: a Needs verifying proposal needs the person's fresh check.
+                    'code' => ['type' => 'string', 'description' => 'For a Needs verifying (tier 3) proposal: the code from the person\'s authenticator, or the one emailed after identity-check.'],
                     // WHIT-1042: the tick on a destructive impact plan.
                     'acknowledgedDestructive' => ['type' => 'boolean', 'description' => 'Needed for a Whity Builder publish or roll back that stops showing data people entered: the person ticked that they understand what is lost.'],
                 ], [])
@@ -16148,6 +16753,25 @@ final class CoreApiSchemas
                     'Runs the operation as your delegate, after checking again that you and the agent may. Edit the arguments by sending them. Runs once, however many times it is approved.',
                     true,
                 ),
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/agent-proposals/{id:\d+}/identity-check',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Start "confirm it\'s you" before approving a Needs verifying proposal',
+                    'description' => 'Names the check (an authenticator code, or a code sent by email) and sends the email code when that is the check. The code then goes with the approval.',
+                    'tags' => ['me'],
+                    'parameters' => [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'ID of the proposal.', 'schema' => ['type' => 'integer']]],
+                    'responses' => [
+                        200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                        404 => self::errorResponse('No such proposal made on your behalf'),
+                        422 => self::errorResponse('This proposal needs no check'),
+                        429 => self::errorResponse('Too many codes were sent lately'),
+                        503 => self::errorResponse('Confirming it is you is not available'),
+                    ] + self::authErrors(),
+                ],
             ],
             [
                 'method' => 'POST',
@@ -18204,6 +18828,18 @@ final class CoreApiSchemas
                 'tags' => ['calendar'],
                 'responses' => [200 => self::jsonResponse('The settings', self::dataEnvelope(SchemaBuilder::ref('CalendarSettings')))] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/calendar/my-view', 'calendar:read', [
+                'summary' => 'Read your own calendar choices: view, Colour by, people and rooms shown',
+                'tags' => ['calendar'],
+                'responses' => [200 => self::jsonResponse('Your choices', self::dataEnvelope(SchemaBuilder::ref('CalendarViewChoices')))] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/calendar/my-view', 'calendar:read', [
+                'summary' => 'Change your own calendar choices; fields left out keep their value, null forgets one',
+                'description' => 'Only changes what you see. Everyone else keeps their own choices.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarViewChoices',
+                'responses' => [200 => self::jsonResponse('Your choices', self::dataEnvelope(SchemaBuilder::ref('CalendarViewChoices')))] + self::authErrors(),
+            ]),
             self::permissionRoute('PUT', '/api/calendar/settings', 'calendar:manage', [
                 'summary' => 'Change the calendar settings; fields left out keep their value',
                 'description' => 'The time zone is the workspace setting `timezone`, changed in Settings, not here.',
@@ -18350,6 +18986,16 @@ final class CoreApiSchemas
                     422 => self::errorResponse('Outside the booking window, or missing customer details'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/calendar/day-counts', 'calendar:read', [
+                'summary' => 'Count live bookings a day, by person, room and service, for up to a year',
+                'description' => 'For the Year view: each row is one day, person, room and service with its count. Days are the workspace\'s calendar dates.',
+                'tags' => ['calendar'],
+                'parameters' => $range,
+                'responses' => [
+                    200 => self::jsonResponse('Counts', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarDayCount')])),
+                    422 => self::errorResponse('A missing or reversed range, or more than a year'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/calendar/bookings/{id:\d+}', 'calendar:read', [
                 'summary' => 'Get one booking',
                 'tags' => ['calendar'],
@@ -18365,7 +19011,7 @@ final class CoreApiSchemas
                 'responses' => [
                     200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
                     404 => self::errorResponse('Not found'),
-                    409 => self::errorResponse('That time was just taken'),
+                    409 => self::errorResponse('That time was just taken; `reason` says why when known: person_busy (Book anyway is possible), room_taken or closed'),
                     422 => self::errorResponse('A cancelled booking, or outside the booking window'),
                 ] + self::authErrors(),
             ]),
@@ -18451,6 +19097,34 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Not found'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/calendar/items', 'calendar:read', [
+                'summary' => 'Everything on the calendar in a range, in one list',
+                'description' => 'Bookings, events, meetings, time off and synced events with one shape (ADR 0018). `can` says what you may do with each. Someone else\'s time off reads "Away" and their synced events "Busy".',
+                'tags' => ['calendar'],
+                'parameters' => array_merge($range, [
+                    self::queryParam('people', 'string', 'Whose calendars, as comma-separated profile ids (people invited count). All when omitted.'),
+                    self::queryParam('kinds', 'string', 'Which kinds, comma-separated: booking, event, meeting, time_off, external, task_due. All but task_due when omitted; tasks due come from Taskaat only when named, and only with tasks:read.'),
+                    self::queryParam('cancelled', 'string', '1 to include cancelled bookings.'),
+                    self::queryParam('unit_id', 'integer', 'Only bookings in this branch.'),
+                ]),
+                'responses' => [
+                    200 => self::jsonResponse('The items, oldest start first', self::object([
+                        'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarItem')],
+                        'unavailable' => ['type' => 'array', 'items' => self::str(), 'description' => 'Kinds that could not be read just now (task_due when Taskaat did not answer); everything else is complete.'],
+                    ], ['data', 'unavailable'])),
+                    422 => self::errorResponse('A bad range, id list or kind'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/events/{id:\d+}/answer', 'calendar:read', [
+                'summary' => 'Say whether you\'ll come to an event you are invited to',
+                'tags' => ['calendar'],
+                'request' => 'CalendarEventAnswerRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The event', self::dataEnvelope(SchemaBuilder::ref('CalendarEvent'))),
+                    404 => self::errorResponse('No such event, or you are not invited'),
+                    422 => self::errorResponse('An unknown answer'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/calendar/events', 'calendar:read', [
                 'summary' => 'List staff events in a range',
                 'tags' => ['calendar'],
@@ -18474,6 +19148,7 @@ final class CoreApiSchemas
                 'responses' => [
                     200 => self::jsonResponse('The event', SchemaBuilder::ref('CalendarEventResponse')),
                     404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('A formal meeting: change it on the meeting (code meeting)'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('DELETE', '/api/calendar/events/{id:\d+}', 'calendar:write', [
@@ -18482,6 +19157,7 @@ final class CoreApiSchemas
                 'responses' => [
                     200 => self::jsonResponse('Removed', self::dataEnvelope(self::object(['id' => self::int(), 'deleted' => self::bool()], ['id', 'deleted']))),
                     404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('A formal meeting: cancel it on the meeting (code meeting)'),
                 ] + self::authErrors(),
             ]),
         ];
@@ -18593,6 +19269,7 @@ final class CoreApiSchemas
         $readOnly = ['readOnlyHint' => true, 'idempotentHint' => true];
         $propose = ['agentPolicy' => 'propose'];
         $plugin = ['name' => 'plugin', 'in' => 'path', 'required' => true, 'description' => 'The workspace plugin\'s slug: its name in lower case, as its permissions start with.', 'schema' => ['type' => 'string']];
+        $codePlugin = ['name' => 'plugin', 'in' => 'path', 'required' => true, 'description' => 'The installed plugin\'s name, as it gives it (FrontOffice).', 'schema' => ['type' => 'string']];
         $id = static fn (string $what): array => ['name' => 'id', 'in' => 'path', 'required' => true, 'description' => $what, 'schema' => ['type' => 'integer']];
 
         return [
@@ -18752,6 +19429,80 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            // WHIT-1122: installed code plugins, switched on per workspace.
+            self::permissionRoute('GET', '/api/workspace/code-plugins', 'plugins:read', [
+                'summary' => 'List the installed plugins this workspace can use',
+                'description' => 'Plugins installed for the whole installation that the operator lets workspaces use, each with whether it is on here, whether this workspace can switch it, and the last change.',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('The plugins', 'WorkspaceCodePluginListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/enable', 'plugins:enable', [
+                'summary' => 'Turn an installed plugin on for this workspace',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('Turned on', 'WorkspaceCodePluginSwitchResponse'),
+                    402 => self::errorResponse('A paid plugin needs a plan that includes it, a purchase or a trial; details.reason is needs_purchase'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                    409 => self::errorResponse('The plugin is on for every workspace and has no switch'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/trial', 'plugins:enable', [
+                'summary' => 'Start this workspace\'s free trial of a paid plugin',
+                'description' => 'Once per workspace and plugin. Turns the plugin on until the trial ends; then 7 days of grace, then read-only unless it was bought.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('The trial started', 'WorkspaceCodePluginTrialResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                    409 => self::errorResponse('Already had its trial, or the plugin offers none'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/disable', 'plugins:disable', [
+                'summary' => 'Turn an installed plugin off for this workspace',
+                'description' => 'Its data is kept; turning it back on brings everything back.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('Turned off', 'WorkspaceCodePluginSwitchResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                    409 => self::errorResponse('The plugin is on for every workspace and has no switch'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/history', 'plugins:read', [
+                'summary' => 'Who turned an installed plugin on or off in this workspace, and when',
+                'description' => 'Newest first, at most 50.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('The changes', 'WorkspaceCodePluginHistoryResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace/onboarding', 'plugins:read', [
+                'summary' => 'List the guided setups of the plugins on in this workspace',
+                'description' => 'Each plugin\'s step-by-step setup the caller may run, in the caller\'s language, with the plugin route that says which steps are done (SDK 1.109).',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('The guided setups', 'WorkspaceOnboardingListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/plugins/workspace-access', 'plugins:read', [
+                'summary' => 'List who can use each installed plugin',
+                'description' => 'Operator only (the system workspace).',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('Each active plugin and its workspace access', 'CodePluginAccessListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/workspace-access', 'plugins:enable', [
+                'summary' => 'Choose who can use an installed plugin',
+                'description' => 'Operator only. all: on for every workspace. choose: each workspace turns it on. operator: only the system workspace.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'request' => 'CodePluginAccessRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The access as it now stands', 'CodePluginAccessResponse'),
+                    404 => self::errorResponse('Not an active plugin'),
+                    422 => self::errorResponse('access must be all, choose or operator'),
+                ] + self::authErrors(),
+            ]),
         ];
     }
 
@@ -18781,6 +19532,77 @@ final class CoreApiSchemas
                 'updated_at' => self::str(),
             ], ['slug', 'plugin', 'version_id', 'version', 'trust', 'enabled', 'automations_enabled']),
             'WorkspacePluginListResponse' => self::listEnvelope('WorkspacePlugin'),
+            'WorkspaceCodePlugin' => self::object([
+                'name' => self::str() + ['description' => 'The plugin\'s name'],
+                'version' => self::str(),
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose'], 'description' => 'all: on for every workspace; choose: this workspace decides'],
+                'canSwitch' => self::bool(),
+                'enabled' => self::bool() + ['description' => 'Whether it is on in this workspace'],
+                'changedAt' => ['type' => 'string', 'nullable' => true],
+                'changedBy' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
+                'state' => ['type' => 'string', 'enum' => ['on', 'read_only', 'off'], 'description' => 'read_only: a paid plugin whose access ended; reads work, writes are refused'],
+                'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['free_for_all', 'entitled', 'cash', 'trial', 'grace', 'lapsed', 'installation_unlicensed', 'installation_grace', null]],
+                'graceUntil' => ['type' => 'string', 'nullable' => true],
+                'trialEndsAt' => ['type' => 'string', 'nullable' => true],
+                'paid' => self::bool(),
+                'product' => ['type' => 'string', 'nullable' => true, 'description' => 'What the workspace buys, plugin.<slug>'],
+                'trialDays' => self::int(),
+                'trialAvailable' => self::bool(),
+                'mayTurnOn' => self::bool() + ['description' => 'Free, included in the plan or an add-on, free for every workspace, or in a trial'],
+                'onboarding' => self::bool() + ['description' => 'It has a guided setup at /admin/setup/{plugin}'],
+                'dependsOn' => ['type' => 'array', 'items' => self::str(), 'description' => 'Plugins turned on with it in this workspace'],
+                'seats' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'description' => 'Sold per seat (SDK 1.110): how many this workspace has, and what one is called',
+                    'properties' => [
+                        'count' => self::int(),
+                        'unit' => SchemaBuilder::ref('LocalizedLabel'),
+                        'units' => SchemaBuilder::ref('LocalizedLabel'),
+                    ],
+                ],
+            ], ['name', 'version', 'access', 'canSwitch', 'enabled', 'state', 'paid', 'trialAvailable', 'mayTurnOn']),
+            'WorkspaceCodePluginListResponse' => self::listEnvelope('WorkspaceCodePlugin'),
+            'WorkspaceCodePluginSwitchResponse' => self::object([
+                'data' => self::object(['name' => self::str(), 'enabled' => self::bool()], ['name', 'enabled']),
+            ], ['data']),
+            'WorkspaceCodePluginHistoryResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => self::object([
+                    'action' => ['type' => 'string', 'enum' => ['enabled', 'disabled', 'trial_started']],
+                    'at' => self::str(),
+                    'by' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
+                ], ['action', 'at'])],
+            ], ['data']),
+            'WorkspaceOnboarding' => self::object([
+                'plugin' => self::str(),
+                'title' => self::str(true),
+                'description' => self::str(true),
+                'status' => self::str() + ['description' => 'The plugin\'s GET route answering {data: {steps: {<id>: bool}}}'],
+                'steps' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::str(),
+                    'title' => self::str(true),
+                    'description' => self::str(true),
+                    'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
+                ], ['id', 'blocks'])],
+            ], ['plugin', 'status', 'steps']),
+            'WorkspaceOnboardingListResponse' => self::listEnvelope('WorkspaceOnboarding'),
+            'WorkspaceCodePluginTrialResponse' => self::object([
+                'data' => self::object(['name' => self::str(), 'enabled' => self::bool(), 'trialEndsAt' => ['type' => 'string', 'nullable' => true]], ['name', 'enabled']),
+            ], ['data']),
+            'CodePluginAccess' => self::object([
+                'name' => self::str(),
+                'version' => self::str(),
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose', 'operator']],
+                'freeForAll' => self::bool() + ['description' => 'A paid plugin is free for every workspace'],
+            ], ['name', 'access', 'freeForAll']),
+            'CodePluginAccessListResponse' => self::listEnvelope('CodePluginAccess'),
+            'CodePluginAccessRequest' => self::object([
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose', 'operator'], 'description' => 'Who can use it: all (on for every workspace), choose (each workspace turns it on) or operator (the system workspace only)'],
+                'freeForAll' => self::bool() + ['description' => 'For a paid plugin: free for every workspace, with no plan, add-on or trial needed. Left out: unchanged.'],
+            ], ['access']),
+            'CodePluginAccessResponse' => self::object([
+                'data' => SchemaBuilder::ref('CodePluginAccess'),
+            ], ['data']),
             'WorkspacePluginManifestRequest' => self::object(['manifest' => $manifest], ['manifest']),
             'PublishWorkspacePluginRequest' => self::object([
                 'manifest' => $manifest,

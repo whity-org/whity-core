@@ -100,6 +100,9 @@ final class MessagesApiHandler
 
             return Response::json(['data' => MessagesPresenter::conversation($conversation) + [
                 'messages' => array_map([MessagesPresenter::class, 'message'], $messages),
+                // C5 (UC.3): what "Send by" offers: the channels this customer
+                // wrote on, the one they last used first.
+                'send_by' => MessagesPresenter::sendBy($this->messaging->contacts()->addresses($tenantId, (int) $conversation['id'])),
             ]]);
         });
     }
@@ -135,12 +138,14 @@ final class MessagesApiHandler
     {
         return $this->guard($request, function (int $tenantId, int $profileId) use ($request, $params): Response {
             $body = JsonBody::parsed($request);
+            $sendBy = isset($body['channel']) && is_string($body['channel']) && $body['channel'] !== '' ? $body['channel'] : null;
             $message = $this->messaging->reply(
                 $tenantId,
                 (int) ($params['id'] ?? 0),
                 $profileId,
                 (string) ($body['body'] ?? ''),
-                $request->isAgent()
+                $request->isAgent(),
+                sendBy: $sendBy,
             );
 
             return Response::json(['data' => MessagesPresenter::message($message)], 201);
