@@ -52,6 +52,8 @@ export interface Message {
   send_after: string | null;
   sent_at: string | null;
   created_at: string;
+  /** One chat (UC.5): booking times, a form or a payment link the team sent; staff only. */
+  block?: import('./chat-wire').CustomerBlock | null;
 }
 
 export interface ConversationList {

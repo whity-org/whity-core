@@ -22,7 +22,20 @@ interface AgentOption {
   name: string;
 }
 
-export function NewTaskDialog({ board, initialTitle = '', onClose, onCreated }: { board?: string; initialTitle?: string; onClose: () => void; onCreated: () => void }) {
+export function NewTaskDialog({
+  board,
+  initialTitle = '',
+  initialDetail,
+  onClose,
+  onCreated,
+}: {
+  board?: string;
+  initialTitle?: string;
+  /** Saved as the task's detail; Chat's "Turn into a task" puts the message and a link back here. */
+  initialDetail?: string;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
   const t = useTranslation('tasks');
   const { user } = useAuth();
   const [boardId, setBoardId] = useState(board ?? '');
@@ -58,7 +71,7 @@ export function NewTaskDialog({ board, initialTitle = '', onClose, onCreated }: 
     try {
       tasksResult(
         await api.POST('/api/v1/tasks', {
-          body: { board: boardId, title: title.trim(), ...(due ? { due_date: due } : {}), ...(assignee ? { assignee } : {}) },
+          body: { board: boardId, title: title.trim(), ...(initialDetail ? { detail: initialDetail } : {}), ...(due ? { due_date: due } : {}), ...(assignee ? { assignee } : {}) },
         }),
         t('error.create', 'Taskaat did not create the task. Try again.'),
       );

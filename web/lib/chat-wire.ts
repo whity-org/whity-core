@@ -100,6 +100,8 @@ export interface ChatMessage {
   reactions: ChatReaction[];
   attachments: ChatAttachment[];
   block: ChatBlock | null;
+  /** Forwarded from another chat: who wrote it there. */
+  forwarded_from?: string | null;
   pinned: boolean;
   edited: boolean;
   deleted: boolean;
@@ -254,6 +256,19 @@ export interface CustomerChatItem {
 }
 
 export type TeamChatItem = ChatSummary & { kind: 'team'; pinned: boolean; muted?: boolean };
+
+/** A block the team sent a customer (UC.5): the customer got words and the link. */
+export type CustomerBlock =
+  | { type: 'booking_times'; service: { id: number; name: string; minutes: number }; times: string[]; url: string }
+  | { type: 'form'; form: { id: number; title: string }; url: string }
+  | { type: 'payment'; description: string; amount: string; currency: string; url: string; reference: string | null };
+
+/** What a customer chat's + can send in this workspace. */
+export interface CustomerBlockOptions {
+  booking_page: boolean;
+  services: { id: number; name: string; minutes: number }[];
+  forms: { id: number; title: string }[];
+}
 
 /** A number or address the workspace blocked (UC.12). */
 export interface ChatBlockedSender {

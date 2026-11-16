@@ -2086,6 +2086,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/inbox/{id}/block-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What a customer chat can send: booking times (services) and forms (messages.reply) */
+        get: operations["get_api_v1_chat_inbox_id_block_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat/inbox/{id}/mute": {
         parameters: {
             query?: never;
@@ -2131,6 +2148,23 @@ export interface paths {
         put?: never;
         /** Mark a customer conversation read up to a message, for you */
         post: operations["post_api_v1_chat_inbox_id_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox/{id}/send-block": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a customer booking times, a form or a payment link: they get words and the link (messages.reply) */
+        post: operations["post_api_v1_chat_inbox_id_send_block"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2186,6 +2220,23 @@ export interface paths {
         put?: never;
         /** Decline an agent's held message (the person it works for) */
         post: operations["post_api_v1_chat_messages_id_decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/messages/{id}/forward": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Forward a message, with its files, poll or record, to another chat you are in */
+        post: operations["post_api_v1_chat_messages_id_forward"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11958,6 +12009,57 @@ export interface components {
             agent_id?: number;
             link?: components["schemas"]["ChatLink"];
         };
+        ChatCustomerBlock: {
+            /** @enum {string} */
+            type: "booking_times" | "form" | "payment";
+            /** @description The link the customer got. */
+            url: string;
+            service?: {
+                id: number;
+                name: string;
+                minutes: number;
+            };
+            times?: string[];
+            form?: {
+                id: number;
+                title: string;
+            };
+            description?: string;
+            /** @description In normal units, as a decimal string. */
+            amount?: string;
+            currency?: string;
+            reference?: string | null;
+        };
+        ChatCustomerBlockOptionsResponse: {
+            data: {
+                booking_page: boolean;
+                services: {
+                    id: number;
+                    name: string;
+                    minutes: number;
+                }[];
+                forms: {
+                    id: number;
+                    title: string;
+                }[];
+            };
+        };
+        ChatCustomerBlockRequest: {
+            /** @enum {string} */
+            type: "booking_times" | "form" | "payment";
+            /** @description Your words above the link. */
+            text?: string;
+            service_id?: number;
+            /** @description Up to six future times (ISO 8601). */
+            times?: string[];
+            form_id?: number;
+            /** @description A payment link (https), from Whity Pay. */
+            url?: string;
+            reference?: string;
+            amount?: string;
+            currency?: string;
+            description?: string;
+        };
         ChatDetailResponse: {
             data: components["schemas"]["Chat"] & {
                 members: components["schemas"]["ChatMember"][];
@@ -11996,6 +12098,10 @@ export interface components {
         ChatFocusRequest: {
             /** @description True while the chat is open in a focused window; false when it stops. */
             focused?: boolean;
+        };
+        ChatForwardRequest: {
+            /** @description The chat to forward to; you must be in it. */
+            chat_id: number;
         };
         ChatInboxItem: {
             /** @description The conversation id; /chat?c=<id> opens it whatever its kind. */
@@ -12112,6 +12218,8 @@ export interface components {
             attachments?: components["schemas"]["ChatAttachment"][];
             /** @description A poll, or a Whity record with its live status (UC.5). */
             block?: components["schemas"]["ChatBlock"] | null;
+            /** @description Forwarded from another chat: who wrote it there (UC.9). */
+            forwarded_from?: string | null;
             pinned?: boolean;
             edited?: boolean;
             /** @description Shown as "This message was deleted"; the body is empty. */
@@ -16153,6 +16261,8 @@ export interface components {
             status: "received" | "queued" | "sent" | "delivered" | "read" | "failed" | "cancelled" | "noted";
             status_detail?: string | null;
             attachments_not_shown?: number;
+            /** @description Booking times, a form or a payment link the team sent (UC.5). Only the team sees it; the customer got words and the link. */
+            block?: components["schemas"]["ChatCustomerBlock"] | null;
             send_after?: string | null;
             sent_at?: string | null;
             created_at: string;
@@ -30456,6 +30566,73 @@ export interface operations {
             };
         };
     };
+    get_api_v1_chat_inbox_id_block_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Services and forms */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatCustomerBlockOptionsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Needs messages.reply */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_chat_inbox_id_mute: {
         parameters: {
             query?: never;
@@ -30678,6 +30855,95 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_inbox_id_send_block: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatCustomerBlockRequest"];
+            };
+        };
+        responses: {
+            /** @description The reply */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagingMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Needs messages.reply */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not something that can be sent */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -30986,6 +31252,86 @@ export interface operations {
             };
             /** @description The message is not waiting */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_messages_id_forward: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatForwardRequest"];
+            };
+        };
+        responses: {
+            /** @description The copy, in the other chat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

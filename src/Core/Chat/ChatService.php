@@ -799,6 +799,7 @@ final class ChatService
                 'reactions' => array_values($grouped),
                 'attachments' => $deleted ? [] : ($files[$id] ?? []),
                 'block' => $blocks[$id] ?? null,
+                'forwarded_from' => is_array($meta['forwarded'] ?? null) ? (string) ($meta['forwarded']['from'] ?? '') : null,
                 'pinned' => ($r['pinned_at'] ?? null) !== null,
                 'edited' => ($r['edited_at'] ?? null) !== null,
                 'deleted' => $deleted,
@@ -1197,6 +1198,44 @@ final class ChatService
             'pinned' => $this->presentMessages($tenantId, $this->repo->pinnedMessages($tenantId, $chatId, $floor), $viewer),
             'now' => self::iso($now),
         ];
+    }
+
+    // ── Forward (UC.9) ───────────────────────────────────────────────────────
+
+    /**
+     * Send a copy of a message to another chat the person is in: its words,
+     * its poll or record, and copies of its files, marked "Forwarded".
+     *
+     * @return array<string, mixed> the new message, in the other chat
+     */
+    public function forward(int $tenantId, ChatViewer $viewer, int $messageId, int $toChatId): array
+    {
+        $this->personOnly($viewer);
+        $message = $this->messageInChat($tenantId, $viewer, $messageId);
+        if ($message['deleted_at'] !== null || !in_array((string) $message['source'], ['chat.person', 'chat.agent'], true)) {
+            throw new ChatException('Only messages people and agents wrote can be forwarded.');
+        }
+        $this->open($tenantId, $viewer, $toChatId);
+        $from = $message['by_agent'] ? (string) ($message['chat_meta']['agent']['name'] ?? '') : (string) ($message['author_name'] ?? '');
+        $meta = ['forwarded' => ['from' => $from]];
+        if (is_array($message['chat_meta']['block'] ?? null)) {
+            $meta['block'] = $message['chat_meta']['block'];
+        }
+        $copies = [];
+        if ($this->attachments !== null) {
+            foreach ($this->attachments->forMessages($tenantId, [$messageId])[$messageId] ?? [] as $file) {
+                $copies[] = $this->attachments->copyForChat($tenantId, (int) $file['id'], $toChatId, $viewer->profileId);
+            }
+        }
+        $id = $this->repo->insertMessage($tenantId, $toChatId, $viewer->profileId, false, 'chat.person', (string) $message['body_text'], $meta);
+        if ($copies !== []) {
+            $this->files()->attach($tenantId, $id, $copies);
+        }
+        $this->repo->markRead($tenantId, (int) $this->open($tenantId, $viewer, $toChatId)[2]['id'], $id);
+        $body = (string) $message['body_text'];
+        $this->pushLine($tenantId, $toChatId, $id, $viewer->profileId, $this->who($viewer->profileId)['name'], $body !== '' ? $body : 'Forwarded a message', []);
+
+        return $this->presented($tenantId, $id, $viewer);
     }
 
     // ── Blocks inside messages (UC.5) ────────────────────────────────────────

@@ -21,7 +21,7 @@ final class MessageRepository
 
     private const COLUMNS = 'm.id, m.tenant_id, m.conversation_id, m.kind, m.author_profile_id, m.by_agent, m.source,
         m.body_text, m.body_html, m.external_id, m.in_reply_to, m.status, m.status_detail, m.attachments_not_shown,
-        m.send_after, m.sent_at, m.created_at, p.display_name AS author_name';
+        m.send_after, m.sent_at, m.created_at, p.display_name AS author_name, m.chat_meta';
 
     public function __construct(private readonly PDO $db)
     {
@@ -30,7 +30,7 @@ final class MessageRepository
     /**
      * @param array{kind: string, status: string, body_text: string, body_html?: ?string, author_profile_id?: ?int,
      *              by_agent?: bool, source?: ?string, external_id?: ?string, in_reply_to?: ?string,
-     *              attachments_not_shown?: int, send_after_seconds?: int} $m
+     *              attachments_not_shown?: int, send_after_seconds?: int, chat_meta?: array<string, mixed>} $m
      */
     public function insert(int $tenantId, int $conversationId, array $m): int
     {
@@ -39,9 +39,9 @@ final class MessageRepository
 
         $stmt = $this->db->prepare(
             'INSERT INTO messages (tenant_id, conversation_id, kind, author_profile_id, by_agent, source, body_text, body_html,
-                                   external_id, in_reply_to, status, attachments_not_shown, send_after, created_at)
+                                   external_id, in_reply_to, status, attachments_not_shown, send_after, chat_meta, created_at)
              VALUES (:tid, :cid, :kind, :author, :by_agent, :source, :body, :html, :external, :reply_to, :status, :attachments,
-                     :send_after, NOW())
+                     :send_after, :meta, NOW())
              RETURNING id'
         );
         $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
@@ -58,6 +58,10 @@ final class MessageRepository
         $stmt->bindValue(':status', $m['status']);
         $stmt->bindValue(':attachments', (int) ($m['attachments_not_shown'] ?? 0), PDO::PARAM_INT);
         $stmt->bindValue(':send_after', $sendAfter);
+        // One chat (UC.5): a block the team sees on a reply (booking times, a form, a payment link).
+        $chatMeta = array_key_exists('chat_meta', $m) ? $m['chat_meta'] : [];
+        $meta = $chatMeta !== [] ? json_encode($chatMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : false;
+        $stmt->bindValue(':meta', $meta === false ? null : $meta, $meta === false ? PDO::PARAM_NULL : PDO::PARAM_STR);
         $stmt->execute();
 
         return (int) $stmt->fetchColumn();

@@ -6993,6 +6993,7 @@ final class CoreApiSchemas
                 ], ['emoji', 'count', 'mine'])],
                 'attachments' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatAttachment'), 'description' => 'Photos (an album when several), videos, files and voice (UC.10).'],
                 'block' => ['oneOf' => [SchemaBuilder::ref('ChatBlock'), ['type' => 'null']], 'description' => 'A poll, or a Whity record with its live status (UC.5).'],
+                'forwarded_from' => self::str(true) + ['description' => 'Forwarded from another chat: who wrote it there (UC.9).'],
                 'pinned' => self::bool(),
                 'edited' => self::bool(),
                 'deleted' => self::bool() + ['description' => 'Shown as "This message was deleted"; the body is empty.'],
@@ -7177,6 +7178,37 @@ final class CoreApiSchemas
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatInboxItem')],
                 'customers' => self::bool() + ['description' => 'Whether the list includes customer conversations (messages.read).'],
             ], ['data', 'customers']),
+            'ChatForwardRequest' => self::object([
+                'chat_id' => self::int() + ['description' => 'The chat to forward to; you must be in it.'],
+            ], ['chat_id']),
+            'ChatCustomerBlock' => self::object([
+                'type' => ['type' => 'string', 'enum' => ['booking_times', 'form', 'payment']],
+                'url' => self::str() + ['description' => 'The link the customer got.'],
+                'service' => self::object(['id' => self::int(), 'name' => self::str(), 'minutes' => self::int()], ['id', 'name', 'minutes']),
+                'times' => ['type' => 'array', 'items' => self::str()],
+                'form' => self::object(['id' => self::int(), 'title' => self::str()], ['id', 'title']),
+                'description' => self::str(),
+                'amount' => self::str() + ['description' => 'In normal units, as a decimal string.'],
+                'currency' => self::str(),
+                'reference' => self::str(true),
+            ], ['type', 'url']),
+            'ChatCustomerBlockOptionsResponse' => self::dataEnvelope(self::object([
+                'booking_page' => self::bool(),
+                'services' => ['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str(), 'minutes' => self::int()], ['id', 'name', 'minutes'])],
+                'forms' => ['type' => 'array', 'items' => self::object(['id' => self::int(), 'title' => self::str()], ['id', 'title'])],
+            ], ['booking_page', 'services', 'forms'])),
+            'ChatCustomerBlockRequest' => self::object([
+                'type' => ['type' => 'string', 'enum' => ['booking_times', 'form', 'payment']],
+                'text' => self::str() + ['description' => 'Your words above the link.'],
+                'service_id' => self::int(),
+                'times' => ['type' => 'array', 'items' => self::str(), 'description' => 'Up to six future times (ISO 8601).'],
+                'form_id' => self::int(),
+                'url' => self::str() + ['description' => 'A payment link (https), from Whity Pay.'],
+                'reference' => self::str(),
+                'amount' => self::str(),
+                'currency' => self::str(),
+                'description' => self::str(),
+            ], ['type']),
             'ChatMuteRequest' => self::object([
                 'muted' => self::bool() + ['description' => 'False unmutes; true by default.'],
             ], []),
@@ -7241,6 +7273,7 @@ final class CoreApiSchemas
                 'status' => ['type' => 'string', 'enum' => ['received', 'queued', 'sent', 'delivered', 'read', 'failed', 'cancelled', 'noted']],
                 'status_detail' => self::str(true),
                 'attachments_not_shown' => self::int(),
+                'block' => ['oneOf' => [SchemaBuilder::ref('ChatCustomerBlock'), ['type' => 'null']], 'description' => 'Booking times, a form or a payment link the team sent (UC.5). Only the team sees it; the customer got words and the link.'],
                 // Set while an agent's reply is held; it can be cancelled until then.
                 'send_after' => self::str(true),
                 'sent_at' => self::str(true),
@@ -13244,6 +13277,27 @@ final class CoreApiSchemas
                 'tags' => ['chat'],
                 'request' => 'ChatPreferencesRequest',
                 'responses' => [200 => self::jsonResponse('Your preference', 'ChatPreferencesResponse')] + self::authErrors(),
+            ]),
+            // Forward and customer blocks (UC.5, UC.9, UC.10; WHIT-1106).
+            self::ungatedRoute('POST', '/api/chat/messages/{id:\d+}/forward', [
+                'mcp' => $personOnly,
+                'summary' => 'Forward a message, with its files, poll or record, to another chat you are in',
+                'tags' => ['chat'],
+                'request' => 'ChatForwardRequest',
+                'responses' => [201 => self::jsonResponse('The copy, in the other chat', 'ChatMessageResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/inbox/{id:\d+}/block-options', [
+                'mcp' => $personOnly,
+                'summary' => 'What a customer chat can send: booking times (services) and forms (messages.reply)',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('Services and forms', 'ChatCustomerBlockOptionsResponse'), 403 => self::errorResponse('Needs messages.reply')] + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/inbox/{id:\d+}/send-block', [
+                'mcp' => $personOnly,
+                'summary' => 'Send a customer booking times, a form or a payment link: they get words and the link (messages.reply)',
+                'tags' => ['chat'],
+                'request' => 'ChatCustomerBlockRequest',
+                'responses' => [201 => self::jsonResponse('The reply', 'MessagingMessageResponse'), 403 => self::errorResponse('Needs messages.reply'), 422 => self::errorResponse('Not something that can be sent')] + $notFound + self::authErrors(),
             ]),
             // Mute, blocking and bots (UC.4, UC.8, UC.12; WHIT-1097).
             self::ungatedRoute('POST', '/api/chat/inbox/{id:\d+}/mute', [

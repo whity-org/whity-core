@@ -42,6 +42,10 @@ import { chatApi, chatErrorText, uploadToChat, type ChatApi } from './chat-api';
 import { AddMemberDialog } from './add-member-dialog';
 import { NewChatDialog } from './new-chat-dialog';
 import { useNewIntent } from '@/lib/commands/new-intent';
+import { useActionPermission } from '@/hooks/useActionPermission';
+import { useToast } from '@/lib/toast-context';
+import { NewTaskDialog } from '@/components/tasks/new-task-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@whity/ui/dialog';
 
 const THREAD_MS = 5000;
 const LIST_MS = 15000;
@@ -711,6 +715,11 @@ function OpenChat({
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [highlight, setHighlight] = useState<{ id: number; words: string } | null>(null);
+  // UC.9: Forward to another chat, and Turn into a task through Taskaat.
+  const [forwarding, setForwarding] = useState<ChatMessage | null>(null);
+  const [tasking, setTasking] = useState<ChatMessage | null>(null);
+  const canTask = useActionPermission('tasks:write');
+  const { addToast } = useToast();
   // The first unread line when the chat opened; it stays put while the chat is open.
   const [newFrom, setNewFrom] = useState<number | null>(null);
   const lastId = useRef(0);
@@ -852,8 +861,10 @@ function OpenChat({
         api.vote(m.id, choices).then(replace, (e: unknown) => setNotice(chatErrorText(e, '')));
       },
       onQuote: (id) => void goTo(id),
+      onForward: (m) => setForwarding(m),
+      onTask: canTask ? (m) => setTasking(m) : undefined,
     }),
-    [api, replace, goTo]
+    [api, replace, goTo, canTask]
   );
 
   if (error !== null) {
@@ -995,6 +1006,41 @@ function OpenChat({
       {side?.kind === 'search' && (
         <SearchPane t={t} api={api} chat={chat} people={people} onOpen={(id, words) => void goTo(id, words)} onClose={() => setSide(null)} />
       )}
+      {forwarding !== null && (
+        <ForwardDialog
+          t={t}
+          api={api}
+          fromChatId={chat.id}
+          onClose={() => setForwarding(null)}
+          onPick={async (toChatId) => {
+            const message = forwarding;
+            setForwarding(null);
+            try {
+              await api.forward(message.id, toChatId);
+              addToast(t('forward.done', 'Forwarded.'), 'success');
+              onChanged();
+            } catch (e) {
+              setNotice(chatErrorText(e, t('forward.error', 'It was not forwarded. Please try again.')));
+            }
+          }}
+        />
+      )}
+      {tasking !== null && (
+        <NewTaskDialog
+          initialTitle={taskTitle(tasking.body)}
+          initialDetail={t('task.detail', '{text}\n\nFrom {name} in {chat}: {link}', {
+            text: tasking.body,
+            name: tasking.author?.name ?? '',
+            chat: chat.title,
+            link: `${window.location.origin}/chat?c=${chat.id}`,
+          })}
+          onClose={() => setTasking(null)}
+          onCreated={() => {
+            setTasking(null);
+            addToast(t('task.done', 'Task created in Taskaat.'), 'success');
+          }}
+        />
+      )}
       {adding !== null && (
         <AddMemberDialog
           open={adding !== null}
@@ -1013,6 +1059,75 @@ function OpenChat({
         />
       )}
     </>
+  );
+}
+
+/** A task's title from a message: its first line, kept short. */
+function taskTitle(body: string): string {
+  const line = body.trim().split('\n')[0] ?? '';
+  return line.length > 120 ? `${line.slice(0, 117)}…` : line;
+}
+
+/** Forward (UC.9): pick another team chat you are in. */
+function ForwardDialog({
+  t,
+  api,
+  fromChatId,
+  onClose,
+  onPick,
+}: {
+  t: TranslateFn;
+  api: ChatApi;
+  fromChatId: number;
+  onClose: () => void;
+  onPick: (chatId: number) => void;
+}) {
+  const [chats, setChats] = useState<ChatSummary[] | null>(null);
+  const [query, setQuery] = useState('');
+  useEffect(() => {
+    let live = true;
+    api.inbox().then(
+      (inbox) => live && setChats(inbox.data.filter((i): i is Extract<ChatInboxItem, { kind: 'team' }> => i.kind === 'team' && i.id !== fromChatId)),
+      () => live && setChats([])
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, fromChatId]);
+  const q = query.trim().toLocaleLowerCase();
+  const shown = (chats ?? []).filter((c) => q === '' || c.title.toLocaleLowerCase().includes(q));
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-[26rem]" closeLabel={t('action.close', 'Close')}>
+        <DialogHeader>
+          <DialogTitle>{t('forward.title', 'Forward to another chat')}</DialogTitle>
+          <DialogDescription>{t('forward.hint', 'A copy goes to the chat you pick, marked as forwarded.')}</DialogDescription>
+        </DialogHeader>
+        <SearchField
+          value={query}
+          onValueChange={setQuery}
+          onSearch={setQuery}
+          label={t('forward.search', 'Find a chat')}
+          clearLabel={t('list.clear', 'Clear search')}
+          placeholder={t('forward.search', 'Find a chat')}
+        />
+        <ul className="grid max-h-80 gap-0.5 overflow-y-auto" aria-busy={chats === null}>
+          {chats !== null && shown.length === 0 && <li className="px-2 py-3 text-sm text-muted-foreground">{t('forward.none', 'No other chats to forward to.')}</li>}
+          {shown.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                className="flex min-h-12 w-full items-center gap-3 rounded-control px-2 text-start hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+                onClick={() => onPick(c.id)}
+              >
+                <ChatIcon chat={c} size={32} />
+                <span className="min-w-0 flex-1 truncate">{c.title}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </DialogContent>
+    </Dialog>
   );
 }
 
