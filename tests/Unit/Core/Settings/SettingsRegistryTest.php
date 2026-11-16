@@ -31,7 +31,8 @@ final class SettingsRegistryTest extends TestCase
              'auth.password_reset_approval_required',
              'auth.self_2fa_recovery_enabled',
              'auth.sso_enabled', 'auth.sso_self_provision_workspace',
-             'workspaces.self_create_enabled', 'workspaces.max_owned_per_person', 'auth.desktop_login_max_hours',
+             'workspaces.self_create_enabled', 'workspaces.max_owned_per_person', 'auth.password_sign_in',
+             'auth.desktop_login_max_hours',
              'storage.driver', 'storage.s3.endpoint', 'storage.s3.region', 'storage.s3.bucket',
              'storage.s3.access_key', 'storage.s3.path_style', 'storage.s3.public_base_url',
              'mail.transport', 'mail.smtp.host', 'mail.smtp.port', 'mail.smtp.encryption',
@@ -478,7 +479,8 @@ final class SettingsRegistryTest extends TestCase
         // 129 with migration 294's three messaging.* keys.
         // 131 since WHIT-1169: workspaces.self_create_enabled and max_owned_per_person.
         // 132 since WHIT-1173: calendar.multi_service_booking.
-        self::assertCount(132, $describe);
+        // 133 since WHIT-1168: auth.password_sign_in.
+        self::assertCount(133, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

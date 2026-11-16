@@ -5192,7 +5192,12 @@ final class CoreApiSchemas
                 'provider_key' => self::str(),
                 'display_name' => self::str(),
             ], ['provider_key', 'display_name']),
-            'SsoProviderListResponse' => self::listEnvelope('SsoProvider'),
+            // WHIT-1168: `password_sign_in` false = the server signs people in
+            // only through these providers; pages then drop the password form.
+            'SsoProviderListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('SsoProvider')],
+                'password_sign_in' => self::bool(),
+            ], ['data', 'password_sign_in']),
             // WHIT-994: GET /api/auth/sso/workspace. `suggested_name` only with
             // state=create, `workspaces` only with state=waiting.
             'SsoWorkspaceSetupResponse' => self::object([
@@ -11892,9 +11897,12 @@ final class CoreApiSchemas
                 'email' => self::str(),
                 'tenant_name' => self::str(),
                 'requires_password' => self::bool(),
+                // WHIT-1168: false when the server signs people in only through
+                // its identity provider; the invitee then accepts by signing in.
+                'password_sign_in' => self::bool(),
                 'inviter_name' => self::str(true),
                 'role_name' => self::str(true),
-            ], ['email', 'tenant_name', 'requires_password', 'inviter_name', 'role_name'])),
+            ], ['email', 'tenant_name', 'requires_password', 'password_sign_in', 'inviter_name', 'role_name'])),
             // POST /api/invitations/accept — `password` is required ONLY when
             // the preview said so; supplied for an address that already has an
             // account it is ignored, never applied.
@@ -11924,7 +11932,8 @@ final class CoreApiSchemas
                 // WHIT-917: whether the email form can work here (a bot check is
                 // set up, or the operator chose to go without), said up front.
                 'email_signup' => self::bool(),
-                'email_signup_reason' => ['type' => 'string', 'enum' => ['bot_check_unavailable'], 'nullable' => true],
+                // WHIT-1168: password_sign_in_off = the server signs people up only through its providers.
+                'email_signup_reason' => ['type' => 'string', 'enum' => ['bot_check_unavailable', 'password_sign_in_off'], 'nullable' => true],
                 // The operator's sign-in providers a visitor may join with: link
                 // to GET /api/v1/auth/sso/{provider_key}/start?join={workspace_slug}.
                 'providers' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupJoinProvider')],

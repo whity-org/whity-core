@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useTranslation } from '@whity/features/i18n';
 import { api } from '@/lib/api/client';
+import { SsoLoginButtons } from '@/components/sso-login-buttons';
 
 /**
  * Invitation landing page (WHIT-417). This is where the link a tenant
@@ -44,6 +45,8 @@ interface InvitationPreview {
   email: string;
   tenantName: string;
   requiresPassword: boolean;
+  /** False when the server signs people in only through its identity provider (WHIT-1168). */
+  passwordSignIn: boolean;
   inviterName: string | null;
   roleName: string | null;
 }
@@ -89,6 +92,7 @@ function AcceptInvitationInner() {
           email: typeof data?.email === 'string' ? data.email : '',
           tenantName: typeof data?.tenant_name === 'string' ? data.tenant_name : '',
           requiresPassword: data?.requires_password === true,
+          passwordSignIn: data?.password_sign_in !== false,
           inviterName: typeof data?.inviter_name === 'string' ? data.inviter_name : null,
           roleName: typeof data?.role_name === 'string' ? data.role_name : null,
         });
@@ -221,7 +225,20 @@ function AcceptInvitationInner() {
                 </AlertDescription>
               </Alert>
 
-              {invitation.requiresPassword ? (
+              {!invitation.passwordSignIn ? (
+                // Accept by signing in: the provider brings them back, the
+                // invitation is accepted for the address it went to, and they
+                // land in the workspace (WHIT-1168).
+                <div className="space-y-3" data-testid="accept-invitation-provider">
+                  <p className="text-sm text-muted-foreground">
+                    {t(
+                      'acceptInvitation.providerOnly',
+                      'Continue to accept. If you are new, this also creates your account.'
+                    )}
+                  </p>
+                  <SsoLoginButtons invite={token ?? undefined} />
+                </div>
+              ) : invitation.requiresPassword ? (
                 <>
                   <div className="space-y-2">
                     <label htmlFor="password" className="text-sm font-medium">
@@ -270,11 +287,13 @@ function AcceptInvitationInner() {
                 </p>
               )}
 
-              <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting
-                  ? t('acceptInvitation.submit.pending', 'Accepting…')
-                  : t('acceptInvitation.submit', 'Accept invitation')}
-              </Button>
+              {invitation.passwordSignIn && (
+                <Button type="submit" className="w-full" disabled={submitting}>
+                  {submitting
+                    ? t('acceptInvitation.submit.pending', 'Accepting…')
+                    : t('acceptInvitation.submit', 'Accept invitation')}
+                </Button>
+              )}
             </form>
           )}
 

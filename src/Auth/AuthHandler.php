@@ -1490,6 +1490,13 @@ class AuthHandler
             return Response::error('No changes provided', 400);
         }
 
+        // WHIT-1168: both changes are proved with the current password, and with
+        // password sign-in off the address and the credential live with the
+        // identity provider, so neither changes here.
+        if (!\Whity\Core\Identity\PasswordSignIn::allowed($this->settingsService)) {
+            return \Whity\Core\Identity\PasswordSignIn::refusal();
+        }
+
         // Load the profile row (global identity table).
         // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $profStmt = $this->db->prepare(
