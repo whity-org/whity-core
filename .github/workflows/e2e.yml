@@ -170,8 +170,26 @@ jobs:
               echo "Pull attempt $i failed — retrying in 15s..."
               sleep 15
             done
-            docker compose -f docker-compose.yml up -d --wait
-            echo $? > "$RUNNER_TEMP/stack.exit"
+            # WHIT-1157: hosted runners sometimes fail to start a container
+            # with "OCI runtime create failed ... unable to apply cgroup
+            # configuration ... disconnected from message bus". That is the
+            # runner, not the app, so on exactly that error: tear down,
+            # restart Docker and try once more. Any other failure fails as
+            # before.
+            for attempt in 1 2; do
+              docker compose -f docker-compose.yml up -d --wait 2>&1 | tee "$RUNNER_TEMP/compose.$attempt.log"
+              rc=${PIPESTATUS[0]}
+              [ "$rc" = 0 ] && break
+              if [ "$attempt" = 1 ] && grep -qE "OCI runtime create failed|cgroup configuration|disconnected from message bus" "$RUNNER_TEMP/compose.$attempt.log"; then
+                echo "::warning::Docker could not start a container (runner cgroup fault). Restarting Docker and retrying once."
+                docker compose -f docker-compose.yml down --remove-orphans || true
+                sudo systemctl restart docker || true
+                sleep 10
+                continue
+              fi
+              break
+            done
+            echo "$rc" > "$RUNNER_TEMP/stack.exit"
           ' > "$RUNNER_TEMP/stack.log" 2>&1 &
           echo "backend stack starting in the background (pid $!)"
 
@@ -334,13 +352,13 @@ jobs:
       # the HTTP surface.
       - name: Wait for the backend stack
         run: |
-          for i in $(seq 1 300); do
+          for i in $(seq 1 480); do
             [ -f "$RUNNER_TEMP/stack.exit" ] && break
             sleep 1
           done
           cat "$RUNNER_TEMP/stack.log"
           if [ "$(cat "$RUNNER_TEMP/stack.exit" 2>/dev/null)" != "0" ]; then
-            echo "::error::docker compose up did not finish cleanly (exit: $(cat "$RUNNER_TEMP/stack.exit" 2>/dev/null || echo 'still running after 300 s'))"
+            echo "::error::docker compose up did not finish cleanly (exit: $(cat "$RUNNER_TEMP/stack.exit" 2>/dev/null || echo 'still running after 480 s'))"
             docker compose -f docker-compose.yml ps
             docker compose -f docker-compose.yml logs --tail 100
             exit 1
