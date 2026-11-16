@@ -145,6 +145,12 @@ final class FieldConditionTest extends TestCase
             'an empty in' => [['field' => 'a', 'in' => []]],
             'in that is not a list' => [['field' => 'a', 'in' => ['k' => 'x']]],
             'in holding a non-string' => [['field' => 'a', 'in' => [1]]],
+            'equals and notEquals' => [['field' => 'a', 'equals' => 'x', 'notEquals' => 'y']],
+            'an empty notEquals' => [['field' => 'a', 'notEquals' => '']],
+            'a list as notEquals' => [['field' => 'a', 'notEquals' => ['x']]],
+            'answered false' => [['field' => 'a', 'answered' => false]],
+            'answered as text' => [['field' => 'a', 'answered' => 'yes']],
+            'answered and equals' => [['field' => 'a', 'answered' => true, 'equals' => 'x']],
         ];
     }
 
@@ -160,6 +166,9 @@ final class FieldConditionTest extends TestCase
         self::assertNull(FieldCondition::parse(null));
         self::assertSame(['field' => 'a', 'equals' => true], FieldCondition::parse(['field' => 'a', 'equals' => true, 'x' => 1]));
         self::assertSame(['field' => 'a', 'in' => ['x', 'y']], FieldCondition::parse(['field' => 'a', 'in' => ['x', 'y']]));
+        self::assertSame(['field' => 'a', 'notEquals' => 'x'], FieldCondition::parse(['field' => 'a', 'notEquals' => 'x']));
+        self::assertSame(['field' => 'a', 'notEquals' => false], FieldCondition::parse(['field' => 'a', 'notEquals' => false]));
+        self::assertSame(['field' => 'a', 'answered' => true], FieldCondition::parse(['field' => 'a', 'answered' => true]));
     }
 
     /**
@@ -182,6 +191,13 @@ final class FieldConditionTest extends TestCase
                     self::field('a', FieldType::TEXT, ['visible_when' => ['field' => 'paper', 'equals' => 'x']]),
                 ],
                 'file question',
+            ],
+            'is not on a table' => [
+                [
+                    self::field('rows', FieldType::REPEATING),
+                    self::field('a', FieldType::TEXT, ['visible_when' => ['field' => 'rows', 'notEquals' => 'x']]),
+                ],
+                'repeating question',
             ],
             'a loop' => [
                 [
@@ -215,6 +231,39 @@ final class FieldConditionTest extends TestCase
             self::field('b', FieldType::TEXT, ['visible_when' => ['field' => 'a', 'equals' => true]]),
             self::field('c', FieldType::TEXT, ['visible_when' => ['field' => 'b', 'equals' => 'x']]),
         ]);
+    }
+
+    public function testIsAnsweredMayHangOffAFileATableOrASignature(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        FieldCondition::assertAuthorable([
+            self::field('paper', FieldType::FILE),
+            self::field('rows', FieldType::REPEATING),
+            self::field('sign', FieldType::SIGNATURE),
+            self::field('a', FieldType::TEXT, ['visible_when' => ['field' => 'paper', 'answered' => true]]),
+            self::field('b', FieldType::TEXT, ['visible_when' => ['field' => 'rows', 'answered' => true]]),
+            self::field('c', FieldType::TEXT, ['visible_when' => ['field' => 'sign', 'answered' => true]]),
+        ]);
+    }
+
+    public function testAnIsNotQuestionWaitsForAnAnswerAndIsRequiredOnceAsked(): void
+    {
+        $fields = [
+            self::field('kind', FieldType::SELECT, ['options' => [['value' => 'clinical', 'label' => ['en' => 'Clinical']], ['value' => 'field', 'label' => ['en' => 'Field']]]]),
+            self::field('why_not_clinical', FieldType::TEXT, [
+                'is_required' => true,
+                'visible_when' => ['field' => 'kind', 'notEquals' => 'clinical'],
+            ]),
+        ];
+
+        // Unanswered: not asked, so not required.
+        self::assertSame([], SubmissionValidator::validate($fields, [])['values']);
+        self::assertSame(['kind' => 'clinical'], SubmissionValidator::validate($fields, ['kind' => 'clinical'])['values']);
+
+        $this->expectException(FormRejectedException::class);
+        $this->expectExceptionMessage('Why not clinical is required');
+        SubmissionValidator::validate($fields, ['kind' => 'field']);
     }
 
     public function testDependantsAreNamed(): void
