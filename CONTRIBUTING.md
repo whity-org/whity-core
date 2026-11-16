@@ -577,11 +577,9 @@ seeded accounts and shared-database discipline.
      - **Unit, static analysis & plugin smoke (SQLite)** — `phpunit`, the
        OpenAPI-spec drift check, `composer phpstan`, the
        plugin-load smoke, the tenant-predicate guard, the plugin
-       tenant-isolation conformance check, and the vendored-SDK parity guard
-       (`scripts/ci-vendored-sdk-parity.php` — the Tauri desktop template
-       carries its own copy of `sdk/src`, and a change to either tree must
-       update both in the SAME commit or a device runs an older plugin
-       contract than the one core publishes).
+       and tenant-isolation conformance check. (The Tauri desktop template
+       copies `sdk/src` at every build, so there is no second SDK tree to
+       keep in step; WHIT-1054.)
      - **i18n catalogue drift** — regenerates the English catalogue from the
        `t()` calls in the source and fails if it differs from
        `database/i18n/`. Runs on frontend changes too, because that is where
