@@ -237,6 +237,12 @@ class PluginLoader
     private ?AuditLogger $auditLogger = null;
 
     /**
+     * Which workspaces have each code plugin on (WHIT-1122). Null means every
+     * plugin is on everywhere, as before.
+     */
+    private ?\Whity\Core\Plugin\Workspace\CodePluginActivation $workspaceActivation = null;
+
+    /**
      * @var HookManager|null Hook manager instance
      */
     private ?HookManager $hookManager;
@@ -527,6 +533,31 @@ class PluginLoader
     public function setLicenceSales(HostLicenceSales $licenceSales): void
     {
         $this->licenceSales = $licenceSales;
+    }
+
+    /** Switch plugins on and off per workspace (WHIT-1122). */
+    public function setWorkspaceActivation(\Whity\Core\Plugin\Workspace\CodePluginActivation $activation): void
+    {
+        $this->workspaceActivation = $activation;
+    }
+
+    /**
+     * Is this plugin off for the current request's workspace (WHIT-1122)?
+     * The system workspace and work with no workspace see every plugin on.
+     *
+     * @param string $pluginKey The plugin's stable identity (original FQCN).
+     */
+    public function isOffForWorkspace(string $pluginKey, ?int $tenantId = null): bool
+    {
+        if ($this->workspaceActivation === null) {
+            return false;
+        }
+        $plugin = $this->registeredPlugins[$pluginKey]['plugin'] ?? null;
+        if ($plugin === null) {
+            return false;
+        }
+
+        return !$this->workspaceActivation->isOn($plugin->getName(), $tenantId);
     }
 
     /**
@@ -5242,6 +5273,10 @@ class PluginLoader
                 continue;
             }
 
+            if ($this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+
             foreach ($info['frontendFeatures'] as $feature) {
                 $features[] = $feature;
             }
@@ -5267,6 +5302,10 @@ class PluginLoader
 
             $lifecycle = $this->lifecycles[$pluginKey] ?? null;
             if ($lifecycle === null || !$lifecycle->isActive()) {
+                continue;
+            }
+
+            if ($this->isOffForWorkspace($pluginKey)) {
                 continue;
             }
 
@@ -5402,6 +5441,13 @@ class PluginLoader
 
             if ($lifecycle !== null && $lifecycle->isFailed()) {
                 return Response::error('Plugin temporarily unavailable', 503);
+            }
+
+            // Off for this workspace (WHIT-1122): it isn't there at all. The
+            // answer is the same as for a route that doesn't exist, so a
+            // workspace can't learn what another workspace has turned on.
+            if ($this->isOffForWorkspace($pluginKey)) {
+                return Response::error('Not Found', 404, ['reason' => 'plugin_off']);
             }
 
             try {

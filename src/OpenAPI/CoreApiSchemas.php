@@ -19173,6 +19173,7 @@ final class CoreApiSchemas
         $readOnly = ['readOnlyHint' => true, 'idempotentHint' => true];
         $propose = ['agentPolicy' => 'propose'];
         $plugin = ['name' => 'plugin', 'in' => 'path', 'required' => true, 'description' => 'The workspace plugin\'s slug: its name in lower case, as its permissions start with.', 'schema' => ['type' => 'string']];
+        $codePlugin = ['name' => 'plugin', 'in' => 'path', 'required' => true, 'description' => 'The installed plugin\'s name, as it gives it (FrontOffice).', 'schema' => ['type' => 'string']];
         $id = static fn (string $what): array => ['name' => 'id', 'in' => 'path', 'required' => true, 'description' => $what, 'schema' => ['type' => 'integer']];
 
         return [
@@ -19332,6 +19333,62 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            // WHIT-1122: installed code plugins, switched on per workspace.
+            self::permissionRoute('GET', '/api/workspace/code-plugins', 'plugins:read', [
+                'summary' => 'List the installed plugins this workspace can use',
+                'description' => 'Plugins installed for the whole installation that the operator lets workspaces use, each with whether it is on here, whether this workspace can switch it, and the last change.',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('The plugins', 'WorkspaceCodePluginListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/enable', 'plugins:enable', [
+                'summary' => 'Turn an installed plugin on for this workspace',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('Turned on', 'WorkspaceCodePluginSwitchResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                    409 => self::errorResponse('The plugin is on for every workspace and has no switch'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/disable', 'plugins:disable', [
+                'summary' => 'Turn an installed plugin off for this workspace',
+                'description' => 'Its data is kept; turning it back on brings everything back.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('Turned off', 'WorkspaceCodePluginSwitchResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                    409 => self::errorResponse('The plugin is on for every workspace and has no switch'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/history', 'plugins:read', [
+                'summary' => 'Who turned an installed plugin on or off in this workspace, and when',
+                'description' => 'Newest first, at most 50.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('The changes', 'WorkspaceCodePluginHistoryResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/plugins/workspace-access', 'plugins:read', [
+                'summary' => 'List who can use each installed plugin',
+                'description' => 'Operator only (the system workspace).',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('Each active plugin and its workspace access', 'CodePluginAccessListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/workspace-access', 'plugins:enable', [
+                'summary' => 'Choose who can use an installed plugin',
+                'description' => 'Operator only. all: on for every workspace. choose: each workspace turns it on. operator: only the system workspace.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'request' => 'CodePluginAccessRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The access as it now stands', 'CodePluginAccessResponse'),
+                    404 => self::errorResponse('Not an active plugin'),
+                    422 => self::errorResponse('access must be all, choose or operator'),
+                ] + self::authErrors(),
+            ]),
         ];
     }
 
@@ -19361,6 +19418,40 @@ final class CoreApiSchemas
                 'updated_at' => self::str(),
             ], ['slug', 'plugin', 'version_id', 'version', 'trust', 'enabled', 'automations_enabled']),
             'WorkspacePluginListResponse' => self::listEnvelope('WorkspacePlugin'),
+            'WorkspaceCodePlugin' => self::object([
+                'name' => self::str() + ['description' => 'The plugin\'s name'],
+                'version' => self::str(),
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose'], 'description' => 'all: on for every workspace; choose: this workspace decides'],
+                'canSwitch' => self::bool(),
+                'enabled' => self::bool() + ['description' => 'Whether it is on in this workspace'],
+                'changedAt' => ['type' => 'string', 'nullable' => true],
+                'changedBy' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
+            ], ['name', 'version', 'access', 'canSwitch', 'enabled']),
+            'WorkspaceCodePluginListResponse' => self::listEnvelope('WorkspaceCodePlugin'),
+            'WorkspaceCodePluginSwitchResponse' => self::object([
+                'data' => self::object(['name' => self::str(), 'enabled' => self::bool()], ['name', 'enabled']),
+            ], ['data']),
+            'WorkspaceCodePluginHistoryResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => self::object([
+                    'action' => ['type' => 'string', 'enum' => ['enabled', 'disabled']],
+                    'at' => self::str(),
+                    'by' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
+                ], ['action', 'at'])],
+            ], ['data']),
+            'CodePluginAccess' => self::object([
+                'name' => self::str(),
+                'version' => self::str(),
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose', 'operator']],
+                'freeForAll' => self::bool() + ['description' => 'A paid plugin is free for every workspace'],
+            ], ['name', 'access', 'freeForAll']),
+            'CodePluginAccessListResponse' => self::listEnvelope('CodePluginAccess'),
+            'CodePluginAccessRequest' => self::object([
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose', 'operator']],
+                'freeForAll' => self::bool(),
+            ], ['access']),
+            'CodePluginAccessResponse' => self::object([
+                'data' => SchemaBuilder::ref('CodePluginAccess'),
+            ], ['data']),
             'WorkspacePluginManifestRequest' => self::object(['manifest' => $manifest], ['manifest']),
             'PublishWorkspacePluginRequest' => self::object([
                 'manifest' => $manifest,
