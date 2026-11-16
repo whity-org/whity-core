@@ -24,6 +24,9 @@ use Whity\Database\Database;
  *   (`code_plugin.enabled` and `code_plugin.disabled`).
  * - `trial_started_at` and `trial_ends_at` are for paid plugins (WHIT-1125):
  *   one trial per workspace and plugin.
+ * - `access_lapsed_at` is when a paid plugin's access (trial, plan or add-on)
+ *   was first seen gone. It stays on for 7 days of grace from then, then turns
+ *   read-only. Cleared when access comes back.
  */
 final class CreateTenantCodePlugins
 {
@@ -36,6 +39,7 @@ final class CreateTenantCodePlugins
                 enabled               BOOLEAN     NOT NULL DEFAULT FALSE,
                 trial_started_at      TIMESTAMP   NULL,
                 trial_ends_at         TIMESTAMP   NULL,
+                access_lapsed_at      TIMESTAMP   NULL,
                 changed_by_profile_id INTEGER     NULL REFERENCES profiles(id) ON DELETE SET NULL,
                 changed_at            TIMESTAMP   NOT NULL DEFAULT NOW(),
                 PRIMARY KEY (tenant_id, plugin_name)
