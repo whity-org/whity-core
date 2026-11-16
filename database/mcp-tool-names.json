@@ -271,6 +271,10 @@
     "en": "List who is away and who decides for them",
     "ar": "عرض الغائبين ومن يقرر نيابةً عنهم"
   },
+  "get_api_billing_cash_payments": {
+    "en": "List a workspace's cash payments",
+    "ar": "عرض الدفعات النقدية لمساحة عمل"
+  },
   "get_api_billing_invoices": {
     "en": "List your workspace's invoices",
     "ar": "عرض الفواتير"
@@ -1213,6 +1217,14 @@
   },
   "post_api_agents_id_resume": {
     "ar": "استئناف عمل وكيل"
+  },
+  "post_api_billing_cash_payments": {
+    "en": "Record a cash payment for a paid plugin plan",
+    "ar": "تسجيل دفعة نقدية لخطة إضافة مدفوعة"
+  },
+  "post_api_billing_cash_payments_id_void": {
+    "en": "Void a cash payment, saying why",
+    "ar": "إلغاء دفعة نقدية مع ذكر السبب"
   },
   "post_api_billing_checkout": {
     "en": "Start a payment for your workspace",

@@ -3206,6 +3206,15 @@ $pluginSeats = new \Whity\Core\Plugin\Workspace\PluginSeats(
     $logger,
 );
 $externalBillingHandler->usePluginSeats($pluginSeats);
+// WHIT-1153: cash payments the operator records cover a workspace's paid plugin
+// like a subscription, and show in its billing history.
+$cashPayments = new \Whity\Core\Billing\Cash\CashPayments($db->getPdo());
+$codePluginActivation->useCashCover(static fn (int $tenantId, string $product): ?array => $cashPayments->coverOf($tenantId, $product));
+$externalBillingHandler->useCashPayments($cashPayments);
+$cashPaymentsHandler = new \Whity\Api\CashPaymentsApiHandler($cashPayments, $auditLogger);
+$router->register('GET', '/api/billing/cash-payments', [$cashPaymentsHandler, 'list'], null, null, CorePermissions::PLANS_MANAGE);
+$router->register('POST', '/api/billing/cash-payments', [$cashPaymentsHandler, 'record'], null, null, CorePermissions::PLANS_MANAGE);
+$router->register('POST', '/api/billing/cash-payments/{id:\d+}/void', [$cashPaymentsHandler, 'void'], null, null, CorePermissions::PLANS_MANAGE);
 $workspaceCodePluginsHandler->useSeats($pluginSeats);
 $hookManager->listen(\Whity\Sdk\Hooks\Events::PLUGIN_SETTINGS_CHANGED, static function (array $data) use ($pluginSeats): array {
     $pluginSeats->onSettingChanged($data);

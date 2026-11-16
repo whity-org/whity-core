@@ -400,10 +400,25 @@ final class ExternalBillingApiHandler
             return $tenantId;
         }
 
+        // WHIT-1153: payments made in cash, recorded by the operator, sit in
+        // the same history, marked "cash", whether or not a provider is set up.
+        $cash = array_map(static fn (array $c): array => [
+            'number' => $c['receipt_number'],
+            'status' => $c['voided_at'] !== null ? 'voided' : 'paid',
+            'total_minor' => $c['amount_minor'],
+            'currency' => $c['currency'],
+            'paid_at' => $c['paid_on'],
+            'issued_at' => $c['recorded_at'],
+            'source' => 'cash',
+            'plan_key' => $c['plan_key'],
+            'quantity' => $c['quantity'],
+            'covers_until' => $c['period_end'],
+        ], $this->cashPayments?->forWorkspace($tenantId) ?? []);
+
         if (!$this->portal->isConfigured()) {
             // Nothing was ever paid through a service this deployment does not
-            // have. An empty list, not an error.
-            return Response::json(['data' => []]);
+            // have; only what was paid in cash, if anything.
+            return Response::json(['data' => $cash]);
         }
 
         try {
@@ -412,9 +427,10 @@ final class ExternalBillingApiHandler
             return $this->portalFailure($e, 'read payment history', ['tenant_id' => $tenantId]);
         }
 
-        return Response::json([
-            'data' => array_map(static fn (Receipt $r): array => $r->toArray(), $receipts),
-        ]);
+        $rows = [...array_map(static fn (Receipt $r): array => $r->toArray(), $receipts), ...$cash];
+        usort($rows, static fn (array $a, array $b): int => strcmp((string) ($b['paid_at'] ?? ''), (string) ($a['paid_at'] ?? '')));
+
+        return Response::json(['data' => $rows]);
     }
 
     /**
@@ -780,6 +796,14 @@ final class ExternalBillingApiHandler
 
     /** The plugin portal's bridge, only when a plugin portal is the one in use. */
     private ?\Whity\Core\Plugin\Workspace\PluginSeats $pluginSeats = null;
+
+    private ?\Whity\Core\Billing\Cash\CashPayments $cashPayments = null;
+
+    /** Cash payments in the billing history (WHIT-1153). */
+    public function useCashPayments(\Whity\Core\Billing\Cash\CashPayments $cash): void
+    {
+        $this->cashPayments = $cash;
+    }
 
     /** Plugins sold per seat (SDK 1.110): the count a checkout buys. */
     public function usePluginSeats(\Whity\Core\Plugin\Workspace\PluginSeats $seats): void
