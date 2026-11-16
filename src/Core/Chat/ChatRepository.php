@@ -28,7 +28,11 @@ final class ChatRepository
         a.role_ar AS agent_role_ar, w.display_name AS works_for_name, ab.display_name AS added_by_name';
 
     private const MESSAGE_COLUMNS = 'x.id, x.conversation_id, x.author_profile_id, x.by_agent, x.source, x.body_text,
-        x.status, x.chat_meta, x.created_at, p.display_name AS author_name';
+        x.status, x.chat_meta, x.created_at, p.display_name AS author_name,
+        x.reply_to_message_id, x.thread_root_id, x.in_chat, x.edited_at, x.deleted_at, x.pinned_at, x.pinned_by_profile_id, x.changed_at';
+
+    /** Lines in the chat itself: everything but thread replies that were not also sent to the chat (UC.6). */
+    private const IN_CHAT = '(x.thread_root_id IS NULL OR x.in_chat = TRUE)';
 
     public function __construct(private readonly PDO $db)
     {
@@ -257,13 +261,28 @@ final class ChatRepository
     // ── Messages ─────────────────────────────────────────────────────────────
 
     /** @param array<string, mixed> $meta */
-    public function insertMessage(int $tenantId, int $chatId, ?int $authorProfileId, bool $byAgent, string $source, string $body, array $meta, string $status = 'noted'): int
-    {
+    public function insertMessage(
+        int $tenantId,
+        int $chatId,
+        ?int $authorProfileId,
+        bool $byAgent,
+        string $source,
+        string $body,
+        array $meta,
+        string $status = 'noted',
+        ?int $replyTo = null,
+        ?int $threadRoot = null,
+        bool $inChat = true,
+    ): int {
         $stmt = $this->db->prepare(
-            "INSERT INTO messages (tenant_id, conversation_id, kind, author_profile_id, by_agent, source, body_text, status, chat_meta, created_at)
-             VALUES (:tid, :cid, 'note', :author, :by_agent, :source, :body, :status, :meta, NOW())
+            "INSERT INTO messages (tenant_id, conversation_id, kind, author_profile_id, by_agent, source, body_text, status, chat_meta,
+                                   reply_to_message_id, thread_root_id, in_chat, created_at)
+             VALUES (:tid, :cid, 'note', :author, :by_agent, :source, :body, :status, :meta, :reply_to, :root, :in_chat, NOW())
              RETURNING id"
         );
+        $stmt->bindValue(':reply_to', $replyTo, $replyTo === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->bindValue(':root', $threadRoot, $threadRoot === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->bindValue(':in_chat', $threadRoot === null || $inChat, PDO::PARAM_BOOL);
         $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
         $stmt->bindValue(':cid', $chatId, PDO::PARAM_INT);
         $stmt->bindValue(':author', $authorProfileId, $authorProfileId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
@@ -291,7 +310,7 @@ final class ChatRepository
     public function messages(int $tenantId, int $chatId, int $floorId, ?int $afterId, ?int $beforeId, int $limit): array
     {
         $sql = 'SELECT ' . self::MESSAGE_COLUMNS . ' FROM messages x LEFT JOIN profiles p ON p.id = x.author_profile_id
-                 WHERE x.tenant_id = :tid AND x.conversation_id = :cid AND x.id > :floor';
+                 WHERE x.tenant_id = :tid AND x.conversation_id = :cid AND x.id > :floor AND ' . self::IN_CHAT;
         $params = [':tid' => $tenantId, ':cid' => $chatId, ':floor' => $floorId];
         if ($afterId !== null) {
             $sql .= ' AND x.id > :after ORDER BY x.id ASC LIMIT :limit';
@@ -363,7 +382,7 @@ final class ChatRepository
         // indistinguishable by author, so an agent counts every line it did not
         // write as a person — the agent reads its own lines as already read.
         $stmt = $this->db->prepare('SELECT COUNT(*) FROM messages x
-            WHERE x.tenant_id = :tid AND x.conversation_id = :cid AND x.id > :mark
+            WHERE x.tenant_id = :tid AND x.conversation_id = :cid AND x.id > :mark AND ' . self::IN_CHAT . '
               AND (x.author_profile_id IS NULL OR x.author_profile_id <> :pid OR x.by_agent = :mine)');
         $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
         $stmt->bindValue(':cid', $chatId, PDO::PARAM_INT);
@@ -413,6 +432,259 @@ final class ChatRepository
         $first = $stmt->fetchColumn();
 
         return $first === null || $first === false ? $this->maxMessageId($tenantId, $chatId) : max(0, (int) $first - 1);
+    }
+
+    // ── Replies, threads, reactions, pins, edits (UC.6–UC.12) ────────────────
+
+    /**
+     * A thread's replies, oldest first, above the floor.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function threadMessages(int $tenantId, int $chatId, int $rootId, int $floorId, int $limit = 200): array
+    {
+        $stmt = $this->db->prepare('SELECT ' . self::MESSAGE_COLUMNS . ' FROM messages x LEFT JOIN profiles p ON p.id = x.author_profile_id
+            WHERE x.tenant_id = :tid AND x.conversation_id = :cid AND x.thread_root_id = :root AND x.id > :floor
+            ORDER BY x.id ASC LIMIT :limit');
+        $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':cid', $chatId, PDO::PARAM_INT);
+        $stmt->bindValue(':root', $rootId, PDO::PARAM_INT);
+        $stmt->bindValue(':floor', $floorId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return array_values(array_map(self::shapeMessage(...), $stmt->fetchAll(PDO::FETCH_ASSOC)));
+    }
+
+    /**
+     * How many replies each message's thread has, when the latest came, and who wrote in it.
+     *
+     * @param list<int> $rootIds
+     * @return array<int, array{count: int, last_at: string, people: list<string>}>
+     */
+    public function threadSummaries(int $tenantId, array $rootIds, int $floorId): array
+    {
+        if ($rootIds === []) {
+            return [];
+        }
+        $marks = implode(',', array_fill(0, count($rootIds), '?'));
+        $stmt = $this->db->prepare("SELECT x.thread_root_id, x.created_at, p.display_name AS author_name, x.chat_meta, x.by_agent
+              FROM messages x LEFT JOIN profiles p ON p.id = x.author_profile_id
+             WHERE x.tenant_id = ? AND x.id > ? AND x.thread_root_id IN ({$marks})
+             ORDER BY x.id ASC");
+        $stmt->execute([$tenantId, $floorId, ...$rootIds]);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $root = (int) $r['thread_root_id'];
+            $meta = self::decode($r['chat_meta']);
+            $name = DbBool::of($r['by_agent']) ? (string) ($meta['agent']['name'] ?? '') : (string) ($r['author_name'] ?? '');
+            $entry = $out[$root] ?? ['count' => 0, 'last_at' => '', 'people' => []];
+            $entry['count']++;
+            $entry['last_at'] = (string) $r['created_at'];
+            if ($name !== '' && !in_array($name, $entry['people'], true)) {
+                $entry['people'][] = $name;
+            }
+            $out[$root] = $entry;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Reactions on the given messages, oldest first.
+     *
+     * @param list<int> $messageIds
+     * @return array<int, list<array{emoji: string, profile_id: int, name: string}>>
+     */
+    public function reactions(int $tenantId, array $messageIds): array
+    {
+        if ($messageIds === []) {
+            return [];
+        }
+        $marks = implode(',', array_fill(0, count($messageIds), '?'));
+        $stmt = $this->db->prepare("SELECT r.message_id, r.emoji, r.profile_id, p.display_name
+              FROM chat_message_reactions r JOIN profiles p ON p.id = r.profile_id
+             WHERE r.tenant_id = ? AND r.message_id IN ({$marks})
+             ORDER BY r.created_at ASC, r.profile_id ASC");
+        $stmt->execute([$tenantId, ...$messageIds]);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $out[(int) $r['message_id']][] = ['emoji' => (string) $r['emoji'], 'profile_id' => (int) $r['profile_id'], 'name' => (string) $r['display_name']];
+        }
+
+        return $out;
+    }
+
+    /** Adds the reaction, or takes it back when the person already gave it. Returns whether it is there now. */
+    public function toggleReaction(int $tenantId, int $messageId, int $profileId, string $emoji): bool
+    {
+        $del = $this->db->prepare('DELETE FROM chat_message_reactions WHERE tenant_id = :tid AND message_id = :mid AND profile_id = :pid AND emoji = :emoji');
+        $del->execute([':tid' => $tenantId, ':mid' => $messageId, ':pid' => $profileId, ':emoji' => $emoji]);
+        $added = $del->rowCount() === 0;
+        if ($added) {
+            $this->db->prepare('INSERT INTO chat_message_reactions (tenant_id, message_id, profile_id, emoji, created_at) VALUES (:tid, :mid, :pid, :emoji, NOW())')
+                ->execute([':tid' => $tenantId, ':mid' => $messageId, ':pid' => $profileId, ':emoji' => $emoji]);
+        }
+        $this->touch($tenantId, $messageId);
+
+        return $added;
+    }
+
+    public function setPinned(int $tenantId, int $messageId, ?int $byProfileId): void
+    {
+        $stmt = $this->db->prepare('UPDATE messages SET pinned_at = ' . ($byProfileId === null ? 'NULL' : 'NOW()') . ', pinned_by_profile_id = :by, changed_at = NOW()
+            WHERE tenant_id = :tid AND id = :id');
+        $stmt->bindValue(':by', $byProfileId, $byProfileId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':id', $messageId, PDO::PARAM_INT);
+        $stmt->execute();
+    }
+
+    /** @param array<string, mixed> $meta */
+    public function editMessage(int $tenantId, int $messageId, string $body, array $meta): void
+    {
+        $this->db->prepare('UPDATE messages SET body_text = :body, chat_meta = :meta, edited_at = NOW(), changed_at = NOW() WHERE tenant_id = :tid AND id = :id')
+            ->execute([':tid' => $tenantId, ':id' => $messageId, ':body' => $body, ':meta' => self::encode($meta === [] ? new \stdClass() : $meta)]);
+    }
+
+    /** The words go; the row stays as "This message was deleted", unpinned and without reactions. */
+    public function deleteMessage(int $tenantId, int $messageId): void
+    {
+        $this->db->prepare("UPDATE messages SET body_text = '', chat_meta = :meta, deleted_at = NOW(), pinned_at = NULL, pinned_by_profile_id = NULL, changed_at = NOW()
+            WHERE tenant_id = :tid AND id = :id")
+            ->execute([':tid' => $tenantId, ':id' => $messageId, ':meta' => '{}']);
+        $this->db->prepare('DELETE FROM chat_message_reactions WHERE tenant_id = :tid AND message_id = :id')
+            ->execute([':tid' => $tenantId, ':id' => $messageId]);
+    }
+
+    /** Marks a message changed (a reaction, a thread reply), so open chats fetch it again. */
+    public function touch(int $tenantId, int $messageId): void
+    {
+        $this->db->prepare('UPDATE messages SET changed_at = NOW() WHERE tenant_id = :tid AND id = :id')
+            ->execute([':tid' => $tenantId, ':id' => $messageId]);
+    }
+
+    /**
+     * Messages changed at or after `$since` (UTC), above the floor.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function changedSince(int $tenantId, int $chatId, int $floorId, string $since, int $limit = 100): array
+    {
+        $stmt = $this->db->prepare('SELECT ' . self::MESSAGE_COLUMNS . ' FROM messages x LEFT JOIN profiles p ON p.id = x.author_profile_id
+            WHERE x.tenant_id = :tid AND x.conversation_id = :cid AND x.id > :floor AND x.changed_at IS NOT NULL AND x.changed_at >= :since
+            ORDER BY x.id ASC LIMIT :limit');
+        $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':cid', $chatId, PDO::PARAM_INT);
+        $stmt->bindValue(':floor', $floorId, PDO::PARAM_INT);
+        $stmt->bindValue(':since', $since);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return array_values(array_map(self::shapeMessage(...), $stmt->fetchAll(PDO::FETCH_ASSOC)));
+    }
+
+    /** @return list<array<string, mixed>> the chat's pinned messages, newest pin first */
+    public function pinnedMessages(int $tenantId, int $chatId, int $floorId): array
+    {
+        $stmt = $this->db->prepare('SELECT ' . self::MESSAGE_COLUMNS . ' FROM messages x LEFT JOIN profiles p ON p.id = x.author_profile_id
+            WHERE x.tenant_id = :tid AND x.conversation_id = :cid AND x.id > :floor AND x.pinned_at IS NOT NULL
+            ORDER BY x.pinned_at DESC, x.id DESC LIMIT 20');
+        $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':cid', $chatId, PDO::PARAM_INT);
+        $stmt->bindValue(':floor', $floorId, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return array_values(array_map(self::shapeMessage(...), $stmt->fetchAll(PDO::FETCH_ASSOC)));
+    }
+
+    /**
+     * People's and agents' messages containing `$q` (any case), newest first,
+     * optionally only those one person wrote.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function search(int $tenantId, int $chatId, int $floorId, string $q, ?int $authorProfileId, int $limit = 50): array
+    {
+        $sql = 'SELECT ' . self::MESSAGE_COLUMNS . " FROM messages x LEFT JOIN profiles p ON p.id = x.author_profile_id
+            WHERE x.tenant_id = :tid AND x.conversation_id = :cid AND x.id > :floor AND x.deleted_at IS NULL
+              AND x.source IN ('chat.person', 'chat.agent')";
+        $params = [':tid' => $tenantId, ':cid' => $chatId, ':floor' => $floorId];
+        if ($q !== '') {
+            $sql .= " AND LOWER(x.body_text) LIKE :q ESCAPE '!'";
+            $params[':q'] = '%' . strtr(mb_strtolower($q), ['!' => '!!', '%' => '!%', '_' => '!_']) . '%';
+        }
+        if ($authorProfileId !== null) {
+            $sql .= ' AND x.author_profile_id = :author AND x.by_agent = FALSE';
+            $params[':author'] = $authorProfileId;
+        }
+        $stmt = $this->db->prepare($sql . ' ORDER BY x.id DESC LIMIT :limit');
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v, is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return array_values(array_map(self::shapeMessage(...), $stmt->fetchAll(PDO::FETCH_ASSOC)));
+    }
+
+    /**
+     * Each person's read mark in the chat, for "Seen by" (UC.11).
+     *
+     * @return list<array{member_id: int, profile_id: int, name: string, last_read_message_id: int}>
+     */
+    public function readMarks(int $tenantId, int $chatId): array
+    {
+        $stmt = $this->db->prepare('SELECT m.id, m.profile_id, p.display_name, m.last_read_message_id
+              FROM chat_members m JOIN profiles p ON p.id = m.profile_id
+             WHERE m.tenant_id = :tid AND m.conversation_id = :cid AND m.removed_at IS NULL AND m.profile_id IS NOT NULL
+             ORDER BY m.id');
+        $stmt->execute([':tid' => $tenantId, ':cid' => $chatId]);
+
+        return array_values(array_map(static fn (array $r): array => [
+            'member_id' => (int) $r['id'],
+            'profile_id' => (int) $r['profile_id'],
+            'name' => (string) $r['display_name'],
+            'last_read_message_id' => (int) $r['last_read_message_id'],
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC)));
+    }
+
+    /**
+     * Messages by id, for the quotes above replies.
+     *
+     * @param list<int> $ids
+     * @return array<int, array<string, mixed>>
+     */
+    public function messagesByIds(int $tenantId, array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare('SELECT ' . self::MESSAGE_COLUMNS . " FROM messages x LEFT JOIN profiles p ON p.id = x.author_profile_id
+            WHERE x.tenant_id = ? AND x.id IN ({$marks})");
+        $stmt->execute([$tenantId, ...$ids]);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $out[(int) $row['id']] = self::shapeMessage($row);
+        }
+
+        return $out;
+    }
+
+    /** Bubbles (the default) or compact rows, the person's own choice (UC.7). */
+    public function chatLayout(int $profileId): string
+    {
+        $stmt = $this->db->prepare('SELECT chat_layout FROM profiles WHERE id = :id');
+        $stmt->execute([':id' => $profileId]);
+
+        return $stmt->fetchColumn() === 'rows' ? 'rows' : 'bubbles';
+    }
+
+    public function setChatLayout(int $profileId, string $layout): void
+    {
+        $this->db->prepare('UPDATE profiles SET chat_layout = :layout WHERE id = :id')
+            ->execute([':layout' => $layout === 'rows' ? 'rows' : 'bubbles', ':id' => $profileId]);
     }
 
     // ── People, agents, proposals ────────────────────────────────────────────
@@ -552,6 +824,9 @@ final class ChatRepository
     {
         $row['by_agent'] = DbBool::of($row['by_agent']);
         $row['chat_meta'] = self::decode($row['chat_meta']);
+        if (array_key_exists('in_chat', $row)) {
+            $row['in_chat'] = DbBool::of($row['in_chat']);
+        }
 
         return $row;
     }

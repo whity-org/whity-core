@@ -5724,13 +5724,14 @@ $router->register('POST',  '/api/messages/settings/inbound-secret',       [$mess
 $chatRepository = new \Whity\Core\Chat\ChatRepository($db->getPdo());
 // WHIT-1077: each chat line is pushed to the chat's other people who have a
 // device on and aren't looking at that chat.
+$chatStore = new \Whity\Core\Store\DatabaseSharedStore($db->getPdo());
 $chatService = new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core\Chat\ChatPushNotifier(
     $notificationDispatcher,
     $chatRepository,
     new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
-    new \Whity\Core\Store\DatabaseSharedStore($db->getPdo()),
+    $chatStore,
     $logger,
-));
+), $chatStore);
 // One chat (UC.1, WHIT-1093): team chats and, for people with messages.read,
 // the customer conversations, in one list with each person's pins.
 $chatHandler = new \Whity\Api\ChatApiHandler(
@@ -5754,6 +5755,19 @@ $router->register('POST',   '/api/chat/chats/{id:\d+}/members',                 
 $router->register('DELETE', '/api/chat/chats/{id:\d+}/members/{member:\d+}',    [$chatHandler, 'removeMember'],  null);
 $router->register('POST',   '/api/chat/messages/{id:\d+}/approve',              [$chatHandler, 'approve'],       null);
 $router->register('POST',   '/api/chat/messages/{id:\d+}/decline',              [$chatHandler, 'decline'],       null);
+// The parts of a message (UC.6-UC.12, WHIT-1094): replies, threads, reactions,
+// pins, edit and delete your own, search, seen and typing. Ungated like the
+// rest of Chat: membership is the check, in ChatService.
+$router->register('PATCH',  '/api/chat/messages/{id:\d+}',                      [$chatHandler, 'edit'],          null);
+$router->register('DELETE', '/api/chat/messages/{id:\d+}',                      [$chatHandler, 'deleteMessage'], null);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/reactions',            [$chatHandler, 'react'],         null);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/pin',                  [$chatHandler, 'pinMessage'],    null);
+$router->register('GET',    '/api/chat/messages/{id:\d+}/thread',               [$chatHandler, 'thread'],        null);
+$router->register('GET',    '/api/chat/chats/{id:\d+}/search',                  [$chatHandler, 'search'],        null);
+$router->register('GET',    '/api/chat/chats/{id:\d+}/state',                   [$chatHandler, 'state'],         null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/typing',                  [$chatHandler, 'typing'],        null);
+$router->register('GET',    '/api/chat/preferences',                            [$chatHandler, 'preferences'],   null);
+$router->register('PUT',    '/api/chat/preferences',                            [$chatHandler, 'preferences'],   null);
 $router->register('GET',    '/api/chat/directory',                              [$chatHandler, 'directory'],     null);
 
 $meMessagesHandler = new \Whity\Api\MeMessagesApiHandler($messagingService);

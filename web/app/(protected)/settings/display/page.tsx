@@ -3,13 +3,14 @@
 /**
  * My settings › Language and display (W.3; WHIT-1081): the language, then the
  * Display card (light or dark on this device; text size, technical details
- * and animations on the account).
+ * and animations on the account), then Chat: bubbles or compact rows (UC.7).
  */
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { LanguageSwitcher, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import { DisplayPreferencesSettings } from '@/components/display-preferences-settings';
 import { MySettingsHeader } from '@/components/settings/scope';
+import { ChatLayoutSetting } from '@/components/chat/chat-layout-setting';
 
 export default function DisplaySettingsPage() {
   const t = useTranslation('auth');
@@ -43,6 +44,8 @@ export default function DisplaySettingsPage() {
         </Card>
       )}
       <DisplayPreferencesSettings />
+      {/* UC.7: bubbles or compact rows in Chat, each person's own choice. */}
+      <ChatLayoutSetting />
     </div>
   );
 }
