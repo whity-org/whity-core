@@ -18,8 +18,8 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { undoWindowWords, type ProposalWords } from '@/components/agents/proposals';
-import { localized } from '@/components/agents/workspace-agents';
 import type { McpAgentAccess, McpListSize, McpTool, McpToolListResponse, McpToolVisibility } from './types';
+import { localizedText } from '@whity/ui/localized-text';
 
 /** The setting that holds the plugin tools this workspace lists directly (WHIT-754). */
 const ALWAYS_ON_SETTING = 'mcp.always_on_plugin_tools';
@@ -58,11 +58,11 @@ export default function McpToolsPage() {
 
   const tools = useMemo(() => data?.data ?? [], [data]);
   const sizes = data?.sizes;
-  const nameOf = (tool: McpTool): string => localized(tool.plainName, tool.plainNameAr, arabic);
-  const areaOf = (tool: McpTool): string => localized(tool.area.title, tool.area.titleAr, arabic);
+  const nameOf = (tool: McpTool): string => localizedText({ en: tool.plainName, ar: tool.plainNameAr }, arabic ? 'ar' : 'en');
+  const areaOf = (tool: McpTool): string => localizedText({ en: tool.area.title, ar: tool.area.titleAr }, arabic ? 'ar' : 'en');
   const areas = useMemo(() => {
     const byId = new Map<string, string>();
-    for (const tool of tools) byId.set(tool.area.id, localized(tool.area.title, tool.area.titleAr, arabic));
+    for (const tool of tools) byId.set(tool.area.id, localizedText({ en: tool.area.title, ar: tool.area.titleAr }, arabic ? 'ar' : 'en'));
     return [...byId.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [tools, arabic]);
 

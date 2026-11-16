@@ -16,6 +16,7 @@ import { Textarea } from '@whity/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import type { CustomField } from '@/lib/contacts/api';
+import { localizedText } from '@whity/ui/localized-text';
 
 /** Whether this screen can show and change the field. */
 export function isEditableHere(field: CustomField): boolean {
@@ -23,8 +24,7 @@ export function isEditableHere(field: CustomField): boolean {
 }
 
 export function fieldLabel(field: CustomField, language: string | null): string {
-  const preferred = language === 'ar' ? field.label.ar : field.label.en;
-  return preferred !== '' ? preferred : field.label.en !== '' ? field.label.en : field.label.ar;
+  return localizedText(field.label, language);
 }
 
 export function FieldInput({

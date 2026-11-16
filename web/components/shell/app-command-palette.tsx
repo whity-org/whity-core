@@ -36,7 +36,6 @@ import { useNavItemLabels } from '@/lib/nav-item-labels';
 import { useThemeMode } from '@/lib/theme-mode-context';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
-import { localizedName } from '@/lib/localized-name';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import {
   APPROVE_NAMES,
@@ -51,6 +50,7 @@ import { usePaletteData } from '@/lib/commands/use-palette-data';
 import { requestNew } from '@/lib/commands/new-intent';
 import { fold, parseCommand, rank } from '@/lib/commands/parse';
 import type { components } from '@whity/api-client';
+import { localizedText } from '@whity/ui/localized-text';
 import { isInSettingsArea, useSettingsGroups } from '@/components/settings/settings-area';
 import { searchSettings, useSettingsIndex, type SettingEntry } from '@/components/settings/settings-index';
 import { SETTINGS_HOME_HREF } from '@/lib/settings/my-settings';
@@ -217,7 +217,7 @@ export function AppCommandPalette() {
       ],
       workspaces: memberships.map((m) => ({
         id: m.tenant_id,
-        name: localizedName(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
+        name: localizedText(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
       })),
       activeWorkspaceId: user?.tenant_id,
       switchWorkspace: (id) => {

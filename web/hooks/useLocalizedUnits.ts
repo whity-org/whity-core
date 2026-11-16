@@ -2,12 +2,12 @@
 
 import { useMemo } from 'react';
 import { useLanguageCode } from '@whity/features/i18n';
-import { localizedName, type LocalizedNames } from '@/lib/localized-name';
+import { localizedText, type LocalizedText } from '@whity/ui/localized-text';
 
 /** The name fields of a unit, as `GET /api/ous` lists them (#821). */
 export interface UnitNames {
   name: string;
-  names?: LocalizedNames | null;
+  names?: LocalizedText | null;
   name_language?: string | null;
 }
 
@@ -26,7 +26,7 @@ export function useLocalizedUnits<T extends UnitNames>(units: readonly T[] | nul
     () =>
       (units ?? []).map((unit) => ({
         ...unit,
-        name: localizedName(unit.names, language, unit.name_language, unit.name),
+        name: localizedText(unit.names, language, unit.name_language, unit.name),
       })),
     [units, language]
   );

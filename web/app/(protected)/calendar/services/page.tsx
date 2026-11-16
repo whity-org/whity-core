@@ -39,7 +39,7 @@ import { EmptyFiltered, ReadOnlyNotice } from '@whity/ui/page-states';
 import { SearchField } from '@whity/ui/search-field';
 import { useTranslation } from '@whity/features/i18n';
 import { calendarApi, type CalendarService } from '@/lib/calendar/api';
-import { cleanNames } from '@/lib/localized-name';
+import { cleanLocalizedText } from '@whity/ui/localized-text';
 
 export default function CalendarServicesPage() {
   const t = useTranslation('calendar');
@@ -206,7 +206,7 @@ function NewServiceDialog({
   const [problem, setProblem] = useState<string | null>(null);
 
   const save = async () => {
-    const names = cleanNames(name);
+    const names = cleanLocalizedText(name);
     const minutes = Number(duration);
     if (Object.keys(names).length === 0) {
       setProblem(t('services.error.name', 'Give the service a name.'));

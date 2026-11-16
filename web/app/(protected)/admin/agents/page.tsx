@@ -18,11 +18,12 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { AgentPresetGallery } from '@/components/agents/agent-preset-gallery';
 import { AgentStatusBadge, OnItsOwn, WorksFor } from '@/components/agents/agent-status';
 import { AgentsTabs } from '@/components/agents/agents-tabs';
-import { localized, refusal, type WorkspaceAgent } from '@/components/agents/workspace-agents';
+import { refusal, type WorkspaceAgent } from '@/components/agents/workspace-agents';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useFetch } from '@/hooks/useFetch';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
+import { localizedText } from '@whity/ui/localized-text';
 
 type Filter = 'all' | 'working' | 'paused' | 'archived';
 
@@ -60,7 +61,7 @@ export default function AgentsPage() {
       addToast(await refusal(new Response(JSON.stringify(error ?? null)), t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
       return;
     }
-    const name = localized(agent.name, agent.nameAr, arabic);
+    const name = localizedText({ en: agent.name, ar: agent.nameAr }, arabic ? 'ar' : 'en');
     addToast(
       archived
         ? t('agents.archived', '{name} archived. Everyone using it has stopped.', { name })
@@ -81,7 +82,7 @@ export default function AgentsPage() {
       addToast(await refusal(new Response(JSON.stringify(error ?? null)), t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
       return;
     }
-    const name = localized(agent.name, agent.nameAr, arabic);
+    const name = localizedText({ en: agent.name, ar: agent.nameAr }, arabic ? 'ar' : 'en');
     addToast(
       paused
         ? t('agents.paused', '{name} is paused. It can’t do anything until it is resumed.', { name })
@@ -118,10 +119,10 @@ export default function AgentsPage() {
       enableSorting: true,
       cell: (agent: WorkspaceAgent) => (
         <span className="flex items-center gap-3">
-          <Avatar kind="agent" name={localized(agent.name, agent.nameAr, arabic)} size={36} />
+          <Avatar kind="agent" name={localizedText({ en: agent.name, ar: agent.nameAr }, arabic ? 'ar' : 'en')} size={36} />
           <span className="min-w-0">
-            <span className="block font-medium">{localized(agent.name, agent.nameAr, arabic)}</span>
-            <span className="block max-w-xs truncate text-sm text-muted-foreground">{localized(agent.role, agent.roleAr, arabic)}</span>
+            <span className="block font-medium">{localizedText({ en: agent.name, ar: agent.nameAr }, arabic ? 'ar' : 'en')}</span>
+            <span className="block max-w-xs truncate text-sm text-muted-foreground">{localizedText({ en: agent.role, ar: agent.roleAr }, arabic ? 'ar' : 'en')}</span>
           </span>
         </span>
       ),

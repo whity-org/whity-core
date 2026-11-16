@@ -28,7 +28,7 @@ namespace Whity\Core\i18n;
  *
  * Step 4 matters: a name in a language the reader did not ask for is still
  * information, and a blank cell reads as a broken query. The web app's twin,
- * `localizedText()` in `@/lib/localized-text`, applies the same rule.
+ * `localizedText()` in `@whity/ui/localized-text`, applies the same rule.
  *
  * Stateless; worker-safe.
  */

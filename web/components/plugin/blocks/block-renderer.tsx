@@ -169,8 +169,8 @@ import {
   TabsTrigger,
 } from '@whity/ui/tabs';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
-import { localizedName, type LocalizedNames } from '@/lib/localized-name';
 import { useDateDisplay } from '@whity/features/datetime';
+import { localizedText, type LocalizedText } from '@whity/ui/localized-text';
 
 /**
  * WC-227: the web renderer for `screen: 'blocks'` plugin features.
@@ -3817,8 +3817,8 @@ function toOuRow(raw: Record<string, unknown>, language: string | null): OuRow |
   const parent = raw.parent_id;
   return {
     id,
-    name: localizedName(
-      typeof raw.names === 'object' ? (raw.names as LocalizedNames | null) : null,
+    name: localizedText(
+      typeof raw.names === 'object' ? (raw.names as LocalizedText | null) : null,
       language,
       typeof raw.name_language === 'string' ? raw.name_language : null,
       raw.name === undefined || raw.name === null ? String(id) : String(raw.name)

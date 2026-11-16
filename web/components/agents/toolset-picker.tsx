@@ -5,7 +5,8 @@ import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { useFetch } from '@/hooks/useFetch';
 import { api } from '@/lib/api/client';
-import { localized, toolsetLabel } from './workspace-agents';
+import { toolsetLabel } from './workspace-agents';
+import { localizedText } from '@whity/ui/localized-text';
 
 /**
  * "What it works with": the areas an agent may use, by name; the toolset id
@@ -28,7 +29,7 @@ export function ToolsetPicker({
   }, []);
   const nameOf = (id: string): string => {
     const known = names.data?.find((toolset) => toolset.id === id);
-    return known !== undefined ? localized(known.title, known.titleAr, arabic) : toolsetLabel(id);
+    return known !== undefined ? localizedText({ en: known.title, ar: known.titleAr }, arabic ? 'ar' : 'en') : toolsetLabel(id);
   };
 
   return (

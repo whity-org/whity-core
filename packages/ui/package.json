@@ -38,6 +38,7 @@
     "./badge": "./src/badge.tsx",
     "./beta-warning": "./src/beta-warning.tsx",
     "./bilingual-input": "./src/bilingual-input.tsx",
+    "./localized-text": "./src/localized-text.ts",
     "./breadcrumb": "./src/breadcrumb.tsx",
     "./button": "./src/button.tsx",
     "./card": "./src/card.tsx",

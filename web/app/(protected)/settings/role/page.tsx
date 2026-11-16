@@ -11,7 +11,7 @@ import { TenantLogo } from '@whity/ui/tenant-logo';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import { roleLabel } from '@whity/features/roles/role-label';
 import { useAuth } from '@/lib/auth-context';
-import { localizedName } from '@/lib/localized-name';
+import { localizedText } from '@whity/ui/localized-text';
 import { roleNames } from '@/lib/workspace-memberships';
 import { MySettingsHeader, useCurrentWorkspace } from '@/components/settings/scope';
 
@@ -30,7 +30,7 @@ export default function RoleSettingsPage() {
   for (const m of memberships) {
     if (m.tenant_id === currentId) continue;
     const entry = others.get(m.tenant_id) ?? {
-      name: localizedName(m.tenant_names, language, m.tenant_name_language, m.tenant_name),
+      name: localizedText(m.tenant_names, language, m.tenant_name_language, m.tenant_name),
       roles: [],
     };
     for (const name of roleNames(m)) if (!entry.roles.includes(name)) entry.roles.push(name);

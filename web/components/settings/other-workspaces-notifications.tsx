@@ -18,7 +18,7 @@ import type { components } from '@whity/api-client';
 import { api } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
-import { localizedName } from '@/lib/localized-name';
+import { localizedText } from '@whity/ui/localized-text';
 
 type Row = components['schemas']['NotificationSummaryWorkspace'];
 
@@ -60,7 +60,7 @@ export function OtherWorkspacesNotifications() {
           {others.map((row) => {
             const membership = memberships.find((m) => m.tenant_id === row.tenant_id);
             const name = membership
-              ? localizedName(membership.tenant_names, language, membership.tenant_name_language, membership.tenant_name)
+              ? localizedText(membership.tenant_names, language, membership.tenant_name_language, membership.tenant_name)
               : '';
             const devices =
               row.push_devices === 1
