@@ -5711,9 +5711,9 @@ $router->register('POST', '/api/public/signup/workspaces/{workspace}', [$publicS
 // MESSAGES (ADR 0016, WHIT-938): conversations with customers by email and web
 // chat, one send API for every core module, channels a store plugin can add,
 // and outbound messages metered in warn mode. (The calendar's booking emails
-// and reminders don't use it: they go to the Mailer through
-// EmailBookingMessenger, and a plugin reminder channel joins through
-// CalendarPlugins::addReminderChannel().)
+// keep their own templates through EmailBookingMessenger; booking reminders
+// by text go through here, on every channel a plugin adds: C4,
+// BookingTextReminders.)
 // Plugin channels join this registry when plugins load below.
 $messageChannelRegistry = new \Whity\Core\Messaging\MessageChannelRegistry();
 \Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannelRegistry);
