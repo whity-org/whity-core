@@ -2895,6 +2895,17 @@ $codePluginActivation->useInstallLicence(static function (string $plugin) use ($
     return $hostStoreLicence->status($slug)->state;
 });
 \Whity\register_service(\Whity\Sdk\Billing\WorkspaceAddons::class, new \Whity\Core\Plan\HostWorkspaceAddons($db->getPdo(), $codePluginActivation, $auditLogger)); // @phpstan-ignore-line
+// WHIT-1156: while a paid plugin is on in a workspace (trial, cash, grace),
+// its add-on plan's number limits apply as if the add-on were held: Salons
+// lifts the staff limit for as long as the salon has it.
+$pluginLimitPacks = new \Whity\Core\Plugin\Workspace\PluginLimitPacks(
+    $db->getPdo(),
+    $codePluginActivation,
+    static fn (): array => $pluginLoader->getPaidAccess(),
+);
+$entitlementService->usePluginPacks(static fn (int $tenantId): array => $pluginLimitPacks->packsFor($tenantId));
+// WHIT-1156: invitations ask the plan's staff limit first, as `seats.enforcement` says.
+$invitationsHandler->useSeats(new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService));
 // WHIT-1129 (SDK 1.108): packs set a workspace up through core's own routes,
 // as the person acting there, limited to WorkspaceSetup::ROUTES.
 \Whity\register_service(\Whity\Sdk\Setup\WorkspaceSetup::class, new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker)); // @phpstan-ignore-line
