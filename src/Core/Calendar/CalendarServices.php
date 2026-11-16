@@ -10,6 +10,7 @@ use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Http\FrontendUrls;
 use Whity\Core\Mail\BrandedEmailSender;
+use Whity\Core\Notification\NotificationDispatcher;
 use Whity\Core\Queue\QueueService;
 use Whity\Core\Settings\SettingsService;
 
@@ -29,6 +30,7 @@ final class CalendarServices
         ?QueueService $queue,
         ?LoggerInterface $logger = null,
         ?CalendarPlugins $plugins = null,
+        ?CalendarInvites $invites = null,
     ): BookingService {
         $service = new BookingService(
             $pdo,
@@ -38,8 +40,7 @@ final class CalendarServices
             $settings,
             $hooks,
         );
-        // Meetings block calendar time (issue #1933, WHIT-1051).
-        $service->addBusySource(new MeetingBusySource($pdo));
+        // Meetings are calendar events (ADR 0018), so free/busy already counts them.
         $service->setLinks(new ManageLinks($pdo));
         $service->setManageUrlBase($urls->linkOrPath(FrontendUrls::BOOKING_MANAGE));
         if ($plugins !== null) {
@@ -55,7 +56,32 @@ final class CalendarServices
         if ($queue !== null) {
             $service->setQueue($queue);
         }
+        if ($invites !== null) {
+            $service->setInvites($invites);
+        }
 
         return $service;
+    }
+
+    /** The one invite path for events with people (ADR 0018). */
+    public static function invites(
+        PDO $pdo,
+        NotificationDispatcher $notifications,
+        BrandedEmailSender $sender,
+        SettingsService $settings,
+        FrontendUrls $urls,
+        ?LoggerInterface $logger = null,
+    ): CalendarInvites {
+        $base = $urls->base();
+
+        return new CalendarInvites(
+            $pdo,
+            new CalendarRepository($pdo),
+            $notifications,
+            $sender,
+            $settings,
+            ($base !== '' ? $base : '') . '/calendar',
+            $logger,
+        );
     }
 }

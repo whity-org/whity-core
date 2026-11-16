@@ -21,7 +21,9 @@ final class CalendarRepository
     public const KIND_MEETING = 'meeting';
     public const KIND_TIME_OFF = 'time_off';
     public const KIND_EXTERNAL = 'external';
-    public const KINDS = [self::KIND_EVENT, self::KIND_MEETING, self::KIND_TIME_OFF, self::KIND_EXTERNAL];
+    /** Extra working hours: widens a person's hours, never shown on the calendar. */
+    public const KIND_OPEN_HOURS = 'open_hours';
+    public const KINDS = [self::KIND_EVENT, self::KIND_MEETING, self::KIND_TIME_OFF, self::KIND_EXTERNAL, self::KIND_OPEN_HOURS];
 
     /** An invited person's answer. */
     public const RESPONSES = ['invited', 'accepted', 'declined', 'tentative'];
@@ -194,55 +196,65 @@ final class CalendarRepository
     }
 
     /**
-     * Exceptions touching `[from, to)`, for one person or (null) everyone.
+     * Time off and extra hours touching `[from, to)`, for one person or (null)
+     * everyone. Both are events since ADR 0018 (kinds `time_off` and
+     * `open_hours`); the shape is the one the time-off API and
+     * {@see Availability} have always read: kind `off` or `open`.
      *
      * @return list<array{id: int, profile_id: int, kind: string, interval: Interval, note: string}>
      */
     public function exceptions(int $tenantId, ?int $profileId, DateTimeImmutable $from, DateTimeImmutable $to): array
     {
-        $sql = 'SELECT id, profile_id, kind, starts_at, ends_at, note FROM calendar_availability_exceptions
-                 WHERE tenant_id = :tenant_id AND starts_at < :to AND ends_at > :from';
+        $sql = "SELECT id, profile_id, kind, starts_at, ends_at, notes FROM calendar_events
+                 WHERE tenant_id = :tenant_id AND starts_at < :to AND ends_at > :from
+                   AND status = 'confirmed' AND kind IN ('time_off', 'open_hours')";
         $params = [':tenant_id' => $tenantId, ':from' => Interval::toDb($from), ':to' => Interval::toDb($to)];
         if ($profileId !== null) {
             $sql .= ' AND profile_id = :profile_id';
             $params[':profile_id'] = $profileId;
         }
-        $stmt = $this->db->prepare($sql . ' ORDER BY starts_at');
+        $stmt = $this->db->prepare($sql . ' ORDER BY starts_at, id');
         $stmt->execute($params);
 
         return array_values(array_map(static fn (array $r): array => [
             'id' => (int) $r['id'],
             'profile_id' => (int) $r['profile_id'],
-            'kind' => (string) $r['kind'],
+            'kind' => $r['kind'] === self::KIND_OPEN_HOURS ? 'open' : 'off',
             'interval' => new Interval(Interval::fromDb((string) $r['starts_at']), Interval::fromDb((string) $r['ends_at'])),
-            'note' => (string) $r['note'],
+            'note' => (string) $r['notes'],
         ], $stmt->fetchAll(PDO::FETCH_ASSOC)));
     }
 
+    /**
+     * Time off (`off`, busy) or extra hours (`open`, not busy) for a person,
+     * stored as an event (ADR 0018). The note is the title when there is one.
+     */
     public function addException(int $tenantId, int $profileId, string $kind, Interval $interval, string $note, ?int $actor): int
     {
-        $stmt = $this->db->prepare(
-            'INSERT INTO calendar_availability_exceptions (tenant_id, profile_id, kind, starts_at, ends_at, note, created_by_profile_id)
-             VALUES (:tenant_id, :profile_id, :kind, :starts_at, :ends_at, :note, :actor)
-             RETURNING id'
-        );
-        $stmt->execute([
-            ':tenant_id' => $tenantId,
-            ':profile_id' => $profileId,
-            ':kind' => $kind,
-            ':starts_at' => Interval::toDb($interval->start),
-            ':ends_at' => Interval::toDb($interval->end),
-            ':note' => $note,
-            ':actor' => $actor,
-        ]);
+        $open = $kind === 'open';
+        $title = $note !== '' ? mb_substr($note, 0, 200) : ($open ? 'Extra hours' : 'Time off');
 
-        return (int) $stmt->fetchColumn();
+        return $this->insertEvent(
+            $tenantId,
+            $profileId,
+            $title,
+            $note,
+            $interval,
+            false,
+            !$open,
+            null,
+            $actor,
+            kind: $open ? self::KIND_OPEN_HOURS : self::KIND_TIME_OFF,
+        );
     }
 
     /** @return array{id: int, profile_id: int}|null */
     public function findException(int $tenantId, int $id): ?array
     {
-        $stmt = $this->db->prepare('SELECT id, profile_id FROM calendar_availability_exceptions WHERE tenant_id = :tenant_id AND id = :id');
+        $stmt = $this->db->prepare(
+            "SELECT id, profile_id FROM calendar_events
+              WHERE tenant_id = :tenant_id AND id = :id AND status = 'confirmed' AND kind IN ('time_off', 'open_hours')"
+        );
         $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -251,8 +263,7 @@ final class CalendarRepository
 
     public function deleteException(int $tenantId, int $id): void
     {
-        $this->db->prepare('DELETE FROM calendar_availability_exceptions WHERE tenant_id = :tenant_id AND id = :id')
-            ->execute([':tenant_id' => $tenantId, ':id' => $id]);
+        $this->cancelEvent($tenantId, $id);
     }
 
     /**
@@ -289,7 +300,7 @@ final class CalendarRepository
               WHERE e.tenant_id = :tenant_id
                 AND e.starts_at < :to AND e.ends_at > :from
                 AND e.busy = :busy AND e.status = 'confirmed'
-                AND (e.profile_id = :profile_id OR EXISTS (
+                AND ((e.profile_id = :profile_id AND e.kind <> 'meeting') OR EXISTS (
                       SELECT 1 FROM calendar_event_people p
                        WHERE p.event_id = e.id AND p.tenant_id = e.tenant_id
                          AND p.profile_id = :profile_id AND p.response <> 'declined'))"
@@ -311,14 +322,23 @@ final class CalendarRepository
      * Events in `[from, to)` for the given people (empty = everyone).
      *
      * @param list<int> $profileIds
+     * @param list<string>|null $kinds only these kinds (null = every kind)
      * @return list<array<string, mixed>>
      */
-    public function listEvents(int $tenantId, array $profileIds, DateTimeImmutable $from, DateTimeImmutable $to): array
+    public function listEvents(int $tenantId, array $profileIds, DateTimeImmutable $from, DateTimeImmutable $to, ?array $kinds = null): array
     {
         $sql = 'SELECT ' . self::EVENT_COLUMNS . "
                   FROM calendar_events
                  WHERE tenant_id = :tenant_id AND starts_at < :to AND ends_at > :from AND status = 'confirmed'";
         $params = [':tenant_id' => $tenantId, ':from' => Interval::toDb($from), ':to' => Interval::toDb($to)];
+        if ($kinds !== null) {
+            $kindIn = [];
+            foreach ($kinds as $i => $kind) {
+                $kindIn[] = ':k' . $i;
+                $params[':k' . $i] = $kind;
+            }
+            $sql .= $kindIn === [] ? ' AND 1 = 0' : ' AND kind IN (' . implode(', ', $kindIn) . ')';
+        }
         if ($profileIds !== []) {
             $in = [];
             foreach ($profileIds as $i => $id) {
@@ -494,8 +514,26 @@ final class CalendarRepository
             ':event_id' => $eventId,
             ':profile_id' => $profileId,
         ]);
+        if ($stmt->rowCount() === 0) {
+            return false;
+        }
 
-        return $stmt->rowCount() > 0;
+        // A formal meeting's invitation is the record (ADR 0018): the answer
+        // given on the calendar is the answer to the invitation.
+        $this->db->prepare(
+            'UPDATE meeting_invitations SET status = :status, responded_at = :now
+              WHERE tenant_id = :tenant_id AND profile_id = :profile_id
+                AND meeting_id = (SELECT meeting_id FROM calendar_events WHERE tenant_id = :tenant_id2 AND id = :event_id)'
+        )->execute([
+            ':status' => $response,
+            ':now' => Interval::toDb(new DateTimeImmutable()),
+            ':tenant_id' => $tenantId,
+            ':tenant_id2' => $tenantId,
+            ':profile_id' => $profileId,
+            ':event_id' => $eventId,
+        ]);
+
+        return true;
     }
 
     /**

@@ -11692,10 +11692,10 @@ export interface components {
             status: string;
             external_ref?: string | null;
             /**
-             * @description A team event or everyday meeting, a formal meeting, time off, or one synced from an outside calendar.
+             * @description A team event or everyday meeting, a formal meeting, time off, one synced from an outside calendar, or extra working hours (never shown on the calendar).
              * @enum {string}
              */
-            kind: "event" | "meeting" | "time_off" | "external";
+            kind: "event" | "meeting" | "time_off" | "external" | "open_hours";
             room_id?: number | null;
             location?: string;
             meeting_id?: number | null;
@@ -27034,6 +27034,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description A formal meeting: cancel it on the meeting (code meeting) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Internal server error */
             500: {
                 headers: {
@@ -27107,6 +27116,15 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A formal meeting: change it on the meeting (code meeting) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

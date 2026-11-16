@@ -574,18 +574,19 @@ final class BookingRealEngineTest extends TestCase
 
     public function testAScheduledMeetingBlocksEveryoneInvitedWhoHasNotDeclined(): void
     {
-        $this->service->addBusySource(new \Whity\Core\Calendar\MeetingBusySource($this->pdo));
         $this->pdo->exec("INSERT INTO convening_bodies (id, tenant_id, body_key, name) VALUES (501, 1, 'board', 'Board')");
         // Monday 16 November, 10:00 in Amman (07:00Z).
         $this->pdo->exec("INSERT INTO meetings (id, tenant_id, body_id, meeting_number, title, scheduled_at, status) VALUES (601, 1, 501, 1, 'Board meeting', '2026-11-16 07:00:00', 'scheduled')");
         $this->pdo->exec("INSERT INTO meeting_invitations (tenant_id, meeting_id, profile_id, status) VALUES (1, 601, 11, 'accepted'), (1, 601, 12, 'declined')");
+        // ADR 0018: the meeting's time is a calendar event, so free/busy counts it.
+        (new \Whity\Core\Convening\MeetingCalendar($this->pdo))->sync(1, 601);
 
         $free = fn (int $who): array => array_column($this->service->availability(1, $this->cake, $who, self::at('2026-11-16T10:00:00+03:00'), self::at('2026-11-16T11:00:00+03:00')), 'starts_at');
         self::assertSame([], $free(11), 'the meeting blocks an hour for baker 11');
         self::assertSame(['2026-11-16T07:00:00Z', '2026-11-16T07:30:00Z'], $free(12), 'baker 12 declined');
 
-        // Another workspace's meeting never blocks.
-        self::assertSame([], (new \Whity\Core\Calendar\MeetingBusySource($this->pdo))->busyTimes(2, 11, self::at('2026-11-16T00:00:00+03:00'), self::at('2026-11-17T00:00:00+03:00')));
+        // Another workspace's calendar never sees it.
+        self::assertSame([], $this->calendar->busy(2, 11, self::at('2026-11-16T00:00:00+03:00'), self::at('2026-11-17T00:00:00+03:00'), self::at('2026-11-15T07:00:00+03:00')));
     }
 
     public function testDayCountsAreLocalDatesByPersonForLiveBookingsOnly(): void

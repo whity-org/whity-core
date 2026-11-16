@@ -10743,7 +10743,7 @@ final class CoreApiSchemas
                 'status' => self::str(),
                 'external_ref' => self::str(true),
                 // ADR 0018: one events table.
-                'kind' => self::str() + ['enum' => ['event', 'meeting', 'time_off', 'external'], 'description' => 'A team event or everyday meeting, a formal meeting, time off, or one synced from an outside calendar.'],
+                'kind' => self::str() + ['enum' => ['event', 'meeting', 'time_off', 'external', 'open_hours'], 'description' => 'A team event or everyday meeting, a formal meeting, time off, one synced from an outside calendar, or extra working hours (never shown on the calendar).'],
                 'room_id' => self::int(true),
                 'location' => self::str(),
                 'meeting_id' => self::int(true),
@@ -19046,6 +19046,7 @@ final class CoreApiSchemas
                 'responses' => [
                     200 => self::jsonResponse('The event', SchemaBuilder::ref('CalendarEventResponse')),
                     404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('A formal meeting: change it on the meeting (code meeting)'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('DELETE', '/api/calendar/events/{id:\d+}', 'calendar:write', [
@@ -19054,6 +19055,7 @@ final class CoreApiSchemas
                 'responses' => [
                     200 => self::jsonResponse('Removed', self::dataEnvelope(self::object(['id' => self::int(), 'deleted' => self::bool()], ['id', 'deleted']))),
                     404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('A formal meeting: cancel it on the meeting (code meeting)'),
                 ] + self::authErrors(),
             ]),
         ];

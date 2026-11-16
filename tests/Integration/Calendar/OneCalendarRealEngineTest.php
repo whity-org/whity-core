@@ -198,6 +198,128 @@ final class OneCalendarRealEngineTest extends TestCase
         self::assertTrue($asManager['event:' . $team]['move']);
     }
 
+    public function testTimeOffIsAnEventThatBlocksAndTheTimeOffApiStillReadsIt(): void
+    {
+        $id = $this->calendar->addException(1, 11, 'off', $this->when('2026-11-16T10:00:00+03:00', '2026-11-16T11:00:00+03:00'), 'Doctor', 11);
+
+        self::assertSame('time_off', $this->calendar->findEvent(1, $id)['kind'] ?? null);
+        self::assertSame([], $this->free(11), 'time off blocks bookings');
+        $listed = $this->calendar->exceptions(1, 11, $this->at('2026-11-16T00:00:00+03:00'), $this->at('2026-11-17T00:00:00+03:00'));
+        self::assertSame([['id' => $id, 'kind' => 'off', 'note' => 'Doctor']], array_map(static fn (array $r): array => ['id' => $r['id'], 'kind' => $r['kind'], 'note' => $r['note']], $listed));
+        self::assertSame(['time_off:' . $id], array_column($this->items(viewer: 11), 'id'));
+
+        // The events list keeps its old meaning: no time off there.
+        self::assertSame([], $this->calendar->listEvents(1, [11], $this->at('2026-11-16T00:00:00+03:00'), $this->at('2026-11-17T00:00:00+03:00'), [CalendarRepository::KIND_EVENT, CalendarRepository::KIND_EXTERNAL, CalendarRepository::KIND_MEETING]));
+
+        $this->calendar->deleteException(1, $id);
+        self::assertSame(['2026-11-16T07:00:00Z', '2026-11-16T07:30:00Z'], $this->free(11), 'removing it frees the time');
+        self::assertNull($this->calendar->findException(1, $id));
+    }
+
+    public function testExtraHoursWidenTheDayAndNeverShowOnTheCalendar(): void
+    {
+        // Friday 20 November is not a working day.
+        $friday = fn (): array => array_column($this->service->availability(1, $this->cake, 11, $this->at('2026-11-20T00:00:00+03:00'), $this->at('2026-11-21T00:00:00+03:00')), 'starts_at');
+        self::assertSame([], $friday());
+
+        $this->calendar->addException(1, 11, 'open', $this->when('2026-11-20T10:00:00+03:00', '2026-11-20T11:00:00+03:00'), '', 11);
+
+        self::assertSame(['2026-11-20T07:00:00Z', '2026-11-20T07:30:00Z'], $friday());
+        self::assertSame([], (new CalendarItems($this->bookings, $this->calendar))->between(1, 11, $this->at('2026-11-20T00:00:00+03:00'), $this->at('2026-11-21T00:00:00+03:00')));
+    }
+
+    public function testOldTimeOffRowsAreCopiedOnceAndKeepTheirMeaning(): void
+    {
+        $this->pdo->exec(
+            "INSERT INTO calendar_availability_exceptions (id, tenant_id, profile_id, kind, starts_at, ends_at, note, created_by_profile_id)
+             VALUES (701, 1, 11, 'off', '2026-11-16 07:00:00', '2026-11-16 08:00:00', '', 11),
+                    (702, 1, 12, 'open', '2026-11-20 07:00:00', '2026-11-20 09:00:00', 'Market day', 12),
+                    (703, 2, 21, 'off', '2026-11-16 07:00:00', '2026-11-16 08:00:00', 'Holiday', 21)"
+        );
+        $db = \Whity\Database\Database::withFactory(fn (): PDO => $this->pdo, 86400, 86400);
+        $db->forceConnect();
+        require_once dirname(__DIR__, 3) . '/database/migrations/285_move_time_off_into_calendar_events.php';
+        \Database\Migrations\MoveTimeOffIntoCalendarEvents::up($db);
+        \Database\Migrations\MoveTimeOffIntoCalendarEvents::up($db);
+
+        $rows = $this->pdo->query("SELECT tenant_id, profile_id, kind, title, busy, legacy_ref FROM calendar_events WHERE legacy_ref IS NOT NULL ORDER BY legacy_ref");
+        self::assertNotFalse($rows);
+        self::assertSame([
+            ['1', '11', 'time_off', 'Time off', 'exception:701'],
+            ['1', '12', 'open_hours', 'Market day', 'exception:702'],
+            ['2', '21', 'time_off', 'Holiday', 'exception:703'],
+        ], array_map(static fn (array $r): array => [(string) $r['tenant_id'], (string) $r['profile_id'], $r['kind'], $r['title'], $r['legacy_ref']], $rows->fetchAll(PDO::FETCH_ASSOC)), 'copied once, each in its own workspace');
+        self::assertSame([], $this->free(11), 'the copied time off blocks');
+    }
+
+    public function testAScheduledMeetingIsACalendarEventForEveryoneInvited(): void
+    {
+        $meeting = $this->meeting(created: 13, invited: [11 => 'accepted', 12 => 'invited']);
+        $eventId = (new \Whity\Core\Convening\MeetingCalendar($this->pdo))->sync(1, $meeting);
+        self::assertNotNull($eventId);
+
+        $event = $this->calendar->findEvent(1, $eventId);
+        self::assertSame('meeting', $event['kind'] ?? null);
+        self::assertSame('Board meeting', $event['title'] ?? null);
+        self::assertSame('2026-11-16T08:00:00Z', $event['ends_at'] ?? null, '60 minutes when only a start is set');
+        self::assertSame('Meeting room 2', $event['location'] ?? null);
+        self::assertSame([[11, 'accepted'], [12, 'invited']], array_map(static fn (array $p): array => [$p['profile_id'], $p['response']], $event['people'] ?? []));
+
+        self::assertSame([], $this->free(11), 'invited and coming');
+        self::assertSame([], $this->free(12), 'invited, no answer yet');
+        self::assertSame(['meeting:' . $eventId], array_column($this->items(viewer: 12, people: [12]), 'id'));
+        self::assertFalse($this->items(viewer: 13)[0]['can']['move'], 'a meeting moves on the meeting');
+    }
+
+    public function testAnAnswerOnTheCalendarIsTheAnswerToTheInvitation(): void
+    {
+        $meeting = $this->meeting(created: 13, invited: [11 => 'invited']);
+        $eventId = (int) (new \Whity\Core\Convening\MeetingCalendar($this->pdo))->sync(1, $meeting);
+
+        self::assertTrue($this->calendar->answerEvent(1, $eventId, 11, 'declined'));
+
+        $status = $this->pdo->query("SELECT status FROM meeting_invitations WHERE meeting_id = {$meeting} AND profile_id = 11");
+        self::assertNotFalse($status);
+        self::assertSame('declined', $status->fetchColumn());
+        self::assertSame(['2026-11-16T07:00:00Z', '2026-11-16T07:30:00Z'], $this->free(11));
+    }
+
+    public function testRescheduledAndCancelledMeetingsKeepOneEvent(): void
+    {
+        $meeting = $this->meeting(created: 13, invited: [11 => 'accepted']);
+        $sync = new \Whity\Core\Convening\MeetingCalendar($this->pdo);
+        $first = $sync->sync(1, $meeting);
+
+        $this->pdo->exec("UPDATE meetings SET scheduled_at = '2026-11-17 07:00:00' WHERE id = {$meeting}");
+        self::assertSame($first, $sync->sync(1, $meeting));
+        self::assertSame('2026-11-17T07:00:00Z', $this->calendar->findEvent(1, (int) $first)['starts_at'] ?? null);
+
+        $this->pdo->exec("UPDATE meetings SET status = 'cancelled' WHERE id = {$meeting}");
+        $sync->sync(1, $meeting);
+        self::assertSame('cancelled', $this->calendar->findEvent(1, (int) $first)['status'] ?? null);
+        $count = $this->pdo->query('SELECT COUNT(*) FROM calendar_events WHERE meeting_id = ' . $meeting);
+        self::assertNotFalse($count);
+        self::assertSame(1, (int) $count->fetchColumn());
+    }
+
+    public function testExistingMeetingsArePutOnTheCalendarOnce(): void
+    {
+        $scheduled = $this->meeting(created: null, invited: [11 => 'accepted', 12 => 'declined'], chair: 12);
+        $this->pdo->exec("INSERT INTO meetings (id, tenant_id, body_id, meeting_number, title, status) VALUES (899, 1, 501, 9, 'Draft', 'draft')");
+
+        $db = \Whity\Database\Database::withFactory(fn (): PDO => $this->pdo, 86400, 86400);
+        $db->forceConnect();
+        require_once dirname(__DIR__, 3) . '/database/migrations/286_schedule_meetings_as_calendar_events.php';
+        \Database\Migrations\ScheduleMeetingsAsCalendarEvents::up($db);
+        \Database\Migrations\ScheduleMeetingsAsCalendarEvents::up($db);
+
+        $rows = $this->pdo->query('SELECT meeting_id, profile_id FROM calendar_events WHERE meeting_id IS NOT NULL');
+        self::assertNotFalse($rows);
+        self::assertSame([[(string) $scheduled, '12']], array_map(static fn (array $r): array => [(string) $r['meeting_id'], (string) $r['profile_id']], $rows->fetchAll(PDO::FETCH_ASSOC)), 'one event, organised by the chair; the draft has none');
+        self::assertSame([], $this->free(11));
+        self::assertSame(['2026-11-16T07:00:00Z', '2026-11-16T07:30:00Z'], $this->free(12), 'the chair declined, so is free');
+    }
+
     public function testAnotherWorkspaceSeesNothing(): void
     {
         $this->event(13, 'Menu tasting', '2026-11-16T10:00:00+03:00', '2026-11-16T11:00:00+03:00', people: [11]);
@@ -214,6 +336,30 @@ final class OneCalendarRealEngineTest extends TestCase
     private function event(int $organiser, string $title, string $from, string $to, array $people = []): int
     {
         return (int) $this->service->createEvent(1, $organiser, $title, '', $this->when($from, $to), false, true, $organiser, people: $people)['event']['id'];
+    }
+
+    /**
+     * A board meeting, Monday 16 November 10:00 in Amman (07:00Z), in meeting
+     * room 2, with these invitations.
+     *
+     * @param array<int, string> $invited profile id => answer
+     */
+    private function meeting(?int $created, array $invited, ?int $chair = null): int
+    {
+        $this->pdo->exec("INSERT INTO convening_bodies (id, tenant_id, body_key, name) VALUES (501, 1, 'board', 'Board')");
+        if ($chair !== null) {
+            $this->pdo->exec("INSERT INTO convening_body_members (tenant_id, body_id, profile_id, member_role) VALUES (1, 501, {$chair}, 'chair')");
+        }
+        $by = $created ?? 'NULL';
+        $this->pdo->exec(
+            "INSERT INTO meetings (id, tenant_id, body_id, meeting_number, title, scheduled_at, location, status, created_by_profile_id)
+             VALUES (601, 1, 501, 1, '{\"en\":\"Board meeting\",\"ar\":\"اجتماع المجلس\"}', '2026-11-16 07:00:00', 'Meeting room 2', 'scheduled', {$by})"
+        );
+        foreach ($invited as $profile => $status) {
+            $this->pdo->exec("INSERT INTO meeting_invitations (tenant_id, meeting_id, profile_id, status) VALUES (1, 601, {$profile}, '{$status}')");
+        }
+
+        return 601;
     }
 
     private function book(int $profileId, string $startsAt): int
