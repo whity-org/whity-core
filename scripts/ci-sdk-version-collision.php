@@ -5,13 +5,11 @@ declare(strict_types=1);
 /**
  * CI SDK version-collision guard (#873).
  *
- * scripts/ci-vendored-sdk-parity.php (#852) compares sdk/src against the
- * desktop template's vendored copy. That is a HORIZONTAL check: two trees, one
- * commit. A version collision is VERTICAL, and no horizontal check can see it.
+ * A version collision is VERTICAL: each branch agrees with itself, and only
+ * history can show the clash.
  *
  * #871 and #872 were built in parallel and both set Sdk::VERSION to 1.30.0.
- * Both branches were internally consistent — source tree and vendored tree
- * agreed on both — so both passed parity, and both were wrong relative to
+ * Both branches were internally consistent, and both were wrong relative to
  * HISTORY. Whichever merged second silently overwrote the first's version
  * number with a different meaning, and nothing in CI said a word.
  *
@@ -19,7 +17,7 @@ declare(strict_types=1);
  * getSdkConstraint() is evaluated against ({@see PluginRequirementsGate}), so
  * two releases both called 1.30.0 leave a plugin declaring `^1.30` bound to
  * whichever meaning survived the race, with no way to tell which one it got.
- * templates/tauri-desktop/php-host/sdk then ships that ambiguity to devices,
+ * The desktop template's SDK copy then ships that ambiguity to devices,
  * where a plugin that cannot resolve its contract cannot even be DECLARED
  * (#849) — a failure that surfaces on hardware, offline, after the fact.
  *
@@ -74,8 +72,8 @@ declare(strict_types=1);
  * check below exists so that removing it fails loudly instead of quietly.
  *
  * NOT CHECKED HERE, deliberately:
- *   - the vendored copy's pins — the parity guard already asserts that tree is
- *     byte-identical to sdk/src, so its pins are this file's pins.
+ *   - the desktop template's copy — it is made from sdk/src at every desktop
+ *     build (WHIT-1054), so its pins are this file's pins.
  *   - sdk/composer.json's `version` — SdkPackageContractTest already pins it to
  *     Sdk::VERSION, and a second copy of that assertion is a second thing to
  *     keep in step.
@@ -604,7 +602,7 @@ if (isset($usedVersions[$version])) {
             . "    2. sdk/composer.json — the `version` field\n"
             . "    3. %s — the ledger entry, which goes FIRST: that\n"
             . "       one is NEWEST-FIRST, the opposite direction from the docblock\n"
-            . "    4. re-vendor templates/tauri-desktop/php-host/sdk (see ci-vendored-sdk-parity.php)\n\n"
+            . "    4. nothing for the desktop template: it copies sdk/src at build (WHIT-1054)\n\n"
             . "Highest version on %s: %s. The lowest free minor above it is %s.\n",
             $testFileRelative,
             BASE_BRANCH,

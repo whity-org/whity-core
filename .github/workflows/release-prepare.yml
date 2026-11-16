@@ -235,6 +235,28 @@ jobs:
             exit 1
           fi
 
+      # The npm packages publish when main moves (publish-*.yml), but only a
+      # version that isn't on the registry yet. So the release versions them
+      # here (WHIT-1063): pending changesets bump their packages, and the typed
+      # client, which follows core's API, gets a minor bump of its own when it
+      # changed since the last release and no changeset named it. Without this
+      # step a release published only what someone remembered to bump by hand.
+      - name: Version the npm packages
+        run: |
+          PREV=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
+          if [ -n "$PREV" ] && ! git diff --quiet "$PREV" -- packages/api-client/src \
+             && ! grep -lq '"@whity/api-client"' .changeset/*.md 2>/dev/null; then
+            printf '%s\n' '---' '"@whity/api-client": minor' '---' '' \
+              "The typed client follows core's API as of ${{ steps.check.outputs.version }}." \
+              > .changeset/api-client-release.md
+          fi
+          npx changeset version
+          # Keep the lockfile's workspace versions in step with the bumps.
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          for p in api-client ui tokens features cli; do
+            echo "packages/${p}: $(node -p "require('./packages/${p}/package.json').version")"
+          done
+
       - name: Commit and push the release branch
         run: |
           VERSION="${{ steps.check.outputs.version }}"
@@ -250,7 +272,8 @@ jobs:
           has to land before the tag.
 
           public/openapi.json carries the version, and both typed clients are
-          generated from it, so all three are regenerated here."
+          generated from it, so all three are regenerated here. Pending
+          changesets version the npm packages, which publish when main moves."
           git push origin "$BRANCH"
 
       - name: Open the release PR
@@ -265,7 +288,7 @@ jobs:
             --title "release: ${VERSION}" \
             --body "Prepared by **Release — prepare** from \`${{ inputs.ref }}\`.
 
-          Bumps \`CoreVersion::VERSION\` to \`${VERSION}\`, dates the CHANGELOG section, and regenerates \`public/openapi.json\` plus both typed clients (the spec embeds the version and the clients are generated from it, so the drift gates fail otherwise).
+          Bumps \`CoreVersion::VERSION\` to \`${VERSION}\`, dates the CHANGELOG section, and regenerates \`public/openapi.json\` plus both typed clients (the spec embeds the version and the clients are generated from it, so the drift gates fail otherwise). Pending changesets version the npm packages (\`@whity/api-client\`, \`@whity/ui\`, \`@whity/tokens\`, \`@whity/features\`, \`@whity/cli\`); each one whose version is new on npm publishes when **main** moves.
 
           ### What happens when you merge this
 

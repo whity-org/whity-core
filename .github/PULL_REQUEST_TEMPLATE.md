@@ -16,6 +16,8 @@
 - [ ] Every tenant-owned query carries an explicit `tenant_id` predicate from
       `TenantContext`
 - [ ] No raw exception messages / stack traces returned to the client
+- [ ] Touching password reset, email verification or two-step sign-in: the same
+      flow in whity-id checked too (ADR 0019)
 - [ ] New API routes: declared in `CoreApiSchemas` **and** `public/openapi.json`
       regenerated (`generate:openapi`), or added to `KNOWN_UNDOCUMENTED` with a
       reason

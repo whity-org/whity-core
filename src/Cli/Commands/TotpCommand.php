@@ -60,8 +60,7 @@ class TotpCommand extends BaseCommand implements CliCommand
             return 1;
         }
 
-        $key = TotpService::resolveEncryptionKey();
-        $reencryptor = new TotpSecretReencryptor(TotpService::fromEnv(), $key);
+        $reencryptor = new TotpSecretReencryptor(TotpService::fromEnv());
         $stats = $reencryptor->reencrypt(Database::connect()->getPdo());
 
         echo sprintf(
