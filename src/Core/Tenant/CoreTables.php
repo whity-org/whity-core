@@ -59,7 +59,6 @@ final class CoreTables
         'audit_log' => '016_create_audit_log.php',
         'away_periods' => '251_add_two_admin_resets_and_away.php',
         'backup_codes' => '007_add_two_factor_support.php',
-        'calendar_availability_exceptions' => '247_create_calendar.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
         'calendar_events' => '247_create_calendar.php',
         'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
@@ -144,7 +143,6 @@ final class CoreTables
         'form_uploads' => '133_create_form_uploads.php',
         'form_drafts' => '210_create_form_drafts.php',
         'plugin_document_links' => '214_create_plugin_document_links.php',
-        'form_submission_reviews' => '194_add_form_staff_fields_and_reviews.php',
         'forms' => '127_create_forms.php',
         'health_samples' => '085_create_health_samples.php',
         'identity_providers' => '048_create_identity_providers.php',
@@ -212,8 +210,8 @@ final class CoreTables
         'tenant_plan_addons' => '241_create_tenant_plan_addons.php',
         'conversations' => '243_create_conversations_and_messages.php',
         'messages' => '243_create_conversations_and_messages.php',
+        'conversation_contacts' => '289_one_conversation_per_customer.php',
         'webchat_visitors' => '245_create_webchat_and_messaging_settings.php',
-        'messaging_settings' => '245_create_webchat_and_messaging_settings.php',
         'chats' => '253_create_team_chat.php',
         'chat_members' => '253_create_team_chat.php',
         // One chat (UC.1): each person's pins and read marks on any conversation.
@@ -227,6 +225,11 @@ final class CoreTables
         // Bots and blocked senders (UC.4, UC.12).
         'chat_bots' => '283_create_chat_bots_and_blocking.php',
         'chat_blocked_senders' => '283_create_chat_bots_and_blocking.php',
+        // Code plugins switched on per workspace (WHIT-1122).
+        'tenant_code_plugins' => '287_create_tenant_code_plugins.php',
+        // Cash payments for paid plugin plans (WHIT-1153).
+        'plugin_cash_payments' => '296_create_plugin_cash_payments.php',
+        'code_plugin_access' => '288_create_code_plugin_access.php',
         'tenant_settings' => '025_create_tenant_settings.php',
         'tenant_storage_config' => '053_create_tenant_storage_config.php',
         'tenants' => '001_create_users_roles.php',

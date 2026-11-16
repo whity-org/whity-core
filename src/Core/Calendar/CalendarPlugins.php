@@ -21,11 +21,24 @@ final class CalendarPlugins
     /** @var list<ExternalBusySource> */
     private array $busy = [];
 
-    /** @var array<string, ReminderChannel> */
-    private array $reminders = [];
-
     public function __construct(private readonly ?LoggerInterface $logger = null)
     {
+    }
+
+    private ?\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $workspaceGate = null;
+
+    /**
+     * Plugins switched off for the current workspace (WHIT-1123) add no
+     * payment step or busy times there.
+     */
+    public function setWorkspaceGate(\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $gate): void
+    {
+        $this->workspaceGate = $gate;
+    }
+
+    private function off(?string $plugin): bool
+    {
+        return $plugin !== null && $this->workspaceGate?->isPluginOffForWorkspace($plugin) === true;
     }
 
     /** Offer a payment step; a second one is refused. Returns whether it was taken. */
@@ -47,37 +60,21 @@ final class CalendarPlugins
         $this->busy[] = new PluginBusySource($plugin, $source, $this->logger);
     }
 
-    /**
-     * Add a reminder channel (design 3.3: WhatsApp is a paid plugin). One per
-     * name; a second with the same name is refused. Returns whether it was taken.
-     */
-    public function addReminderChannel(string $plugin, ReminderChannel $channel): bool
-    {
-        $name = $channel->name();
-        if (isset($this->reminders[$name])) {
-            $this->logger?->warning('[calendar] a second reminder channel with the same name was refused', ['plugin' => $plugin, 'channel' => $name]);
-
-            return false;
-        }
-        $this->reminders[$name] = $channel;
-
-        return true;
-    }
-
-    /** @return list<ReminderChannel> */
-    public function reminderChannels(): array
-    {
-        return array_values($this->reminders);
-    }
-
     public function paymentStep(): ?BookingPaymentStep
     {
-        return $this->paymentStep;
+        return $this->off($this->paymentPlugin) ? null : $this->paymentStep;
     }
 
     /** @return list<ExternalBusySource> */
     public function busySources(): array
     {
-        return $this->busy;
+        if ($this->workspaceGate === null) {
+            return $this->busy;
+        }
+
+        return array_values(array_filter(
+            $this->busy,
+            fn (ExternalBusySource $source): bool => !($source instanceof PluginBusySource && $this->off($source->plugin())),
+        ));
     }
 }

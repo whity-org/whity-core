@@ -550,19 +550,6 @@ final class FormUploadsApiRealEngineTest extends TestCase
         self::assertSame(404, $this->downloadForOffice($submissionId, $unclaimed)->getStatusCode());
     }
 
-    public function testAFileOnAStaffQuestionIsTheOfficesAndNotTheSenders(): void
-    {
-        $formId = $this->publishedFormWithFileField();
-        $this->fields->create(self::TENANT, $formId, 'office_copy', FieldType::FILE, ['en' => 'Office copy'], null, false, [], [], null, null, null, null, FormFieldRepository::AUDIENCE_STAFF);
-        $reference = $this->upload($formId, self::PAPER);
-        $submissionId = (new FormSubmissionRepository($this->pdo))->create(self::TENANT, $formId, 1, self::APPLICANT, null, ['office_copy' => $reference]);
-        $this->uploadRows->claim(self::TENANT, $formId, $reference, self::APPLICANT, $submissionId);
-        $fileId = $this->uploadRows->forSubmission(self::TENANT, $submissionId)[0]['id'];
-
-        self::assertSame(200, $this->downloadForOffice($submissionId, $fileId)->getStatusCode());
-        self::assertSame(404, $this->downloadMine($submissionId, $fileId)->getStatusCode());
-    }
-
     public function testThePagesListTheFilesWithoutSayingWhereTheyAreStored(): void
     {
         [$submissionId, $fileId] = $this->sentPaper();

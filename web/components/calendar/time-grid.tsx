@@ -45,7 +45,19 @@ export const PHONE_HOUR_PX = 56;
 /** From this long a booking shows its second line (CV.5). */
 const SECOND_LINE_MINUTES = 54;
 
-export type ItemKind = 'booking' | 'wait' | 'request' | 'event' | 'timeoff' | 'cancelled';
+/**
+ * How an item is drawn: a booking by its state (waiting for payment, a
+ * request, cancelled), then a team event, a formal meeting, time off, or a
+ * task due from Taskaat.
+ */
+export type ItemKind = 'booking' | 'wait' | 'request' | 'event' | 'meeting' | 'timeoff' | 'task' | 'cancelled';
+
+/** Someone invited, and their answer (the one-calendar model, WHIT-1109). */
+export interface ItemPerson {
+  profile_id: number;
+  role: 'required' | 'optional';
+  response: 'invited' | 'accepted' | 'declined' | 'tentative';
+}
 
 /**
  * One thing on the calendar, ready to draw. The grid, the details and the
@@ -54,7 +66,7 @@ export type ItemKind = 'booking' | 'wait' | 'request' | 'event' | 'timeoff' | 'c
  * `/api/calendar/items`).
  */
 export interface CalItem {
-  /** "booking:7", "event:12", "time_off:5": the id the one-calendar items endpoint will use. */
+  /** The one-calendar id, kind and record: "booking:7", "event:12", "meeting:3", "time_off:5". */
   key: string;
   kind: ItemKind;
   starts_at: string;
@@ -70,6 +82,14 @@ export interface CalItem {
   booking?: CalendarBooking;
   event?: CalendarEvent;
   timeOff?: CalendarTimeOff;
+  /** Whose calendar it is on: the booked person or the organiser. */
+  organiserId?: number;
+  /** Who else is invited, with their answers. */
+  people?: ItemPerson[];
+  /** The Convening meeting behind a formal meeting. */
+  meetingId?: number | null;
+  /** What the viewer may do with it, from the server. */
+  can?: { open: boolean; move: boolean; resize: boolean; cancel: boolean };
 }
 
 export interface TimeGridProps {
@@ -167,7 +187,11 @@ export function itemStyle(kind: ItemKind, colour: string): CSSProperties {
     case 'request':
       return { background: 'var(--card)', border: `1.5px dashed ${colour}`, borderInlineStartWidth: 4, borderInlineStartStyle: 'solid', borderInlineStartColor: colour };
     case 'event':
+    case 'task':
       return { background: 'var(--muted)', borderInlineStart: `4px solid ${colour}` };
+    case 'meeting':
+      // Formal meetings carry the blue edge (register, section 27: Meetings).
+      return { background: `color-mix(in oklab, ${colour} 20%, var(--card))`, borderInlineStart: '4px solid var(--primary)' };
     case 'timeoff':
       return {
         background: `repeating-linear-gradient(135deg, color-mix(in oklab, ${colour} 22%, var(--card)) 0 6px, var(--card) 6px 12px)`,

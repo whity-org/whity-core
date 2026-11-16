@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@whity/ui/dropdown-menu';
 import { api, apiFetch } from '@/lib/api/client';
+import { DiscussInChat, recordLink } from '@/components/chat/discuss-in-chat';
 import { useToast } from '@/lib/toast-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { DOCUMENTS_WITHDRAW } from '@/lib/capabilities';
@@ -173,6 +174,7 @@ export function DocumentHeaderActions({ record, onWithdrawn }: DocumentHeaderAct
         <IconPrinter className="size-4 me-1" aria-hidden />
         {t('record.actions.print', 'Print')}
       </Button>
+      <DiscussInChat link={recordLink('document', record.id, record.title)} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" aria-label={t('record.actions.more', 'More actions')}>

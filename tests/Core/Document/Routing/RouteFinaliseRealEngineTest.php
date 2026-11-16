@@ -52,7 +52,6 @@ use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormSubmissionFieldProvider;
 use Whity\Core\Form\FormSubmissionRepository;
-use Whity\Core\Form\FormSubmissionReviewRepository;
 use Whity\Core\Form\FormSubmissionRouteSubject;
 use Whity\Core\Form\FormTemplateDraft;
 use Whity\Core\Form\FormUploadRepository;
@@ -597,6 +596,8 @@ final class RouteFinaliseRealEngineTest extends TestCase
                 'decision' => true,
                 'decision_quorum' => null,
                 'satisfied_by' => 'act',
+                // Merge map A3: the office names the supervisor at pre-check.
+                'inputs' => [['key' => 'supervisor', 'label' => 'Supervisor', 'type' => 'person', 'required' => false]],
                 'canvas_x' => 0,
                 'canvas_y' => 0,
             ],
@@ -629,13 +630,11 @@ final class RouteFinaliseRealEngineTest extends TestCase
         ], []);
 
         $formId = $this->form($design, $id);
-        $this->fields->create(self::TENANT, $formId, 'supervisor', 'profile_ref', ['en' => 'Supervisor'], null, false, [], [], null, null, null, null, FormFieldRepository::AUDIENCE_STAFF);
         $submission = $this->send($formId, ['supplier' => 'Example Mill']);
         $route = $this->routeOf((int) $submission['id']);
 
         // The coordinator records the supervisor at pre-check, then passes it on.
-        (new FormSubmissionReviewRepository($this->pdo))->record(self::TENANT, (int) $submission['id'], ['supervisor' => self::SUPERVISOR], self::CLERK);
-        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED, values: ['supervisor' => (string) self::SUPERVISOR]);
 
         $route = $this->routeOf((int) $submission['id']);
         self::assertNull($this->open((int) $route['id'], self::SUPERVISOR), 'the supervisor the office named is not asked');
@@ -1311,7 +1310,7 @@ final class RouteFinaliseRealEngineTest extends TestCase
     {
         $form = $this->forms->find(self::TENANT, $formId);
         self::assertNotNull($form);
-        $fields = FormFieldRepository::applicantFields($this->fields->listForForm(self::TENANT, $formId));
+        $fields = $this->fields->listForForm(self::TENANT, $formId);
 
         return $this->issuer->submit(self::TENANT, self::APPLICANT, $form, $fields, $answers)['submission'];
     }

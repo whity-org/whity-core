@@ -2,9 +2,8 @@
 
 [العربية](Whity-CLI-ar.md)
 
-`whity` installs and updates a self-hosted Whity on Docker. It comes from the npm package `whity`
-(the same command is also published as `@whity/cli`; install one, not both) and runs on Linux,
-macOS and Windows (PowerShell 5.1 and newer).
+`whity` installs and updates a self-hosted Whity on Docker. It comes from the npm package
+`@whity/cli` and runs on Linux, macOS and Windows (PowerShell 5.1 and newer).
 
 It is not `bin/whity-cli`. That is the PHP tool that runs on the server against the database
 ([CLI Reference](CLI_REFERENCE.md)). `whity` runs on your machine and calls `bin/whity-cli`
@@ -20,7 +19,7 @@ inside the containers, so migrations and seeding always use the code of the inst
 ## Install
 
 ```bash
-npm install -g whity
+npm install -g @whity/cli
 whity install
 ```
 

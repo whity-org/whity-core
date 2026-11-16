@@ -2214,30 +2214,6 @@ final class CoreApiSchemas
                     503 => self::errorResponse('PDFs are turned off, or the render service is unavailable'),
                 ] + self::authErrors(),
             ]),
-            self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/review', 'forms:read', [
-                'summary' => 'What the office recorded about a submission',
-                'description' => 'The current review, every earlier one, and the staff fields they answer. '
-                    . 'The applicant has no route to this.',
-                'tags' => ['forms'],
-                'responses' => [
-                    200 => self::jsonResponse('The review and its history', 'FormSubmissionReviewDetailResponse'),
-                    404 => self::errorResponse('Submission not found'),
-                ] + self::authErrors(),
-            ]),
-            self::permissionRoute('POST', '/api/form-submissions/{id:\d+}/review', 'forms:review', [
-                'summary' => 'Record the office\'s decision on a submission',
-                'description' => 'Checked against the form\'s staff fields as a submission is checked against '
-                    . 'its own, and sent whole. Each save is a new row and the newest is current, so changing '
-                    . 'a decision leaves the old one readable. The submission itself is never changed. Works '
-                    . 'on a closed form. `meta.ignored_keys` names answers that matched no staff field.',
-                'tags' => ['forms'],
-                'request' => 'FormSubmissionCreateRequest',
-                'responses' => [
-                    201 => self::jsonResponse('The recorded review', 'FormSubmissionReviewResponse'),
-                    404 => self::errorResponse('Submission not found'),
-                    422 => self::errorResponse('The form has no staff fields, or an answer failed validation'),
-                ] + self::authErrors(),
-            ]),
             [
                 'method' => 'GET',
                 'path' => '/api/me/form-submissions',
@@ -2996,8 +2972,11 @@ final class CoreApiSchemas
         return [
             self::permissionRoute('GET', '/api/audit-logs', 'audit:read', [
                 'summary' => 'List the tenant\'s audit entries (newest first, paginated)',
+                'description' => 'Besides the audit log, the list reads what agents did with their tools (`agent.action.ran`) and the decisions people made on routes '
+                    . '(`route.approved`, `route.rejected`, `route.signed`, `route.declined`, `route.sent_back`). A target filter, or `source=audit`, reads the audit log alone. The CSV export is the audit log.',
                 'tags' => ['audit-logs'],
                 'parameters' => [
+                    self::queryParam('source', 'string', '`audit` for the audit log alone; otherwise everything'),
                     self::queryParam('action', 'string', 'Exact action match (e.g. users:create)'),
                     self::queryParam('actor', 'integer', 'Filter by actor user id'),
                     self::queryParam('agent', 'string', 'Filter by agent principal, as listed by /api/audit-logs/facets'),
@@ -3233,8 +3212,10 @@ final class CoreApiSchemas
                 'requiredPermission' => null,
                 'schema' => [
                     'summary' => 'List the caller\'s in-app notifications (newest first, paginated) + unread count',
+                    'description' => 'The Inbox\'s Mentions and Updates tabs (M.43): `tab=mentions` is someone naming you in a chat or a comment; `tab=updates` is every other notice except those whose item is already in Waiting for me (GET /api/me/waiting). Without a tab, every notice. `unread` counts each tab.',
                     'tags' => ['notifications'],
                     'parameters' => [
+                        self::queryParam('tab', 'string', 'mentions or updates; every notice when omitted'),
                         self::queryParam('unread', 'boolean', 'Restrict to unread notifications when truthy'),
                         self::queryParam('page', 'integer', '1-indexed page (default 1)'),
                         self::queryParam('per_page', 'integer', 'Page size (default 25, max 100)'),
@@ -4628,6 +4609,9 @@ final class CoreApiSchemas
 
         $auditEntry = self::object([
             'id' => self::int(),
+            // Merge map plumbing: which record the entry is. Ids repeat across
+            // sources, so a client keys rows by source and id.
+            'source' => ['type' => 'string', 'enum' => ['audit', 'agents', 'routes'], 'description' => 'audit (the audit log), agents (what an agent did with a tool) or routes (a decision on a route).'],
             'tenantId' => self::int(),
             'actorUserId' => self::int(true),
             'action' => self::str(),
@@ -5632,7 +5616,7 @@ final class CoreApiSchemas
                 'plan_id' => self::int(),
                 'currency' => self::str(),
                 'unit_amount' => self::int(),
-                'billing_period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
                 'is_per_seat' => self::bool(),
                 'is_per_device' => self::bool(),
                 'is_active' => self::bool(),
@@ -5958,7 +5942,7 @@ final class CoreApiSchemas
             // here would invite a client to act on one.
             'CheckoutStartRequest' => self::object([
                 'plan_key' => self::str(),
-                'billing_period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
             ], ['plan_key']),
             // Only a destination. The session reference is a capability token
             // and is deliberately not returned — the browser needs somewhere to
@@ -5978,7 +5962,7 @@ final class CoreApiSchemas
                 'description' => self::str(true),
                 'unit_amount' => self::int(),
                 'currency' => self::str(),
-                'billing_period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
                 'is_per_seat' => self::bool(),
                 'is_per_device' => self::bool(),
                 'is_addon' => self::bool(),
@@ -5996,8 +5980,45 @@ final class CoreApiSchemas
                 'currency' => self::str(),
                 'paid_at' => self::str(true),
                 'issued_at' => self::str(true),
+                // WHIT-1153: present on a payment made in cash.
+                'source' => ['type' => 'string', 'enum' => ['cash'], 'description' => 'cash: recorded by the operator, not paid through a provider'],
+                'plan_key' => self::str() + ['description' => 'Cash only: the plugin plan paid for'],
+                'quantity' => self::int() + ['description' => 'Cash only: how many seats'],
+                'covers_until' => self::str() + ['description' => 'Cash only: the end of what it pays for'],
             ], ['number', 'status', 'total_minor', 'currency']),
             'BillingReceiptListResponse' => self::listEnvelope('BillingReceipt'),
+            'CashPayment' => self::object([
+                'id' => self::int(),
+                'tenant_id' => self::int(),
+                'plan_key' => self::str(),
+                'quantity' => self::int(),
+                'amount_minor' => self::int(),
+                'currency' => self::str(),
+                'receipt_number' => self::str(),
+                'note' => self::str(true),
+                'paid_on' => self::str(),
+                'period_start' => self::str(),
+                'period_end' => self::str(),
+                'recorded_by' => self::str(true),
+                'recorded_at' => self::str(),
+                'voided_at' => self::str(true),
+                'void_reason' => self::str(true),
+            ], ['id', 'tenant_id', 'plan_key', 'quantity', 'amount_minor', 'currency', 'receipt_number', 'paid_on', 'period_start', 'period_end']),
+            'CashPaymentListResponse' => self::listEnvelope('CashPayment'),
+            'CashPaymentResponse' => self::dataEnvelope(SchemaBuilder::ref('CashPayment')),
+            'CashPaymentCreateRequest' => self::object([
+                'workspace' => self::int() + ['description' => 'The workspace that paid'],
+                'planKey' => self::str() + ['description' => 'A paid plugin plan, such as plugin.salons.monthly'],
+                'quantity' => self::int() + ['description' => 'How many seats (chairs); 1 when the plugin is not sold per seat'],
+                'amount' => self::str() + ['description' => 'The amount paid, as written: 15 or 15.000'],
+                'currency' => self::str() + ['description' => 'Three letters; JOD when left out'],
+                'receiptNumber' => self::str() + ['description' => 'The paper receipt\'s number; once per workspace'],
+                'note' => self::str() + ['description' => 'Anything worth keeping'],
+                'paidOn' => self::str() + ['description' => 'The date paid, like 2026-11-16'],
+            ], ['workspace', 'planKey', 'amount', 'receiptNumber', 'paidOn']),
+            'CashPaymentVoidRequest' => self::object([
+                'reason' => self::str() + ['description' => 'Why it is voided'],
+            ], ['reason']),
             'BillingQuantityRequest' => self::object([
                 'quantity' => self::int(),
             ], ['quantity']),
@@ -6019,7 +6040,7 @@ final class CoreApiSchemas
             'PlanPriceCreateRequest' => self::object([
                 'currency' => self::str(),
                 'unit_amount' => self::int(),
-                'billing_period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
                 'is_per_seat' => self::bool(),
                 // At most ONE of these. Both set is refused with 422 rather
                 // than accepted, because the billing run would have to choose a
@@ -6433,7 +6454,7 @@ final class CoreApiSchemas
                 // it fans out to many people. NULL is not "no quorum": it defers
                 // to the tenant's `documents.routing_approval_quorum` setting,
                 // which defaults to `all`.
-                'decision_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority'], 'nullable' => true],
+                'decision_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority', 'first'], 'nullable' => true],
                 // #1054. WHETHER ANYBODY HERE IS ASKED TO ACT. `delivery` means
                 // the people this step reaches are TOLD: their inbox item is
                 // closed by the event that created it and the document carries
@@ -6513,7 +6534,7 @@ final class CoreApiSchemas
                 // step is the least likely person in the tenant to hold it - so
                 // without this a client could not tell an approver whether their
                 // single approval carries the gate or is one of four hundred.
-                'default_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority']],
+                'default_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority', 'first']],
                 // WHIT-1016: what people entered at the steps that ask for
                 // values, each key's latest. On the route lists; absent on the
                 // response that issues a route, where nothing is entered yet.
@@ -6566,7 +6587,7 @@ final class CoreApiSchemas
                         'decision' => self::bool(true),
                         'decision_quorum' => [
                             'type' => 'string',
-                            'enum' => ['all', 'any', 'majority'],
+                            'enum' => ['all', 'any', 'majority', 'first'],
                             'nullable' => true,
                         ],
                         // Targets are named by 1-BASED POSITION in this same
@@ -6666,6 +6687,9 @@ final class CoreApiSchemas
                 // resubmits.
                 'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true],
                 'occurred_at' => self::str(),
+                // Merge map A2: the person who was away, when the actor decided
+                // for them ("Awss Haddad for Amro Saleh"). Null otherwise.
+                'on_behalf_of_profile_id' => self::int(true),
                 // WHIT-922, on the audit page only: the hash of the entry before
                 // this one on the document, and this entry's own. Null on
                 // entries written before the chain began.
@@ -7063,6 +7087,22 @@ final class CoreApiSchemas
                 'agent_id' => self::int() + ['description' => 'For a direct chat with one of your agents.'],
                 'link' => SchemaBuilder::ref('ChatLink'),
             ], []),
+            'ChatDiscussRequest' => self::object([
+                'link' => SchemaBuilder::ref('ChatLink'),
+            ], ['link']),
+            'ChatDiscussResponse' => self::dataEnvelope([
+                'allOf' => [
+                    SchemaBuilder::ref('Chat'),
+                    self::object([
+                        'members' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMember')],
+                        'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatMessage')],
+                        'has_earlier' => self::bool(),
+                        'my_member_id' => self::int(),
+                        'last_read_message_id' => self::int(),
+                        'created' => self::bool() + ['description' => 'True when this call started the chat.'],
+                    ], ['members', 'messages', 'created']),
+                ],
+            ]),
             'ChatUpdateRequest' => self::object([
                 'title' => self::str() + ['description' => 'A group\'s new name.'],
                 'link' => ['oneOf' => [SchemaBuilder::ref('ChatLink'), ['type' => 'null']], 'description' => 'What the chat is about, or null to remove the link.'],
@@ -7210,6 +7250,7 @@ final class CoreApiSchemas
                 'amount' => self::str(),
                 'currency' => self::str(),
                 'description' => self::str(),
+                'channel' => self::str() + ['description' => 'Send by this channel (one from the conversation\'s send_by). Default: where the customer last wrote.'],
             ], ['type']),
             'ChatMuteRequest' => self::object([
                 'muted' => self::bool() + ['description' => 'False unmutes; true by default.'],
@@ -7280,6 +7321,7 @@ final class CoreApiSchemas
                 'send_after' => self::str(true),
                 'sent_at' => self::str(true),
                 'created_at' => self::str(),
+                'channel' => self::str(true) + ['description' => 'The channel this message came or went on; one conversation can span channels (C5).'],
             ], ['id', 'conversation_id', 'kind', 'body', 'status', 'created_at']),
             'MessagingConversationListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingConversation')],
@@ -7290,7 +7332,10 @@ final class CoreApiSchemas
             'MessagingConversationDetailResponse' => self::dataEnvelope([
                 'allOf' => [
                     SchemaBuilder::ref('MessagingConversation'),
-                    self::object(['messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingMessage')]], ['messages']),
+                    self::object([
+                        'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingMessage')],
+                        'send_by' => ['type' => 'array', 'items' => self::object(['channel' => self::str(), 'address' => self::str()], ['channel', 'address']), 'description' => 'The channels a reply can go on (UC.3): those the customer wrote on, the last first.'],
+                    ], ['messages']),
                 ],
             ]),
             'MessagingConversationResponse' => self::dataEnvelope(SchemaBuilder::ref('MessagingConversation')),
@@ -8471,11 +8516,11 @@ final class CoreApiSchemas
                 'anchor_block_id' => self::str() + ['description' => 'The id of the block the commented text is in'],
                 'quote' => self::str() + ['description' => 'The commented text, at most 2000 characters'],
                 'body' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The first message as the contract Inline[] (text, field, break, math), not empty'],
-                'mentions' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Profile ids @mentioned; members who can read the document are told in-app'],
+                'mentions' => ['type' => 'array', 'maxItems' => 50, 'items' => ['oneOf' => [['type' => 'integer'], self::object(['type' => self::str() + ['enum' => ['person', 'agent', 'everyone']], 'id' => self::int()], ['type'])]], 'description' => 'The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox › Mentions and a push'],
             ], ['anchor_block_id', 'quote', 'body']),
             'DocumentCommentMessageCreateRequest' => self::object([
                 'body' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The reply as the contract Inline[] (text, field, break, math), not empty'],
-                'mentions' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Profile ids @mentioned; members who can read the document are told in-app'],
+                'mentions' => ['type' => 'array', 'maxItems' => 50, 'items' => ['oneOf' => [['type' => 'integer'], self::object(['type' => self::str() + ['enum' => ['person', 'agent', 'everyone']], 'id' => self::int()], ['type'])]], 'description' => 'The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox › Mentions and a push'],
             ], ['body']),
             'DocumentMentionablePerson' => self::object([
                 'kind' => ['type' => 'string', 'enum' => ['person'], 'description' => 'Always person'],
@@ -9407,7 +9452,6 @@ final class CoreApiSchemas
                 'section_key' => self::str(true),
                 'position' => self::int(),
                 'visible_when' => SchemaBuilder::ref('FormFieldCondition'),
-                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff']],
                 'multi_valued' => self::bool(),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
@@ -9528,22 +9572,6 @@ final class CoreApiSchemas
                 'secret' => self::str(true),
                 'allow_without_bot_check' => ['type' => 'boolean'],
             ], []),
-            'FormSubmissionReview' => self::object([
-                'id' => self::int(),
-                'submission_id' => self::int(),
-                'data' => ['type' => 'object', 'additionalProperties' => true],
-                'recorded_by_profile_id' => self::int(true),
-                'recorded_at' => self::str(),
-            ], ['id', 'submission_id', 'data', 'recorded_at']),
-            'FormSubmissionReviewResponse' => self::object([
-                'data' => SchemaBuilder::ref('FormSubmissionReview'),
-                'meta' => self::object(['ignored_keys' => ['type' => 'array', 'items' => ['type' => 'string']]], []),
-            ], ['data']),
-            'FormSubmissionReviewDetailResponse' => self::dataEnvelope(self::object([
-                'current' => SchemaBuilder::ref('FormSubmissionReview') + ['nullable' => true],
-                'history' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSubmissionReview')],
-                'fields' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormField')],
-            ], ['current', 'history', 'fields'])),
             'FormSectionText' => self::object([
                 'key' => self::str(),
                 'title' => self::localizedText(),
@@ -9643,7 +9671,6 @@ final class CoreApiSchemas
                 'prefill_source' => self::str(true) + ['description' => 'Fill the field in advance from the submitter\'s profile; sources are listed in the field list\'s `meta.prefill_sources`.'],
                 'section_key' => self::name() + ['description' => 'Section to group the field under; fields sharing a key form one section.'],
                 'visible_when' => SchemaBuilder::ref('FormFieldCondition') + ['description' => 'Show this question only when another answer matches; null means always.'],
-                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff'], 'description' => 'Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review.'],
                 // Absent means the server appends it after the current maximum.
                 'position' => self::int() + ['description' => 'Position in the form; omitted appends it at the end.'],
             ], ['field_key', 'field_type', 'label']),
@@ -9674,7 +9701,6 @@ final class CoreApiSchemas
                 'prefill_source' => self::str(true) + ['description' => 'Profile detail to prefill from; null for none.'],
                 'section_key' => self::name() + ['description' => 'Section to group the field under.'],
                 'visible_when' => SchemaBuilder::ref('FormFieldCondition') + ['description' => 'Show this question only when another answer matches; null means always.'],
-                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff'], 'description' => 'Who answers it. A staff field is never shown to the applicant.'],
                 'position' => self::int() + ['description' => 'New position in the form.'],
             ], []) + ['minProperties' => 1],
             // `prefill` is keyed by FIELD KEY, not by source: two fields may name
@@ -10542,6 +10568,7 @@ final class CoreApiSchemas
                 'time_zone' => self::str(),
             ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
             'CalendarSettings' => self::object([
+                'booking_page_url' => self::str(true) + ['description' => 'The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only.'],
                 'time_zone' => self::str() + ['description' => 'The workspace time zone (IANA).'],
                 'booking_page_enabled' => self::bool(),
                 'min_notice_minutes' => self::int(),
@@ -10937,6 +10964,16 @@ final class CoreApiSchemas
             'FrontendFeature' => self::object([
                 'id' => self::str(),
                 'plugin' => self::str(),
+                // WHIT-1127: only on a paid plugin's screens in grace or read-only.
+                'pluginAccess' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'state' => ['type' => 'string', 'enum' => ['on', 'read_only']],
+                        'reason' => self::str(true),
+                        'graceUntil' => self::str(true),
+                    ],
+                ],
                 'label' => self::str(),
                 'icon' => self::str(true),
                 'group' => self::str(),
@@ -11118,7 +11155,11 @@ final class CoreApiSchemas
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationEntry')],
                 'pagination' => SchemaBuilder::ref('Pagination'),
                 'unread_count' => self::int(),
-            ], ['data', 'pagination', 'unread_count']),
+                'unread' => self::object([
+                    'mentions' => self::int(),
+                    'updates' => self::int(),
+                ], ['mentions', 'updates']),
+            ], ['data', 'pagination', 'unread_count', 'unread']),
             'UnreadCountResponse' => self::object([
                 'unread_count' => self::int(),
             ], ['unread_count']),
@@ -11863,6 +11904,7 @@ final class CoreApiSchemas
                 'allowed_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'customer_invites' => self::bool(),
                 'invites_per_customer' => self::int() + ['description' => 'How many people one customer may invite; 0 is no limit (WHIT-1043).'],
+                'route_template_id' => self::int(true) + ['description' => 'The route template join requests travel on; null is the default, one step for everyone who can manage sign-ups.'],
                 'eligible_roles' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupEligibleRole')],
                 'pending_count' => self::int(),
                 'workspace_slug' => self::str(true),
@@ -11895,6 +11937,9 @@ final class CoreApiSchemas
                 ],
                 'invites_per_customer' => self::int() + [
                     'description' => 'How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043).',
+                ],
+                'route_template_id' => self::int(true) + [
+                    'description' => 'One of this workspace\'s route templates for join requests to travel on, or null for the default: one step for everyone who can manage sign-ups.',
                 ],
             ], []),
             'TeamInvitationItem' => self::object([
@@ -11982,8 +12027,11 @@ final class CoreApiSchemas
                 'code' => ['type' => 'string', 'description' => 'The code from the approver\'s authenticator, or the one emailed by the identity check'],
             ], ['code']),
             'IdentityCheckResponse' => self::dataEnvelope(self::object([
-                'method' => ['type' => 'string', 'enum' => ['totp', 'email_code']],
+                'method' => ['type' => 'string', 'enum' => ['totp', 'email_code', 'fresh_sign_in']],
                 'email_hint' => self::str(true),
+                // fresh_sign_in (WHIT-1147): where to sign in again, and the purpose to name there.
+                'provider_key' => self::str(true),
+                'purpose' => self::str(true),
             ], ['method', 'email_hint'])),
             // OR.1: "I'm away".
             'AwayPeriod' => self::object([
@@ -13087,6 +13135,19 @@ final class CoreApiSchemas
                     422 => self::errorResponse('No name, someone who is not in this workspace, or an agent that does not work for you'),
                 ] + self::authErrors(),
             ]),
+            self::ungatedRoute('POST', '/api/chat/chats/discuss', [
+                'mcp' => $personOnly,
+                'summary' => 'Open the chat about a board, a meeting or a record, starting it if new',
+                'description' => 'One group chat per linked board, meeting or record, named after it. You join it if you are not in it yet. '
+                    . '201 when the chat was started, 200 when it was already there; `created` says the same.',
+                'tags' => ['chat'],
+                'request' => 'ChatDiscussRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The chat it already had', 'ChatDiscussResponse'),
+                    201 => self::jsonResponse('The chat, just started', 'ChatDiscussResponse'),
+                    422 => self::errorResponse('The link is not a board, a meeting or a record with an id and a name'),
+                ] + self::authErrors(),
+            ]),
             self::ungatedRoute('GET', '/api/chat/chats/{id:\d+}', [
                 'summary' => 'Read a chat: its members, what each agent may do, and its latest messages',
                 'description' => 'An agent reads only the messages from when it joined (or what the person who added it allowed).',
@@ -13475,10 +13536,13 @@ final class CoreApiSchemas
             self::permissionRoute('POST', '/api/messages/conversations/{id:\d+}/replies', 'messages:reply', [
                 'mcp' => $cancelHeld,
                 'summary' => 'Reply to the customer in a conversation',
-                'description' => 'Sent on the conversation\'s channel from a background job. An agent\'s reply waits five minutes '
+                'description' => 'Sent from a background job on the channel the customer last wrote on, or on `channel` when it names another they have (`send_by`). An agent\'s reply waits five minutes '
                     . 'and can be cancelled in that time.',
                 'tags' => ['messages'],
-                'request' => 'MessagingBodyRequest',
+                'request' => self::object([
+                    'body' => self::str() + ['description' => 'The text, in plain words.'],
+                    'channel' => self::str() + ['description' => 'Send by this channel (one from the conversation\'s send_by). Default: where the customer last wrote.'],
+                ], ['body']),
                 'responses' => [
                     201 => self::jsonResponse('The queued reply', 'MessagingMessageResponse'),
                 ] + $refused + self::authErrors(),
@@ -13842,10 +13906,12 @@ final class CoreApiSchemas
             self::permissionRoute('POST', '/api/signup/requests/{id:\d+}/approve', 'signup:manage', [
                 'summary' => 'Let a waiting person join as a customer',
                 'description' => 'Creates the customer membership with the current starting role. A '
-                    . 'rejected request can be approved later.',
+                    . 'rejected request can be approved later. A request on its route is answered there: '
+                    . 'your step\'s approval, which decides it unless the workspace\'s route has more steps (202).',
                 'tags' => ['signup'],
                 'responses' => [
                     200 => self::jsonResponse('Approved', 'SignupDecisionResponse'),
+                    202 => ['description' => 'Your step is answered; the route has more to decide'],
                     404 => self::errorResponse('No request waiting for a decision has that id'),
                     409 => self::errorResponse('The starting role is missing or unsafe, or the person is suspended or invited here'),
                 ] + self::authErrors(),
@@ -13855,6 +13921,8 @@ final class CoreApiSchemas
                 'tags' => ['signup'],
                 'responses' => [
                     200 => self::jsonResponse('Rejected', 'SignupDecisionResponse'),
+                    202 => ['description' => 'Your step is answered; the route has more to decide'],
+                    409 => self::errorResponse('The request\'s route refused the answer (for example, it is not your step)'),
                     404 => self::errorResponse('No pending request has that id'),
                 ] + self::authErrors(),
             ]),
@@ -14497,6 +14565,33 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('What this tenant has paid', 'BillingReceiptListResponse'),
                     502 => self::errorResponse('The billing service refused the request'),
                     503 => self::errorResponse('The billing service is temporarily unreachable'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/billing/cash-payments', 'plans:manage', [
+                'summary' => 'List a workspace\'s cash payments',
+                'description' => 'Operator only. ?workspace=<id>.',
+                'tags' => ['billing'],
+                'parameters' => [self::queryParam('workspace', 'integer', 'The workspace.')],
+                'responses' => [200 => self::jsonResponse('Its cash payments, newest first', 'CashPaymentListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/billing/cash-payments', 'plans:manage', [
+                'summary' => 'Record a cash payment for a paid plugin plan',
+                'description' => 'Operator only. Covers the workspace from the date paid, or the end of its current cash cover if later, for the plan\'s period.',
+                'tags' => ['billing'],
+                'request' => 'CashPaymentCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('Recorded', 'CashPaymentResponse'),
+                    422 => self::errorResponse('Something is missing or wrong; the message says what'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/billing/cash-payments/{id:\d+}/void', 'plans:manage', [
+                'summary' => 'Void a cash payment, saying why',
+                'tags' => ['billing'],
+                'parameters' => [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'The cash payment.', 'schema' => ['type' => 'integer']]],
+                'request' => 'CashPaymentVoidRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Voided', 'CashPaymentResponse'),
+                    422 => self::errorResponse('No reason, no such payment, or already voided'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/billing/quantity', 'billing:pay', [
@@ -16152,7 +16247,7 @@ final class CoreApiSchemas
                         . '`unavailable` and the rest is still served. There are no pages: the rest is on Inbox and Approvals.',
                     'tags' => ['inbox'],
                     'parameters' => [
-                        self::queryParam('limit', 'integer', 'How many rows (default 6, max 50)'),
+                        self::queryParam('limit', 'integer', 'How many rows (default 6, max 200: the Inbox reads the whole list)'),
                     ],
                     'responses' => [
                         200 => self::jsonResponse('The oldest rows and the totals', 'WaitingListResponse'),
@@ -19174,6 +19269,7 @@ final class CoreApiSchemas
         $readOnly = ['readOnlyHint' => true, 'idempotentHint' => true];
         $propose = ['agentPolicy' => 'propose'];
         $plugin = ['name' => 'plugin', 'in' => 'path', 'required' => true, 'description' => 'The workspace plugin\'s slug: its name in lower case, as its permissions start with.', 'schema' => ['type' => 'string']];
+        $codePlugin = ['name' => 'plugin', 'in' => 'path', 'required' => true, 'description' => 'The installed plugin\'s name, as it gives it (FrontOffice).', 'schema' => ['type' => 'string']];
         $id = static fn (string $what): array => ['name' => 'id', 'in' => 'path', 'required' => true, 'description' => $what, 'schema' => ['type' => 'integer']];
 
         return [
@@ -19333,6 +19429,80 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            // WHIT-1122: installed code plugins, switched on per workspace.
+            self::permissionRoute('GET', '/api/workspace/code-plugins', 'plugins:read', [
+                'summary' => 'List the installed plugins this workspace can use',
+                'description' => 'Plugins installed for the whole installation that the operator lets workspaces use, each with whether it is on here, whether this workspace can switch it, and the last change.',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('The plugins', 'WorkspaceCodePluginListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/enable', 'plugins:enable', [
+                'summary' => 'Turn an installed plugin on for this workspace',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('Turned on', 'WorkspaceCodePluginSwitchResponse'),
+                    402 => self::errorResponse('A paid plugin needs a plan that includes it, a purchase or a trial; details.reason is needs_purchase'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                    409 => self::errorResponse('The plugin is on for every workspace and has no switch'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/trial', 'plugins:enable', [
+                'summary' => 'Start this workspace\'s free trial of a paid plugin',
+                'description' => 'Once per workspace and plugin. Turns the plugin on until the trial ends; then 7 days of grace, then read-only unless it was bought.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('The trial started', 'WorkspaceCodePluginTrialResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                    409 => self::errorResponse('Already had its trial, or the plugin offers none'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/disable', 'plugins:disable', [
+                'summary' => 'Turn an installed plugin off for this workspace',
+                'description' => 'Its data is kept; turning it back on brings everything back.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('Turned off', 'WorkspaceCodePluginSwitchResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                    409 => self::errorResponse('The plugin is on for every workspace and has no switch'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/history', 'plugins:read', [
+                'summary' => 'Who turned an installed plugin on or off in this workspace, and when',
+                'description' => 'Newest first, at most 50.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('The changes', 'WorkspaceCodePluginHistoryResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace/onboarding', 'plugins:read', [
+                'summary' => 'List the guided setups of the plugins on in this workspace',
+                'description' => 'Each plugin\'s step-by-step setup the caller may run, in the caller\'s language, with the plugin route that says which steps are done (SDK 1.109).',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('The guided setups', 'WorkspaceOnboardingListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/plugins/workspace-access', 'plugins:read', [
+                'summary' => 'List who can use each installed plugin',
+                'description' => 'Operator only (the system workspace).',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('Each active plugin and its workspace access', 'CodePluginAccessListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/workspace-access', 'plugins:enable', [
+                'summary' => 'Choose who can use an installed plugin',
+                'description' => 'Operator only. all: on for every workspace. choose: each workspace turns it on. operator: only the system workspace.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'request' => 'CodePluginAccessRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The access as it now stands', 'CodePluginAccessResponse'),
+                    404 => self::errorResponse('Not an active plugin'),
+                    422 => self::errorResponse('access must be all, choose or operator'),
+                ] + self::authErrors(),
+            ]),
         ];
     }
 
@@ -19362,6 +19532,77 @@ final class CoreApiSchemas
                 'updated_at' => self::str(),
             ], ['slug', 'plugin', 'version_id', 'version', 'trust', 'enabled', 'automations_enabled']),
             'WorkspacePluginListResponse' => self::listEnvelope('WorkspacePlugin'),
+            'WorkspaceCodePlugin' => self::object([
+                'name' => self::str() + ['description' => 'The plugin\'s name'],
+                'version' => self::str(),
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose'], 'description' => 'all: on for every workspace; choose: this workspace decides'],
+                'canSwitch' => self::bool(),
+                'enabled' => self::bool() + ['description' => 'Whether it is on in this workspace'],
+                'changedAt' => ['type' => 'string', 'nullable' => true],
+                'changedBy' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
+                'state' => ['type' => 'string', 'enum' => ['on', 'read_only', 'off'], 'description' => 'read_only: a paid plugin whose access ended; reads work, writes are refused'],
+                'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['free_for_all', 'entitled', 'cash', 'trial', 'grace', 'lapsed', 'installation_unlicensed', 'installation_grace', null]],
+                'graceUntil' => ['type' => 'string', 'nullable' => true],
+                'trialEndsAt' => ['type' => 'string', 'nullable' => true],
+                'paid' => self::bool(),
+                'product' => ['type' => 'string', 'nullable' => true, 'description' => 'What the workspace buys, plugin.<slug>'],
+                'trialDays' => self::int(),
+                'trialAvailable' => self::bool(),
+                'mayTurnOn' => self::bool() + ['description' => 'Free, included in the plan or an add-on, free for every workspace, or in a trial'],
+                'onboarding' => self::bool() + ['description' => 'It has a guided setup at /admin/setup/{plugin}'],
+                'dependsOn' => ['type' => 'array', 'items' => self::str(), 'description' => 'Plugins turned on with it in this workspace'],
+                'seats' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'description' => 'Sold per seat (SDK 1.110): how many this workspace has, and what one is called',
+                    'properties' => [
+                        'count' => self::int(),
+                        'unit' => SchemaBuilder::ref('LocalizedLabel'),
+                        'units' => SchemaBuilder::ref('LocalizedLabel'),
+                    ],
+                ],
+            ], ['name', 'version', 'access', 'canSwitch', 'enabled', 'state', 'paid', 'trialAvailable', 'mayTurnOn']),
+            'WorkspaceCodePluginListResponse' => self::listEnvelope('WorkspaceCodePlugin'),
+            'WorkspaceCodePluginSwitchResponse' => self::object([
+                'data' => self::object(['name' => self::str(), 'enabled' => self::bool()], ['name', 'enabled']),
+            ], ['data']),
+            'WorkspaceCodePluginHistoryResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => self::object([
+                    'action' => ['type' => 'string', 'enum' => ['enabled', 'disabled', 'trial_started']],
+                    'at' => self::str(),
+                    'by' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
+                ], ['action', 'at'])],
+            ], ['data']),
+            'WorkspaceOnboarding' => self::object([
+                'plugin' => self::str(),
+                'title' => self::str(true),
+                'description' => self::str(true),
+                'status' => self::str() + ['description' => 'The plugin\'s GET route answering {data: {steps: {<id>: bool}}}'],
+                'steps' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::str(),
+                    'title' => self::str(true),
+                    'description' => self::str(true),
+                    'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
+                ], ['id', 'blocks'])],
+            ], ['plugin', 'status', 'steps']),
+            'WorkspaceOnboardingListResponse' => self::listEnvelope('WorkspaceOnboarding'),
+            'WorkspaceCodePluginTrialResponse' => self::object([
+                'data' => self::object(['name' => self::str(), 'enabled' => self::bool(), 'trialEndsAt' => ['type' => 'string', 'nullable' => true]], ['name', 'enabled']),
+            ], ['data']),
+            'CodePluginAccess' => self::object([
+                'name' => self::str(),
+                'version' => self::str(),
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose', 'operator']],
+                'freeForAll' => self::bool() + ['description' => 'A paid plugin is free for every workspace'],
+            ], ['name', 'access', 'freeForAll']),
+            'CodePluginAccessListResponse' => self::listEnvelope('CodePluginAccess'),
+            'CodePluginAccessRequest' => self::object([
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose', 'operator'], 'description' => 'Who can use it: all (on for every workspace), choose (each workspace turns it on) or operator (the system workspace only)'],
+                'freeForAll' => self::bool() + ['description' => 'For a paid plugin: free for every workspace, with no plan, add-on or trial needed. Left out: unchanged.'],
+            ], ['access']),
+            'CodePluginAccessResponse' => self::object([
+                'data' => SchemaBuilder::ref('CodePluginAccess'),
+            ], ['data']),
             'WorkspacePluginManifestRequest' => self::object(['manifest' => $manifest], ['manifest']),
             'PublishWorkspacePluginRequest' => self::object([
                 'manifest' => $manifest,

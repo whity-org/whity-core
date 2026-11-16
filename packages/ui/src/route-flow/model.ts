@@ -53,7 +53,7 @@
 export type RouteFlowVerdict = 'approved' | 'rejected';
 
 /** What "this node approved" means. Mirrors core's `RouteQuorum`. */
-export type RouteFlowQuorum = 'all' | 'any' | 'majority';
+export type RouteFlowQuorum = 'all' | 'any' | 'majority' | 'first';
 
 /**
  * Whether a stage ASKS or TELLS. Mirrors core's `RouteSatisfaction`.
@@ -152,6 +152,8 @@ export interface RouteFlowStepInput {
   labelAr: string | null;
   required: boolean;
   maxLength: number;
+  /** Merge map A3: a person in the workspace (the supervisor), or a line of text. */
+  type?: 'text' | 'person';
 }
 
 /** One STORED transition, keyed by the verdict that takes it. */

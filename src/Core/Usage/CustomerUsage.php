@@ -33,8 +33,10 @@ use Whity\Sdk\Hooks\Events;
  *    (`memberships.kind = 'customer'`, WHIT-915);
  *  - somebody whose booking is confirmed (WHIT-941, ADR 0017): by profile
  *    when the booking is linked to one that is not staff, otherwise by a
- *    hash of the email they gave, so one person booking twice in a month
- *    counts once and no address is kept in the count. A booking for a
+ *    hash of the email they gave, else of the phone number's digits (a
+ *    walk-in at a salon gives only a phone, WHIT-1156), so one person
+ *    booking twice in a month counts once and no address or number is kept
+ *    in the count. A booking with neither counts once. A booking for a
  *    member of staff counts nothing.
  *
  * Staff (`memberships.kind = 'member'`) sending an internal form are not
@@ -110,7 +112,7 @@ final class CustomerUsage
                 return $data;
             }
             $stmt = $this->db->prepare(
-                'SELECT customer_profile_id, customer_email FROM calendar_bookings WHERE tenant_id = :tenant_id AND id = :id'
+                'SELECT customer_profile_id, customer_email, customer_phone FROM calendar_bookings WHERE tenant_id = :tenant_id AND id = :id'
             );
             $stmt->execute([':tenant_id' => $tenantId, ':id' => $bookingId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -119,12 +121,15 @@ final class CustomerUsage
             }
             $profileId = $row['customer_profile_id'] !== null ? (int) $row['customer_profile_id'] : null;
             $email = strtolower(trim((string) $row['customer_email']));
+            $phone = preg_replace('/\D/', '', (string) ($row['customer_phone'] ?? '')) ?? '';
             if ($profileId !== null) {
                 if (!$this->isStaff($tenantId, $profileId)) {
                     $this->served($tenantId, 'profile:' . $profileId);
                 }
             } elseif ($email !== '') {
                 $this->served($tenantId, 'booking-email:' . hash('sha256', $email));
+            } elseif (strlen($phone) >= 6) {
+                $this->served($tenantId, 'booking-phone:' . hash('sha256', $phone));
             } else {
                 $this->served($tenantId, 'booking:' . $bookingId);
             }

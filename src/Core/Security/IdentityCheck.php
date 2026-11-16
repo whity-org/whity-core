@@ -8,6 +8,7 @@ use PDO;
 use Whity\Auth\TotpService;
 use Whity\Auth\TotpStepFloor;
 use Whity\Core\Db\DbBool;
+use Whity\Core\Identity\AuthMethod;
 use Whity\Core\Document\Signing\SigningChallengeRepository;
 
 /**
@@ -33,6 +34,8 @@ class IdentityCheck
 {
     public const TOTP = 'totp';
     public const EMAIL_CODE = SigningChallengeRepository::EMAIL_CODE;
+    /** Signing in again at the identity provider, for people who sign in only that way (WHIT-1147). */
+    public const FRESH_SIGN_IN = SigningChallengeRepository::FRESH_SIGN_IN;
 
     /** Email codes for gating carry no route. */
     private const NO_ROUTE = 0;
@@ -48,18 +51,46 @@ class IdentityCheck
     /** The check this person confirms with. */
     public function methodFor(int $profileId): string
     {
+        return $this->check($profileId)['method'];
+    }
+
+    /**
+     * The check this approver makes: an authenticator code when they have two-step; a fresh
+     * sign-in at their identity provider when they sign in only through one (WHIT-1147, as
+     * document signing does); otherwise a code emailed to them.
+     *
+     * @return array{method: string, provider_key: ?string}
+     */
+    public function check(int $profileId): array
+    {
         // profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
-        $stmt = $this->db->prepare('SELECT two_factor_enabled, two_factor_secret FROM profiles WHERE id = :id');
+        $stmt = $this->db->prepare('SELECT two_factor_enabled, two_factor_secret, auth_method FROM profiles WHERE id = :id');
         $stmt->execute([':id' => $profileId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         $stmt->closeCursor();
         $row = is_array($row) ? $row : [];
 
-        return $this->totp !== null
+        if ($this->totp !== null
             && DbBool::of($row['two_factor_enabled'] ?? false)
             && (string) ($row['two_factor_secret'] ?? '') !== ''
-            ? self::TOTP
-            : self::EMAIL_CODE;
+        ) {
+            return ['method' => self::TOTP, 'provider_key' => null];
+        }
+
+        if ((string) ($row['auth_method'] ?? '') === AuthMethod::IDP) {
+            // external_identities is a sanctioned GLOBAL identity table (WC-7ad4)
+            $link = $this->db->prepare(
+                'SELECT provider_key FROM external_identities WHERE profile_id = :id ORDER BY last_login_at DESC, id DESC LIMIT 1'
+            );
+            $link->execute([':id' => $profileId]);
+            $providerKey = $link->fetchColumn();
+            $link->closeCursor();
+            if (is_string($providerKey) && $providerKey !== '') {
+                return ['method' => self::FRESH_SIGN_IN, 'provider_key' => $providerKey];
+            }
+        }
+
+        return ['method' => self::EMAIL_CODE, 'provider_key' => null];
     }
 
     /**
@@ -73,9 +104,14 @@ class IdentityCheck
      */
     public function start(int $tenantId, int $profileId, string $purpose, string $what): ?array
     {
-        $method = $this->methodFor($profileId);
+        $check = $this->check($profileId);
+        $method = $check['method'];
         if ($method === self::TOTP) {
             return ['method' => $method, 'email_hint' => null];
+        }
+        if ($method === self::FRESH_SIGN_IN) {
+            // The page sends the approver to sign in again with this purpose; nothing is sent.
+            return ['method' => $method, 'email_hint' => null, 'provider_key' => $check['provider_key'], 'purpose' => $purpose];
         }
 
         $email = $this->primaryEmail($profileId);
@@ -97,11 +133,15 @@ class IdentityCheck
      */
     public function verify(int $tenantId, int $profileId, string $purpose, ?string $code): ?string
     {
+        $method = $this->methodFor($profileId);
+        if ($method === self::FRESH_SIGN_IN) {
+            // No code: the provider's answer was recorded when the approver came back (WHIT-1147).
+            return $this->challenges->consumeGateFreshSignIn($tenantId, $profileId, self::key($purpose)) ? $method : null;
+        }
         $code = preg_replace('/\s+/', '', (string) $code) ?? '';
         if ($code === '') {
             return null;
         }
-        $method = $this->methodFor($profileId);
 
         $ok = $method === self::TOTP
             ? $this->totpProves($profileId, $code)
@@ -110,7 +150,8 @@ class IdentityCheck
         return $ok ? $method : null;
     }
 
-    private static function key(string $purpose): string
+    /** The key a purpose's codes and fresh sign-ins are bound to. */
+    public static function key(string $purpose): string
     {
         return hash('sha256', 'gating:' . $purpose);
     }

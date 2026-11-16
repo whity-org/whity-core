@@ -45,7 +45,7 @@ final class FormTemplateDraft
 
         // In the order people answer them, keeping a section's questions together.
         $sections = [];
-        foreach (FormFieldRepository::applicantFields($fields) as $field) {
+        foreach ($fields as $field) {
             $sections[(string) ($field['section_key'] ?? '')][] = $field;
         }
         foreach ($sections as $sectionKey => $questions) {

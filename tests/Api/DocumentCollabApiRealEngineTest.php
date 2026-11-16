@@ -388,6 +388,18 @@ final class DocumentCollabApiRealEngineTest extends TestCase
         self::assertSame(2, (int) $this->q("SELECT COUNT(*) FROM notifications WHERE type = 'document.comment.mention'")->fetchColumn());
     }
 
+    public function testCommentsTakeTheSameMentionShapeAsChat(): void
+    {
+        $id = $this->document();
+
+        // N4: {type, id} as chat sends them; an agent can't be named in a comment.
+        $res = $this->comment(self::SUGGESTER, $id, 'b1', 'Pay', 'Please check', [['type' => 'person', 'id' => self::WRITER], ['type' => 'agent', 'id' => 5]]);
+        self::assertSame(201, $res->getStatusCode(), $res->getBody());
+        self::assertSame([self::WRITER], array_column($this->data($res)['messages'][0]['mentions'], 'id'));
+
+        self::assertSame(422, $this->comment(self::SUGGESTER, $id, 'b1', 'Pay', 'Bad', [['type' => 'robot', 'id' => 1]])->getStatusCode());
+    }
+
     public function testMentionableListsOnlyMembersWhoCanReadTheDocument(): void
     {
         $this->q("INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
@@ -565,7 +577,7 @@ final class DocumentCollabApiRealEngineTest extends TestCase
         return $this->handler->decideMany($this->request('POST', "/api/document-sources/{$id}/suggestions/decisions", $userId, (string) json_encode($body)), ['id' => (string) $id]);
     }
 
-    /** @param list<int> $mentions */
+    /** @param list<int|array{type: string, id: int}> $mentions ids, or the {type, id} shape chat sends */
     private function comment(int $userId, int $id, string $anchor, string $quote, string $text, array $mentions = [], int $tenant = self::TENANT): Response
     {
         $body = ['anchor_block_id' => $anchor, 'quote' => $quote, 'body' => [['type' => 'text', 'text' => $text]], 'mentions' => $mentions];

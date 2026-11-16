@@ -79,6 +79,18 @@ final class ToolsCallHandler implements MethodHandler
         private readonly ?MeterService $agentWork = null,
     ) {}
 
+    /**
+     * Plugins switched off for a workspace (WHIT-1123): their authored tools
+     * answer as unknown there. Derived tools reach the plugin's route, whose
+     * wrapper refuses the same way.
+     */
+    private ?\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $workspaceGate = null;
+
+    public function setWorkspaceGate(\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $gate): void
+    {
+        $this->workspaceGate = $gate;
+    }
+
     /** WHIT-812: on an agent's result, the action to undo and until when. */
     public const META_UNDO = 'dev.whity/undo';
 
@@ -403,6 +415,9 @@ final class ToolsCallHandler implements MethodHandler
         }
         if ($declaration === null) {
             $authored = $this->authoredTools?->get($toolName);
+            if ($authored !== null && $this->workspaceGate?->isToolsetOffForWorkspace($this->authoredTools->toolsetOf($toolName), $principal->tenantId) === true) {
+                throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Unknown tool: {$toolName}");
+            }
             if ($authored !== null) {
                 try {
                     $this->assertInTokenToolsets($principal, $this->authoredTools->toolsetOf($toolName));

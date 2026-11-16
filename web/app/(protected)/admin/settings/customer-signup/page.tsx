@@ -60,6 +60,8 @@ interface SignupSettings {
   customer_invites?: boolean;
   /** How many people one customer may invite; 0 is no limit (WHIT-1043). */
   invites_per_customer?: number;
+  /** Merge map A4: the route join requests travel on; null is the default one step. */
+  route_template_id?: number | null;
   eligible_roles: EligibleRole[];
   pending_count: number;
   workspace_slug: string | null;
@@ -92,6 +94,8 @@ interface Draft {
   customerInvites: boolean;
   /** Text as typed; empty is no limit. */
   perCustomer: string;
+  /** '' is the default route: one step for everyone who can manage sign-ups. */
+  routeTemplateId: string;
 }
 
 function draftOf(settings: SignupSettings): Draft {
@@ -102,6 +106,7 @@ function draftOf(settings: SignupSettings): Draft {
     domainInput: '',
     customerInvites: settings.customer_invites === true,
     perCustomer: settings.invites_per_customer ? String(settings.invites_per_customer) : '',
+    routeTemplateId: settings.route_template_id ? String(settings.route_template_id) : '',
   };
 }
 
@@ -132,6 +137,8 @@ function codeText(t: TranslateFn, details: Record<string, unknown>): string | nu
       return t('settings.customerSignup.error.perCustomerInvalid', 'Enter a whole number from 1 to 1000, or leave it empty for no limit.');
     case 'customer_invites_invalid':
       return t('settings.customerSignup.error.invitesInvalid', 'Turn customer invitations on or off.');
+    case 'route_template_invalid':
+      return t('settings.customerSignup.error.routeInvalid', 'Choose one of this workspace’s routes, or the default.');
     case 'mode_invalid':
       return t('settings.customerSignup.error.modeInvalid', 'Choose Off, Approval required or Open.');
     case 'role_required':
@@ -196,6 +203,14 @@ export default function CustomerSignupSettingsPage() {
     return (data as unknown as { data: SignupSettings }).data;
   }, []);
 
+  // Merge map A4: the routes a join request can travel on. Somebody who can't
+  // read route templates still sees and keeps the default.
+  const { data: routeTemplates } = useFetch<{ id: number; name: string }[]>(async () => {
+    const { data, response: res } = await api.GET('/api/v1/document-route-templates');
+    if (!res.ok) return [];
+    return ((data as unknown as { data?: { id: number; name: string }[] }).data ?? []).map((r) => ({ id: r.id, name: r.name }));
+  }, []);
+
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -209,6 +224,7 @@ export default function CustomerSignupSettingsPage() {
       current.roleId !== saved.roleId ||
       current.customerInvites !== saved.customerInvites ||
       current.perCustomer.trim() !== saved.perCustomer ||
+      current.routeTemplateId !== saved.routeTemplateId ||
       domainsOf(current).join(',') !== domainsOf(saved).join(','));
 
   if (!capabilitiesLoading && !canManage) {
@@ -239,6 +255,7 @@ export default function CustomerSignupSettingsPage() {
         customer_invites: current.customerInvites,
         // Empty is no limit (0); anything else the server checks is a whole number.
         invites_per_customer: current.perCustomer.trim() === '' ? 0 : Number(current.perCustomer.trim()),
+        route_template_id: current.routeTemplateId === '' ? null : Number(current.routeTemplateId),
       },
     });
     setSaving(false);
@@ -446,6 +463,29 @@ export default function CustomerSignupSettingsPage() {
                   </p>
                 </ChangedField>
               </div>
+
+              {current.mode === 'approval' && (
+                <ChangedField changed={current.routeTemplateId !== saved?.routeTemplateId}>
+                  <label htmlFor="signup-route" className="text-sm font-medium text-foreground">
+                    {t('settings.customerSignup.route.label', 'Who decides')}
+                  </label>
+                  <FieldSelect
+                    id="signup-route"
+                    value={current.routeTemplateId === '' ? 'default' : current.routeTemplateId}
+                    onChange={(value) => update({ routeTemplateId: value === 'default' ? '' : value })}
+                    options={[
+                      { value: 'default', label: t('settings.customerSignup.route.default', 'Anyone who can manage sign-ups') },
+                      ...(routeTemplates ?? []).map((route) => ({ value: String(route.id), label: route.name })),
+                    ]}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t(
+                      'settings.customerSignup.route.hint',
+                      'Each request waits in their Inbox. Choose one of your routes to add steps, such as a check by the front desk first.'
+                    )}
+                  </p>
+                </ChangedField>
+              )}
 
               {joinLink && (
                 <div

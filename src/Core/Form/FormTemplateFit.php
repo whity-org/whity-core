@@ -21,15 +21,14 @@ use Whity\Core\Document\Print\WhityDocumentPrinter;
  *    decides it: the check reports with it and the finalise step prints with
  *    it, so what is reported as filled is what gets filled.
  *
- * Only questions the applicant answers count: the office's own questions are
- * not printed on the final document.
+ * What the office records is asked at a route step and prints as a route value
+ * (merge map A3), not as a question of the form.
  *
  * Stateless — worker-safe.
  */
 final class FormTemplateFit
 {
     public const NOT_ASKED = 'not_asked';
-    public const STAFF_ONLY = 'staff_only';
     public const OTHER_RECORD = 'other_record';
 
     private const OWN = 'template.';
@@ -55,7 +54,7 @@ final class FormTemplateFit
     {
         $keys = [];
         $wordings = [];
-        foreach (FormFieldRepository::applicantFields($fields) as $question) {
+        foreach ($fields as $question) {
             $key = (string) $question['field_key'];
             $keys[$key] = true;
             /** @var array<string, string> $label */
@@ -91,7 +90,7 @@ final class FormTemplateFit
      */
     public static function check(array $fields, array $printed, ?array $draft, array $sharedPaths, array $leftOut): array
     {
-        $questions = FormFieldRepository::applicantFields($fields);
+        $questions = $fields;
         $applicant = array_fill_keys(array_map(static fn (array $q): string => (string) $q['field_key'], $questions), true);
         $answers = self::ownFieldAnswers($fields, $printed);
 
@@ -112,9 +111,7 @@ final class FormTemplateFit
                 $filled++;
                 continue;
             }
-            $needs[] = self::isStaffQuestion($fields, $key)
-                ? ['path' => $path, 'label' => $label, 'reason' => self::STAFF_ONLY, 'field_key' => null]
-                : ['path' => $path, 'label' => $label, 'reason' => self::NOT_ASKED, 'field_key' => self::questionKey($key)];
+            $needs[] = ['path' => $path, 'label' => $label, 'reason' => self::NOT_ASKED, 'field_key' => self::questionKey($key)];
         }
 
         $placed = self::placedQuestions($fields, $printed);
@@ -132,18 +129,6 @@ final class FormTemplateFit
         }
 
         return ['filled' => $filled, 'needs' => $needs, 'unused' => $unused];
-    }
-
-    /** @param list<array<string, mixed>> $fields */
-    private static function isStaffQuestion(array $fields, string $key): bool
-    {
-        foreach ($fields as $field) {
-            if ((string) $field['field_key'] === $key) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

@@ -53,6 +53,11 @@ final class PluginRecords
             self::encode($domains),
             $profileId,
         ]);
+
+        // A new install starts off for every workspace; each one turns it on
+        // in Settings › Plugins (WHIT-1122). A reinstall keeps the operator's
+        // earlier choice.
+        (new \Whity\Core\Plugin\Workspace\CodePluginActivation($this->pdo))->defaultToChoose($name, $profileId);
     }
 
     /** @return array<string, array<string, mixed>> Install rows by plugin name, with the installer's name. */
