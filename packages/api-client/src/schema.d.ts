@@ -15343,8 +15343,11 @@ export interface components {
         };
         FormFieldColumn: {
             key: string;
-            /** @enum {string} */
-            type: "text" | "textarea" | "number" | "date" | "select" | "checkbox";
+            /**
+             * @description What the cell holds. profile_ref is a person, checked against the workspace like a person question.
+             * @enum {string}
+             */
+            type: "text" | "textarea" | "number" | "date" | "select" | "checkbox" | "profile_ref";
             label: {
                 ar?: string;
                 en?: string;

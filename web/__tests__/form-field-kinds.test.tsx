@@ -154,6 +154,69 @@ describe('a table of rows', () => {
   });
 });
 
+describe('a person column (WHIT-1162)', () => {
+  const people = [
+    { value: '13', label: 'Ahmad Khalil' },
+    { value: '12', label: 'Awss Haddad' },
+  ];
+  const field = spec({
+    field_key: 'researchers',
+    field_type: 'repeating',
+    label: { en: 'Other researchers' },
+    multi_valued: true,
+    validation: {
+      columns: [
+        { key: 'person', type: 'profile_ref', label: { en: 'Researcher' }, required: true },
+        { key: 'role', type: 'text', label: { en: 'Role' } },
+      ],
+    },
+  });
+
+  it('draws the cell with the person picker a person question uses, by name', () => {
+    render(
+      <FormField
+        field={field}
+        value={[{ person: 13 as unknown as string, role: 'Co-researcher' }]}
+        preferArabic={false}
+        references={{ profile_ref: people }}
+        onChange={jest.fn()}
+      />
+    );
+
+    const picker = screen.getByRole('combobox');
+    expect(picker.id).toBe('field-researchers-0-person');
+    expect(picker.textContent).toBe('Ahmad Khalil');
+    expect(document.body.textContent).not.toContain('13');
+  });
+
+  it('shows the person by name on Review', async () => {
+    const fields: FillableField[] = [
+      { ...field, position: 1 } as FillableField,
+      spec({ field_key: 'extra', position: 2 }),
+    ];
+    render(
+      <FormFill
+        fields={fields}
+        sections={[
+          { key: 'a', field_keys: ['researchers'] },
+          { key: 'b', field_keys: ['extra'] },
+        ]}
+        answers={{ researchers: [{ person: '12', role: 'Analyst' }] }}
+        onAnswersChange={jest.fn()}
+        preferArabic={false}
+        references={{ profile_ref: people }}
+        submitLabel="Send"
+        submit={jest.fn()}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(screen.getByText('Researcher: Awss Haddad · Role: Analyst')).toBeTruthy();
+  });
+});
+
 describe('a signature', () => {
   it('answers with the name alone, so the time stays the server’s', async () => {
     const onValue = jest.fn();

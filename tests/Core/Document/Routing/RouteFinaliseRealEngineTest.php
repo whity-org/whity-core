@@ -527,6 +527,85 @@ final class RouteFinaliseRealEngineTest extends TestCase
     }
 
     /**
+     * WHIT-1162: the other researchers are a table with a person column. A
+     * step leaving out the people named in that table leaves out everyone in
+     * its rows, and the printout's "Not counted" line lists them.
+     */
+    public function testAPersonNamedInATablesRowIsLeftOutOfTheCommitteeAndRecorded(): void
+    {
+        $design = $this->routeTemplates->create(self::TENANT, 'Ethics review', null, null);
+        $this->routeTemplates->replaceGraph($design, self::TENANT, [
+            [
+                'position' => 1,
+                'rule_kind' => 'explicit',
+                'rule_config' => ['profile_ids' => [self::CLERK, self::MEMBER, self::SUPERVISOR]],
+                'label' => 'Ethics committee',
+                'decision' => true,
+                'decision_quorum' => 'all',
+                'satisfied_by' => 'act',
+                'exclude_named_in' => ['researchers'],
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+            [
+                'position' => 2,
+                'rule_kind' => RouteStepKind::FINALISE_RULE,
+                'rule_config' => [],
+                'label' => 'Certificate',
+                'decision' => false,
+                'decision_quorum' => null,
+                'satisfied_by' => 'act',
+                'allow_send_back' => false,
+                'kind' => RouteStepKind::FINALISE,
+                'final_template_id' => null,
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+        ], []);
+
+        $formId = $this->form($design, null);
+        $this->fields->create(self::TENANT, $formId, 'researchers', 'repeating', ['en' => 'Other researchers'], null, false, [], ['columns' => [
+            ['key' => 'role', 'type' => 'text', 'label' => ['en' => 'Role'], 'required' => false],
+            ['key' => 'person', 'type' => 'profile_ref', 'label' => ['en' => 'Researcher'], 'required' => true],
+        ]], null, null, null);
+
+        // A person from another workspace is refused in a cell, as in a person question.
+        $this->pdo->exec("INSERT INTO tenants (id, name) VALUES (2, 'Example Mill') ON CONFLICT DO NOTHING");
+        $now = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? "datetime('now')" : 'NOW()';
+        $this->pdo->exec(
+            "INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
+             VALUES (14, 'Emad Nasser', 'x', false, 0, 0, {$now}, {$now})"
+        );
+        $this->pdo->exec(
+            "INSERT INTO memberships (id, profile_id, tenant_id, role_id, ou_id, is_primary, status, created_at) VALUES
+                (1014, 14, 2, 100, NULL, true, 'active', {$now})"
+        );
+        try {
+            $this->send($formId, ['supplier' => 'Example Mill', 'researchers' => [['role' => 'Analyst', 'person' => 14]]]);
+            self::fail('a person from another workspace was accepted in a cell');
+        } catch (\Whity\Core\Form\FormRejectedException $e) {
+            self::assertSame('bad_reference', $e->reason);
+            self::assertSame('researchers', $e->fieldKey);
+            self::assertSame(['row' => 1, 'column' => 'person'], $e->params);
+        }
+
+        $submission = $this->send($formId, ['supplier' => 'Example Mill', 'researchers' => [
+            ['role' => 'Co-researcher', 'person' => (string) self::SUPERVISOR],
+        ]]);
+        $route = $this->routeOf((int) $submission['id']);
+
+        self::assertNull($this->open((int) $route['id'], self::SUPERVISOR), 'a researcher named in a row is not asked');
+        self::assertNotNull($this->open((int) $route['id'], self::MEMBER));
+
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        $second = $this->router->act(self::TENANT, self::MEMBER, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertSame('approved', $second['decided'], 'the researcher in the table does not count');
+
+        $left = (new \Whity\Core\Document\Routing\RouteLeftOut($this->pdo))->forRoute(self::TENANT, (int) $route['id']);
+        self::assertSame([['profile_id' => self::SUPERVISOR, 'name' => 'Ahmad Khalil', 'key' => 'researchers']], $left);
+    }
+
+    /**
      * Design 3.4 (FP.1): a form whose route makes a final document with no
      * template prints the response in the automatic layout, with the decision
      * and the approvals, instead of failing for want of a template.

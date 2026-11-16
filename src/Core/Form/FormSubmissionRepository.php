@@ -49,6 +49,15 @@ final class FormSubmissionRepository
     }
 
     /**
+     * A fresh name lookup for the people a submission's answers name
+     * (WHIT-1162), for printing and exporting them by name.
+     */
+    public function profileNames(): ProfileNames
+    {
+        return new ProfileNames($this->db);
+    }
+
+    /**
      * Insert a submission. Called only from inside
      * {@see SubmissionIssuer::submit()}'s transaction — a submission that exists
      * without the document it was supposed to produce is the one torn state this
