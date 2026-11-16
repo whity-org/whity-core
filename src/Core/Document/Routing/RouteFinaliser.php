@@ -507,9 +507,16 @@ final class RouteFinaliser implements RouteFinaliseService
      */
     private function routeValues(int $tenantId, int $routeId): array
     {
+        // A choice prints its option's label, not the value it is stored as.
+        $inputs = [];
+        foreach ((new RouteStepRepository($this->db))->listForRoute($routeId, $tenantId) as $step) {
+            foreach (RouteStepInputs::decode($step['inputs'] ?? []) as $input) {
+                $inputs[$input['key']] = $input;
+            }
+        }
         $out = [];
         foreach ($this->stepValues->valuesForRoute($tenantId, $routeId) as $key => $value) {
-            $out[RouteValueFieldProvider::path($key)] = $value;
+            $out[RouteValueFieldProvider::path($key)] = isset($inputs[$key]) ? RouteStepInputs::display($inputs[$key], $value) : $value;
         }
 
         return $out;

@@ -138,6 +138,33 @@ final class RouteStepInputsRealEngineTest extends TestCase
         );
     }
 
+    /** WHIT-1163: the IRB's decision picked from a list, kept on the route with the route's step. */
+    public function testAChoiceIsPickedFromTheStagesOptions(): void
+    {
+        $decision = [
+            'key' => 'irb_decision', 'label' => 'IRB decision', 'type' => 'choice',
+            'options' => [
+                ['value' => 'approved', 'label' => 'Approved'],
+                ['value' => 'conditional', 'label' => 'Conditionally approved'],
+            ],
+        ];
+        $route = $this->issueMemberThenSecretary($this->seedDocument(self::AUTHOR), [$decision]);
+        $this->approve(self::MEMBER_A, $route);
+
+        $step = $this->steps->listForRoute((int) $route['id'], self::TENANT)[1];
+        self::assertSame('choice', $step['inputs'][0]['type']);
+        self::assertSame(['approved', 'conditional'], array_column(RoutingPresenter::step($step)['inputs'][0]['options'], 'value'));
+
+        try {
+            $this->approve(self::CLERK, $route, ['irb_decision' => 'Approved']);
+            self::fail('A value that is not one of the options must be refused.');
+        } catch (RoutingRejectedException $e) {
+            self::assertStringContainsString('Choose one of the options', $e->clientMessage);
+        }
+        $this->approve(self::CLERK, $route, ['irb_decision' => 'conditional']);
+        self::assertSame('conditional', $this->router->enteredValues(self::TENANT, (int) $route['id'])['irb_decision']['value']);
+    }
+
     public function testValuesGoOnlyWithLettingItThrough(): void
     {
         $route = $this->issueMemberThenSecretary($this->seedDocument(self::AUTHOR), [self::MEETING]);

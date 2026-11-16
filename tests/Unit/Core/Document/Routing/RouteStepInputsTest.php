@@ -130,7 +130,7 @@ final class RouteStepInputsTest extends TestCase
     public function testAnUnknownTypeIsRefusedInPlainWords(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage("'type' is text or person.");
+        $this->expectExceptionMessage("'type' is text, person or choice.");
         RouteStepInputs::parse([['key' => 'supervisor', 'label' => 'Supervisor', 'type' => 'date']]);
     }
 
@@ -143,6 +143,52 @@ final class RouteStepInputsTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Choose a person for “Supervisor”.');
         RouteStepInputs::accept($inputs, ['supervisor' => 'Amro Saleh']);
+    }
+
+    /** WHIT-1163: a decision picked from a list, stored as its value, printed as its label. */
+    public function testAChoiceKeepsItsOptionsAndAcceptsOnlyOne(): void
+    {
+        $decision = [
+            'key' => 'irb_decision', 'label' => 'IRB decision', 'type' => 'choice',
+            'options' => [
+                ['value' => 'approved', 'label' => 'Approved', 'label_ar' => 'تمت الموافقة'],
+                ['value' => 'conditional', 'label' => 'Conditionally approved'],
+                ['value' => 'revisions', 'label' => 'Revisions required'],
+                ['value' => 'not_approved', 'label' => 'Not approved'],
+            ],
+        ];
+        $inputs = RouteStepInputs::parse([$decision]);
+
+        self::assertSame('choice', $inputs[0]['type']);
+        self::assertSame(['value' => 'conditional', 'label' => 'Conditionally approved', 'label_ar' => null], ($inputs[0]['options'] ?? [])[1] ?? null);
+        self::assertSame($inputs, RouteStepInputs::decode(RouteStepInputs::encode($inputs)));
+        self::assertSame(['irb_decision' => 'conditional'], RouteStepInputs::accept($inputs, ['irb_decision' => 'conditional']));
+        self::assertSame('Conditionally approved', RouteStepInputs::display($inputs[0], 'conditional'));
+        self::assertSame('تمت الموافقة', RouteStepInputs::display($inputs[0], 'approved', 'ar'));
+        self::assertSame('Revisions required', RouteStepInputs::display($inputs[0], 'revisions', 'ar'), 'English when no Arabic label');
+        self::assertSame('gone', RouteStepInputs::display($inputs[0], 'gone'), 'a value no option has prints as it is');
+        self::assertArrayNotHasKey('options', RouteStepInputs::parse([['key' => 'meeting', 'label' => 'Meeting']])[0]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Choose one of the options for “IRB decision”.');
+        RouteStepInputs::accept($inputs, ['irb_decision' => 'Approved']);
+    }
+
+    /** @return iterable<string, array{mixed, string}> */
+    public static function badChoices(): iterable
+    {
+        yield 'no options' => [['key' => 'd', 'label' => 'D', 'type' => 'choice'], 'a choice needs 2 to 12 options'];
+        yield 'one option' => [['key' => 'd', 'label' => 'D', 'type' => 'choice', 'options' => [['value' => 'a', 'label' => 'A']]], 'a choice needs 2 to 12 options'];
+        yield 'a bad value' => [['key' => 'd', 'label' => 'D', 'type' => 'choice', 'options' => [['value' => 'A b', 'label' => 'A'], ['value' => 'b', 'label' => 'B']]], "each option needs a 'value'"];
+        yield 'a repeated value' => [['key' => 'd', 'label' => 'D', 'type' => 'choice', 'options' => [['value' => 'a', 'label' => 'A'], ['value' => 'a', 'label' => 'B']]], "two options use the value 'a'"];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('badChoices')]
+    public function testABadChoiceIsRefusedInPlainWords(mixed $input, string $message): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
+        RouteStepInputs::parse([$input]);
     }
 
     public function testTheValuesObjectIsShapedAtTheBoundary(): void

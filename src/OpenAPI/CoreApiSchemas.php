@@ -6547,6 +6547,12 @@ final class CoreApiSchemas
                 'label_ar' => self::str(true) + ['description' => 'The label in Arabic, when it differs.'],
                 'required' => self::bool() + ['description' => 'Whether approving needs it. True when absent.'],
                 'max_length' => self::int() + ['description' => 'Longest value, 1 to 200. 100 when absent.'],
+                'type' => ['type' => 'string', 'enum' => ['text', 'person', 'choice'], 'description' => 'A line of text (the default), a person in the workspace (their user id), or one of `options` (WHIT-1163).'],
+                'options' => ['type' => 'array', 'maxItems' => 12, 'description' => 'For a choice: 2 to 12 options. The value is stored; the label prints.', 'items' => self::object([
+                    'value' => self::str() + ['description' => 'Small letters, digits and _, up to 40 characters.'],
+                    'label' => self::str() + ['description' => 'At most 80 characters.'],
+                    'label_ar' => self::str(true),
+                ], ['value', 'label'])],
             ], ['key', 'label']),
             // WHIT-1016: a value entered on a route.
             'RouteStepValue' => self::object([

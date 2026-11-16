@@ -18352,6 +18352,19 @@ export interface components {
             required?: boolean;
             /** @description Longest value, 1 to 200. 100 when absent. */
             max_length?: number;
+            /**
+             * @description A line of text (the default), a person in the workspace (their user id), or one of `options` (WHIT-1163).
+             * @enum {string}
+             */
+            type?: "text" | "person" | "choice";
+            /** @description For a choice: 2 to 12 options. The value is stored; the label prints. */
+            options?: {
+                /** @description Small letters, digits and _, up to 40 characters. */
+                value: string;
+                /** @description At most 80 characters. */
+                label: string;
+                label_ar?: string | null;
+            }[];
         };
         RouteStepValue: {
             key: string;

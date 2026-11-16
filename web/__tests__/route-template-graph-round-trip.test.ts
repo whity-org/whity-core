@@ -131,6 +131,27 @@ describe('the route-template graph round trip', () => {
     expect(saved.steps[0].inputs).toEqual(asked);
   });
 
+  it('keeps a choice and its options, and a person, through a save (WHIT-1163)', () => {
+    const asked = [
+      {
+        key: 'irb_decision',
+        label: 'IRB decision',
+        label_ar: null,
+        required: true,
+        max_length: 100,
+        type: 'choice' as const,
+        options: [
+          { value: 'approved', label: 'Approved', label_ar: 'تمت الموافقة' },
+          { value: 'conditional', label: 'Conditionally approved', label_ar: null },
+        ],
+      },
+      { key: 'supervisor', label: 'Supervisor', label_ar: null, required: false, max_length: 100, type: 'person' as const },
+    ];
+    const saved = toGraphRequest(toFlowGraph(graph([step({ inputs: asked })])));
+
+    expect(saved.steps[0].inputs).toEqual(asked);
+  });
+
   it('reads a stage from a server that predates values as one asking for none, and says so on save', () => {
     const legacy = step();
     delete (legacy as Partial<RouteTemplateStepWire>).inputs;
