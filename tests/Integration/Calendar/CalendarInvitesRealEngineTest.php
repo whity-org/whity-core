@@ -197,8 +197,14 @@ final class CalendarInvitesRealEngineTest extends TestCase
 
         $jobs = $this->pdo->query("SELECT payload FROM jobs WHERE name = 'core.calendar.event_reminder'");
         self::assertNotFalse($jobs);
-        $payloads = array_map(static fn (string $p): array => (array) json_decode($p, true), $jobs->fetchAll(PDO::FETCH_COLUMN));
-        self::assertSame([['tenant_id' => 1, 'event_id' => $id, 'starts_at' => '2026-11-16T07:00:00Z']], $payloads);
+        // Postgres stores the payload as JSONB, which orders its keys its own way.
+        $payloads = array_map(static function (string $p): array {
+            $payload = (array) json_decode($p, true);
+            ksort($payload);
+
+            return $payload;
+        }, $jobs->fetchAll(PDO::FETCH_COLUMN));
+        self::assertSame([['event_id' => $id, 'starts_at' => '2026-11-16T07:00:00Z', 'tenant_id' => 1]], $payloads);
 
         $early = $this->reminders->send(1, $id, '2026-11-16T07:00:00Z');
         self::assertIsArray($early, 'not yet');
