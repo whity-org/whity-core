@@ -473,7 +473,6 @@ final class CalendarApiHandler
                 $start,
                 $profileId,
                 $isAgent || ($body['keep_to_hours'] ?? false) === true,
-                $options['duration_minutes'],
                 $options['notify'],
                 $options['book_anyway'],
                 $options['within_hours'],
@@ -630,22 +629,21 @@ final class CalendarApiHandler
 
     /**
      * What the calendar grid adds to a create or a move (design 3.5, CV.8,
-     * CV.9): a length of its own, "Email the customer" (default on), Book
-     * anyway when the person is busy, and keeping to the person's hours. An
-     * agent never books over someone's time.
+     * CV.9): "Email the customer" (default on), Book anyway when the person is
+     * busy, and keeping to the person's hours. An agent never books over
+     * someone's time. A booking's length is its service's (owner, Q35.7), so
+     * a length of its own is refused rather than ignored.
      *
      * @param array<string, mixed> $body
-     * @return array{duration_minutes: ?int, notify: bool, book_anyway: bool, within_hours: bool}
+     * @return array{notify: bool, book_anyway: bool, within_hours: bool}
      */
     private static function gridOptions(array $body, bool $isAgent): array
     {
-        $minutes = $body['duration_minutes'] ?? null;
-        if ($minutes !== null && !is_int($minutes)) {
-            throw new CalendarRejectedException('duration_minutes must be a whole number of minutes', 422);
+        if (array_key_exists('duration_minutes', $body)) {
+            throw new CalendarRejectedException('A booking lasts as long as its service. Choose another service to change its length.', 422);
         }
 
         return [
-            'duration_minutes' => $minutes,
             'notify' => ($body['notify'] ?? true) !== false,
             'book_anyway' => !$isAgent && ($body['book_anyway'] ?? false) === true,
             'within_hours' => ($body['within_hours'] ?? false) === true,

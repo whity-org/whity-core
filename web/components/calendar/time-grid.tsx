@@ -88,8 +88,10 @@ export interface TimeGridProps {
   /** The details beside the selected booking. */
   renderDetails?: (item: CalItem) => ReactNode;
   onPickDay?: (date: CalendarDate) => void;
-  /** CV.9: whether an item may be dragged, resized or moved with the keys. */
+  /** CV.9: whether an item may be dragged or moved with the keys. */
   canDrag?: (item: CalItem) => boolean;
+  /** Whether its bottom edge can be pulled: team events only; a booking lasts as long as its service (Q35.7). */
+  canResize?: (item: CalItem) => boolean;
   /** CV.8: click or drag on an empty time. A click gives no end: the default length applies. */
   onCreate?: (slot: GridSlot) => void;
   /** CV.9, CV.10: an item dropped at a new time or pulled to a new length. */
@@ -214,6 +216,7 @@ export function TimeGrid({
   renderDetails,
   onPickDay,
   canDrag,
+  canResize,
   onCreate,
   onChange,
   preview = null,
@@ -601,7 +604,7 @@ export function TimeGrid({
                       {long && item.who !== '' && <span className="truncate">{item.who}</span>}
                       {long && wide && item.where !== '' && <span className="truncate">{item.where}</span>}
                     </button>
-                    {draggable && !leaving ? (
+                    {draggable && canResize?.(item) === true && !leaving ? (
                       // Pull the bottom edge to change how long it is (CV.9).
                       <span
                         role="presentation"
