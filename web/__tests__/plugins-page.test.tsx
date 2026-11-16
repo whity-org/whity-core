@@ -103,13 +103,25 @@ const DISABLED_PLUGIN: PluginRow = {
 };
 
 /** A jest mock that resolves the typed-client `{ data }` plugin-list shape. */
-function mockPluginList(plugins: PluginRow[], canOperate = true, removed: unknown[] = []): void {
+function mockPluginList(
+  plugins: PluginRow[],
+  canOperate = true,
+  removed: unknown[] = [],
+  workspaceCode: unknown[] = [],
+  addonPlans: unknown[] = [],
+): void {
   mockApiGet.mockImplementation((path: string) => {
     if (path === '/api/v1/plugins') {
       return Promise.resolve({ data: { data: plugins, meta: { can_operate: canOperate } } });
     }
     if (path === '/api/v1/plugins/removed') {
       return Promise.resolve({ data: { data: removed } });
+    }
+    if (path === '/api/v1/workspace/code-plugins') {
+      return Promise.resolve({ data: { data: workspaceCode } });
+    }
+    if (path === '/api/v1/billing/plans') {
+      return Promise.resolve({ data: { data: addonPlans }, response: { ok: true } });
     }
     return Promise.resolve({ data: { data: [] } });
   });
@@ -472,19 +484,28 @@ describe('PluginsPage rejected screens (#953)', () => {
   });
 
   describe('install-wide lifecycle (Q4)', () => {
-    it('offers a workspace no changes, whatever its role holds', async () => {
+    it('offers a workspace its own switch, never the operator tools (WHIT-1124)', async () => {
       const user = userEvent.setup();
-      setCapabilities(['plugins:read', 'plugins:upload', 'plugins:reload', 'plugins:uninstall', 'plugins:disable']);
-      mockPluginList([ACTIVE_PLUGIN], false);
+      setCapabilities(['plugins:read', 'plugins:upload', 'plugins:reload', 'plugins:uninstall', 'plugins:enable', 'plugins:disable']);
+      mockPluginList([ACTIVE_PLUGIN], false, [], [
+        { name: 'HelloWorld', version: '1.2.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null },
+        { name: 'AlwaysThere', version: '2.0.0', access: 'all', canSwitch: false, enabled: true, changedAt: null, changedBy: null },
+      ]);
+      mockApiPost.mockResolvedValue({ data: { data: { name: 'HelloWorld', enabled: true } } });
 
       render(<PluginsPage />);
       await screen.findByText('HelloWorld');
 
-      expect(screen.getByText(/the platform operator manages them/)).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Operator tools' })).not.toBeInTheDocument();
-      const menu = await openRowMenu(user, 'HelloWorld');
-      expect(within(menu).queryByRole('menuitem', { name: 'Uninstall' })).not.toBeInTheDocument();
-      expect(within(menu).queryByRole('menuitem', { name: 'Turn off' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'More actions for HelloWorld' })).not.toBeInTheDocument();
+      expect(screen.getByText('Always on')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('switch', { name: 'Use HelloWorld in this workspace' }));
+      await waitFor(() =>
+        expect(mockApiPost).toHaveBeenCalledWith('/api/v1/workspace/code-plugins/{plugin}/enable', {
+          params: { path: { plugin: 'HelloWorld' } },
+        }),
+      );
     });
   });
 
@@ -510,11 +531,47 @@ describe('PluginsPage rejected screens (#953)', () => {
       );
     });
 
+    it('offers a paid plugin a trial and Buy instead of the switch (WHIT-1127)', async () => {
+      const user = userEvent.setup();
+      setCapabilities(['plugins:read', 'plugins:enable', 'plugins:disable', 'billing:pay']);
+      mockPluginList(
+        [ACTIVE_PLUGIN],
+        false,
+        [],
+        [
+          {
+            name: 'FrontOffice', version: '0.8.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null,
+            state: 'off', reason: null, graceUntil: null, trialEndsAt: null, paid: true, product: 'plugin.front-office',
+            trialDays: 14, trialAvailable: true, mayTurnOn: false,
+          },
+        ],
+        [{ plan_key: 'plugin.front-office.monthly', is_addon: true, unit_amount: 2900, currency: 'USD', billing_period: 'month' }],
+      );
+      mockApiPost.mockResolvedValue({ data: { data: { name: 'FrontOffice', enabled: true, trialEndsAt: '2026-11-30 10:00:00' } } });
+
+      render(<PluginsPage />);
+      await screen.findByText('FrontOffice');
+
+      expect(screen.queryByRole('switch', { name: 'Use FrontOffice in this workspace' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Buy' })).toBeInTheDocument();
+      expect(screen.getByText(/a month for this workspace/)).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Start 14-day trial' }));
+      await waitFor(() =>
+        expect(mockApiPost).toHaveBeenCalledWith('/api/v1/workspace/code-plugins/{plugin}/trial', {
+          params: { path: { plugin: 'FrontOffice' } },
+        }),
+      );
+    });
+
     it('shows a workspace nothing removed', async () => {
       setCapabilities(['plugins:read', 'plugins:install']);
-      mockPluginList([ACTIVE_PLUGIN], false, [
-        { name: 'CakeOrders', version: null, removed_by: null, removed_at: 'x', purge_after: 'y', purge_failed: false },
-      ]);
+      mockPluginList(
+        [ACTIVE_PLUGIN],
+        false,
+        [{ name: 'CakeOrders', version: null, removed_by: null, removed_at: 'x', purge_after: 'y', purge_failed: false }],
+        [{ name: 'HelloWorld', version: '1.2.0', access: 'all', canSwitch: false, enabled: true, changedAt: null, changedBy: null }],
+      );
 
       render(<PluginsPage />);
       await screen.findByText('HelloWorld');

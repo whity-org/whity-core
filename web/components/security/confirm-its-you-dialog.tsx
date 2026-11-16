@@ -25,8 +25,20 @@ import { api } from '@/lib/api/client';
 
 /** What the server said the approver confirms with. */
 export interface IdentityCheck {
-  method: 'totp' | 'email_code';
+  method: 'totp' | 'email_code' | 'fresh_sign_in';
   email_hint: string | null;
+  /** fresh_sign_in: the provider to sign in again at, and the approval it is for. */
+  provider_key?: string | null;
+  purpose?: string | null;
+}
+
+/** Where to sign in again for a fresh_sign_in check, coming back to this page. */
+export function freshSignInUrl(check: IdentityCheck): string | null {
+  if (check.method !== 'fresh_sign_in' || !check.provider_key || !check.purpose) return null;
+  return (
+    `/api/v1/auth/sso/${encodeURIComponent(check.provider_key)}/start?reauth=gate` +
+    `&purpose=${encodeURIComponent(check.purpose)}&return_to=${encodeURIComponent(window.location.pathname)}`
+  );
 }
 
 /** The answer when the code was missing, wrong or used. */
@@ -84,6 +96,44 @@ export function ConfirmItsYouDialog({ check, busy, error, onCancel, onConfirm, o
   if (check !== codeFor) {
     setCodeFor(check);
     setCode('');
+  }
+
+  if (check?.method === 'fresh_sign_in') {
+    // Signing in again at Whity ID (or the provider this person uses). Back here, Approve uses it.
+    const url = freshSignInUrl(check);
+    return (
+      <Dialog open onOpenChange={(open) => !open && onCancel()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('twoStep.identity.title', 'Confirm it’s you')}</DialogTitle>
+            <DialogDescription>
+              {t(
+                'twoStep.identity.freshSignIn',
+                'Sign in again to confirm it’s you, then come back and approve within five minutes.',
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={onCancel}>
+              {t('twoStep.identity.cancel', 'Cancel')}
+            </Button>
+            {url ? (
+              <Button variant="outline" onClick={() => window.location.assign(url)}>
+                {t('twoStep.identity.signInAgain', 'Sign in again')}
+              </Button>
+            ) : null}
+            <Button disabled={busy} onClick={() => onConfirm('')}>
+              {t('twoStep.identity.approve', 'Approve')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
   }
 
   return (

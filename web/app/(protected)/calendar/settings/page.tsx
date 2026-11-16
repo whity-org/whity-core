@@ -21,6 +21,7 @@ import { FieldSelect } from '@/components/field-select';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { CalendarNav } from '@/components/calendar/calendar-nav';
+import { BookingLinkCard } from '@/components/calendar/booking-link';
 import { useCalendarAccess } from '@/components/calendar/use-calendar-basics';
 import { useCalendarWords } from '@/components/calendar/use-calendar-words';
 import { useFetch } from '@/hooks/useFetch';
@@ -165,6 +166,14 @@ export default function CalendarSettingsPage() {
         </div>
       ) : (
         <>
+          {/* The address customers book at, to share (WHIT-1117). */}
+          <BookingLinkCard
+            link={data.booking_page_url ?? null}
+            enabled={saved.bookingPage}
+            canManage={access.canManage}
+            onEnabled={refetch}
+            shareOnOpen={typeof window !== 'undefined' && window.location.hash === '#share'}
+          />
           <Card>
             <CardHeader>
               <CardTitle>{t('settings.card.booking', 'Booking')}</CardTitle>
