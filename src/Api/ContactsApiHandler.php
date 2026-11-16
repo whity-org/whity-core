@@ -38,7 +38,20 @@ final class ContactsApiHandler
         private readonly ContactTags $tags,
         private readonly ContactImportService $imports,
         private readonly ?RoleChecker $roleChecker = null,
+        // Contacts as the one customer record: what the customer did here.
+        private readonly ?\Whity\Core\Contacts\CustomerActivity $activity = null,
     ) {
+    }
+
+    /** @param array<string, string> $params */
+    public function activity(Request $request, array $params): Response
+    {
+        return $this->run($request, 'activity', function (int $tenantId, ?int $actor) use ($params): Response {
+            $id = (int) $params['id'];
+            $this->contacts->show($tenantId, $id);
+
+            return Response::json(['data' => $this->activity?->forContact($tenantId, $id, $this->permissions($tenantId, $actor)) ?? []]);
+        });
     }
 
     public function list(Request $request): Response

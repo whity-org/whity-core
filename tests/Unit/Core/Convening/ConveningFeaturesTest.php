@@ -117,26 +117,27 @@ final class ConveningFeaturesTest extends TestCase
         }
     }
 
-    public function testNavigationItemsAreDerivedFromTheDescriptors(): void
+    public function testTheMenuHasOneEntryForTheMeetingsInTheWorkGroup(): void
     {
         $router = new Router('/v1');
         $features = ConveningFeatures::all($router);
         $items = ConveningFeatures::navigationItems($router);
 
-        self::assertCount(count($features), $items);
+        self::assertCount(1, $items, 'the bodies are a tab and one meeting is reached from the list');
+        $meetings = array_values(array_filter(
+            $features,
+            static fn (array $f): bool => $f['id'] === ConveningFeatures::MEETINGS
+        ))[0];
 
-        foreach ($items as $index => $item) {
-            $feature = $features[$index];
-            self::assertSame($feature['id'], $item['id']);
-            self::assertSame($feature['label'], $item['label']);
-            self::assertSame(
-                '/admin/x/' . (string) $feature['id'],
-                $item['href'],
-                'the menu entry must point at the host screen route the features endpoint serves, or '
-                . 'the link goes somewhere nothing renders'
-            );
-            self::assertSame($feature['requiredPermission'], $item['requiredPermission']);
-        }
+        self::assertSame($meetings['id'], $items[0]['id']);
+        self::assertSame($meetings['label'], $items[0]['label']);
+        self::assertSame('work', $items[0]['group']);
+        self::assertSame(
+            '/calendar/meetings',
+            $items[0]['href'],
+            'the menu points at the meetings page inside the calendar, not the old /admin/x/ screen'
+        );
+        self::assertSame($meetings['requiredPermission'], $items[0]['requiredPermission']);
     }
 
     public function testTheMeetingsListLinksToTheMeetingDetailScreenThatExists(): void

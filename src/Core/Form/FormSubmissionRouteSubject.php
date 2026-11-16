@@ -10,6 +10,7 @@ use Whity\Core\Document\Routing\RouteSubjectFinaliseInterface;
 use Whity\Core\Document\Routing\RouteSubjectApprovedInterface;
 use Whity\Core\Document\Routing\RouteSubjectPeopleInterface;
 use Whity\Core\Document\Routing\RouteSubjectProviderInterface;
+use Whity\Core\Document\Routing\RouteStepInputs;
 use Whity\Core\Document\Routing\RoutingRejectedException;
 
 /**
@@ -35,10 +36,10 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface,
      * people pickers, such as a supervisor), from its answers as they are now.
      * A key that is not a people question names nobody.
      *
-     * WHIT-1028: an office (staff-audience) question is answered at review, not
-     * by the applicant, so its answer is read from the current review. That is
-     * how a public form, which cannot ask the applicant to pick people, still
-     * names a supervisor: the office records one at pre-check.
+     * WHIT-1028, merge map A3: the office names people at a route step (a
+     * person value, such as the supervisor at pre-check), so those are read from
+     * the submission's routes too. That is how a public form, which cannot ask
+     * the applicant to pick people, still names a supervisor.
      *
      * @param list<string> $keys
      * @return list<int>
@@ -53,26 +54,60 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface,
             return [];
         }
         $answers = is_array($submission['data']) ? $submission['data'] : [];
-        $office = null;
         $people = [];
         foreach ((new FormFieldRepository($this->db))->listForForm($tenantId, (int) $submission['form_id']) as $field) {
             if (($field['field_type'] ?? null) !== 'profile_ref' || !in_array((string) $field['field_key'], $keys, true)) {
                 continue;
             }
-            if (($field['audience'] ?? FormFieldRepository::AUDIENCE_APPLICANT) === FormFieldRepository::AUDIENCE_STAFF) {
-                $office ??= (new FormSubmissionReviewRepository($this->db))->currentAnswers($tenantId, $subjectId);
-                $answer = $office[(string) $field['field_key']] ?? null;
-            } else {
-                $answer = $answers[(string) $field['field_key']] ?? null;
-            }
+            $answer = $answers[(string) $field['field_key']] ?? null;
             foreach (is_array($answer) ? $answer : [$answer] as $id) {
                 if (is_int($id) || (is_string($id) && ctype_digit($id))) {
                     $people[(int) $id] = (int) $id;
                 }
             }
         }
+        foreach ($this->peopleNamedOnRoutes($tenantId, $subjectId, $keys) as $id) {
+            $people[$id] = $id;
+        }
 
         return array_values($people);
+    }
+
+    /**
+     * Merge map A3: the people a step on this submission's routes named for these
+     * keys (a person value, such as the supervisor the office names at
+     * pre-check). The latest value for each key counts.
+     *
+     * @param list<string> $keys
+     * @return list<int>
+     */
+    private function peopleNamedOnRoutes(int $tenantId, int $subjectId, array $keys): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT v.value_key, v.value, s.inputs
+               FROM route_step_values v
+               JOIN document_routes r ON r.id = v.route_id AND r.tenant_id = v.tenant_id
+               JOIN document_route_steps s ON s.id = v.step_id AND s.tenant_id = v.tenant_id
+              WHERE v.tenant_id = :tenant_id AND r.subject_type = :type AND r.subject_id = :subject_id
+              ORDER BY v.id DESC'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':type' => self::TYPE, ':subject_id' => $subjectId]);
+        $latest = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $key = (string) $row['value_key'];
+            if (isset($latest[$key]) || !in_array($key, $keys, true)) {
+                continue;
+            }
+            $isPerson = false;
+            foreach (RouteStepInputs::decode($row['inputs']) as $input) {
+                if ($input['key'] === $key && $input['type'] === RouteStepInputs::TYPE_PERSON) {
+                    $isPerson = true;
+                }
+            }
+            $latest[$key] = $isPerson && ctype_digit((string) $row['value']) ? (int) $row['value'] : 0;
+        }
+
+        return array_values(array_filter($latest, static fn (int $id): bool => $id > 0));
     }
 
     /**
@@ -239,7 +274,7 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface,
         $allFields = (new FormFieldRepository($this->db))->listForForm($tenantId, (int) $row['form_id']);
 
         $values = [];
-        foreach (FormFieldRepository::applicantFields($allFields) as $field) {
+        foreach ($allFields as $field) {
             $key = (string) $field['field_key'];
             $answer = $answers[$key] ?? null;
             $text = ResponsesCsv::printed($field, $answer, $language);

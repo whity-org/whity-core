@@ -465,7 +465,8 @@ final class DocumentRouterVerdictRealEngineTest extends TestCase
                 $this->decide($route, $late, RouteVerdict::APPROVED);
                 self::fail('a settled step must not accept a second answer');
             } catch (RoutingRejectedException $e) {
-                self::assertStringContainsString('no open item', $e->clientMessage);
+                // Told politely who settled it (the first answer decided).
+                self::assertStringContainsString('already decided by', $e->clientMessage);
             }
         }
 

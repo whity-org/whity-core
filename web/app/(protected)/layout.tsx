@@ -9,6 +9,7 @@ import { PlanLimitBanner } from '@/components/billing/plan-limit-banner';
 import { PhoneNav } from '@/components/shell/phone-nav';
 import { DataTableLabels } from '@/components/shell/data-table-labels';
 import { PushOffer } from '@/components/pwa/push-offer';
+import { AppSwitchSheet } from '@/components/pwa/app-switch-sheet';
 
 /**
  * The standard app shell: sidebar + a padded, max-width content column; on a
@@ -61,6 +62,8 @@ export default function ProtectedLayout({
         </main>
         <AppCommandPalette />
         <PhoneNav />
+        {/* WHIT-1155: on a phone's browser, open the installed app or install it. */}
+        <AppSwitchSheet />
       </div>
     </AuthGate>
   );

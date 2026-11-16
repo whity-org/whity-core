@@ -2214,30 +2214,6 @@ final class CoreApiSchemas
                     503 => self::errorResponse('PDFs are turned off, or the render service is unavailable'),
                 ] + self::authErrors(),
             ]),
-            self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/review', 'forms:read', [
-                'summary' => 'What the office recorded about a submission',
-                'description' => 'The current review, every earlier one, and the staff fields they answer. '
-                    . 'The applicant has no route to this.',
-                'tags' => ['forms'],
-                'responses' => [
-                    200 => self::jsonResponse('The review and its history', 'FormSubmissionReviewDetailResponse'),
-                    404 => self::errorResponse('Submission not found'),
-                ] + self::authErrors(),
-            ]),
-            self::permissionRoute('POST', '/api/form-submissions/{id:\d+}/review', 'forms:review', [
-                'summary' => 'Record the office\'s decision on a submission',
-                'description' => 'Checked against the form\'s staff fields as a submission is checked against '
-                    . 'its own, and sent whole. Each save is a new row and the newest is current, so changing '
-                    . 'a decision leaves the old one readable. The submission itself is never changed. Works '
-                    . 'on a closed form. `meta.ignored_keys` names answers that matched no staff field.',
-                'tags' => ['forms'],
-                'request' => 'FormSubmissionCreateRequest',
-                'responses' => [
-                    201 => self::jsonResponse('The recorded review', 'FormSubmissionReviewResponse'),
-                    404 => self::errorResponse('Submission not found'),
-                    422 => self::errorResponse('The form has no staff fields, or an answer failed validation'),
-                ] + self::authErrors(),
-            ]),
             [
                 'method' => 'GET',
                 'path' => '/api/me/form-submissions',
@@ -2996,8 +2972,11 @@ final class CoreApiSchemas
         return [
             self::permissionRoute('GET', '/api/audit-logs', 'audit:read', [
                 'summary' => 'List the tenant\'s audit entries (newest first, paginated)',
+                'description' => 'Besides the audit log, the list reads what agents did with their tools (`agent.action.ran`) and the decisions people made on routes '
+                    . '(`route.approved`, `route.rejected`, `route.signed`, `route.declined`, `route.sent_back`). A target filter, or `source=audit`, reads the audit log alone. The CSV export is the audit log.',
                 'tags' => ['audit-logs'],
                 'parameters' => [
+                    self::queryParam('source', 'string', '`audit` for the audit log alone; otherwise everything'),
                     self::queryParam('action', 'string', 'Exact action match (e.g. users:create)'),
                     self::queryParam('actor', 'integer', 'Filter by actor user id'),
                     self::queryParam('agent', 'string', 'Filter by agent principal, as listed by /api/audit-logs/facets'),
@@ -4630,6 +4609,9 @@ final class CoreApiSchemas
 
         $auditEntry = self::object([
             'id' => self::int(),
+            // Merge map plumbing: which record the entry is. Ids repeat across
+            // sources, so a client keys rows by source and id.
+            'source' => ['type' => 'string', 'enum' => ['audit', 'agents', 'routes'], 'description' => 'audit (the audit log), agents (what an agent did with a tool) or routes (a decision on a route).'],
             'tenantId' => self::int(),
             'actorUserId' => self::int(true),
             'action' => self::str(),
@@ -6472,7 +6454,7 @@ final class CoreApiSchemas
                 // it fans out to many people. NULL is not "no quorum": it defers
                 // to the tenant's `documents.routing_approval_quorum` setting,
                 // which defaults to `all`.
-                'decision_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority'], 'nullable' => true],
+                'decision_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority', 'first'], 'nullable' => true],
                 // #1054. WHETHER ANYBODY HERE IS ASKED TO ACT. `delivery` means
                 // the people this step reaches are TOLD: their inbox item is
                 // closed by the event that created it and the document carries
@@ -6552,7 +6534,7 @@ final class CoreApiSchemas
                 // step is the least likely person in the tenant to hold it - so
                 // without this a client could not tell an approver whether their
                 // single approval carries the gate or is one of four hundred.
-                'default_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority']],
+                'default_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority', 'first']],
                 // WHIT-1016: what people entered at the steps that ask for
                 // values, each key's latest. On the route lists; absent on the
                 // response that issues a route, where nothing is entered yet.
@@ -6605,7 +6587,7 @@ final class CoreApiSchemas
                         'decision' => self::bool(true),
                         'decision_quorum' => [
                             'type' => 'string',
-                            'enum' => ['all', 'any', 'majority'],
+                            'enum' => ['all', 'any', 'majority', 'first'],
                             'nullable' => true,
                         ],
                         // Targets are named by 1-BASED POSITION in this same
@@ -9470,7 +9452,6 @@ final class CoreApiSchemas
                 'section_key' => self::str(true),
                 'position' => self::int(),
                 'visible_when' => SchemaBuilder::ref('FormFieldCondition'),
-                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff']],
                 'multi_valued' => self::bool(),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
@@ -9591,22 +9572,6 @@ final class CoreApiSchemas
                 'secret' => self::str(true),
                 'allow_without_bot_check' => ['type' => 'boolean'],
             ], []),
-            'FormSubmissionReview' => self::object([
-                'id' => self::int(),
-                'submission_id' => self::int(),
-                'data' => ['type' => 'object', 'additionalProperties' => true],
-                'recorded_by_profile_id' => self::int(true),
-                'recorded_at' => self::str(),
-            ], ['id', 'submission_id', 'data', 'recorded_at']),
-            'FormSubmissionReviewResponse' => self::object([
-                'data' => SchemaBuilder::ref('FormSubmissionReview'),
-                'meta' => self::object(['ignored_keys' => ['type' => 'array', 'items' => ['type' => 'string']]], []),
-            ], ['data']),
-            'FormSubmissionReviewDetailResponse' => self::dataEnvelope(self::object([
-                'current' => SchemaBuilder::ref('FormSubmissionReview') + ['nullable' => true],
-                'history' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSubmissionReview')],
-                'fields' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormField')],
-            ], ['current', 'history', 'fields'])),
             'FormSectionText' => self::object([
                 'key' => self::str(),
                 'title' => self::localizedText(),
@@ -9706,7 +9671,6 @@ final class CoreApiSchemas
                 'prefill_source' => self::str(true) + ['description' => 'Fill the field in advance from the submitter\'s profile; sources are listed in the field list\'s `meta.prefill_sources`.'],
                 'section_key' => self::name() + ['description' => 'Section to group the field under; fields sharing a key form one section.'],
                 'visible_when' => SchemaBuilder::ref('FormFieldCondition') + ['description' => 'Show this question only when another answer matches; null means always.'],
-                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff'], 'description' => 'Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review.'],
                 // Absent means the server appends it after the current maximum.
                 'position' => self::int() + ['description' => 'Position in the form; omitted appends it at the end.'],
             ], ['field_key', 'field_type', 'label']),
@@ -9737,7 +9701,6 @@ final class CoreApiSchemas
                 'prefill_source' => self::str(true) + ['description' => 'Profile detail to prefill from; null for none.'],
                 'section_key' => self::name() + ['description' => 'Section to group the field under.'],
                 'visible_when' => SchemaBuilder::ref('FormFieldCondition') + ['description' => 'Show this question only when another answer matches; null means always.'],
-                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff'], 'description' => 'Who answers it. A staff field is never shown to the applicant.'],
                 'position' => self::int() + ['description' => 'New position in the form.'],
             ], []) + ['minProperties' => 1],
             // `prefill` is keyed by FIELD KEY, not by source: two fields may name
@@ -10605,6 +10568,7 @@ final class CoreApiSchemas
                 'time_zone' => self::str(),
             ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
             'CalendarSettings' => self::object([
+                'booking_page_url' => self::str(true) + ['description' => 'The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only.'],
                 'time_zone' => self::str() + ['description' => 'The workspace time zone (IANA).'],
                 'booking_page_enabled' => self::bool(),
                 'min_notice_minutes' => self::int(),
@@ -11940,6 +11904,7 @@ final class CoreApiSchemas
                 'allowed_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'customer_invites' => self::bool(),
                 'invites_per_customer' => self::int() + ['description' => 'How many people one customer may invite; 0 is no limit (WHIT-1043).'],
+                'route_template_id' => self::int(true) + ['description' => 'The route template join requests travel on; null is the default, one step for everyone who can manage sign-ups.'],
                 'eligible_roles' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupEligibleRole')],
                 'pending_count' => self::int(),
                 'workspace_slug' => self::str(true),
@@ -11972,6 +11937,9 @@ final class CoreApiSchemas
                 ],
                 'invites_per_customer' => self::int() + [
                     'description' => 'How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043).',
+                ],
+                'route_template_id' => self::int(true) + [
+                    'description' => 'One of this workspace\'s route templates for join requests to travel on, or null for the default: one step for everyone who can manage sign-ups.',
                 ],
             ], []),
             'TeamInvitationItem' => self::object([
@@ -13938,10 +13906,12 @@ final class CoreApiSchemas
             self::permissionRoute('POST', '/api/signup/requests/{id:\d+}/approve', 'signup:manage', [
                 'summary' => 'Let a waiting person join as a customer',
                 'description' => 'Creates the customer membership with the current starting role. A '
-                    . 'rejected request can be approved later.',
+                    . 'rejected request can be approved later. A request on its route is answered there: '
+                    . 'your step\'s approval, which decides it unless the workspace\'s route has more steps (202).',
                 'tags' => ['signup'],
                 'responses' => [
                     200 => self::jsonResponse('Approved', 'SignupDecisionResponse'),
+                    202 => ['description' => 'Your step is answered; the route has more to decide'],
                     404 => self::errorResponse('No request waiting for a decision has that id'),
                     409 => self::errorResponse('The starting role is missing or unsafe, or the person is suspended or invited here'),
                 ] + self::authErrors(),
@@ -13951,6 +13921,8 @@ final class CoreApiSchemas
                 'tags' => ['signup'],
                 'responses' => [
                     200 => self::jsonResponse('Rejected', 'SignupDecisionResponse'),
+                    202 => ['description' => 'Your step is answered; the route has more to decide'],
+                    409 => self::errorResponse('The request\'s route refused the answer (for example, it is not your step)'),
                     404 => self::errorResponse('No pending request has that id'),
                 ] + self::authErrors(),
             ]),

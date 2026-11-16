@@ -3419,7 +3419,17 @@
                 "tags": [
                     "audit-logs"
                 ],
+                "description": "Besides the audit log, the list reads what agents did with their tools (`agent.action.ran`) and the decisions people made on routes (`route.approved`, `route.rejected`, `route.signed`, `route.declined`, `route.sent_back`). A target filter, or `source=audit`, reads the audit log alone. The CSV export is the audit log.",
                 "parameters": [
+                    {
+                        "name": "source",
+                        "in": "query",
+                        "required": false,
+                        "description": "`audit` for the audit log alone; otherwise everything",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "name": "action",
                         "in": "query",
@@ -17348,6 +17358,247 @@
                     },
                     "422": {
                         "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/contacts/{id}/activity": {
+            "get": {
+                "operationId": "get_api_v1_contacts_id_activity",
+                "summary": "What a customer did here: their bookings, chats, forms and requests to join",
+                "tags": [
+                    "contacts"
+                ],
+                "description": "Newest first, up to 50 of each. A section shows only to someone who may read that kind of record (bookings: calendar:read; chats: messages:reply; forms: forms:read; join requests: signup:manage). A service's or form's name comes in both languages.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The activity",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "bookings": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "title": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "string"
+                                                                    },
+                                                                    {
+                                                                        "type": "object",
+                                                                        "additionalProperties": {
+                                                                            "type": "string"
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            },
+                                                            "at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "title",
+                                                            "status",
+                                                            "at"
+                                                        ]
+                                                    }
+                                                },
+                                                "chats": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "title": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "string"
+                                                                    },
+                                                                    {
+                                                                        "type": "object",
+                                                                        "additionalProperties": {
+                                                                            "type": "string"
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            },
+                                                            "at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "title",
+                                                            "status",
+                                                            "at"
+                                                        ]
+                                                    }
+                                                },
+                                                "forms": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "title": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "string"
+                                                                    },
+                                                                    {
+                                                                        "type": "object",
+                                                                        "additionalProperties": {
+                                                                            "type": "string"
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            },
+                                                            "at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "title",
+                                                            "status",
+                                                            "at"
+                                                        ]
+                                                    }
+                                                },
+                                                "join_requests": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "title": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "string"
+                                                                    },
+                                                                    {
+                                                                        "type": "object",
+                                                                        "additionalProperties": {
+                                                                            "type": "string"
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            },
+                                                            "at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "title",
+                                                            "status",
+                                                            "at"
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -33026,208 +33277,6 @@
                     },
                     "503": {
                         "description": "PDFs are turned off, or the render service is unavailable",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/v1/form-submissions/{id}/review": {
-            "get": {
-                "operationId": "get_api_v1_form_submissions_id_review",
-                "summary": "What the office recorded about a submission",
-                "tags": [
-                    "forms"
-                ],
-                "description": "The current review, every earlier one, and the staff fields they answer. The applicant has no route to this.",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "The review and its history",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/FormSubmissionReviewDetailResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid authentication",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Insufficient permissions",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Submission not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "405": {
-                        "description": "Method not allowed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "post": {
-                "operationId": "post_api_v1_form_submissions_id_review",
-                "summary": "Record the office's decision on a submission",
-                "tags": [
-                    "forms"
-                ],
-                "description": "Checked against the form's staff fields as a submission is checked against its own, and sent whole. Each save is a new row and the newest is current, so changing a decision leaves the old one readable. The submission itself is never changed. Works on a closed form. `meta.ignored_keys` names answers that matched no staff field.",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/FormSubmissionCreateRequest"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "The recorded review",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/FormSubmissionReviewResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request body",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid authentication",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Insufficient permissions",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Submission not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "405": {
-                        "description": "Method not allowed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "The form has no staff fields, or an answer failed validation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -63703,7 +63752,7 @@
                 "tags": [
                     "signup"
                 ],
-                "description": "Creates the customer membership with the current starting role. A rejected request can be approved later.",
+                "description": "Creates the customer membership with the current starting role. A rejected request can be approved later. A request on its route is answered there: your step's approval, which decides it unless the workspace's route has more steps (202).",
                 "parameters": [
                     {
                         "name": "id",
@@ -63724,6 +63773,9 @@
                                 }
                             }
                         }
+                    },
+                    "202": {
+                        "description": "Your step is answered; the route has more to decide"
                     },
                     "401": {
                         "description": "Missing or invalid authentication",
@@ -63821,6 +63873,9 @@
                             }
                         }
                     },
+                    "202": {
+                        "description": "Your step is answered; the route has more to decide"
+                    },
                     "401": {
                         "description": "Missing or invalid authentication",
                         "content": {
@@ -63853,6 +63908,16 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The request's route refused the answer (for example, it is not your step)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -77349,6 +77414,15 @@
                     "id": {
                         "type": "integer"
                     },
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "audit",
+                            "agents",
+                            "routes"
+                        ],
+                        "description": "audit (the audit log), agents (what an agent did with a tool) or routes (a decision on a route)."
+                    },
                     "tenantId": {
                         "type": "integer"
                     },
@@ -79130,6 +79204,11 @@
             "CalendarSettings": {
                 "type": "object",
                 "properties": {
+                    "booking_page_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only."
+                    },
                     "time_zone": {
                         "type": "string",
                         "description": "The workspace time zone (IANA)."
@@ -85832,7 +85911,8 @@
                         "enum": [
                             "all",
                             "any",
-                            "majority"
+                            "majority",
+                            "first"
                         ]
                     },
                     "values": {
@@ -85967,7 +86047,8 @@
                                     "enum": [
                                         "all",
                                         "any",
-                                        "majority"
+                                        "majority",
+                                        "first"
                                     ],
                                     "nullable": true
                                 },
@@ -86225,7 +86306,8 @@
                         "enum": [
                             "all",
                             "any",
-                            "majority"
+                            "majority",
+                            "first"
                         ],
                         "nullable": true
                     },
@@ -89871,13 +89953,6 @@
                     "visible_when": {
                         "$ref": "#/components/schemas/FormFieldCondition"
                     },
-                    "audience": {
-                        "type": "string",
-                        "enum": [
-                            "applicant",
-                            "staff"
-                        ]
-                    },
                     "multi_valued": {
                         "type": "boolean"
                     },
@@ -90040,14 +90115,6 @@
                         "$ref": "#/components/schemas/FormFieldCondition",
                         "description": "Show this question only when another answer matches; null means always."
                     },
-                    "audience": {
-                        "type": "string",
-                        "enum": [
-                            "applicant",
-                            "staff"
-                        ],
-                        "description": "Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review."
-                    },
                     "position": {
                         "type": "integer",
                         "description": "Position in the form; omitted appends it at the end."
@@ -90193,14 +90260,6 @@
                     "visible_when": {
                         "$ref": "#/components/schemas/FormFieldCondition",
                         "description": "Show this question only when another answer matches; null means always."
-                    },
-                    "audience": {
-                        "type": "string",
-                        "enum": [
-                            "applicant",
-                            "staff"
-                        ],
-                        "description": "Who answers it. A staff field is never shown to the applicant."
                     },
                     "position": {
                         "type": "integer",
@@ -91010,90 +91069,6 @@
                 "required": [
                     "data",
                     "meta"
-                ]
-            },
-            "FormSubmissionReview": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer"
-                    },
-                    "submission_id": {
-                        "type": "integer"
-                    },
-                    "data": {
-                        "type": "object",
-                        "additionalProperties": true
-                    },
-                    "recorded_by_profile_id": {
-                        "type": "integer",
-                        "nullable": true
-                    },
-                    "recorded_at": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "id",
-                    "submission_id",
-                    "data",
-                    "recorded_at"
-                ]
-            },
-            "FormSubmissionReviewDetailResponse": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "type": "object",
-                        "properties": {
-                            "current": {
-                                "$ref": "#/components/schemas/FormSubmissionReview",
-                                "nullable": true
-                            },
-                            "history": {
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/components/schemas/FormSubmissionReview"
-                                }
-                            },
-                            "fields": {
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/components/schemas/FormField"
-                                }
-                            }
-                        },
-                        "required": [
-                            "current",
-                            "history",
-                            "fields"
-                        ]
-                    }
-                },
-                "required": [
-                    "data"
-                ]
-            },
-            "FormSubmissionReviewResponse": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "$ref": "#/components/schemas/FormSubmissionReview"
-                    },
-                    "meta": {
-                        "type": "object",
-                        "properties": {
-                            "ignored_keys": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
-                },
-                "required": [
-                    "data"
                 ]
             },
             "FormSubmissionWithdrawnResponse": {
@@ -103105,6 +103080,11 @@
                         "type": "integer",
                         "description": "How many people one customer may invite; 0 is no limit (WHIT-1043)."
                     },
+                    "route_template_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The route template join requests travel on; null is the default, one step for everyone who can manage sign-ups."
+                    },
                     "eligible_roles": {
                         "type": "array",
                         "items": {
@@ -103194,6 +103174,11 @@
                     "invites_per_customer": {
                         "type": "integer",
                         "description": "How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043)."
+                    },
+                    "route_template_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "One of this workspace's route templates for join requests to travel on, or null for the default: one step for everyone who can manage sign-ups."
                     }
                 }
             },

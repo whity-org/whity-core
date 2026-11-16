@@ -170,8 +170,8 @@ final class PublicChatApiHandler
                 throw new MessagingException('The message could not be filed.');
             }
             $this->db->prepare(
-                'INSERT INTO webchat_visitors (tenant_id, conversation_id, token_hash, display_name, email, ip_hash, created_at, last_seen_at)
-                 VALUES (:tid, :cid, :hash, :name, :email, :ip, NOW(), NOW())'
+                'INSERT INTO webchat_visitors (tenant_id, conversation_id, token_hash, display_name, email, ip_hash, contact_id, created_at, last_seen_at)
+                 VALUES (:tid, :cid, :hash, :name, :email, :ip, :contact, NOW(), NOW())'
             )->execute([
                 ':tid' => $tenantId,
                 ':cid' => (int) $message['conversation_id'],
@@ -179,6 +179,8 @@ final class PublicChatApiHandler
                 ':name' => $name,
                 ':email' => $email !== '' ? strtolower($email) : null,
                 ':ip' => $ipHash,
+                // A visitor who gave an email is a customer contact.
+                ':contact' => $email !== '' ? (new \Whity\Core\Contacts\CustomerContacts($this->db))->forCustomer($tenantId, (string) ($name ?? ''), $email, '') : null,
             ]);
             if ($own) {
                 $this->db->commit();

@@ -4654,13 +4654,6 @@ $formSubmissionsHandler = new \Whity\Api\FormSubmissionsApiHandler(
     $routeFinalisationRepository,
     $routeFinalDocumentFile,
 );
-$formSubmissionReviewsHandler = new \Whity\Api\FormSubmissionReviewsApiHandler(
-    $formFieldRepository,
-    $formSubmissionRepository,
-    new \Whity\Core\Form\FormSubmissionReviewRepository($db->getPdo()),
-    $submissionIssuer,
-    $hookManager
-);
 $router->register('POST', '/api/forms/{id:\d+}/submissions', [$formSubmissionsHandler, 'submit'], null, null, CorePermissions::FORMS_SUBMIT);
 $router->register('GET', '/api/form-submissions', [$formSubmissionsHandler, 'list'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
@@ -4675,9 +4668,6 @@ $formPrintoutsHandler = new \Whity\Api\FormPrintoutsApiHandler(
 );
 $router->register('GET', '/api/form-submissions/{id:\d+}/printout', [$formPrintoutsHandler, 'submission'], null, null, CorePermissions::FORMS_READ);
 $router->register('POST', '/api/document-themes/form-printout-preview', [$formPrintoutsHandler, 'themePreview'], null, null, CorePermissions::DOCUMENTS_THEMES);
-// The office's record on a submission (migration 194). Somebody who can read a
-// submission can read what became of it; recording takes `forms:review`.
-$router->register('GET', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
 // What the responses add up to, and the export. `forms:read`, which reads these rows anyway.
 $formResponsesHandler = new \Whity\Api\FormResponsesApiHandler(
     $formRepository,
@@ -4687,7 +4677,6 @@ $formResponsesHandler = new \Whity\Api\FormResponsesApiHandler(
 );
 $router->register('GET', '/api/forms/{id:\d+}/responses/summary', [$formResponsesHandler, 'summary'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/forms/{id:\d+}/responses/export', [$formResponsesHandler, 'export'], null, null, CorePermissions::FORMS_READ);
-$router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'record'], null, null, CorePermissions::FORMS_REVIEW);
 // Only ever the caller's own rows — the ROUTE decides whose, not a query param,
 // so no client can widen it. No permission: the rows already name exactly one
 // person, so a tenant-wide permission has nothing left to decide (migration 113's
@@ -5422,7 +5411,7 @@ $contactImportService = new \Whity\Core\Contacts\Import\ContactImportService(
     new \Whity\Core\Contacts\Import\ContactImportRepository($db->getPdo()),
 );
 $contactImportService->addTargets(new \Whity\Core\CustomFields\CustomFieldImportTargets($customFieldService, $customFieldRepository, 'contact'));
-$contactsHandler = new \Whity\Api\ContactsApiHandler($contactService, $contactTags, $contactImportService, $roleChecker);
+$contactsHandler = new \Whity\Api\ContactsApiHandler($contactService, $contactTags, $contactImportService, $roleChecker, new \Whity\Core\Contacts\CustomerActivity($db->getPdo()));
 $customFieldsHandler = new \Whity\Api\CustomFieldsApiHandler($customFieldService, $roleChecker);
 // Listing a type's fields checks that type's read permission in the handler.
 $router->register('GET',    '/api/custom-fields/record-types',             [$customFieldsHandler, 'recordTypes'], null);
@@ -5435,6 +5424,7 @@ $router->register('GET',    '/api/contacts',                               [$con
 $router->register('POST',   '/api/contacts',                               [$contactsHandler, 'create'],      null, null, CorePermissions::CONTACTS_WRITE);
 $router->register('GET',    '/api/contacts/tags',                          [$contactsHandler, 'listTags'],    null, null, CorePermissions::CONTACTS_READ);
 $router->register('GET',    '/api/contacts/{id:\d+}',                      [$contactsHandler, 'show'],        null, null, CorePermissions::CONTACTS_READ);
+$router->register('GET',    '/api/contacts/{id:\d+}/activity',             [$contactsHandler, 'activity'],    null, null, CorePermissions::CONTACTS_READ);
 $router->register('PATCH',  '/api/contacts/{id:\d+}',                      [$contactsHandler, 'update'],      null, null, CorePermissions::CONTACTS_WRITE);
 $router->register('POST',   '/api/contacts/{id:\d+}/archive',              [$contactsHandler, 'archive'],     null, null, CorePermissions::CONTACTS_WRITE);
 $router->register('POST',   '/api/contacts/{id:\d+}/restore',              [$contactsHandler, 'restore'],     null, null, CorePermissions::CONTACTS_WRITE);
@@ -5733,6 +5723,20 @@ $customerSignupService = new \Whity\Core\Signup\CustomerSignupService(
     $customerSafeRoles,
     $hookManager
 );
+// Merge map A4: a join request is decided on a route: the workspace's chosen
+// template, or one step for everyone who can manage sign-ups.
+$routeSubjectRegistry->register(new \Whity\Core\Signup\CustomerSignupRouteSubject($db->getPdo(), $customerSignupService));
+$customerSignupRoutes = new \Whity\Core\Signup\CustomerSignupRoutes(
+    $db->getPdo(),
+    $documentRouter,
+    $routeRepository,
+    $routeTemplateRepository,
+    $signupSettings,
+    $roleChecker,
+);
+$customerSignupService->whenPending(static function (int $tenantId, int $signupId) use ($customerSignupRoutes): void {
+    $customerSignupRoutes->issue($tenantId, $signupId);
+});
 $joinProviders = new \Whity\Core\Signup\JoinProviders(
     new \Whity\Core\Identity\IdentityProviderRepository($db->getPdo()),
     $settingsService
@@ -5951,6 +5955,8 @@ $workspaceSignupHandler =new \Whity\Api\WorkspaceSignupApiHandler(
     $publicFormBotCheck,
     $joinProviders,
     new \Whity\Core\Signup\JoinDecisionMailer($brandedEmailSender, $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::SSO_LOGIN)),
+    $customerSignupRoutes,
+    $documentRouter,
 );
 $router->register('GET',  '/api/signup/settings',                   [$workspaceSignupHandler, 'getSettings'],    null, null, CorePermissions::SIGNUP_MANAGE);
 $router->register('PUT',  '/api/signup/settings',                   [$workspaceSignupHandler, 'updateSettings'], null, null, CorePermissions::SIGNUP_MANAGE);

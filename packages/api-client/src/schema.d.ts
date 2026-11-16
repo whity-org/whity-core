@@ -533,7 +533,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the tenant's audit entries (newest first, paginated) */
+        /**
+         * List the tenant's audit entries (newest first, paginated)
+         * @description Besides the audit log, the list reads what agents did with their tools (`agent.action.ran`) and the decisions people made on routes (`route.approved`, `route.rejected`, `route.signed`, `route.declined`, `route.sent_back`). A target filter, or `source=audit`, reads the audit log alone. The CSV export is the audit log.
+         */
         get: operations["get_api_v1_audit_logs"];
         put?: never;
         post?: never;
@@ -2619,6 +2622,26 @@ export interface paths {
          * @description `tags`, when sent, replaces the contact's tags.
          */
         patch: operations["patch_api_v1_contacts_id"];
+        trace?: never;
+    };
+    "/api/v1/contacts/{id}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What a customer did here: their bookings, chats, forms and requests to join
+         * @description Newest first, up to 50 of each. A section shows only to someone who may read that kind of record (bookings: calendar:read; chats: messages:reply; forms: forms:read; join requests: signup:manage). A service's or form's name comes in both languages.
+         */
+        get: operations["get_api_v1_contacts_id_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/contacts/{id}/archive": {
@@ -4866,30 +4889,6 @@ export interface paths {
         get: operations["get_api_v1_form_submissions_id_printout"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/form-submissions/{id}/review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * What the office recorded about a submission
-         * @description The current review, every earlier one, and the staff fields they answer. The applicant has no route to this.
-         */
-        get: operations["get_api_v1_form_submissions_id_review"];
-        put?: never;
-        /**
-         * Record the office's decision on a submission
-         * @description Checked against the form's staff fields as a submission is checked against its own, and sent whole. Each save is a new row and the newest is current, so changing a decision leaves the old one readable. The submission itself is never changed. Works on a closed form. `meta.ignored_keys` names answers that matched no staff field.
-         */
-        post: operations["post_api_v1_form_submissions_id_review"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9514,7 +9513,7 @@ export interface paths {
         put?: never;
         /**
          * Let a waiting person join as a customer
-         * @description Creates the customer membership with the current starting role. A rejected request can be approved later.
+         * @description Creates the customer membership with the current starting role. A rejected request can be approved later. A request on its route is answered there: your step's approval, which decides it unless the workspace's route has more steps (202).
          */
         post: operations["post_api_v1_signup_requests_id_approve"];
         delete?: never;
@@ -11569,6 +11568,11 @@ export interface components {
         };
         AuditLogEntry: {
             id: number;
+            /**
+             * @description audit (the audit log), agents (what an agent did with a tool) or routes (a decision on a route).
+             * @enum {string}
+             */
+            source?: "audit" | "agents" | "routes";
             tenantId: number;
             actorUserId: number | null;
             action: string;
@@ -12089,6 +12093,8 @@ export interface components {
             needs_approval?: boolean;
         };
         CalendarSettings: {
+            /** @description The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only. */
+            booking_page_url?: string | null;
             /** @description The workspace time zone (IANA). */
             time_zone: string;
             booking_page_enabled: boolean;
@@ -13986,7 +13992,7 @@ export interface components {
             steps: components["schemas"]["DocumentRouteStep"][];
             edges: components["schemas"]["DocumentRouteEdge"][];
             /** @enum {string} */
-            default_quorum: "all" | "any" | "majority";
+            default_quorum: "all" | "any" | "majority" | "first";
             values?: components["schemas"]["RouteStepValue"][];
         };
         DocumentRouteActionRequest: {
@@ -14033,7 +14039,7 @@ export interface components {
                 label?: string | null;
                 decision?: boolean | null;
                 /** @enum {string|null} */
-                decision_quorum?: "all" | "any" | "majority" | null;
+                decision_quorum?: "all" | "any" | "majority" | "first" | null;
                 on_approved?: number | null;
                 on_rejected?: number | null;
                 /** @enum {string} */
@@ -14104,7 +14110,7 @@ export interface components {
             label?: string | null;
             decision: boolean;
             /** @enum {string|null} */
-            decision_quorum?: "all" | "any" | "majority" | null;
+            decision_quorum?: "all" | "any" | "majority" | "first" | null;
             /** @enum {string} */
             satisfied_by: "act" | "delivery";
             /** @enum {string} */
@@ -15331,8 +15337,6 @@ export interface components {
             section_key?: string | null;
             position: number;
             visible_when?: components["schemas"]["FormFieldCondition"];
-            /** @enum {string} */
-            audience?: "applicant" | "staff";
             multi_valued?: boolean;
             created_at?: string;
             updated_at?: string;
@@ -15381,11 +15385,6 @@ export interface components {
             section_key?: string;
             /** @description Show this question only when another answer matches; null means always. */
             visible_when?: components["schemas"]["FormFieldCondition"];
-            /**
-             * @description Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review.
-             * @enum {string}
-             */
-            audience?: "applicant" | "staff";
             /** @description Position in the form; omitted appends it at the end. */
             position?: number;
         };
@@ -15432,11 +15431,6 @@ export interface components {
             section_key?: string;
             /** @description Show this question only when another answer matches; null means always. */
             visible_when?: components["schemas"]["FormFieldCondition"];
-            /**
-             * @description Who answers it. A staff field is never shown to the applicant.
-             * @enum {string}
-             */
-            audience?: "applicant" | "staff";
             /** @description New position in the form. */
             position?: number;
         };
@@ -15657,28 +15651,6 @@ export interface components {
             data: components["schemas"]["FormSubmission"];
             meta: {
                 ignored_keys: string[];
-            };
-        };
-        FormSubmissionReview: {
-            id: number;
-            submission_id: number;
-            data: {
-                [key: string]: unknown;
-            };
-            recorded_by_profile_id?: number | null;
-            recorded_at: string;
-        };
-        FormSubmissionReviewDetailResponse: {
-            data: {
-                current: components["schemas"]["FormSubmissionReview"];
-                history: components["schemas"]["FormSubmissionReview"][];
-                fields: components["schemas"]["FormField"][];
-            };
-        };
-        FormSubmissionReviewResponse: {
-            data: components["schemas"]["FormSubmissionReview"];
-            meta?: {
-                ignored_keys?: string[];
             };
         };
         FormSubmissionWithdrawnResponse: {
@@ -18925,6 +18897,8 @@ export interface components {
             customer_invites: boolean;
             /** @description How many people one customer may invite; 0 is no limit (WHIT-1043). */
             invites_per_customer: number;
+            /** @description The route template join requests travel on; null is the default, one step for everyone who can manage sign-ups. */
+            route_template_id?: number | null;
             eligible_roles: components["schemas"]["SignupEligibleRole"][];
             pending_count: number;
             workspace_slug: string | null;
@@ -18950,6 +18924,8 @@ export interface components {
             customer_invites?: boolean;
             /** @description How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043). */
             invites_per_customer?: number;
+            /** @description One of this workspace's route templates for join requests to travel on, or null for the default: one step for everyone who can manage sign-ups. */
+            route_template_id?: number | null;
         };
         SimpleMessageResponse: {
             message: string;
@@ -23095,6 +23071,8 @@ export interface operations {
     get_api_v1_audit_logs: {
         parameters: {
             query?: {
+                /** @description `audit` for the audit log alone; otherwise everything */
+                source?: string;
                 /** @description Exact action match (e.g. users:create) */
                 action?: string;
                 /** @description Filter by actor user id */
@@ -33901,6 +33879,108 @@ export interface operations {
             };
             /** @description A value that doesn't look right */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_contacts_id_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            bookings?: {
+                                id: number;
+                                title: string | {
+                                    [key: string]: string;
+                                };
+                                status: string;
+                                at: string;
+                            }[];
+                            chats?: {
+                                id: number;
+                                title: string | {
+                                    [key: string]: string;
+                                };
+                                status: string;
+                                at: string;
+                            }[];
+                            forms?: {
+                                id: number;
+                                title: string | {
+                                    [key: string]: string;
+                                };
+                                status: string;
+                                at: string;
+                            }[];
+                            join_requests?: {
+                                id: number;
+                                title: string | {
+                                    [key: string]: string;
+                                };
+                                status: string;
+                                at: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -45905,162 +45985,6 @@ export interface operations {
             };
             /** @description PDFs are turned off, or the render service is unavailable */
             503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    get_api_v1_form_submissions_id_review: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The review and its history */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FormSubmissionReviewDetailResponse"];
-                };
-            };
-            /** @description Missing or invalid authentication */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Submission not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Method not allowed */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    post_api_v1_form_submissions_id_review: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FormSubmissionCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description The recorded review */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FormSubmissionReviewResponse"];
-                };
-            };
-            /** @description Invalid request body */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Missing or invalid authentication */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Submission not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Method not allowed */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description The form has no staff fields, or an answer failed validation */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -70332,6 +70256,13 @@ export interface operations {
                     "application/json": components["schemas"]["SignupDecisionResponse"];
                 };
             };
+            /** @description Your step is answered; the route has more to decide */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Missing or invalid authentication */
             401: {
                 headers: {
@@ -70408,6 +70339,13 @@ export interface operations {
                     "application/json": components["schemas"]["SignupDecisionResponse"];
                 };
             };
+            /** @description Your step is answered; the route has more to decide */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Missing or invalid authentication */
             401: {
                 headers: {
@@ -70437,6 +70375,15 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request's route refused the answer (for example, it is not your step) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -13,9 +13,9 @@ final class FormTemplateFitTest extends TestCase
      * @param array<string, string> $label
      * @return array<string, mixed>
      */
-    private static function question(string $key, array $label, string $audience = 'applicant'): array
+    private static function question(string $key, array $label): array
     {
-        return ['field_key' => $key, 'label' => $label, 'audience' => $audience];
+        return ['field_key' => $key, 'label' => $label];
     }
 
     /**
@@ -85,21 +85,6 @@ final class FormTemplateFitTest extends TestCase
 
         self::assertSame(3, $fit['filled']);
         self::assertSame([], $fit['needs']);
-    }
-
-    public function testAQuestionOnlyTheOfficeAnswersCannotFillTheDocument(): void
-    {
-        $fit = FormTemplateFit::check(
-            [self::question('office_note', ['en' => 'Office note'], 'staff')],
-            self::content(['submission.office_note' => 'Office note']),
-            null,
-            [],
-            [],
-        );
-
-        self::assertSame(FormTemplateFit::STAFF_ONLY, $fit['needs'][0]['reason']);
-        self::assertNull($fit['needs'][0]['field_key'], 'adding it again would collide with the question that exists');
-        self::assertSame([], $fit['unused'], 'and an office question is never offered for the document');
     }
 
     public function testAFieldFromAnotherKindOfRecordCannotBeAddedToTheForm(): void
