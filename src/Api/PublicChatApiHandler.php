@@ -20,6 +20,7 @@ use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
 use Whity\Http\JsonBody;
 use Whity\Sdk\Messaging\InboundMessage;
+use Whity\Core\Security\PublicToken;
 
 /**
  * Web chat for visitors without an account (ADR 0016 §5):
@@ -126,7 +127,7 @@ final class PublicChatApiHandler
         $body = JsonBody::parsed($request);
         if (self::isBot($body)) {
             // Answer like a success so the bot learns nothing; nothing is written.
-            return Response::json(['data' => ['token' => bin2hex(random_bytes(32)), 'messages' => []]], 201);
+            return Response::json(['data' => ['token' => PublicToken::make(32), 'messages' => []]], 201);
         }
 
         if ($this->bot->isReady()) {
@@ -151,8 +152,8 @@ final class PublicChatApiHandler
             return Response::error('The email address is not valid.', 422);
         }
 
-        $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
-        $visitorAddress = 'visitor:' . substr(hash('sha256', $token), 0, 24);
+        $token = PublicToken::makeUrlSafe();
+        $visitorAddress = 'visitor:' . substr(PublicToken::hash($token), 0, 24);
 
         // Joins a transaction the caller already holds rather than nesting one.
         $own = !$this->db->inTransaction();
@@ -174,7 +175,7 @@ final class PublicChatApiHandler
             )->execute([
                 ':tid' => $tenantId,
                 ':cid' => (int) $message['conversation_id'],
-                ':hash' => hash('sha256', $token),
+                ':hash' => PublicToken::hash($token),
                 ':name' => $name,
                 ':email' => $email !== '' ? strtolower($email) : null,
                 ':ip' => $ipHash,
@@ -328,7 +329,7 @@ final class PublicChatApiHandler
         $stmt = $this->db->prepare(
             'SELECT id, conversation_id, display_name FROM webchat_visitors WHERE tenant_id = :tid AND token_hash = :hash'
         );
-        $stmt->execute([':tid' => $tenantId, ':hash' => hash('sha256', $token)]);
+        $stmt->execute([':tid' => $tenantId, ':hash' => PublicToken::hash($token)]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row === false) {
             return null;

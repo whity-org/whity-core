@@ -8,6 +8,7 @@ use PDO;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\CustomerSafeRole;
 use Whity\Core\Identity\MembershipRepository;
+use Whity\Core\Security\PublicToken;
 
 /**
  * Workspace-controlled customer sign-up (WHIT-915).
@@ -94,7 +95,7 @@ final class CustomerSignupService
      */
     public function request(int $tenantId, string $email, string $displayName): string
     {
-        $token = bin2hex(random_bytes(self::TOKEN_BYTES));
+        $token = PublicToken::make(self::TOKEN_BYTES);
 
         $ownTx = !$this->db->inTransaction();
         if ($ownTx) {
@@ -119,7 +120,7 @@ final class CustomerSignupService
                 ':tid' => $tenantId,
                 ':email' => $email,
                 ':name' => $displayName,
-                ':hash' => hash('sha256', $token),
+                ':hash' => PublicToken::hash($token),
                 ':status' => self::STATUS_UNVERIFIED,
                 ':expires' => gmdate('Y-m-d H:i:s', time() + self::TTL_SECONDS),
             ]);
@@ -529,7 +530,7 @@ final class CustomerSignupService
               LIMIT 1'
         );
         $stmt->execute([
-            ':hash' => hash('sha256', $rawToken),
+            ':hash' => PublicToken::hash($rawToken),
             ':status' => self::STATUS_UNVERIFIED,
             ':now' => gmdate('Y-m-d H:i:s'),
         ]);

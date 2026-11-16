@@ -31,6 +31,8 @@ final class HostPluginNotifier implements PluginNotifier
         private readonly NotificationDispatcher $dispatcher,
         private readonly ?LoggerInterface $logger = null,
         ?\Closure $tenant = null,
+        // WHIT-1123: (plugin name, workspace) => is the plugin off there?
+        private readonly ?\Closure $pluginOff = null,
     ) {
         $this->tenant = $tenant ?? static fn (): ?int => TenantContext::getTenantId();
     }
@@ -42,6 +44,17 @@ final class HostPluginNotifier implements PluginNotifier
             ? PluginNotificationTypes::of($plugin, $slug)
             : [];
 
-        return new HostNotifier($this->db, $this->dispatcher, $slug, $types, $this->tenant, $this->logger);
+        $name = $plugin->getName();
+        $off = $this->pluginOff;
+
+        return new HostNotifier(
+            $this->db,
+            $this->dispatcher,
+            $slug,
+            $types,
+            $this->tenant,
+            $this->logger,
+            $off !== null ? static fn (int $tenantId): bool => $off($name, $tenantId) === true : null,
+        );
     }
 }

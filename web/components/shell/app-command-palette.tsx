@@ -372,6 +372,31 @@ export function AppCommandPalette() {
       icon: <Icon name="settings" size={16} />,
       onSelect: () => openPlace({ id: 'page-settings', label: settingsLabel, href: SETTINGS_HOME_HREF }),
     });
+    // The public booking link, to give customers (WHIT-1117). Found by its
+    // words in both languages whatever the screen's language.
+    if (navItems.some((item) => item.id === 'calendar')) {
+      const linkWords = 'booking bookings appointment appointments link url share customers book حجز الحجوزات موعد مواعيد رابط مشاركة شارك العملاء';
+      pages.push(
+        {
+          id: 'page-booking-link',
+          group: t('palette.group.pages', 'Go to'),
+          label: t('palette.bookingLink', 'Booking link'),
+          hint: t('palette.bookingLinkHint', 'The address customers book at'),
+          keywords: linkWords,
+          icon: <Icon name="link" size={16} />,
+          onSelect: () => openPlace({ id: 'page-booking-link', label: t('palette.bookingLink', 'Booking link'), href: '/calendar#booking-link' }),
+        },
+        {
+          id: 'action-share-booking-link',
+          group: t('palette.group.pages', 'Go to'),
+          label: t('palette.shareBookingLink', 'Share booking link'),
+          hint: t('palette.shareBookingLinkHint', 'WhatsApp, email, copy or a QR code'),
+          keywords: linkWords,
+          icon: <Icon name="send" size={16} />,
+          onSelect: () => openPlace({ id: 'action-share-booking-link', label: t('palette.shareBookingLink', 'Share booking link'), href: '/calendar?share=booking-link' }),
+        }
+      );
+    }
 
     // Every setting by name, in both languages, whatever the screen's language
     // (WHIT-1084). Matched here with Arabic folding, so the palette must not

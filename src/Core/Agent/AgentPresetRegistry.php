@@ -168,6 +168,14 @@ final class AgentPresetRegistry implements HostWiredService
         return $refused;
     }
 
+    private ?\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $workspaceGate = null;
+
+    /** Plugins switched off for a workspace offer no presets there (WHIT-1123). */
+    public function setWorkspaceGate(\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $gate): void
+    {
+        $this->workspaceGate = $gate;
+    }
+
     public function unregisterPlugin(string $pluginKey): void
     {
         unset($this->plugins[$pluginKey]);
@@ -183,7 +191,11 @@ final class AgentPresetRegistry implements HostWiredService
     public function forTenant(int $tenantId): array
     {
         $presets = $this->presets;
-        foreach ($this->plugins as $declared) {
+        foreach ($this->plugins as $pluginKey => $declared) {
+            // A plugin switched off for this workspace offers no agents (WHIT-1123).
+            if ($this->workspaceGate?->isOffForWorkspace($pluginKey, $tenantId) === true) {
+                continue;
+            }
             $presets += $declared;
         }
         if ($this->manifests !== null && $tenantId !== 0) {

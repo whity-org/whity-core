@@ -22,6 +22,7 @@ use Whity\Http\JsonBody;
  *   GET  /api/workspace/code-plugins                      plugins:read
  *   POST /api/workspace/code-plugins/{plugin}/enable      plugins:enable
  *   POST /api/workspace/code-plugins/{plugin}/disable     plugins:disable
+ *   POST /api/workspace/code-plugins/{plugin}/trial       plugins:enable (WHIT-1125)
  *   GET  /api/workspace/code-plugins/{plugin}/history     plugins:read
  *   GET  /api/plugins/workspace-access                    plugins:read, operator only
  *   PUT  /api/plugins/{plugin}/workspace-access {access, freeForAll?}
@@ -38,6 +39,7 @@ final class WorkspaceCodePluginsApiHandler
     public const AUDIT_ENABLED = 'code_plugin.enabled';
     public const AUDIT_DISABLED = 'code_plugin.disabled';
     public const AUDIT_ACCESS = 'code_plugin.access_changed';
+    public const AUDIT_TRIAL = 'code_plugin.trial_started';
 
     private const HISTORY_LIMIT = 50;
 
@@ -60,14 +62,26 @@ final class WorkspaceCodePluginsApiHandler
                     continue;
                 }
                 $row = $rows[$name] ?? null;
+                $state = $this->activation->stateFor($name, $tenantId);
+                $paid = $this->activation->paidAccessOf($name);
                 $data[] = [
                     'name' => $name,
                     'version' => $version,
                     'access' => $access,
                     'canSwitch' => $access === CodePluginActivation::CHOOSE,
-                    'enabled' => $this->activation->isOn($name, $tenantId),
+                    'enabled' => $state['state'] !== CodePluginActivation::STATE_OFF,
                     'changedAt' => $row['changed_at'] ?? null,
                     'changedBy' => $row['changed_by'] ?? null,
+                    // WHIT-1125: what a paid plugin needs, and where it stands.
+                    'state' => $state['state'],
+                    'reason' => $state['reason'],
+                    'graceUntil' => $state['graceUntil'],
+                    'trialEndsAt' => $state['trialEndsAt'],
+                    'paid' => $paid !== null,
+                    'product' => $paid['product'] ?? null,
+                    'trialDays' => $paid['trialDays'] ?? 0,
+                    'trialAvailable' => $this->activation->trialAvailable($name, $tenantId),
+                    'mayTurnOn' => $this->activation->mayTurnOn($name, $tenantId),
                 ];
             }
 
@@ -85,6 +99,38 @@ final class WorkspaceCodePluginsApiHandler
     public function disable(Request $request, array $params = []): Response
     {
         return $this->setEnabled($request, $params, false);
+    }
+
+    /**
+     * POST /api/workspace/code-plugins/{plugin}/trial: the workspace's one free
+     * trial of a paid plugin, which also turns it on (WHIT-1125).
+     *
+     * @param array<string, string> $params
+     */
+    public function trial(Request $request, array $params = []): Response
+    {
+        return $this->inWorkspace(function (int $tenantId) use ($request, $params): Response {
+            $name = $this->visiblePlugin((string) ($params['plugin'] ?? ''));
+            if ($name === null) {
+                return self::notFound();
+            }
+            if (!$this->activation->trialAvailable($name, $tenantId)) {
+                return Response::error('This workspace has already had its trial, or the plugin offers none', 409, ['reason' => 'trial_unavailable']);
+            }
+
+            $profileId = self::profileId($request);
+            $this->activation->startTrial($tenantId, $name, $profileId);
+            $state = $this->activation->stateFor($name, $tenantId);
+            $this->audit?->record(self::AUDIT_TRIAL, [
+                'tenant_id' => $tenantId,
+                'actor_user_id' => $profileId,
+                'target_type' => 'code_plugin',
+                'metadata' => ['plugin' => $name, 'until' => $state['trialEndsAt']],
+            ]);
+            $this->loader->notifyWorkspaceSwitch($name, $tenantId, true);
+
+            return Response::json(['data' => ['name' => $name, 'enabled' => true, 'trialEndsAt' => $state['trialEndsAt']]]);
+        });
     }
 
     /** @param array<string, string> $params */
@@ -114,7 +160,11 @@ final class WorkspaceCodePluginsApiHandler
                     continue;
                 }
                 $events[] = [
-                    'action' => $row['action'] === self::AUDIT_ENABLED ? 'enabled' : 'disabled',
+                    'action' => match ($row['action']) {
+                        self::AUDIT_ENABLED => 'enabled',
+                        self::AUDIT_TRIAL => 'trial_started',
+                        default => 'disabled',
+                    },
                     'at' => (string) $row['created_at'],
                     'by' => $row['actor_user_id'] !== null
                         ? ['id' => (int) $row['actor_user_id'], 'name' => (string) ($row['display_name'] ?? '')]
@@ -210,6 +260,17 @@ final class WorkspaceCodePluginsApiHandler
                 return Response::error('This plugin is on for every workspace', 409, ['reason' => 'always_on']);
             }
 
+            // A paid plugin needs a plan, an add-on or a trial first (WHIT-1125).
+            if ($enabled && !$this->activation->mayTurnOn($name, $tenantId)) {
+                $paid = $this->activation->paidAccessOf($name);
+
+                return Response::error('This plugin needs a plan that includes it, a purchase or a trial', 402, [
+                    'reason' => 'needs_purchase',
+                    'product' => $paid['product'] ?? null,
+                    'trialAvailable' => $this->activation->trialAvailable($name, $tenantId),
+                ]);
+            }
+
             $profileId = self::profileId($request);
             $this->activation->setEnabled($tenantId, $name, $enabled, $profileId);
             $this->audit?->record($enabled ? self::AUDIT_ENABLED : self::AUDIT_DISABLED, [
@@ -218,6 +279,7 @@ final class WorkspaceCodePluginsApiHandler
                 'target_type' => 'code_plugin',
                 'metadata' => ['plugin' => $name],
             ]);
+            $this->loader->notifyWorkspaceSwitch($name, $tenantId, $enabled);
 
             return Response::json(['data' => ['name' => $name, 'enabled' => $enabled]]);
         });

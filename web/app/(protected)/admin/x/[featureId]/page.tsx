@@ -16,6 +16,7 @@ import { Skeleton } from '@whity/ui/skeleton';
 import { AccessDenied } from '@/components/ui/access-denied';
 import { IconPuzzle } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import { useDateDisplay } from '@whity/features/datetime';
 
 /**
  * Renders a registry override. Declared at module level and fed the component
@@ -44,6 +45,48 @@ function OverrideScreen({
  *   5. a placeholder asking the app to register a custom screen.
  */
 export default function PluginFeaturePage() {
+  return (
+    <>
+      <PluginAccessBanner />
+      <PluginFeatureScreen />
+    </>
+  );
+}
+
+/**
+ * WHIT-1127: a paid plugin in its grace period or read-only says so on every
+ * one of its screens, in plain words, with who can fix it.
+ */
+function PluginAccessBanner() {
+  const params = useParams<{ featureId: string | string[] }>();
+  const featureId = Array.isArray(params.featureId) ? params.featureId[0] : params.featureId;
+  const { features } = usePluginFeatures();
+  const t = useTranslation('plugin');
+  const dates = useDateDisplay();
+  const access = features.find((candidate) => candidate.id === featureId)?.pluginAccess;
+  if (!access) {
+    return null;
+  }
+
+  const message =
+    access.reason === 'grace'
+      ? t('access.grace', 'This plugin’s access has ended. It keeps working until {date}, then becomes read-only. Someone who manages billing can buy it in Settings › Plugins.', {
+          date: dates.date(access.graceUntil ?? '') ?? '',
+        })
+      : access.reason === 'installation_grace'
+        ? t('access.licenceGrace', 'Your platform’s licence for this plugin needs renewing soon.')
+        : access.reason === 'installation_unlicensed'
+          ? t('access.unlicensed', 'Read-only: your platform’s licence for this plugin has ended. Ask your platform operator.')
+          : t('access.readOnly', 'Read-only: you can see everything here, but not change it. Nothing was deleted. Someone who manages billing can buy it again in Settings › Plugins.');
+
+  return (
+    <div role="status" className="mb-6 rounded-card border border-warning/30 bg-warning-tint p-4 text-sm text-warning-text">
+      {message}
+    </div>
+  );
+}
+
+function PluginFeatureScreen() {
   // Client pages read dynamic segments via useParams (Next 16 app router).
   // The single [featureId] segment is always a string, but the hook's honest
   // type allows string[] for catch-alls, so narrow defensively.
