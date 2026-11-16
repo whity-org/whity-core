@@ -187,7 +187,8 @@ export function toGraphRequest(graph: RouteFlowGraph): {
               label_ar: input.labelAr?.trim() ? input.labelAr.trim() : null,
               required: input.required,
               max_length: input.maxLength,
-              type: input.type === 'person' ? 'person' : 'text',
+              // Only a person is said: a value with no type is text.
+              ...(input.type === 'person' ? { type: 'person' as const } : {}),
             })),
       // WHIT-1018: always sent, so a save never stops leaving people out.
       exclude_named_in: s.kind === 'finalise' ? [] : (s.excludeNamedIn ?? []),
