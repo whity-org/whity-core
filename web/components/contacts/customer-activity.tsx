@@ -58,7 +58,9 @@ export function CustomerActivity({ contactId }: { contactId: number }) {
     join_requests: t('contacts.activity.joinRequests', 'Requests to join'),
   };
   const titleOf = (title: Title): string =>
-    typeof title === 'string' ? title : (title[language] ?? title.en ?? title.ar ?? Object.values(title)[0] ?? '');
+    typeof title === 'string'
+      ? title
+      : ((language !== null ? title[language] : undefined) ?? title.en ?? title.ar ?? Object.values(title)[0] ?? '');
 
   if (loading) {
     return <div className="h-24 animate-pulse rounded-lg bg-muted" aria-busy="true" />;
