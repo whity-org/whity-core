@@ -42,9 +42,30 @@ export interface BookingDetailsProps {
   onOpen: () => void;
   /** The phone's sheet (CV.11): Move, Call, Message, then Cancel booking. */
   inSheet?: boolean;
+  /** For events and meetings (WHIT-1116): a person's name, for the organiser and guests. */
+  nameOf?: (profileId: number) => string;
+  /** The signed-in person, to offer Yes / No / Maybe when they are invited. */
+  me?: number | null;
+  onAnswer?: (response: 'accepted' | 'declined' | 'tentative') => void;
+  /** Change a team event in the event dialog. */
+  onEdit?: () => void;
 }
 
-export function BookingDetails({ item, timeZone, withName, canChange, onClose, onMove, onCancel, onOpen, inSheet = false }: BookingDetailsProps) {
+export function BookingDetails({
+  item,
+  timeZone,
+  withName,
+  canChange,
+  onClose,
+  onMove,
+  onCancel,
+  onOpen,
+  inSheet = false,
+  nameOf = () => '',
+  me = null,
+  onAnswer,
+  onEdit,
+}: BookingDetailsProps) {
   const t = useTranslation('calendar');
   const words = useCalendarWords();
   const dates = useDateDisplay({ timeZone });
@@ -101,6 +122,9 @@ export function BookingDetails({ item, timeZone, withName, canChange, onClose, o
       {item.where !== '' && <Row icon="store">{item.where}</Row>}
       {paid !== null && <Row icon="money">{paid}</Row>}
       {how !== null && <Row icon="clock">{how}</Row>}
+      {booking === undefined && (
+        <EventRows item={item} nameOf={nameOf} me={me} onAnswer={onAnswer} onEdit={onEdit} inSheet={inSheet} />
+      )}
       {booking !== undefined && inSheet && (
         <>
           <div className="grid grid-cols-3 gap-2">
@@ -170,5 +194,96 @@ export function BookingDetails({ item, timeZone, withName, canChange, onClose, o
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * The rest of an event's details (WHIT-1116): who organised it, the guests and
+ * their answers, the notes, Yes / No / Maybe for the viewer when invited, and
+ * Open meeting or Change event.
+ */
+function EventRows({
+  item,
+  nameOf,
+  me,
+  onAnswer,
+  onEdit,
+  inSheet,
+}: {
+  item: CalItem;
+  nameOf: (profileId: number) => string;
+  me: number | null;
+  onAnswer?: (response: 'accepted' | 'declined' | 'tentative') => void;
+  onEdit?: () => void;
+  inSheet: boolean;
+}) {
+  const t = useTranslation('calendar');
+  const people = item.people ?? [];
+  const mine = me === null ? undefined : people.find((p) => p.profile_id === me);
+  const answer = (response: string) =>
+    response === 'accepted'
+      ? t('details.answer.accepted', 'Coming')
+      : response === 'declined'
+        ? t('details.answer.declined', 'Not coming')
+        : response === 'tentative'
+          ? t('details.answer.tentative', 'Maybe')
+          : t('details.answer.invited', 'Not answered yet');
+  const organiser = item.organiserId !== undefined ? nameOf(item.organiserId) : '';
+  const size = inSheet ? 'h-12' : '';
+  return (
+    <>
+      {organiser !== '' && item.kind !== 'timeoff' && (
+        <Row icon="user">{t('details.organiser', 'Organised by {name}', { name: organiser })}</Row>
+      )}
+      {people.length > 0 && (
+        <Row icon="users">
+          <ul className="m-0 grid list-none gap-0.5 p-0" data-testid="calendar-details-guests">
+            {people.map((person) => (
+              <li key={person.profile_id} className="flex justify-between gap-3">
+                <span className="truncate">{nameOf(person.profile_id)}</span>
+                <span className="shrink-0 text-muted-foreground">{answer(person.response)}</span>
+              </li>
+            ))}
+          </ul>
+        </Row>
+      )}
+      {item.event?.notes ? <Row icon="text">{item.event.notes}</Row> : null}
+      {mine !== undefined && onAnswer && (
+        <div className="grid gap-1.5" role="group" aria-label={t('details.going', 'Going?')}>
+          <span className="text-sm text-muted-foreground">{t('details.going', 'Going?')}</span>
+          <div className="flex gap-2">
+            {(['accepted', 'declined', 'tentative'] as const).map((response) => (
+              <Button
+                key={response}
+                size="sm"
+                variant={mine.response === response ? 'default' : 'outline'}
+                aria-pressed={mine.response === response}
+                className={size}
+                onClick={() => onAnswer(response)}
+                data-testid={`calendar-answer-${response}`}
+              >
+                {response === 'accepted' ? t('details.yes', 'Yes') : response === 'declined' ? t('details.no', 'No') : t('details.maybe', 'Maybe')}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {item.kind === 'meeting' && item.meetingId ? (
+          <Button size="sm" variant="outline" className={size} asChild>
+            <a href={`/calendar/meetings/${item.meetingId}`} data-testid="calendar-details-meeting">
+              {t('details.openMeeting', 'Open meeting')}
+              <Icon name="chevron-right" className="rtl:-scale-x-100" />
+            </a>
+          </Button>
+        ) : null}
+        {item.kind === 'event' && onEdit && (item.can === undefined || item.can.open) ? (
+          <Button size="sm" variant="outline" className={size} onClick={onEdit} data-testid="calendar-details-edit">
+            <Icon name="edit" />
+            {t('details.changeEvent', 'Change event')}
+          </Button>
+        ) : null}
+      </div>
+    </>
   );
 }

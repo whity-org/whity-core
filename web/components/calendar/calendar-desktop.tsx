@@ -24,11 +24,13 @@ import { Skeleton } from '@whity/ui/skeleton';
 import { EmptyFirstTime, ReadOnlyNotice } from '@whity/ui/page-states';
 import { Button } from '@whity/ui/button';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay, zonedDate } from '@whity/features/datetime';
 import { calendarApi, type CalendarBooking, type CalendarEvent } from '@/lib/calendar/api';
 import { DEFAULT_ALSO_SHOW, useViewChoices, type AlsoShow } from '@/lib/calendar/choices';
-import { colourOf, NEUTRAL, palette, type ColourBy } from '@/lib/calendar/colours';
+import { kindsFor, toCalItems } from '@/lib/calendar/items';
+import { colourOf, palette, type ColourBy } from '@/lib/calendar/colours';
 import {
   addDays,
   dateKey,
@@ -60,11 +62,7 @@ import { useCalendarWords } from './use-calendar-words';
 /** The views a computer offers (CV.7). */
 export const DESKTOP_VIEWS: CalendarView[] = ['day', 'four_days', 'week', 'month', 'year'];
 const REQUESTS_AHEAD_DAYS = 60;
-const LIVE = 'confirmed,pending_payment,requested';
 
-function firstName(name: string): string {
-  return name.trim().split(/\s+/)[0] ?? name;
-}
 
 function typingIn(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -76,6 +74,7 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
   const words = useCalendarWords();
   const access = useCalendarAccess();
   const { addToast } = useToast();
+  const router = useRouter();
   const { settings, staff, services, rooms, timeZone } = basics;
   const units = useLocalizedUnits(basics.units);
   const dates = useDateDisplay({ timeZone });
@@ -110,19 +109,14 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
   const range = viewRange(view, anchor, settings.week_start);
   const query = rangeQuery(range, timeZone);
   const showCancelled = alsoShow.includes('cancelled');
-  const showEvents = alsoShow.includes('team_events');
-  const showTimeOff = alsoShow.includes('time_off');
 
+  // One list for everything on the calendar (WHIT-1116): Also show picks the kinds.
+  const kinds = kindsFor(alsoShow);
   const { data, loading, error, forbidden } = useFetch(async () => {
-    // Year reads counts only (below); the lists are capped at 62 days.
-    if (view === 'year') return { bookings: [], events: [], timeOff: [] };
-    const [bookings, events, timeOff] = await Promise.all([
-      calendarApi.bookings({ ...query, status: showCancelled ? `${LIVE},cancelled` : LIVE }),
-      showEvents ? calendarApi.events(query) : Promise.resolve([]),
-      showTimeOff ? calendarApi.timeOff(query).catch(() => []) : Promise.resolve([]),
-    ]);
-    return { bookings, events, timeOff };
-  }, [view === 'year', query.from, query.to, showCancelled, showEvents, showTimeOff, reloadKey]);
+    // Year reads counts only (below); the list is capped at 62 days.
+    if (view === 'year') return { items: [], unavailable: [] as string[] };
+    return calendarApi.items({ ...query, kinds, cancelled: showCancelled });
+  }, [view === 'year', query.from, query.to, showCancelled, kinds.join(','), reloadKey]);
 
   // The working hours of everyone, once, for the hours the grid draws (CV.6).
   const openings = useFetch(async () => {
@@ -160,75 +154,34 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
   const serviceById = useMemo(() => new Map(services.map((s) => [s.id, s])), [services]);
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
 
-  const items: CalItem[] = useMemo(() => {
-    if (data === null) return [];
-    const out: CalItem[] = [];
-    for (const b of data.bookings) {
-      if (hiddenPeople.has(b.profile_id)) continue;
-      if (b.room_id !== null && b.room_id !== undefined && hiddenRooms.has(b.room_id)) continue;
-      if (colourBy === 'service' && hiddenServices.has(b.service_id)) continue;
-      const customer = b.customer.name ?? t('booking.noName', 'No name given');
-      const person = staffName.get(b.profile_id) ?? '';
-      const room = b.room_name ? words.label(b.room_name) : b.room_id ? words.label(roomById.get(b.room_id)?.name) : '';
-      const kind = b.status === 'cancelled' ? 'cancelled' : b.status === 'pending_payment' ? 'wait' : b.status === 'requested' ? 'request' : 'booking';
-      const state =
-        kind === 'wait'
-          ? t('grid.waitingPayment', 'waiting for payment')
-          : kind === 'request'
-            ? t('grid.requestShort', 'request')
-            : kind === 'cancelled'
-              ? t('grid.cancelledShort', 'cancelled')
-              : b.checked_in_at
-                ? t('grid.checkedInShort', 'checked in')
-                : '';
-      out.push({
-        key: `booking:${b.id}`,
-        kind,
-        starts_at: b.starts_at,
-        ends_at: b.ends_at,
-        allDay: false,
-        title: words.serviceName(serviceById.get(b.service_id)),
-        who: [customer, firstName(person)].filter((part) => part !== '').join(' · '),
-        where: [room, state].filter((part) => part !== '').join(' · '),
-        colour: colourOf(colourBy, colours, { profileId: b.profile_id, serviceId: b.service_id, roomId: b.room_id ?? null }),
-        booking: b,
-      });
-    }
-    for (const e of data.events) {
-      if (e.status === 'cancelled' || hiddenPeople.has(e.profile_id)) continue;
-      out.push({
-        key: `event:${e.id}`,
-        kind: 'event',
-        starts_at: e.starts_at,
-        ends_at: e.ends_at,
-        allDay: e.all_day,
-        title: e.title,
-        who: staffName.get(e.profile_id) ?? '',
-        where: e.busy ? '' : t('event.kind.free', 'Doesn’t block bookings'),
-        colour: colourBy === 'person' ? colourOf('person', colours, { profileId: e.profile_id }) : NEUTRAL,
-        event: e,
-      });
-    }
-    for (const off of data.timeOff) {
-      if (off.kind === 'open' || hiddenPeople.has(off.profile_id)) continue;
-      const name = staffName.get(off.profile_id) ?? '';
-      const span = new Date(off.ends_at).getTime() - new Date(off.starts_at).getTime();
-      out.push({
-        key: `time_off:${off.id}`,
-        kind: 'timeoff',
-        starts_at: off.starts_at,
-        ends_at: off.ends_at,
-        allDay: span >= 20 * 3_600_000,
-        title: t('grid.leave', '{name} · time off', { name }),
-        who: off.note,
-        where: '',
-        colour: colourBy === 'person' ? colourOf('person', colours, { profileId: off.profile_id }) : NEUTRAL,
-        timeOff: off,
-      });
-    }
-    const needle = search.trim().toLowerCase();
-    return needle === '' ? out : out.filter((item) => `${item.title} ${item.who} ${item.where}`.toLowerCase().includes(needle));
-  }, [data, hiddenPeople, hiddenRooms, hiddenServices, colourBy, colours, staffName, serviceById, roomById, search, t, words]);
+  const items: CalItem[] = useMemo(
+    () =>
+      data === null
+        ? []
+        : toCalItems(data.items, {
+            colourBy,
+            colours,
+            staffName,
+            services: serviceById,
+            rooms: roomById,
+            hiddenPeople,
+            hiddenRooms,
+            hiddenServices,
+            search,
+            serviceName: words.serviceName,
+            label: words.label,
+            words: {
+              noName: t('booking.noName', 'No name given'),
+              waitingPayment: t('grid.waitingPayment', 'waiting for payment'),
+              request: t('grid.requestShort', 'request'),
+              cancelled: t('grid.cancelledShort', 'cancelled'),
+              checkedIn: t('grid.checkedInShort', 'checked in'),
+              timeOff: (name) => t('grid.leave', '{name} · time off', { name }),
+              guests: (count) => (count === 1 ? t('grid.guestsOne', '1 guest') : t('grid.guestsMany', '{count} guests', { count })),
+            },
+          }),
+    [data, colourBy, colours, staffName, serviceById, roomById, hiddenPeople, hiddenRooms, hiddenServices, search, t, words]
+  );
 
   const hours = hoursToDraw(openings.data ?? [], items, range.days, timeZone);
 
@@ -332,14 +285,27 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
     onChanged: refetch,
   });
 
+  // An invitation answered from the details (WHIT-1116).
+  const answer = async (item: CalItem, response: 'accepted' | 'declined' | 'tentative') => {
+    if (!item.event) return;
+    try {
+      await calendarApi.answerEvent(item.event.id, response);
+      addToast(t('details.answered', 'Answer saved'), 'success');
+      refetch();
+    } catch (error) {
+      addToast(words.errorText(error, t('details.answerFailed', 'Your answer could not be saved. Try again.')), 'error');
+    }
+  };
+  const nameOf = (profileId: number) => staffName.get(profileId) ?? '';
+  const editEvent = (item: CalItem) => {
+    if (!item.event) return;
+    setEditing(item.event);
+    setEventOpen(true);
+  };
+
+  // Every item opens its details beside it: bookings, events, meetings, time off.
   const openItem = (item: CalItem | null) => {
     edits.setDraft(null);
-    if (item?.event) {
-      setSelected(null);
-      setEditing(item.event);
-      setEventOpen(true);
-      return;
-    }
     setSelected(item);
   };
 
@@ -390,6 +356,11 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
           onToday={() => setAnchor(today)}
           onStep={(direction) => setAnchor(stepAnchor(view, anchor, direction))}
         />
+        {data !== null && data.unavailable.includes('task_due') && (
+          <p className="m-0 text-sm text-muted-foreground" role="status" data-testid="calendar-tasks-unavailable">
+            {t('grid.tasksUnavailable', 'Tasks due couldn’t be read from Taskaat just now. Everything else is up to date.')}
+          </p>
+        )}
         {!access.loading && !access.canWrite && (
           <ReadOnlyNotice
             title={t('readOnly.title', 'You can see the calendar but not book')}
@@ -431,8 +402,10 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
             timeZone={timeZone}
             items={items}
             onOpenItem={(item) => {
+              // Month has no room beside an item: a booking opens its sheet, an event its dialog, a meeting its page.
               if (item.booking) setSheet({ booking: item.booking, startWith: null, suggest: false });
-              else openItem(item);
+              else if (item.kind === 'meeting' && item.meetingId) router.push(`/calendar/meetings/${item.meetingId}`);
+              else editEvent(item);
             }}
             onOpenDay={(date) => update({ date: dateKey(date), view: 'day' })}
           />
@@ -503,6 +476,13 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
                 onMove={() => item.booking && setSheet({ booking: item.booking, startWith: 'move', suggest: false })}
                 onCancel={() => item.booking && setSheet({ booking: item.booking, startWith: 'cancel', suggest: false })}
                 onOpen={() => item.booking && setSheet({ booking: item.booking, startWith: null, suggest: false })}
+                nameOf={nameOf}
+                me={access.me}
+                onAnswer={(response) => void answer(item, response)}
+                onEdit={() => {
+                  setSelected(null);
+                  editEvent(item);
+                }}
               />
             )}
           />
@@ -571,6 +551,7 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
         canChange={editing === null ? access.canWrite : access.canChange(editing.profile_id)}
         initialDate={view === 'day' ? anchor : null}
         onSaved={refetch}
+        rooms={rooms}
       />
       {edits.dialogs}
     </div>
