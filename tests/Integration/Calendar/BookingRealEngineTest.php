@@ -506,29 +506,21 @@ final class BookingRealEngineTest extends TestCase
         return $told;
     }
 
-    public function testStaffCanResizeAndAMoveKeepsTheNewLength(): void
+    public function testABookingAlwaysLastsAsLongAsItsService(): void
     {
-        $booking = $this->service->book(1, $this->desk('2026-11-16T10:00:00+03:00', 11));
+        // Owner, Q35.7: the length goes with the service and its price.
+        $booking = $this->service->book(1, $this->desk('2026-11-16T10:00:00+03:00', 11, ['duration_minutes' => 90]));
         self::assertSame('2026-11-16T07:30:00Z', $booking['ends_at']);
-
-        // Pull the bottom edge to 11:30 (CV.9): 90 minutes, the buffer after still held.
-        $longer = $this->service->move(1, $booking['id'], self::at('2026-11-16T10:00:00+03:00'), null, false, 90);
-        self::assertSame('2026-11-16T08:30:00Z', $longer['ends_at']);
-        self::assertSame('2026-11-16T08:45:00Z', $longer['blocks_until']);
-
-        // A later move keeps the 90 minutes.
         $moved = $this->service->move(1, $booking['id'], self::at('2026-11-16T13:00:00+03:00'), null, false);
-        self::assertSame('2026-11-16T11:30:00Z', $moved['ends_at']);
+        self::assertSame('2026-11-16T10:30:00Z', $moved['ends_at']);
 
-        // A booking made across a dragged time takes that length.
-        $dragged = $this->service->book(1, $this->desk('2026-11-17T09:00:00+03:00', 11, ['duration_minutes' => 45]));
-        self::assertSame('2026-11-17T06:45:00Z', $dragged['ends_at']);
-
-        $this->expectExceptionObject(new CalendarRejectedException('A booking lasts from 5 minutes to 24 hours.', 422));
-        $this->service->move(1, $booking['id'], self::at('2026-11-16T13:00:00+03:00'), null, false, 2);
+        // One booked before the service got longer keeps the time it was booked for.
+        $this->services->update(1, $this->cake, ['duration_minutes' => 45] + $this->cakeValues());
+        $again = $this->service->move(1, $booking['id'], self::at('2026-11-16T14:00:00+03:00'), null, false);
+        self::assertSame('2026-11-16T11:30:00Z', $again['ends_at']);
     }
 
-    public function testAPublicBookingCannotChooseItsOwnLength(): void
+    public function testThePublicPageBooksTheServicesLength(): void
     {
         $booking = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11, ['duration_minutes' => 240]));
         self::assertSame('2026-11-16T07:30:00Z', $booking['ends_at']);
@@ -538,7 +530,7 @@ final class BookingRealEngineTest extends TestCase
     {
         $told = $this->recordMessages();
         $booking = $this->service->book(1, $this->desk('2026-11-16T10:00:00+03:00', 11));
-        $this->service->move(1, $booking['id'], self::at('2026-11-16T11:00:00+03:00'), null, false, null, false);
+        $this->service->move(1, $booking['id'], self::at('2026-11-16T11:00:00+03:00'), null, false, false);
         $this->service->book(1, $this->desk('2026-11-16T14:00:00+03:00', 11, ['notify' => false]));
         self::assertSame(['confirmed'], $told->getArrayCopy());
 
@@ -561,7 +553,7 @@ final class BookingRealEngineTest extends TestCase
 
         // Kept to the hours: Friday is closed, Book anyway or not.
         try {
-            $this->service->move(1, $anyway['id'], self::at('2026-11-20T10:00:00+03:00'), null, false, null, true, true, true);
+            $this->service->move(1, $anyway['id'], self::at('2026-11-20T10:00:00+03:00'), null, false, true, true, true);
             self::fail('closed hours must refuse');
         } catch (CalendarRejectedException $e) {
             self::assertSame(['reason' => CalendarRejectedException::CLOSED], $e->extra);

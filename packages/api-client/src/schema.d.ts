@@ -11637,8 +11637,6 @@ export interface components {
             customer: components["schemas"]["CalendarBookingCustomer"];
             /** @description Refuse a time outside working hours. Always on for agents. */
             keep_to_hours?: boolean;
-            /** @description Staff only: a length other than the service's, such as a time dragged across on the grid. */
-            duration_minutes?: number;
             /** @description Email the customer a confirmation. Default true. */
             notify?: boolean;
             /** @description Book even though the person is busy then (a taken room or closed hours still refuse). Never for agents. */
@@ -11661,8 +11659,6 @@ export interface components {
             profile_id?: number;
             /** @description Refuse a time outside working hours. Always on for agents. */
             keep_to_hours?: boolean;
-            /** @description A new length, such as pulling the bottom edge on the grid. Default: keep the booking's length. */
-            duration_minutes?: number;
             /** @description Email the customer the new time. Default true. */
             notify?: boolean;
             /** @description Move even though the person is busy then (a taken room or closed hours still refuse). Never for agents. */

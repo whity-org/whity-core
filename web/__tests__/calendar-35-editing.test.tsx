@@ -116,7 +116,48 @@ it('asks before moving a customer booking, emails by default, and offers Undo (C
   expect(message).toBe('Moved to Wednesday 18 November, 12:30. Ahmad was emailed.');
   expect(duration).toBe(10_000);
   action.onClick();
-  expect(calendarApi.moveBooking).toHaveBeenLastCalledWith(7, expect.objectContaining({ starts_at: '2026-11-17T10:00:00+03:00', duration_minutes: 75, book_anyway: true }));
+  const undo = (calendarApi.moveBooking as jest.Mock).mock.calls.at(-1);
+  expect(undo[1]).toEqual(expect.objectContaining({ starts_at: '2026-11-17T10:00:00+03:00', book_anyway: true }));
+  // A booking's length is its service's (Q35.7): neither the move nor the Undo sends one.
+  expect(undo[1]).not.toHaveProperty('duration_minutes');
+  expect((calendarApi.moveBooking as jest.Mock).mock.calls[0][1]).not.toHaveProperty('duration_minutes');
+});
+
+it('says the customer’s calendar won’t update when the email is unticked (Q35.8)', () => {
+  const { result, rerender } = renderHook(() => useEditing());
+  act(() => result.current.onChange(item, { date: WED, startMinute: 750, endMinute: 825 }, 'move'));
+  rerender();
+  const { rerender: again } = render(<Dialogs>{result.current.dialogs}</Dialogs>);
+  expect(screen.queryByTestId('calendar-ask-no-email')).toBeNull();
+  fireEvent.click(screen.getByTestId('calendar-ask-notify'));
+  rerender();
+  again(<Dialogs>{result.current.dialogs}</Dialogs>);
+  expect(screen.getByTestId('calendar-ask-no-email')).toHaveTextContent('Ahmad’s calendar won’t update');
+});
+
+it('pulls only team events to a new length, never a booking (Q35.7)', () => {
+  const event: CalItem = { ...item, key: 'event:3', kind: 'event', title: 'Team lunch', booking: undefined, event: { id: 3, profile_id: 4, title: 'Team lunch', starts_at: item.starts_at, ends_at: item.ends_at, all_day: false, busy: true, status: 'confirmed' } as never };
+  const { result } = renderHook(() => useEditing());
+  expect(result.current.canResize(item)).toBe(false);
+  expect(result.current.canResize(event)).toBe(true);
+  render(
+    <TimeGrid
+      days={[TUE]}
+      items={[{ ...item, starts_at: '2026-11-17T05:00:00Z', ends_at: '2026-11-17T06:00:00Z' }, event]}
+      startHour={8}
+      endHour={19}
+      timeZone={AMMAN}
+      weekendDays={[]}
+      today={TUE}
+      zone="GMT+3"
+      selectedKey={null}
+      onSelect={() => {}}
+      canDrag={() => true}
+      canResize={result.current.canResize}
+      onChange={() => {}}
+    />
+  );
+  expect(screen.getAllByTestId('calendar-resize')).toHaveLength(1);
 });
 
 it('says a busy person is busy and books anyway on request', async () => {

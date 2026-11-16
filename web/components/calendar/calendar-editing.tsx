@@ -7,10 +7,11 @@
  *   across the time you want; it stays dashed until Save. The quick booking
  *   beside it chooses Booking, Event or Time off; More options opens the full
  *   booking dialog.
- * - Drag a booking to move it, pull its bottom edge to change its length, or
- *   use the arrow keys. A customer's booking asks first, with "Email the new
- *   time" ticked; team events move without asking. After any change, Undo
- *   for 10 seconds.
+ * - Drag a booking to move it, or use the arrow keys. A customer's booking
+ *   asks first, with "Email the new time" ticked; unticking it says the
+ *   customer's calendar won't update (owner, Q35.8). Team events move without
+ *   asking, and only they can be pulled to a new length: a booking lasts as
+ *   long as its service (owner, Q35.7). After any change, Undo for 10 seconds.
  * - A busy person says so and offers Book anyway. A taken room, closed hours
  *   or a time just taken (409) send it back and say why: nothing is saved.
  *
@@ -113,8 +114,10 @@ export interface Draft {
   date: CalendarDate;
   startMinute: number;
   endMinute: number;
-  /** Dragged across: the length is the person's, not the service's. */
+  /** Dragged across: an event or time off keeps that length; a booking always takes its service's (Q35.7). */
   fixed: boolean;
+  /** Where the slot ended before a service sized it. */
+  dragEnd: number;
 }
 
 export interface QuickBookingProps {
@@ -124,7 +127,8 @@ export interface QuickBookingProps {
   timeZone: string;
   canEvent: boolean;
   me: number | null;
-  onServiceLength: (minutes: number) => void;
+  /** A booking's service sets the slot's length; null gives an event or time off back the length dragged. */
+  onServiceLength: (minutes: number | null) => void;
   onClose: () => void;
   onSaved: (message: string) => void;
   onMore: (date: CalendarDate, profileId: number | null) => void;
@@ -157,7 +161,7 @@ export function QuickBooking({ draft, services, staff, timeZone, canEvent, me, o
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (service !== null && kind === 'booking') onServiceLength(service.duration_minutes);
+    onServiceLength(service !== null && kind === 'booking' ? service.duration_minutes : null);
   }, [service, kind, onServiceLength]);
 
   const searching = picked === null && customer.trim().length >= 2;
@@ -193,7 +197,6 @@ export function QuickBooking({ draft, services, staff, timeZone, canEvent, me, o
           customer: { name: customer.trim(), ...(email !== '' ? { email } : {}), ...(phone !== '' ? { phone } : {}) },
           notify: notify && email !== '',
           within_hours: true,
-          ...(draft.fixed ? { duration_minutes: draft.endMinute - draft.startMinute } : {}),
           ...(anyway ? { book_anyway: true } : {}),
         });
         onSaved(t('booking.made', 'Booked for {name}', { name: made.customer.name ?? '' }));
@@ -411,36 +414,40 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
       if (!canWrite) return;
       const fixed = slot.endMinute !== null;
       // @date-display-ignore: a calendar day for the grid, not a timestamp rendered here
-      setDraft({ date: slot.date, startMinute: slot.startMinute, endMinute: slot.endMinute ?? Math.min(24 * 60, slot.startMinute + defaultLength), fixed });
+      const end = slot.endMinute ?? Math.min(24 * 60, slot.startMinute + defaultLength);
+      // @date-display-ignore: a calendar day for the grid, not a timestamp rendered here
+      setDraft({ date: slot.date, startMinute: slot.startMinute, endMinute: end, fixed, dragEnd: end });
     },
     [canWrite, defaultLength]
   );
 
-  const onServiceLength = useCallback((minutes: number) => {
-    setDraft((current) => (current === null || current.fixed ? current : { ...current, endMinute: Math.min(24 * 60, current.startMinute + minutes) }));
+  const onServiceLength = useCallback((minutes: number | null) => {
+    setDraft((current) => {
+      if (current === null) return current;
+      const endMinute = minutes === null ? current.dragEnd : Math.min(24 * 60, current.startMinute + minutes);
+      return endMinute === current.endMinute ? current : { ...current, endMinute };
+    });
   }, []);
+
+  // Only team events can be pulled to a new length; a booking lasts as long as its service (Q35.7).
+  const canResize = useCallback((item: CalItem) => item.event !== undefined && !item.allDay && canChange(item.event.profile_id), [canChange]);
 
   const name = (item: CalItem) => item.booking?.customer.name ?? '';
 
   const save = async (change: Change, options: { notify: boolean; anyway: boolean }) => {
-    const { item, to, from, how } = change;
+    const { item, to, from } = change;
     setSaving(change);
-    const length = to.endMinute - to.startMinute;
     try {
       if (item.booking) {
         const booking = item.booking;
         await calendarApi.moveBooking(booking.id, {
           starts_at: isoAt(to.date, to.startMinute, timeZone),
-          ...(length !== from.endMinute - from.startMinute ? { duration_minutes: length } : {}),
           notify: options.notify,
           within_hours: true,
           ...(options.anyway ? { book_anyway: true } : {}),
         });
         const told = options.notify && booking.customer.email ? t('edit.wasEmailed', ' {name} was emailed.', { name: firstName(booking.customer.name) }) : '';
-        const message =
-          how === 'move'
-            ? t('edit.moved', 'Moved to {when}.', { when: when(to.date, to.startMinute) }) + told
-            : t('edit.resized', 'Now until {time}.', { time: minuteToTime(to.endMinute) }) + told;
+        const message = t('edit.moved', 'Moved to {when}.', { when: when(to.date, to.startMinute) }) + told;
         onChanged();
         addToast(message, 'success', UNDO_MS, {
           label: t('edit.undo', 'Undo'),
@@ -448,7 +455,6 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
             void calendarApi
               .moveBooking(booking.id, {
                 starts_at: isoAt(from.date, from.startMinute, timeZone),
-                duration_minutes: from.endMinute - from.startMinute,
                 notify: options.notify,
                 book_anyway: true,
               })
@@ -499,6 +505,8 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
     (item: CalItem, to: GridSlot & { endMinute: number }, how: 'move' | 'resize') => {
       const from = placeOf(item);
       if (from === null) return;
+      // A booking lasts as long as its service (Q35.7): never resized here.
+      if (item.booking && how === 'resize') return;
       if (from.startMinute === to.startMinute && from.endMinute === to.endMinute && from.date.day === to.date.day && from.date.month === to.date.month) return;
       const change = { item, to, how, from };
       // A customer's booking asks first; team events move without asking (CV.9).
@@ -522,12 +530,8 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
         { key: null, date: draft.date, startMinute: draft.startMinute, endMinute: draft.endMinute, how: 'create' }
       : null;
 
-  const askTitle = (change: Change) => {
-    const service = change.item.title;
-    return change.how === 'move'
-      ? t('edit.askMove', 'Move {name}’s {service}?', { name: name(change.item), service: service.toLowerCase() })
-      : t('edit.askResize', 'Change {name}’s {service}?', { name: name(change.item), service: service.toLowerCase() });
-  };
+  const askTitle = (change: Change) =>
+    t('edit.askMove', 'Move {name}’s {service}?', { name: name(change.item), service: change.item.title.toLowerCase() });
   const person = (change: Change) => staff.find((s) => s.profile_id === change.item.booking?.profile_id)?.display_name ?? '';
 
   const dialogs = (
@@ -538,13 +542,11 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
             <AlertDialogHeader>
               <AlertDialogTitle>{askTitle(asking)}</AlertDialogTitle>
               <AlertDialogDescription>
-                {asking.how === 'move'
-                  ? t('edit.askMoveBody', 'From {from} to {to}. Same place, with {person}.', {
-                      from: when(asking.from.date, asking.from.startMinute),
-                      to: when(asking.to.date, asking.to.startMinute),
-                      person: firstName(person(asking)),
-                    })
-                  : t('edit.askResizeBody', '{when}, now until {time}.', { when: when(asking.to.date, asking.to.startMinute), time: minuteToTime(asking.to.endMinute) })}
+                {t('edit.askMoveBody', 'From {from} to {to}. Same place, with {person}.', {
+                  from: when(asking.from.date, asking.from.startMinute),
+                  to: when(asking.to.date, asking.to.startMinute),
+                  person: firstName(person(asking)),
+                })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             {asking.item.booking?.customer.email ? (
@@ -552,6 +554,13 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
                 <Checkbox checked={notify} onCheckedChange={(value) => setNotify(value === true)} data-testid="calendar-ask-notify" />
                 {t('edit.emailNewTime', 'Email {name} the new time with a calendar file', { name: firstName(asking.item.booking.customer.name) })}
               </label>
+            ) : null}
+            {asking.item.booking?.customer.email && !notify ? (
+              <p className="m-0 text-sm text-warning-text" role="status" data-testid="calendar-ask-no-email">
+                {t('edit.noEmailWarning', '{name}’s calendar won’t update: they keep the old time until someone tells them.', {
+                  name: firstName(asking.item.booking.customer.name),
+                })}
+              </p>
             ) : null}
             <AlertDialogFooter>
               <AlertDialogCancel>{t('edit.keep', 'Keep the old time')}</AlertDialogCancel>
@@ -563,7 +572,7 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
                   void save(change, { notify, anyway: false });
                 }}
               >
-                {asking.how === 'move' ? t('edit.moveIt', 'Move it') : t('edit.changeIt', 'Change it')}
+                {t('edit.moveIt', 'Move it')}
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -601,5 +610,5 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
     </>
   );
 
-  return { draft, setDraft, preview, canDrag, onCreate, onChange, onServiceLength, dialogs };
+  return { draft, setDraft, preview, canDrag, canResize, onCreate, onChange, onServiceLength, dialogs };
 }
