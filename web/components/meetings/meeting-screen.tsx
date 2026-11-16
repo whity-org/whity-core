@@ -150,6 +150,7 @@ export function MeetingScreen({ id }: { id: number }) {
                 <>
                   {dates.calendarLabel(when.date, 'fullDate') ?? when.date}
                   {' · '}
+                  {/* @date-display-ignore: the workspace's wall-clock time as written, not a record timestamp to convert */}
                   <span className="font-mono tabular-nums" dir="ltr">
                     {when.time}
                   </span>
@@ -192,6 +193,7 @@ export function MeetingScreen({ id }: { id: number }) {
 
           <ScheduleDialog
             open={scheduling}
+            // @date-display-ignore: the editable value of the schedule field, not displayed text
             current={data.scheduled_at}
             location={data.location}
             onOpenChange={setScheduling}
