@@ -12847,6 +12847,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/password-resets/{id:\d+}/approve', 'password_resets:approve', [
+                // AG.1: approved only by a person who confirms it's them, never by an agent.
+                'mcp' => ['expose' => false],
                 'summary' => 'Apply the staged password once the approver has confirmed it is them (tenant-scoped)',
                 'tags' => ['auth'],
                 'request' => 'GatedApprovalRequest',
@@ -13760,6 +13762,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/2fa-recovery/{id:\d+}/approve', 'two_factor_recovery:approve', [
+                // AG.1: approved only by a person who confirms it's them, never by an agent.
+                'mcp' => ['expose' => false],
                 'summary' => 'Approve a two-step reset: the first admin\'s approval is recorded, a second admin\'s clears the two-step and sends a reset link',
                 'description' => 'Two different admins must approve, and the person asking can never approve their own (AG.1). Each approval first confirms the admin is who they say with a code.',
                 'tags' => ['auth'],
@@ -13801,6 +13805,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/2fa-recovery/force-reset', 'two_factor_recovery:approve', [
+                // AG.1: approved only by a person who confirms it's them, never by an agent.
+                'mcp' => ['expose' => false],
                 'summary' => 'Start a two-step reset for a named profile with no prior request; it counts as the first approval (tenant-scoped)',
                 'tags' => ['auth'],
                 'request' => 'ForceResetRequest',
