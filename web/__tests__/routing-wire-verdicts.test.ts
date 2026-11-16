@@ -81,8 +81,9 @@ describe('the closed vocabularies', () => {
     expect([...ROUTE_VERDICTS]).toEqual(['approved', 'rejected']);
   });
 
-  it('has exactly the three quorums, and no rejection quorum among them', () => {
-    expect([...ROUTE_QUORUMS]).toEqual(['all', 'any', 'majority']);
+  it('has exactly the four quorums, and no rejection quorum among them', () => {
+    // `first` (migration 295): the first answer decides, either way.
+    expect([...ROUTE_QUORUMS]).toEqual(['all', 'any', 'majority', 'first']);
     // Rejection routing is DERIVED — the reject edge fires when the approval
     // quorum becomes arithmetically unreachable. A quorum named for rejection
     // would be a control over a rule that does not exist.

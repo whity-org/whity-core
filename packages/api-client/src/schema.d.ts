@@ -9449,7 +9449,7 @@ export interface paths {
         put?: never;
         /**
          * Let a waiting person join as a customer
-         * @description Creates the customer membership with the current starting role. A rejected request can be approved later.
+         * @description Creates the customer membership with the current starting role. A rejected request can be approved later. A request on its route is answered there: your step's approval, which decides it unless the workspace's route has more steps (202).
          */
         post: operations["post_api_v1_signup_requests_id_approve"];
         delete?: never;
@@ -13847,7 +13847,7 @@ export interface components {
             steps: components["schemas"]["DocumentRouteStep"][];
             edges: components["schemas"]["DocumentRouteEdge"][];
             /** @enum {string} */
-            default_quorum: "all" | "any" | "majority";
+            default_quorum: "all" | "any" | "majority" | "first";
             values?: components["schemas"]["RouteStepValue"][];
         };
         DocumentRouteActionRequest: {
@@ -13894,7 +13894,7 @@ export interface components {
                 label?: string | null;
                 decision?: boolean | null;
                 /** @enum {string|null} */
-                decision_quorum?: "all" | "any" | "majority" | null;
+                decision_quorum?: "all" | "any" | "majority" | "first" | null;
                 on_approved?: number | null;
                 on_rejected?: number | null;
                 /** @enum {string} */
@@ -13965,7 +13965,7 @@ export interface components {
             label?: string | null;
             decision: boolean;
             /** @enum {string|null} */
-            decision_quorum?: "all" | "any" | "majority" | null;
+            decision_quorum?: "all" | "any" | "majority" | "first" | null;
             /** @enum {string} */
             satisfied_by: "act" | "delivery";
             /** @enum {string} */
@@ -18752,6 +18752,8 @@ export interface components {
             customer_invites: boolean;
             /** @description How many people one customer may invite; 0 is no limit (WHIT-1043). */
             invites_per_customer: number;
+            /** @description The route template join requests travel on; null is the default, one step for everyone who can manage sign-ups. */
+            route_template_id?: number | null;
             eligible_roles: components["schemas"]["SignupEligibleRole"][];
             pending_count: number;
             workspace_slug: string | null;
@@ -18777,6 +18779,8 @@ export interface components {
             customer_invites?: boolean;
             /** @description How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043). */
             invites_per_customer?: number;
+            /** @description One of this workspace's route templates for join requests to travel on, or null for the default: one step for everyone who can manage sign-ups. */
+            route_template_id?: number | null;
         };
         SimpleMessageResponse: {
             message: string;
@@ -69730,6 +69734,13 @@ export interface operations {
                     "application/json": components["schemas"]["SignupDecisionResponse"];
                 };
             };
+            /** @description Your step is answered; the route has more to decide */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Missing or invalid authentication */
             401: {
                 headers: {
@@ -69806,6 +69817,13 @@ export interface operations {
                     "application/json": components["schemas"]["SignupDecisionResponse"];
                 };
             };
+            /** @description Your step is answered; the route has more to decide */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Missing or invalid authentication */
             401: {
                 headers: {
@@ -69835,6 +69853,15 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request's route refused the answer (for example, it is not your step) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

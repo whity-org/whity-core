@@ -6411,7 +6411,7 @@ final class CoreApiSchemas
                 // it fans out to many people. NULL is not "no quorum": it defers
                 // to the tenant's `documents.routing_approval_quorum` setting,
                 // which defaults to `all`.
-                'decision_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority'], 'nullable' => true],
+                'decision_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority', 'first'], 'nullable' => true],
                 // #1054. WHETHER ANYBODY HERE IS ASKED TO ACT. `delivery` means
                 // the people this step reaches are TOLD: their inbox item is
                 // closed by the event that created it and the document carries
@@ -6491,7 +6491,7 @@ final class CoreApiSchemas
                 // step is the least likely person in the tenant to hold it - so
                 // without this a client could not tell an approver whether their
                 // single approval carries the gate or is one of four hundred.
-                'default_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority']],
+                'default_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority', 'first']],
                 // WHIT-1016: what people entered at the steps that ask for
                 // values, each key's latest. On the route lists; absent on the
                 // response that issues a route, where nothing is entered yet.
@@ -6544,7 +6544,7 @@ final class CoreApiSchemas
                         'decision' => self::bool(true),
                         'decision_quorum' => [
                             'type' => 'string',
-                            'enum' => ['all', 'any', 'majority'],
+                            'enum' => ['all', 'any', 'majority', 'first'],
                             'nullable' => true,
                         ],
                         // Targets are named by 1-BASED POSITION in this same
@@ -11861,6 +11861,7 @@ final class CoreApiSchemas
                 'allowed_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'customer_invites' => self::bool(),
                 'invites_per_customer' => self::int() + ['description' => 'How many people one customer may invite; 0 is no limit (WHIT-1043).'],
+                'route_template_id' => self::int(true) + ['description' => 'The route template join requests travel on; null is the default, one step for everyone who can manage sign-ups.'],
                 'eligible_roles' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupEligibleRole')],
                 'pending_count' => self::int(),
                 'workspace_slug' => self::str(true),
@@ -11893,6 +11894,9 @@ final class CoreApiSchemas
                 ],
                 'invites_per_customer' => self::int() + [
                     'description' => 'How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043).',
+                ],
+                'route_template_id' => self::int(true) + [
+                    'description' => 'One of this workspace\'s route templates for join requests to travel on, or null for the default: one step for everyone who can manage sign-ups.',
                 ],
             ], []),
             'TeamInvitationItem' => self::object([
@@ -13859,10 +13863,12 @@ final class CoreApiSchemas
             self::permissionRoute('POST', '/api/signup/requests/{id:\d+}/approve', 'signup:manage', [
                 'summary' => 'Let a waiting person join as a customer',
                 'description' => 'Creates the customer membership with the current starting role. A '
-                    . 'rejected request can be approved later.',
+                    . 'rejected request can be approved later. A request on its route is answered there: '
+                    . 'your step\'s approval, which decides it unless the workspace\'s route has more steps (202).',
                 'tags' => ['signup'],
                 'responses' => [
                     200 => self::jsonResponse('Approved', 'SignupDecisionResponse'),
+                    202 => ['description' => 'Your step is answered; the route has more to decide'],
                     404 => self::errorResponse('No request waiting for a decision has that id'),
                     409 => self::errorResponse('The starting role is missing or unsafe, or the person is suspended or invited here'),
                 ] + self::authErrors(),
@@ -13872,6 +13878,8 @@ final class CoreApiSchemas
                 'tags' => ['signup'],
                 'responses' => [
                     200 => self::jsonResponse('Rejected', 'SignupDecisionResponse'),
+                    202 => ['description' => 'Your step is answered; the route has more to decide'],
+                    409 => self::errorResponse('The request\'s route refused the answer (for example, it is not your step)'),
                     404 => self::errorResponse('No pending request has that id'),
                 ] + self::authErrors(),
             ]),

@@ -84,6 +84,33 @@ final class CustomerSignupService
     ) {
     }
 
+    /** @var (\Closure(int, int): void)|null */
+    private ?\Closure $onPending = null;
+
+    /**
+     * Merge map A4: called with (tenant id, request id) once a request starts
+     * waiting for a decision, after it is saved, to put it on its route.
+     *
+     * @param \Closure(int, int): void $fn
+     */
+    public function whenPending(\Closure $fn): void
+    {
+        $this->onPending = $fn;
+    }
+
+    private function pending(int $tenantId, int $signupId): void
+    {
+        if ($this->onPending === null) {
+            return;
+        }
+        try {
+            ($this->onPending)($tenantId, $signupId);
+        } catch (\Throwable $e) {
+            // The request is saved and still decidable from Sign-up approvals.
+            error_log('[customer-signup] the request could not be put on its route: ' . $e->getMessage());
+        }
+    }
+
     /**
      * Record a sign-up request and return the raw token for the mail.
      *
@@ -269,6 +296,9 @@ final class CustomerSignupService
         if ($announce !== null) {
             $this->announce(self::HOOK_CUSTOMER_JOINED, $announce);
         }
+        if ($newStatus === self::STATUS_PENDING) {
+            $this->pending($tenantId, $signupId);
+        }
 
         return $result;
     }
@@ -355,7 +385,11 @@ final class CustomerSignupService
             ]);
 
             if ($approval) {
-                return $this->finishJoin($ownTx, $out(self::CONFIRM_PENDING));
+                $signupId = (int) $this->db->lastInsertId();
+                $waiting = $this->finishJoin($ownTx, $out(self::CONFIRM_PENDING));
+                $this->pending($tenantId, $signupId);
+
+                return $waiting;
             }
 
             $membershipId = $this->grant($profileId, $tenantId, $roleId, 'customer_signup_open');

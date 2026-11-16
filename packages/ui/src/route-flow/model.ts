@@ -53,7 +53,7 @@
 export type RouteFlowVerdict = 'approved' | 'rejected';
 
 /** What "this node approved" means. Mirrors core's `RouteQuorum`. */
-export type RouteFlowQuorum = 'all' | 'any' | 'majority';
+export type RouteFlowQuorum = 'all' | 'any' | 'majority' | 'first';
 
 /**
  * Whether a stage ASKS or TELLS. Mirrors core's `RouteSatisfaction`.

@@ -694,6 +694,11 @@ export function RouteActPanel({
                   'routing.act.quorum.any',
                   'One approval from any of them carries it, so yours may settle it on its own. A rejection decides nothing while anybody is still able to approve.'
                 )
+              : quorum === 'first'
+                ? t(
+                    'routing.act.quorum.first',
+                    'The first of them to answer decides, approve or reject. Once someone has answered, nothing more is needed from the others.'
+                  )
               : quorum === 'majority'
                 ? t(
                     'routing.act.quorum.majority',

@@ -1,9 +1,15 @@
 'use client';
 
 /**
- * Pick a free time on the public booking pages (WHIT-945): a week of days on
- * the WORKSPACE's clock, then the times free on the chosen day. Used by the
- * booking page and by Move on the customer's manage page.
+ * THE one picker for a free time (WHIT-945, WHIT-1051, issue #1933, ADR 0018):
+ * a week of days on the WORKSPACE's clock, then the times free on the chosen
+ * day. Used by the public booking page, by Move on the customer's manage page,
+ * and (through `calendar/slot-picker.tsx`) by New booking and Move in the
+ * staff calendar.
+ *
+ * The staff calendar differs in three small ways, all optional props: there is
+ * no first or last bookable day (`earliest` is null; the first week starts on
+ * `startOn`), and the day is the dialog's own (`day` / `onDayChange`).
  *
  * Days are calendar dates in the workspace's zone (ADR 0017 section 2): a slot
  * at 23:30 in Amman sits on Amman's day whatever zone the visitor's phone is
@@ -34,19 +40,24 @@ import {
 import { daysOfWeek, weekQuery, PublicBookingError, type FreeTime } from '@/lib/booking/public-api';
 import { cn } from '@/lib/utils';
 
-export interface FreeTimePickerProps {
+export interface FreeTimePickerProps<T extends FreeTime = FreeTime> {
   id: string;
   timeZone: string;
-  /** The first day that can be booked (today in the workspace's zone). */
-  earliest: CalendarDate;
+  /** The first day that can be booked (today in the workspace's zone), or null when any day can (staff). */
+  earliest: CalendarDate | null;
+  /** The day the first week starts on when `earliest` is null. */
+  startOn?: CalendarDate;
+  /** A day the caller owns (the booking's date). Without it the picker keeps its own. */
+  day?: CalendarDate | null;
+  onDayChange?: (day: CalendarDate) => void;
   /** The last day that can be booked, or null when the page does not say. */
   latest: CalendarDate | null;
   /** Fetch the free times between two instants (ISO with the workspace's offset). */
-  load: (range: { from: string; to: string }) => Promise<FreeTime[]>;
+  load: (range: { from: string; to: string }) => Promise<T[]>;
   /** Changes when what is being booked changes (service, person): fetch again. */
   loadKey: string;
-  selected: FreeTime | null;
-  onSelect: (slot: FreeTime | null) => void;
+  selected: T | null;
+  onSelect: (slot: T | null) => void;
   reloadKey?: number;
   /** A time to leave out, such as the booking's own when moving it. */
   exclude?: { starts_at: string } | null;
@@ -54,10 +65,13 @@ export interface FreeTimePickerProps {
 
 const WEEK = 7;
 
-export function FreeTimePicker({
+export function FreeTimePicker<T extends FreeTime = FreeTime>({
   id,
   timeZone,
   earliest,
+  startOn,
+  day: controlledDay,
+  onDayChange,
   latest,
   load,
   loadKey,
@@ -65,25 +79,37 @@ export function FreeTimePicker({
   onSelect,
   reloadKey = 0,
   exclude = null,
-}: FreeTimePickerProps) {
+}: FreeTimePickerProps<T>) {
   const t = useTranslation('booking');
   const dates = useDateDisplay({ timeZone });
-  const [first, setFirst] = useState<CalendarDate>(earliest);
+  const floor = earliest ?? startOn ?? controlledDay ?? null;
+  if (floor === null) throw new Error('FreeTimePicker needs `earliest`, `startOn` or `day`.');
+  const [first, setFirst] = useState<CalendarDate>(floor);
   // The day the person picked; null until they do (the first day with times is shown).
-  const [day, setDay] = useState<CalendarDate | null>(null);
+  const [ownDay, setOwnDay] = useState<CalendarDate | null>(null);
+  const day = controlledDay !== undefined ? controlledDay : ownDay;
+  const setDay = (next: CalendarDate | null) => {
+    setOwnDay(next);
+    if (next !== null) onDayChange?.(next);
+  };
+
+  // A day the caller moved outside the week shown: show its week.
+  if (controlledDay && (dateKey(controlledDay) < dateKey(first) || dateKey(controlledDay) > dateKey(addDays(first, WEEK - 1)))) {
+    setFirst(controlledDay);
+  }
   const [retry, setRetry] = useState(0);
 
   // What is being booked changed: start again from the first bookable week.
   const [seenLoadKey, setSeenLoadKey] = useState(loadKey);
   if (seenLoadKey !== loadKey) {
     setSeenLoadKey(loadKey);
-    setFirst(earliest);
-    setDay(null);
+    setFirst(floor);
+    setOwnDay(null);
   }
 
   // The answer is filed under the request it answers, so a stale one is never shown as current.
   const requestKey = `${dateKey(first)}|${timeZone}|${loadKey}|${reloadKey}|${retry}`;
-  const [answer, setAnswer] = useState<{ key: string; slots: FreeTime[] | null; failed: number | null } | null>(null);
+  const [answer, setAnswer] = useState<{ key: string; slots: T[] | null; failed: number | null } | null>(null);
   useEffect(() => {
     let cancelled = false;
     load(weekQuery(first, timeZone, WEEK))
@@ -122,13 +148,16 @@ export function FreeTimePicker({
   }, [week, slots]);
 
   const last = addDays(first, WEEK - 1);
-  const canGoBack = dateKey(first) > dateKey(earliest);
+  const canGoBack = earliest === null || dateKey(first) > dateKey(earliest);
   const canGoOn = latest === null || dateKey(addDays(first, WEEK)) <= dateKey(latest);
 
   const move = (direction: 1 | -1) => {
     const next = addDays(first, direction * WEEK);
-    setFirst(dateKey(next) < dateKey(earliest) ? earliest : next);
-    setDay(null);
+    const target = earliest !== null && dateKey(next) < dateKey(earliest) ? earliest : next;
+    setFirst(target);
+    setOwnDay(null);
+    // A day the caller owns follows the week, or it would pull the week back.
+    if (controlledDay !== undefined) onDayChange?.(target);
     onSelect(null);
   };
 

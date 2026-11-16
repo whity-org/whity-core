@@ -149,7 +149,7 @@ const GROUP_KIND = 'group';
  */
 const NEW_STAGE_KIND_PREFERENCE = ['role', 'group', 'role_below_actor'];
 
-const QUORUMS: RouteFlowQuorum[] = ['all', 'any', 'majority'];
+const QUORUMS: RouteFlowQuorum[] = ['all', 'any', 'majority', 'first'];
 
 export function RouteFlowEditorScreen({
   templateId,
@@ -654,6 +654,7 @@ function RouteFlowBody({
             quorumAll: t('routeTemplates.quorum.all', 'all must approve'),
             quorumAny: t('routeTemplates.quorum.any', 'any one may approve'),
             quorumMajority: t('routeTemplates.quorum.majority', 'a majority must approve'),
+            quorumFirst: t('routeTemplates.quorum.first', 'the first answer decides'),
             tooManyNodes: t(
               'routeTemplates.canvas.tooMany',
               'This flow is larger than the canvas will draw. Showing the first stages only.'
@@ -1383,7 +1384,9 @@ function StageInspector({
                     ? t('routeTemplates.quorum.all', 'all must approve')
                     : q === 'any'
                       ? t('routeTemplates.quorum.any', 'any one may approve')
-                      : t('routeTemplates.quorum.majority', 'a majority must approve')}
+                      : q === 'first'
+                        ? t('routeTemplates.quorum.first', 'the first answer decides')
+                        : t('routeTemplates.quorum.majority', 'a majority must approve')}
                 </SelectItem>
               ))}
             </SelectContent>
