@@ -432,10 +432,14 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
     });
   }, []);
 
-  // Only team events can be pulled to a new length; a booking lasts as long as its service (Q35.7).
+  // Only team events and time off can be pulled to a new length; a booking lasts as long as its service (Q35.7).
   const canResize = useCallback(
     (item: CalItem) =>
-      item.event !== undefined && item.kind === 'event' && !item.allDay && (item.can === undefined || item.can.resize) && canChange(item.event.profile_id),
+      item.event !== undefined &&
+      (item.kind === 'event' || item.kind === 'timeoff') &&
+      !item.allDay &&
+      (item.can === undefined || item.can.resize) &&
+      canChange(item.event.profile_id),
     [canChange]
   );
 

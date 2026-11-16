@@ -10,6 +10,8 @@ import { kindsFor, toCalItems, type ItemContext, type ServerItem } from '@/lib/c
 import { palette } from '@/lib/calendar/colours';
 import { BookingDetails } from '@/components/calendar/booking-details';
 
+jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast: jest.fn() }) }));
+
 const ctx: ItemContext = {
   colourBy: 'person',
   colours: palette([3, 4], [1], [7]),
@@ -89,6 +91,19 @@ it('maps every kind onto one list, keyed by the server id', () => {
   expect(items[1]).toMatchObject({ who: 'Amro Saleh · 1 guests', meetingId: 3 });
   expect(items[1].event).toMatchObject({ id: 9, profile_id: 3, kind: 'meeting' });
   expect(items[2]).toMatchObject({ title: 'Awss Haddad · time off', who: 'Away', allDay: true });
+});
+
+it('lets time off be moved and pulled longer, like a team event (Q35.7)', () => {
+  const { renderHook } = jest.requireActual('@testing-library/react');
+  const { useGridEditing } = jest.requireActual('@/components/calendar/calendar-editing');
+  const [off] = toCalItems([row({ id: 'time_off:5', kind: 'time_off', title: 'Dentist', event: { id: 5, notes: '', meeting_id: null, external_ref: null } })], ctx);
+  const [meeting] = toCalItems([row({ id: 'meeting:3', kind: 'meeting', can: { open: true, move: false, resize: false, cancel: false } })], ctx);
+  const { result } = renderHook(() =>
+    useGridEditing({ items: [off], days: [], services: [], staff: [], timeZone: 'Asia/Amman', canWrite: true, canChange: () => true, placeOf: () => null, onChanged: () => {} })
+  );
+  expect(result.current.canDrag(off)).toBe(true);
+  expect(result.current.canResize(off)).toBe(true);
+  expect(result.current.canDrag(meeting)).toBe(false);
 });
 
 it('leaves out what the panel unticked', () => {
