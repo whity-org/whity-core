@@ -11,6 +11,7 @@ use Tests\Support\SchemaFromMigrations;
 use Whity\Core\Plan\CatalogueImporter;
 use Whity\Core\Plan\PlanPriceRepository;
 use Whity\Core\Plan\PlanRepository;
+use Whity\Core\Plan\PlanService;
 
 /**
  * The catalogue import only ever adds. Each test here is a way it could
@@ -181,8 +182,19 @@ final class CatalogueImporterRealEngineTest extends TestCase
             'mistyped field' => [$with(['sortorder' => 1]), 'unknown field "sortorder"'],
             'duplicate key' => [$with(['plan_key' => 'SAMPLE']), 'appears more than once'],
             'bad key' => [$with(['plan_key' => 'no spaces']), 'plan_key must be lowercase'],
+            'empty part' => [$with(['plan_key' => 'plugin..salons']), 'plan_key must be lowercase'],
+            'trailing dot' => [$with(['plan_key' => 'plugin.salons.']), 'plan_key must be lowercase'],
             'no name' => [$with(['name' => '  ']), 'needs a name'],
         ];
+    }
+
+    /** WHIT-1156: a paid plugin's add-on plans are `plugin.<slug>.<plan>`, as every add-on reader in core expects. */
+    public function testAPluginAddonKeyWithDotsIsValid(): void
+    {
+        foreach (['plugin.salons.monthly', 'plugin.salons.half_year', 'plugin.front-office.yearly'] as $key) {
+            PlanService::assertValidKey($key);
+        }
+        $this->addToAssertionCount(3);
     }
 
     public function testAFileWithNoPlansIsRefused(): void

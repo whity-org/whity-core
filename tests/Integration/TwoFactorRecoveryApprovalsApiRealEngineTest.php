@@ -21,6 +21,7 @@ use Whity\Core\Mail\Mailer;
 use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\Document\Signing\SigningChallengeRepository;
 use Whity\Core\Request;
+use Whity\Core\Security\GatedApproval;
 use Whity\Core\Security\IdentityCheck;
 use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Settings\SettingsRegistry;
@@ -495,7 +496,8 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
             new AuditLogger($this->pdo, new NullLogger()),
             $resetMailer,
             // The admin's own check is IdentityCheck's to prove (IdentityCheckTest); here a fixed code stands in.
-            new class ($this->pdo) extends IdentityCheck {
+            // Only a code for a two-step reset counts here (GatedApproval binds the kind).
+            new GatedApproval(new class ($this->pdo) extends IdentityCheck {
                 public function __construct(PDO $pdo)
                 {
                     parent::__construct($pdo, new SigningChallengeRepository($pdo));
@@ -503,9 +505,9 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
 
                 public function verify(int $tenantId, int $profileId, string $purpose, ?string $code): ?string
                 {
-                    return $code === '123456' ? self::TOTP : null;
+                    return $code === '123456' && str_starts_with($purpose, GatedApproval::TWO_FACTOR_RECOVERY . ':') ? self::TOTP : null;
                 }
-            },
+            }),
         );
     }
 

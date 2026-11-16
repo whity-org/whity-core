@@ -113,7 +113,9 @@ export function ChangePlan({ onChanged }: { onChanged: () => void }) {
               <bdi>{formatMoney(plan.unit_amount, plan.currency)}</bdi>{' '}
               {plan.billing_period === 'year'
                 ? t('billing.plans.perYear', 'per year')
-                : t('billing.plans.perMonth', 'per month')}
+                : plan.billing_period === 'half_year'
+                  ? t('billing.plans.perHalfYear', 'every 6 months')
+                  : t('billing.plans.perMonth', 'per month')}
             </p>
             {canPay ? (
               <Button variant="outline" onClick={() => open(plan)} data-testid={`change-plan-${plan.plan_key}`}>

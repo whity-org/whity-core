@@ -12,8 +12,8 @@
 
 import { useMemo } from 'react';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
-import { localizedName } from '@/lib/localized-name';
 import { CalendarRequestError, type CalendarBooking, type CalendarService } from '@/lib/calendar/api';
+import { localizedText } from '@whity/ui/localized-text';
 
 export interface CalendarWords {
   /** "Monday" for ISO weekday 1. */
@@ -100,9 +100,9 @@ export function useCalendarWords(): CalendarWords {
     const minutes = (n: number) => t('unit.minutes', '{n} min', { n });
     /** A `{ar, en}` label, such as a room's name, in the reader's language. */
     const label = (names: Record<string, string> | null | undefined) =>
-      localizedName(names ?? {}, language, 'en', t('room.unnamed', 'Unnamed room'));
+      localizedText(names ?? {}, language, 'en', t('room.unnamed', 'Unnamed room'));
     const serviceName = (service: CalendarService | null | undefined) =>
-      service ? localizedName(service.name, language, 'en', t('service.unnamed', 'Unnamed service')) : t('service.unknown', 'A removed service');
+      service ? localizedText(service.name, language, 'en', t('service.unnamed', 'Unnamed service')) : t('service.unknown', 'A removed service');
     const errorText = (error: unknown, fallback: string) => {
       if (error instanceof CalendarRequestError) {
         switch (error.status) {

@@ -11,8 +11,8 @@ import { AccessDeniedPanel, AreaError, EmptyFirstTime, LoadingRows } from "@whit
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
 import { createFormsApi } from "./api"
-import { pickText } from "./text"
 import type { FormRow, FormsScreenEnv } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 /**
  * The forms a person can fill in, as cards. What they started and did not send comes
@@ -64,9 +64,9 @@ export function FormsCatalogScreen({ env, canReadForms = true }: { env: FormsScr
   const card = (form: FormRow, resume: boolean) => (
     <Card key={`${resume ? "d" : "a"}-${form.id}`}>
       <CardHeader>
-        <CardTitle className="text-base">{pickText(form.name, currentLanguage) || form.form_key}</CardTitle>
-        {pickText(form.description_i18n, currentLanguage) !== "" && (
-          <CardDescription>{pickText(form.description_i18n, currentLanguage)}</CardDescription>
+        <CardTitle className="text-base">{localizedText(form.name, currentLanguage) || form.form_key}</CardTitle>
+        {localizedText(form.description_i18n, currentLanguage) !== "" && (
+          <CardDescription>{localizedText(form.description_i18n, currentLanguage)}</CardDescription>
         )}
       </CardHeader>
       <CardContent className="flex items-center justify-between gap-3">

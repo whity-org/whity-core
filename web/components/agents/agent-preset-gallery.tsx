@@ -8,10 +8,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Icon, type IconName } from '@whity/ui/icon';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
-import { localized, refusalText, toolsetLabel, type AgentPreset, type WorkspaceAgent } from '@/components/agents/workspace-agents';
+import { refusalText, toolsetLabel, type AgentPreset, type WorkspaceAgent } from '@/components/agents/workspace-agents';
 import { useFetch } from '@/hooks/useFetch';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
+import { localizedText } from '@whity/ui/localized-text';
 
 /**
  * New agent (AI.2, TplAgentPresets): a gallery of ready agents with Start from
@@ -71,7 +72,7 @@ export function AgentPresetGallery({ open, onOpenChange }: { open: boolean; onOp
                     <Icon name={(preset.icon ?? 'robot') as IconName} size={20} />
                   </span>
                   <span className="min-w-0">
-                    <span className="block font-semibold">{localized(preset.name, preset.nameAr, arabic)}</span>
+                    <span className="block font-semibold">{localizedText({ en: preset.name, ar: preset.nameAr }, arabic ? 'ar' : 'en')}</span>
                     {preset.agentsFromIt > 0 && (
                       <span className="block text-sm text-muted-foreground">
                         {t('agents.new.fromIt', 'You have {n} from this', { n: preset.agentsFromIt })}
@@ -79,7 +80,7 @@ export function AgentPresetGallery({ open, onOpenChange }: { open: boolean; onOp
                     )}
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground">{localized(preset.role, preset.roleAr, arabic)}</p>
+                <p className="text-sm text-muted-foreground">{localizedText({ en: preset.role, ar: preset.roleAr }, arabic ? 'ar' : 'en')}</p>
                 {preset.does.length > 0 && (
                   <ul className="flex-1 list-disc space-y-1 ps-5 text-sm">
                     {(arabic && preset.doesAr.length > 0 ? preset.doesAr : preset.does).map((thing) => (

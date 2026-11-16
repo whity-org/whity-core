@@ -197,6 +197,26 @@ final class CoreJobs
                 false
             );
             $registry->register(\Whity\Core\Calendar\BookingHoldExpiryJob::NAME, new \Whity\Core\Calendar\BookingHoldExpiryJob($calendarBookings), false);
+            // ADR 0018: reminders before events and meetings, through the same
+            // notices, preferences and push as every other notice.
+            $registry->register(
+                \Whity\Core\Calendar\EventReminderJob::NAME,
+                new \Whity\Core\Calendar\EventReminderJob(new \Whity\Core\Calendar\EventReminders(
+                    $pdo,
+                    new \Whity\Core\Calendar\CalendarRepository($pdo),
+                    $calendarQueue,
+                    new NotificationDispatcher(
+                        new NotificationRepository($pdo),
+                        $transports,
+                        $calendarQueue,
+                        null,
+                        $calendarLogger,
+                        new \Whity\Core\Notification\NotificationPreferenceResolver(new \Whity\Core\Notification\NotificationPreferenceRepository($pdo)),
+                    ),
+                    $calendarLogger,
+                )),
+                false
+            );
             $registry->register(
                 \Whity\Core\Calendar\BookingReminderJob::NAME,
                 new \Whity\Core\Calendar\BookingReminderJob(

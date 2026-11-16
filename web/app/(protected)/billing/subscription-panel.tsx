@@ -46,6 +46,9 @@ interface Receipt {
   currency: string;
   paid_at: string | null;
   issued_at: string | null;
+  /** WHIT-1153: recorded by the operator, paid in cash. */
+  source?: 'cash';
+  covers_until?: string;
 }
 
 export function SubscriptionPanel() {
@@ -139,8 +142,12 @@ export function SubscriptionPanel() {
         ) : (
           <ul className="divide-y rounded-lg border text-sm">
             {paid.map((receipt) => (
-              <li key={receipt.number} className="flex flex-wrap items-baseline justify-between gap-2 p-3">
-                <span className="font-medium">{receipt.number}</span>
+              <li key={`${receipt.source ?? 'provider'}-${receipt.number}`} className="flex flex-wrap items-baseline justify-between gap-2 p-3">
+                <span className="font-medium">
+                  {receipt.source === 'cash'
+                    ? t('billing.receipts.cash', 'Paid in cash · receipt {number}', { number: receipt.number })
+                    : receipt.number}
+                </span>
                 <span className="text-muted-foreground">
                   {dates.date(receipt.paid_at) ?? ''}
                 </span>

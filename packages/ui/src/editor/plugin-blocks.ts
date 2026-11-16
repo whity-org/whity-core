@@ -1,4 +1,5 @@
 import type { Localized, PluginBlockDefinition, PluginBlocks, PluginBlockSource } from "./services"
+import { localizedText } from "../localized-text"
 
 /**
  * Plugin blocks in the editor (editor M7, E.17–E.20). A block's view is a
@@ -8,12 +9,6 @@ import type { Localized, PluginBlockDefinition, PluginBlocks, PluginBlockSource 
  * language. Nothing a plugin declares is run.
  */
 
-export function localized(text: Localized | string | null | undefined, lang: "en" | "ar"): string {
-  if (!text) return ""
-  if (typeof text === "string") return text
-  return text[lang] || text.en || text.ar || ""
-}
-
 /** Each field's shown text; a select shows its option's label. */
 export function fieldValues(definition: PluginBlockDefinition, data: Record<string, unknown>, lang: "en" | "ar"): Record<string, string> {
   const out: Record<string, string> = {}
@@ -22,7 +17,7 @@ export function fieldValues(definition: PluginBlockDefinition, data: Record<stri
     let text = raw === null || raw === undefined ? "" : String(raw)
     if (field.type === "select") {
       const option = field.options?.find((o) => o.value === text)
-      if (option) text = localized(option.label, lang)
+      if (option) text = localizedText(option.label, lang)
     }
     out[field.key] = text
   }
@@ -36,7 +31,7 @@ const isLocalized = (v: unknown): v is Localized =>
 export function fillView(view: unknown[], values: Record<string, string>, lang: "en" | "ar"): unknown[] {
   const fill = (value: unknown): unknown => {
     if (typeof value === "string") return value.replace(/\{\{\s*data\.([a-z][a-z0-9_]{0,39})\s*\}\}/g, (_, key: string) => values[key] ?? "")
-    if (isLocalized(value)) return fill(localized(value, lang))
+    if (isLocalized(value)) return fill(localizedText(value, lang))
     if (Array.isArray(value)) return value.map(fill)
     if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fill(v)]))
     return value

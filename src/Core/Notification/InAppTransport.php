@@ -12,7 +12,7 @@ use Whity\Sdk\Notification\SendResult;
  * The built-in in-app ("inbox") transport (WC-notifications). For the `in_app`
  * channel there is nothing to send OUT: the dispatcher already persisted the
  * `notifications` row (which IS the inbox item) before enqueuing this delivery,
- * and {@see \Whity\Api\InboxApiHandler} serves it from that row. So delivery is
+ * and {@see \Whity\Api\NotificationsApiHandler} serves it from that row. So delivery is
  * simply confirming the inbox item is available — this transport reports success
  * and carries no external provider.
  *

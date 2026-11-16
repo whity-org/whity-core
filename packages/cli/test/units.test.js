@@ -110,3 +110,20 @@ test('every line of help is plain ASCII, which PowerShell 5.1 can print', async 
   await main(['--help'], deps);
   assert.match(deps.logs.join('\n'), /^[\x00-\x7f]*$/);
 });
+
+test('whity update finds the install from inside its folder too', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'whity-here-'));
+  const before = process.cwd();
+  try {
+    writeFileSync(join(dir, '.env'), 'WHITY_VERSION=v0.2.22\n');
+    writeFileSync(join(dir, 'docker-compose.yml'), 'services: {}\n');
+    process.chdir(dir);
+    const deps = fakeDeps({ running: '0.2.22', target: '0.2.22' });
+    const code = await main(['update', 'v0.2.22'], deps);
+    assert.equal(code, 0);
+    assert.match(deps.logs.join('\n'), /Already on v0\.2\.22/);
+  } finally {
+    process.chdir(before);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

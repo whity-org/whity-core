@@ -149,7 +149,7 @@ const GROUP_KIND = 'group';
  */
 const NEW_STAGE_KIND_PREFERENCE = ['role', 'group', 'role_below_actor'];
 
-const QUORUMS: RouteFlowQuorum[] = ['all', 'any', 'majority'];
+const QUORUMS: RouteFlowQuorum[] = ['all', 'any', 'majority', 'first'];
 
 export function RouteFlowEditorScreen({
   templateId,
@@ -654,6 +654,7 @@ function RouteFlowBody({
             quorumAll: t('routeTemplates.quorum.all', 'all must approve'),
             quorumAny: t('routeTemplates.quorum.any', 'any one may approve'),
             quorumMajority: t('routeTemplates.quorum.majority', 'a majority must approve'),
+            quorumFirst: t('routeTemplates.quorum.first', 'the first answer decides'),
             tooManyNodes: t(
               'routeTemplates.canvas.tooMany',
               'This flow is larger than the canvas will draw. Showing the first stages only.'
@@ -866,7 +867,7 @@ function StageValuesEditor({
     if (label === '') return;
     onChange([
       ...inputs,
-      { key: stageValueKey(label, inputs.map((input) => input.key)), label, labelAr: null, required: true, maxLength: 100 },
+      { key: stageValueKey(label, inputs.map((input) => input.key)), label, labelAr: null, required: true, maxLength: 100, type: 'text' },
     ]);
     setDraft('');
   };
@@ -911,6 +912,14 @@ function StageValuesEditor({
                 onCheckedChange={(checked) => update(index, { required: checked })}
               />
               {t('routeTemplates.inspector.valueRequired', 'Needed to approve')}
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Switch
+                checked={input.type === 'person'}
+                disabled={readOnly}
+                onCheckedChange={(checked) => update(index, { type: checked ? 'person' : 'text' })}
+              />
+              {t('routeTemplates.inspector.valuePerson', 'A person in the workspace')}
             </label>
             {!readOnly && (
               <Button
@@ -984,12 +993,12 @@ function StageExclusionsEditor({
   return (
     <section className="space-y-2" aria-labelledby="stage-exclusions-heading">
       <h3 id="stage-exclusions-heading" className="text-sm font-medium">
-        {t('routeTemplates.inspector.exclusions', 'Leave out people named on the form')}
+        {t('routeTemplates.inspector.exclusions', 'Leave out people named on the form or at an earlier stage')}
       </h3>
       <p className="text-xs text-muted-foreground">
         {t(
           'routeTemplates.inspector.exclusionsHelp',
-          'People picked in these questions, such as the supervisor, are not asked here, are not counted towards approval and are not printed among the approvals.'
+          'People picked in these questions or stage values, such as the supervisor, are not asked here, are not counted towards approval and are not printed among the approvals.'
         )}
       </p>
       {keys.length > 0 && (
@@ -1375,7 +1384,9 @@ function StageInspector({
                     ? t('routeTemplates.quorum.all', 'all must approve')
                     : q === 'any'
                       ? t('routeTemplates.quorum.any', 'any one may approve')
-                      : t('routeTemplates.quorum.majority', 'a majority must approve')}
+                      : q === 'first'
+                        ? t('routeTemplates.quorum.first', 'the first answer decides')
+                        : t('routeTemplates.quorum.majority', 'a majority must approve')}
                 </SelectItem>
               ))}
             </SelectContent>

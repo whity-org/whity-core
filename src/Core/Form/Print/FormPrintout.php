@@ -51,7 +51,7 @@ final class FormPrintout
      *   workspace: array{name: string, lines?: list<string>, logo?: ?string, nameAr?: ?string, linesAr?: list<string>},
      *   form: array{title: mixed, description?: mixed, sections?: list<array<string, mixed>>, fields: list<array<string, mixed>>},
      *   answers: array<string, mixed>,
-     *   office?: array<string, array{value: mixed, by?: ?string, at?: ?string}>,
+     *   office?: list<array{label: mixed, value: string, by?: ?string, at?: ?string}>,
      *   submission: array{reference?: ?string, submittedAt?: ?string, submittedBy?: ?string},
      *   decision?: ?array{status: string, decidedAt?: ?string, approvals?: list<array{name: string, role?: ?string, at?: ?string}>, notCounted?: list<array{name: string, question?: ?string}>},
      *   verify?: ?array{url: string, reference?: ?string},
@@ -99,8 +99,7 @@ final class FormPrintout
         }
 
         $fields = $in['form']['fields'];
-        $applicant = FormFieldRepository::applicantFields($fields);
-        $staff = FormFieldRepository::staffFields($fields);
+        $applicant = $fields;
         $sections = $this->sections($in['form']['sections'] ?? [], $applicant);
         $number = 0;
         $titled = count(array_filter($sections, static fn (array $s): bool => $s['title'] !== ''));
@@ -111,8 +110,8 @@ final class FormPrintout
             $number += $section['title'] !== '' ? 1 : 0;
             $this->section($content, $section, $section['fields'], $in['answers'], $number, $titled);
         }
-        if ($staff !== []) {
-            $this->officialUse($content, $staff, $in['office'] ?? []);
+        if (($in['office'] ?? []) !== []) {
+            $this->officialUse($content, $in['office']);
         }
         if ($atEnd) {
             if ($this->style['decision'] !== 'top') {
@@ -679,36 +678,19 @@ final class FormPrintout
     }
 
     /**
-     * The questions the office answers, with who answered and when.
+     * "For official use" (merge map A3): what the office entered at the route's
+     * steps, with who entered it and when.
      *
      * @param list<array<mixed>> $content
-     * @param list<array<string, mixed>> $fields
-     * @param array<string, array{value: mixed, by?: ?string, at?: ?string}> $office
+     * @param list<array{label: mixed, value: string, by?: ?string, at?: ?string}> $office
      */
-    private function officialUse(array &$content, array $fields, array $office): void
+    private function officialUse(array &$content, array $office): void
     {
         $t = $this->t;
         $content[] = $this->sectionHeading('i', $t->get('officeUse'), null);
-        foreach ($fields as $field) {
-            $entry = $office[(string) $field['field_key']] ?? null;
-            $label = mb_substr(self::numbered($t->pick($field['label'] ?? null) ?: (string) $field['field_key'])[1], 0, 600);
-            if ($entry === null || $this->isBlank($entry['value'])) {
-                $content[] = ['type' => 'formQuestion', 'number' => '', 'text' => $label, 'answer' => ['kind' => 'empty', 'text' => $t->get('notAnswered')]];
-                continue;
-            }
-            $scratch = [];
-            $answer = $this->answer($field, $entry['value'], $scratch);
-            $value = match ($answer['kind']) {
-                'yesNo' => $answer['word'],
-                'choices' => implode(', ', array_map(static fn (array $o): string => $o['text'], array_filter($answer['options'], static fn (array $o): bool => $o['chosen']))),
-                'text' => implode(' ', $answer['paragraphs']),
-                default => '',
-            };
-            if ($value === '') {
-                $content[] = ['type' => 'formQuestion', 'number' => '', 'text' => $label, 'answer' => $answer];
-                continue;
-            }
-            $items = [['label' => $t->get('answer'), 'value' => mb_substr($value, 0, 500)]];
+        foreach ($office as $entry) {
+            $label = mb_substr($t->pick($entry['label']) ?: '—', 0, 600);
+            $items = [['label' => $t->get('answer'), 'value' => mb_substr($entry['value'], 0, 500)]];
             if (($entry['by'] ?? '') !== '') {
                 $items[] = ['label' => $t->get('by'), 'value' => (string) $entry['by']];
             }

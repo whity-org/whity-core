@@ -15,7 +15,6 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -226,17 +225,8 @@ export default function DocumentThemesPage() {
     }
   };
 
-  const breadcrumb = (
-    <nav aria-label={t('themes.breadcrumb', 'Breadcrumb')} className="flex flex-wrap items-center gap-1">
-      <Link href="/admin/document-library" className="hover:underline">
-        {t('themes.crumb.documents', 'Documents')}
-      </Link>
-      <Icon name={ar ? 'chevron-left' : 'chevron-right'} size={12} />
-      <span aria-current="page" className="text-foreground">
-        {t('themes.crumb.themes', 'Document themes')}
-      </span>
-    </nav>
-  );
+  // No breadcrumb of its own: document themes are a workspace setting
+  // (WHIT-1082), and the Settings frame shows "Settings › Document themes".
 
   // What the selected theme prints with: its own values over what it resolves to.
   const resolved: ThemeTokens = theme?.resolved?.tokens ?? {};
@@ -269,7 +259,6 @@ export default function DocumentThemesPage() {
   return (
     <div className="pb-16">
       <PageHeader
-        breadcrumb={breadcrumb}
         title={t('themes.crumb.themes', 'Document themes')}
         description={t(
           'themes.listDescription',

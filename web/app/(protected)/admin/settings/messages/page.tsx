@@ -24,6 +24,7 @@ import { Textarea } from '@whity/ui/textarea';
 import { AreaError, EmptyFirstTime } from '@whity/ui/page-states';
 import { useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
+import { BlockedSendersCard, ChatBotsCard } from '@/components/chat/chat-settings';
 import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -134,8 +135,8 @@ export default function MessagesSettingsPage() {
   return (
     <div className="space-y-6">
       <AdminHeader
-        title={t('settings.messages.title', 'Messages')}
-        description={t('settings.messages.description', 'Web chat and email for customers’ messages.')}
+        title={t('settings.messages.title', 'Chat')}
+        description={t('settings.messages.description', 'Web chat and email for customers, the bots that answer them, and who is blocked.')}
       />
 
       {settings.error ? (
@@ -308,6 +309,10 @@ export default function MessagesSettingsPage() {
           </Card>
         </>
       )}
+
+      {/* Settings › Chat (design 3.5, UC.4, UC.12): the workspace's bots, and who it blocked. */}
+      <ChatBotsCard />
+      <BlockedSendersCard />
 
       <ConfirmAction
         open={confirmRotate}

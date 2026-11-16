@@ -11,6 +11,12 @@
  *
  * There is no web card for this screen yet (brand ask WHIT-1075); it follows
  * the phone app's `TmPreferences` and the Display card next to it.
+ *
+ * One place to choose (merge map N3, WHIT-1119): each kind has a Push and an
+ * Email switch, both on the same (type, channel) preferences every sender
+ * reads: notices, agents' emails, calendar invitations and reminders. In the
+ * app is always on, since that's the Inbox's Mentions and Updates. Reminders
+ * by email start off, and come only when turned on.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -22,18 +28,24 @@ import { useDateDisplay } from '@whity/features/datetime';
 import { api } from '@/lib/api/client';
 import { deviceLabel, NOTIFICATIONS_ANCHOR, usePush } from '@/lib/pwa/push';
 
-const CHANNEL = 'push';
+type Channel = 'push' | 'email';
 
-type Kind = { id: string; types: string[]; label: string };
+/** `email: false` when the kind never comes by email; `emailOff` when email starts off. */
+type Kind = { id: string; types: string[]; label: string; email?: boolean; emailOff?: boolean };
 
 type Preference = { type: string; channel: string; enabled: boolean };
 
-/** On unless the person turned the kind, or every kind, off on push. */
-function isOn(prefs: Preference[], types: string[]): boolean {
-  const every = prefs.find((p) => p.type === '*' && p.channel === CHANNEL);
+/**
+ * On unless the person turned the kind, or every kind, off on this channel;
+ * for a kind that starts off on email, off until turned on.
+ */
+function isOn(prefs: Preference[], types: string[], channel: Channel, startsOff = false): boolean {
+  const every = prefs.find((p) => p.type === '*' && p.channel === channel);
   return types.every((type) => {
-    const exact = prefs.find((p) => p.type === type && p.channel === CHANNEL);
-    return exact ? exact.enabled : every ? every.enabled : true;
+    const exact = prefs.find((p) => p.type === type && p.channel === channel);
+    if (exact) return exact.enabled;
+    if (startsOff) return false;
+    return every ? every.enabled : true;
   });
 }
 
@@ -76,11 +88,13 @@ export function PushSettings() {
       id: 'chat-messages',
       types: ['chat.message'],
       label: t('settings.push.kind.chat', 'Chat messages'),
+      email: false,
     },
     {
       id: 'chat-mentions',
       types: ['chat.mention'],
       label: t('settings.push.kind.chatMention', 'Mentions in chat'),
+      email: false,
     },
     {
       id: 'documents-waiting',
@@ -99,16 +113,34 @@ export function PushSettings() {
     },
     {
       id: 'meetings',
-      types: ['convening.meeting.invited', 'convening.meeting.updated'],
+      types: [
+        'convening.meeting.invited',
+        'convening.meeting.updated',
+        'convening.meeting.cancelled',
+        'calendar.event.invited',
+        'calendar.event.updated',
+        'calendar.event.cancelled',
+      ],
       label: t('settings.push.kind.meetings', 'Meeting invitations and changes'),
+    },
+    {
+      id: 'reminders',
+      types: ['calendar.event.reminder'],
+      label: t('settings.push.kind.reminders', 'Reminders 15 minutes before meetings and events'),
+      emailOff: true,
+    },
+    {
+      id: 'agents',
+      types: ['agent.needs_approval'],
+      label: t('settings.push.kind.agents', 'Agents asking you first'),
     },
     ...pluginKinds,
   ];
 
-  const setKind = useCallback(async (kind: Kind, enabled: boolean) => {
-    setSaving(kind.id);
+  const setKind = useCallback(async (kind: Kind, channel: Channel, enabled: boolean) => {
+    setSaving(`${kind.id}:${channel}`);
     const { data } = await api.PUT('/api/v1/me/notification-preferences', {
-      body: { preferences: kind.types.map((type) => ({ type, channel: CHANNEL, enabled })) },
+      body: { preferences: kind.types.map((type) => ({ type, channel, enabled })) },
     });
     if (data) setPrefs(data.data as Preference[]);
     setSaving(null);
@@ -187,19 +219,57 @@ export function PushSettings() {
           </div>
         )}
 
-        <fieldset className="grid gap-3" disabled={push.devices.length === 0}>
-          <legend className="mb-2 text-sm font-medium">{t('settings.push.kinds', 'Send a notification for')}</legend>
-          {kinds.map((kind) => (
-            <label key={kind.id} className="flex items-center justify-between gap-4">
-              <span className="text-sm">{kind.label}</span>
-              <Switch
-                checked={isOn(prefs, kind.types)}
-                disabled={push.devices.length === 0 || saving === kind.id}
-                onCheckedChange={(checked) => void setKind(kind, checked)}
-              />
-            </label>
-          ))}
-        </fieldset>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" data-testid="notification-choices">
+            <caption className="mb-2 text-start text-sm font-medium">
+              {t('settings.push.kinds', 'Send a notification for')}
+            </caption>
+            <thead>
+              <tr className="text-muted-foreground">
+                <th scope="col" className="py-2 text-start font-normal">
+                  {t('settings.notifications.kind', 'What')}
+                </th>
+                <th scope="col" className="w-20 py-2 text-center font-normal">
+                  {t('settings.notifications.push', 'Push')}
+                </th>
+                <th scope="col" className="w-20 py-2 text-center font-normal">
+                  {t('settings.notifications.email', 'Email')}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {kinds.map((kind) => (
+                <tr key={kind.id} className="h-12">
+                  <th scope="row" className="py-2 pe-4 text-start font-normal">
+                    {kind.label}
+                  </th>
+                  <td className="py-2 text-center">
+                    <Switch
+                      aria-label={t('settings.notifications.pushFor', 'Push: {kind}', { kind: kind.label })}
+                      checked={isOn(prefs, kind.types, 'push')}
+                      disabled={push.devices.length === 0 || saving === `${kind.id}:push`}
+                      onCheckedChange={(checked) => void setKind(kind, 'push', checked)}
+                    />
+                  </td>
+                  <td className="py-2 text-center">
+                    {kind.email === false ? (
+                      <span className="text-muted-foreground" aria-label={t('settings.notifications.noEmail', 'Not sent by email')}>
+                        —
+                      </span>
+                    ) : (
+                      <Switch
+                        aria-label={t('settings.notifications.emailFor', 'Email: {kind}', { kind: kind.label })}
+                        checked={isOn(prefs, kind.types, 'email', kind.emailOff === true)}
+                        disabled={saving === `${kind.id}:email`}
+                        onCheckedChange={(checked) => void setKind(kind, 'email', checked)}
+                      />
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </CardContent>
     </Card>
   );

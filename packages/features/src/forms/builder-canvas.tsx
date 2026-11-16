@@ -14,8 +14,8 @@ import { useCurrentLanguage } from "./language"
 import { groupBySection } from "./builder-model"
 import { ChoiceSelect } from "./choice-select"
 import { useKindLabel } from "./kind-labels"
-import { pickText } from "./text"
 import type { FieldCondition, FieldDraft, FieldKind, FormBannerValue, FormSectionDef } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 /** What an answer will look like, drawn quietly so the author sees the shape. */
 function AnswerPreview({ field }: { field: FieldDraft }) {
@@ -32,7 +32,7 @@ function AnswerPreview({ field }: { field: FieldDraft }) {
           {field.options.map((option, i) => (
             <div key={i} className="flex items-center gap-2 text-sm">
               <span className={cn("size-4 border border-input", field.field_type === "select" ? "rounded-full" : "rounded-sm")} aria-hidden />
-              {pickText(option.label, currentLanguage) || t("builder.preview.choice", "Choice")}
+              {localizedText(option.label, currentLanguage) || t("builder.preview.choice", "Choice")}
             </div>
           ))}
         </div>
@@ -81,7 +81,7 @@ function JumpTo({ fields, onJump }: { fields: readonly FieldDraft[]; onJump: (in
           { value: JUMP_NONE, label: t("builder.jump", "Jump to a question") },
           ...fields.map((f, i) => ({
             value: String(i),
-            label: `${i + 1}. ${pickText(f.label, currentLanguage) || t("builder.question.untitled", "Untitled question")}`,
+            label: `${i + 1}. ${localizedText(f.label, currentLanguage) || t("builder.question.untitled", "Untitled question")}`,
           })),
         ]}
         onChange={(next) => next !== JUMP_NONE && onJump(Number(next))}
@@ -168,14 +168,14 @@ export function BuilderCanvas({
   const { currentLanguage } = useCurrentLanguage()
   const kindLabel = useKindLabel()
   const groups = groupBySection(fields, sections.map((s) => s.key))
-  const labelOf = (key: string) => pickText(fields.find((f) => f.field_key === key)?.label, currentLanguage) || key
+  const labelOf = (key: string) => localizedText(fields.find((f) => f.field_key === key)?.label, currentLanguage) || key
   // A rule stores the choice's value, which is written once. The reader gets its words.
   const answerWords = (rule: FieldCondition): string => {
     const controller = fields.find((f) => f.field_key === rule.field)
     const words = (raw: string | number | boolean): string => {
       if (controller?.field_type === "checkbox") return raw === true || raw === "true" ? t("responses.yes", "Yes") : t("responses.no", "No")
       const option = controller?.options.find((o) => o.value === String(raw))
-      return (option && pickText(option.label, currentLanguage)) || String(raw)
+      return (option && localizedText(option.label, currentLanguage)) || String(raw)
     }
     return rule.equals !== undefined ? words(rule.equals) : (rule.in ?? []).map(words).join(", ")
   }
@@ -233,7 +233,7 @@ export function BuilderCanvas({
                 <span>
                   <span className="block text-sm font-semibold">
                     {t("builder.section.bar", "Section {number}", { number: sectionNumber })}
-                    {pickText(section.title, currentLanguage) !== "" && ` · ${pickText(section.title, currentLanguage)}`}
+                    {localizedText(section.title, currentLanguage) !== "" && ` · ${localizedText(section.title, currentLanguage)}`}
                   </span>
                   <span className="block text-xs text-muted-foreground">
                     {t("builder.section.count", "{count} questions", { count: group.items.length })}
@@ -245,8 +245,8 @@ export function BuilderCanvas({
             {(section !== undefined && collapsed.has(section.key) && !group.items.some((i) => i.index === selected) ? [] : group.items).map(({ field, index }) => {
               const position = group.items.findIndex((i) => i.index === index)
               const isSelected = selected === index
-              const label = pickText(field.label, currentLanguage)
-              const help = pickText(field.help_text_i18n, currentLanguage)
+              const label = localizedText(field.label, currentLanguage)
+              const help = localizedText(field.help_text_i18n, currentLanguage)
               return (
                 <div
                   key={field.field_key}

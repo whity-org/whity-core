@@ -1,5 +1,6 @@
-import { keyFrom, pickText } from "./text"
+import { keyFrom } from "./text"
 import type { FieldCondition, FieldDraft, FieldKind, FieldOption, LocalizedMap } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 /** Kinds that carry choices the author writes. */
 export const CHOICE_KINDS: readonly string[] = ["select", "multiselect"]
@@ -56,7 +57,7 @@ export function blankOption(existing: readonly FieldOption[]): FieldOption {
 
 /** The value an option is stored under, from the words the author wrote for it. */
 export function optionValueFrom(label: LocalizedMap, existing: readonly FieldOption[], self: string): string {
-  const words = (label.en ?? "").trim() || (label.ar ?? "").trim() || pickText(label, null).trim()
+  const words = (label.en ?? "").trim() || (label.ar ?? "").trim() || localizedText(label, null).trim()
   const taken = new Set(existing.filter((o) => o.value !== self).map((o) => o.value))
   if (words === "") return self
   let candidate = words.slice(0, 120)

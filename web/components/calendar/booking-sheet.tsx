@@ -81,6 +81,8 @@ export interface BookingSheetProps {
   booking: CalendarBooking | null;
   /** Open straight on Suggest another time (from the Requests card). */
   suggest?: boolean;
+  /** Open straight on Move or Cancel (the details beside a booking, design 3.5 CV.6). */
+  startWith?: 'move' | 'cancel' | null;
   onClose: () => void;
   services: CalendarService[];
   staff: CalendarStaff[];
@@ -89,7 +91,7 @@ export interface BookingSheetProps {
   onChanged: (booking: CalendarBooking, what: BookingChange) => void;
 }
 
-export function BookingSheet({ booking, suggest = false, onClose, services, staff, timeZone, canChange, onChanged }: BookingSheetProps) {
+export function BookingSheet({ booking, suggest = false, startWith = null, onClose, services, staff, timeZone, canChange, onChanged }: BookingSheetProps) {
   const t = useTranslation('calendar');
   const words = useCalendarWords();
   const dates = useDateDisplay({ timeZone });
@@ -101,11 +103,12 @@ export function BookingSheet({ booking, suggest = false, onClose, services, staf
 
   // A different booking, or the Requests card's Suggest, starts the sheet
   // afresh (adjusting state while rendering, not in an effect).
-  const opening = `${bookingId ?? ''}:${suggest ? 'suggest' : 'view'}`;
+  const opening = `${bookingId ?? ''}:${suggest ? 'suggest' : startWith ?? 'view'}`;
   const [opened, setOpened] = useState(opening);
   if (opened !== opening) {
     setOpened(opening);
-    setMode(suggest && bookingId !== null ? 'suggest' : 'view');
+    setMode(bookingId === null ? 'view' : suggest ? 'suggest' : startWith === 'move' ? 'move' : 'view');
+    setCancelling(bookingId !== null && !suggest && startWith === 'cancel');
     setProblem(null);
   }
 

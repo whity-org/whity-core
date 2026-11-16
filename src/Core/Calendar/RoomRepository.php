@@ -115,6 +115,23 @@ final class RoomRepository
             $busy[] = new Interval(Interval::fromDb((string) $r['s']), Interval::fromDb((string) $r['e']));
         }
 
+        // ADR 0018: an event (a meeting, say) held in the room blocks it too.
+        $events = $this->db->prepare(
+            "SELECT starts_at AS s, ends_at AS e FROM calendar_events
+              WHERE tenant_id = :tenant_id AND room_id = :room_id
+                AND starts_at < :to AND ends_at > :from
+                AND busy = :busy AND status = 'confirmed'"
+        );
+        $events->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $events->bindValue(':room_id', $roomId, PDO::PARAM_INT);
+        $events->bindValue(':from', Interval::toDb($from));
+        $events->bindValue(':to', Interval::toDb($to));
+        $events->bindValue(':busy', true, PDO::PARAM_BOOL);
+        $events->execute();
+        foreach ($events->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $busy[] = new Interval(Interval::fromDb((string) $r['s']), Interval::fromDb((string) $r['e']));
+        }
+
         return $busy;
     }
 

@@ -41,7 +41,9 @@ export class CalendarRequestError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly serverMessage: string | null
+    public readonly serverMessage: string | null,
+    /** Why a time is not free (design 3.5, CV.9): person_busy, room_taken or closed. */
+    public readonly reason: string | null = null
   ) {
     super(message);
     this.name = 'CalendarRequestError';
@@ -53,6 +55,12 @@ interface Result {
   data?: unknown;
   error?: unknown;
   response: Response;
+}
+
+function serverReason(error: unknown): string | null {
+  // The server sends it as `details.reason` on the 409 (CalendarRejectedException::notFree).
+  const reason = (error as { details?: { reason?: unknown } } | null | undefined)?.details?.reason;
+  return typeof reason === 'string' && reason !== '' ? reason : null;
 }
 
 function serverText(error: unknown): string | null {
@@ -71,7 +79,7 @@ function read<T>(result: Result, fallback: string): T {
 
 function sendBody<B>(result: Result, fallback: string): B {
   if (!result.response.ok) {
-    throw new CalendarRequestError(fallback, result.response.status, serverText(result.error));
+    throw new CalendarRequestError(fallback, result.response.status, serverText(result.error), serverReason(result.error));
   }
   return result.data as B;
 }
@@ -161,6 +169,37 @@ export const calendarApi = {
       'Free times could not be loaded'
     ),
 
+  /**
+   * Everything on the calendar in one list (the one-calendar model, WHIT-1109):
+   * bookings, team events, meetings, time off, synced busy time and, when asked,
+   * tasks due. `unavailable` names the kinds that could not be read (Taskaat down).
+   */
+  items: async ({ from, to, kinds, cancelled }: { from: string; to: string; kinds: string[]; cancelled: boolean }) => {
+    const result = await api.GET('/api/v1/calendar/items', {
+      params: { query: query({ from, to, kinds: kinds.join(','), cancelled: cancelled ? '1' : null }) },
+    });
+    if (result.response.status === 403) throw new ForbiddenError();
+    if (!result.response.ok) {
+      throw new CalendarRequestError('The calendar could not be loaded', result.response.status, serverText(result.error));
+    }
+    const body = result.data as { data: Schemas['CalendarItem'][]; unavailable?: string[] };
+    return { items: body.data, unavailable: body.unavailable ?? [] };
+  },
+
+  /** Answer an invitation: accepted, declined or tentative. */
+  answerEvent: async (id: number, response: 'accepted' | 'declined' | 'tentative') =>
+    send<CalendarEvent>(
+      await api.POST('/api/v1/calendar/events/{id}/answer', { params: { path: { id } }, body: { response } }),
+      'Your answer could not be saved'
+    ),
+
+  /** Live bookings a day by person, room and service, up to a year (design 3.5 Year view). */
+  dayCounts: async ({ from, to }: RangeParams) =>
+    read<Schemas['CalendarDayCount'][]>(
+      await api.GET('/api/v1/calendar/day-counts', { params: { query: query({ from, to }) } }),
+      'The bookings could not be counted'
+    ),
+
   bookings: async ({ from, to, profileId, unitId, status }: RangeParams) =>
     read<CalendarBooking[]>(
       await api.GET('/api/v1/calendar/bookings', {
@@ -175,7 +214,7 @@ export const calendarApi = {
     ),
   createBooking: async (body: CalendarBookingCreateRequest) =>
     send<CalendarBooking>(await api.POST('/api/v1/calendar/bookings', { body }), 'The booking could not be made'),
-  moveBooking: async (id: number, body: { starts_at: string; profile_id?: number }) =>
+  moveBooking: async (id: number, body: Schemas['CalendarBookingMoveRequest']) =>
     send<CalendarBooking>(
       await api.POST('/api/v1/calendar/bookings/{id}/move', { params: { path: { id } }, body }),
       'The booking could not be moved'
@@ -246,4 +285,10 @@ export const calendarApi = {
 /** Whether an error is the 409 the server sends when a time was just taken. */
 export function isTaken(error: unknown): boolean {
   return error instanceof CalendarRequestError && error.status === 409;
+}
+
+/** Why a 409 refused a time, when the server said (CV.9). */
+export function takenReason(error: unknown): 'person_busy' | 'room_taken' | 'closed' | null {
+  if (!(error instanceof CalendarRequestError) || error.status !== 409) return null;
+  return error.reason === 'person_busy' || error.reason === 'room_taken' || error.reason === 'closed' ? error.reason : null;
 }

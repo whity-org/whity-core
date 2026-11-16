@@ -11,7 +11,8 @@ import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { useFetch } from '@/hooks/useFetch';
 import { api } from '@/lib/api/client';
 import type { components } from '@whity/api-client';
-import { localized, type WorkspaceAgent } from './workspace-agents';
+import { type WorkspaceAgent } from './workspace-agents';
+import { localizedText } from '@whity/ui/localized-text';
 
 type Item = components['schemas']['AgentActivityItem'];
 type Status = Item['status'];
@@ -94,11 +95,11 @@ export function WorkspaceActivityPanel({
   const items = useMemo<AgentActivityItem[]>(
     () =>
       rows.map((row) => {
-        const what = localized(row.toolInfo?.plainName ?? row.summary, row.toolInfo?.plainNameAr ?? null, arabic);
+        const what = localizedText({ en: row.toolInfo?.plainName ?? row.summary, ar: row.toolInfo?.plainNameAr ?? null }, arabic ? 'ar' : 'en');
         return {
           id: row.id,
           kind: KIND[row.status],
-          actor: localized(row.agent.name, row.agent.nameAr, arabic) || t('agentActivity.agent.unknown', 'An agent'),
+          actor: localizedText({ en: row.agent.name, ar: row.agent.nameAr }, arabic ? 'ar' : 'en') || t('agentActivity.agent.unknown', 'An agent'),
           onBehalfOf: row.person.name ?? undefined,
           text: row.status === 'done' ? what : t('agentActivity.workspace.row', '{status}: {what}', { status: statusWords[row.status], what }),
           timeLabel: dates.dateTime(row.createdAt) ?? '',
@@ -124,7 +125,7 @@ export function WorkspaceActivityPanel({
             <SelectItem value={ALL}>{t('agentActivity.workspace.allAgents', 'All agents')}</SelectItem>
             {(agents.data ?? []).map((option) => (
               <SelectItem key={option.id} value={String(option.id)}>
-                {localized(option.name, option.nameAr, arabic)}
+                {localizedText({ en: option.name, ar: option.nameAr }, arabic ? 'ar' : 'en')}
               </SelectItem>
             ))}
           </SelectContent>

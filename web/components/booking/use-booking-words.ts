@@ -10,8 +10,8 @@
 import { useMemo } from 'react';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import { formatMoney } from '@whity/ui/money/currency';
-import { localizedName, type LocalizedNames } from '@/lib/localized-name';
 import { PublicBookingError, type PublicBooking } from '@/lib/booking/public-api';
+import { localizedText, type LocalizedText } from '@whity/ui/localized-text';
 
 /** Money in normal units with the currency's decimals: JOD 12.500. */
 export function moneyText(minor: number, currency: string): string {
@@ -23,7 +23,7 @@ export function moneyText(minor: number, currency: string): string {
 }
 
 export interface BookingWords {
-  name: (names: LocalizedNames | unknown[] | null | undefined) => string;
+  name: (names: LocalizedText | unknown[] | null | undefined) => string;
   /** "30 min", "1 hr 30 min" */
   duration: (minutes: number | null | undefined) => string | null;
   /** "JOD 12.500", "No charge", or null when the service shows no price. */
@@ -38,8 +38,8 @@ export function useBookingWords(): BookingWords {
   const language = useLanguageCode();
 
   return useMemo<BookingWords>(() => {
-    const name = (names: LocalizedNames | unknown[] | null | undefined) =>
-      localizedName(Array.isArray(names) ? {} : names, language, 'en', t('service.unnamed', 'A service'));
+    const name = (names: LocalizedText | unknown[] | null | undefined) =>
+      localizedText(Array.isArray(names) ? {} : names, language, 'en', t('service.unnamed', 'A service'));
 
     const duration = (minutes: number | null | undefined) => {
       if (minutes === null || minutes === undefined || minutes <= 0) return null;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.106).
+ * SDK identity (v1.110).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1291,12 +1291,45 @@ namespace Whity\Sdk;
  * PHP's openssl extension. The host, the store plugin and the builder connector share it (WHIT-1026).
  *
  * Purely additive.)
+ *
+ * 1.107 (PAID PLUGINS, SWITCHED ON PER WORKSPACE: {@see PluginAccessInterface} lets a plugin say
+ * what a workspace needs to use it: an entitlement its plan or add-on grants, the product it is
+ * sold as (`plugin.<slug>`) and an optional trial. When access ends it has 7 days of grace, then
+ * turns read-only. {@see PluginWorkspaceLifecycleInterface} tells a plugin a workspace turned it
+ * on or off, so it can set the workspace up. {@see Billing\WorkspaceAddons} is the host service a
+ * billing plugin calls to grant and revoke a workspace's add-on plans (WHIT-1125).
+ *
+ * Purely additive.)
+ *
+ * 1.108 (WORKSPACE SETUP FOR PACKS: {@see Setup\WorkspaceSetup} lets a plugin set a workspace up
+ * through core's own routes (calendar settings, services, staff and hours; workspace settings;
+ * forms), as the person acting there and with only that person's permissions, so an industry pack
+ * can prepare a workspace when it is turned on (WHIT-1129).
+ *
+ * Purely additive.)
+ *
+ * 1.109 (GUIDED SETUP: {@see PluginOnboardingInterface} lets a plugin declare a step-by-step
+ * setup, each step a block screen with a status route saying which steps are done; core draws it
+ * as a stepper and opens it right after the plugin is turned on. {@see Setup\WorkspaceSetup} also
+ * reaches the workspace's people and staff invitations. A plugin's declared dependencies are
+ * turned on with it in a workspace (WHIT-1148).
+ *
+ * Purely additive.)
+ *
+ * 1.110 (SOLD PER SEAT: a paid plugin's {@see PluginAccessInterface::getAccess()} may add `seats`,
+ * one of its own integer settings counting what the workspace has (Whity for Salons: chairs). The
+ * host buys that many, and changes the subscription's quantity when the count changes.
+ * {@see Billing\QuantityCheckout} is the optional portal interface for a checkout of several of
+ * one price (WHIT-1152). {@see Setup\WorkspaceSetup} also reaches bookings (list, create, check in)
+ * and contacts (list, create), for a salon's walk-ins and commission (WHIT-1154).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.106.0';
+    public const VERSION = '1.110.0';
 
     /**
      * Static identity only — never instantiated.

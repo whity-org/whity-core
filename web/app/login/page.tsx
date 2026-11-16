@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { continueSignupPlugin } from '@/lib/signup-plugin';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useBranding } from '@/lib/branding-context';
@@ -16,9 +17,9 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
 import { TwoFactorSetupWizard } from '@/components/TwoFactorSettings';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
-import { localizedName } from '@/lib/localized-name';
 import { oneEntryPerWorkspace, rolesLabel } from '@/lib/workspace-memberships';
 import { SSO_ERROR_KEYS } from './sso-error-keys';
+import { localizedText } from '@whity/ui/localized-text';
 
 /**
  * THIS SCREEN IS THE TRANSLATION TEMPLATE — the first one converted from
@@ -265,7 +266,7 @@ export default function LoginPage() {
         } else {
           // Single-membership: session cookie already set — redirect in.
           await refreshAuth();
-          router.push('/dashboard');
+          router.push((await continueSignupPlugin()) ?? '/dashboard');
         }
       } else {
         const errorData = ((loginError_ ?? {}) as unknown) as { message?: string };
@@ -305,7 +306,7 @@ export default function LoginPage() {
       if (response.ok) {
         // Session issued for the chosen tenant — redirect in.
         await refreshAuth();
-        router.push('/dashboard');
+        router.push((await continueSignupPlugin()) ?? '/dashboard');
       } else {
         const errorData = ((selectError ?? {}) as unknown) as { message?: string };
         const message =
@@ -365,7 +366,7 @@ export default function LoginPage() {
       if (response.ok) {
         // 2FA successful - refresh auth state and redirect
         await refreshAuth();
-        router.push('/dashboard');
+        router.push((await continueSignupPlugin()) ?? '/dashboard');
       } else if (response.status === 401) {
         const errorMsg = backupCodeMode
           ? t('recovery.error.invalid', 'Invalid recovery code. Please try again.')
@@ -586,7 +587,7 @@ export default function LoginPage() {
                 onClick={() => handleSelectTenant(m.tenant_id)}
               >
                 <span>
-                  {localizedName(m.tenant_names, readerLanguage, m.tenant_name_language, m.tenant_name)}
+                  {localizedText(m.tenant_names, readerLanguage, m.tenant_name_language, m.tenant_name)}
                 </span>
                 <span className="text-xs capitalize text-muted-foreground">{rolesLabel(m)}</span>
               </Button>

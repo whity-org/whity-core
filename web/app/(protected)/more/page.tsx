@@ -28,11 +28,11 @@ import { useThemeMode } from '@/lib/theme-mode-context';
 import { useShellNav } from '@/components/shell/use-shell-nav';
 import { TenantSwitcher } from '@/components/sidebar';
 import { InstallOffer } from '@/components/pwa/install-offer';
-import { localizedName } from '@/lib/localized-name';
 import { rolesLabel } from '@/lib/workspace-memberships';
 import { SETTINGS_AREA_NAV_IDS, WORKSPACE_PAGE_NAV_IDS } from '@/components/settings/settings-area';
 import { MY_SETTINGS_HREF, WORKSPACE_SETTINGS_MENU_HREF } from '@/lib/settings/my-settings';
 import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
+import { localizedText } from '@whity/ui/localized-text';
 
 /** Nav items the tab bar already holds, and the Settings entry, which More splits in two. */
 const HIDDEN_ITEM_IDS = ['dashboard', 'inbox', 'chat', 'settings-area'];
@@ -88,7 +88,7 @@ export default function MorePage() {
   const displayName = user?.display_name || user?.email || '';
   const membership = memberships.find((m) => m.tenant_id === user?.tenant_id);
   const workspace = membership
-    ? localizedName(membership.tenant_names, currentLanguage ?? 'en', membership.tenant_name_language, membership.tenant_name)
+    ? localizedText(membership.tenant_names, currentLanguage ?? 'en', membership.tenant_name_language, membership.tenant_name)
     : '';
   // Every role held here (WHIT-1079), already in words.
   const role = (membership ? rolesLabel(membership) : '') || (user?.role ? roleLabel(user.role) : '');

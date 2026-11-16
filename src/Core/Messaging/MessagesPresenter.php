@@ -70,7 +70,35 @@ final class MessagesPresenter
             'send_after' => $row['send_after'] !== null ? (string) $row['send_after'] : null,
             'sent_at' => $row['sent_at'] !== null ? (string) $row['sent_at'] : null,
             'created_at' => (string) $row['created_at'],
+            // One chat (UC.5): booking times, a form or a payment link the team sent; staff only.
+            'block' => self::block($row['chat_meta'] ?? null),
+            // C5: the channel this message came or went on (one conversation can span channels).
+            'channel' => isset($row['channel']) && $row['channel'] !== '' ? (string) $row['channel'] : null,
         ];
+    }
+
+    /**
+     * "Send by" (UC.3): the channels a reply can go on, the customer's last first.
+     *
+     * @param array<string, string> $addresses channel => address
+     * @return list<array{channel: string, address: string}>
+     */
+    public static function sendBy(array $addresses): array
+    {
+        $out = [];
+        foreach ($addresses as $channel => $address) {
+            $out[] = ['channel' => $channel, 'address' => $address];
+        }
+
+        return $out;
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function block(mixed $meta): ?array
+    {
+        $decoded = is_string($meta) ? json_decode($meta, true) : $meta;
+
+        return is_array($decoded) && is_array($decoded['block'] ?? null) ? $decoded['block'] : null;
     }
 
     /**

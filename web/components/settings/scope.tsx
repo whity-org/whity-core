@@ -20,7 +20,7 @@ import { TenantLogo } from '@whity/ui/tenant-logo';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import { useAuth } from '@/lib/auth-context';
 import { useBranding } from '@/lib/branding-context';
-import { localizedName } from '@/lib/localized-name';
+import { localizedText } from '@whity/ui/localized-text';
 import type { SettingScope } from '@/lib/settings/my-settings';
 
 /** The workspace the person is in, named in their language. */
@@ -29,7 +29,7 @@ export function useCurrentWorkspace(): { id: number | undefined; name: string } 
   const language = useLanguageCode();
   const membership = memberships.find((m) => m.tenant_id === user?.tenant_id);
   const name = membership
-    ? localizedName(membership.tenant_names, language ?? 'en', membership.tenant_name_language, membership.tenant_name)
+    ? localizedText(membership.tenant_names, language ?? 'en', membership.tenant_name_language, membership.tenant_name)
     : '';
   return { id: user?.tenant_id, name };
 }

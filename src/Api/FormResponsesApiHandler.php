@@ -58,7 +58,7 @@ final class FormResponsesApiHandler
                 return Response::error('Form not found', 404);
             }
 
-            $fields = FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, $formId));
+            $fields = $this->fields->listForForm($tenantId, $formId);
 
             $questions = [];
             foreach ($fields as $field) {
@@ -146,7 +146,7 @@ final class FormResponsesApiHandler
             }
 
             $language = self::language($request);
-            $fields = FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, $formId));
+            $fields = $this->fields->listForForm($tenantId, $formId);
 
             $rows = iterator_to_array($this->rows($tenantId, $formId), false);
             $csv = ResponsesCsv::build($fields, $rows, $language);

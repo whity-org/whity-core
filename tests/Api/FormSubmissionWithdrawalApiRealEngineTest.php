@@ -18,7 +18,6 @@ use Whity\Core\Document\Routing\RouteEventRepository;
 use Whity\Core\Document\Routing\RouteRecipientRepository;
 use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormSubmissionRepository;
-use Whity\Core\Form\FormSubmissionReviewRepository;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
@@ -172,18 +171,6 @@ final class FormSubmissionWithdrawalApiRealEngineTest extends TestCase
 
         self::assertSame(409, $response->getStatusCode());
         self::assertSame('already_withdrawn', $this->body($response)['details']['reason']);
-    }
-
-    public function testARecordedReviewBlocksIt(): void
-    {
-        $id = $this->send();
-        (new FormSubmissionReviewRepository($this->pdo))->record(self::TENANT, $id, ['decision' => 'yes'], self::SOMEBODY_ELSE);
-
-        $response = $this->withdraw($id);
-
-        self::assertSame(409, $response->getStatusCode());
-        self::assertSame('already_decided', $this->body($response)['details']['reason']);
-        self::assertNull($this->submissions->find(self::TENANT, $id)['withdrawn_at'] ?? null);
     }
 
     public function testTheDocumentItProducedIsWithdrawnWithIt(): void

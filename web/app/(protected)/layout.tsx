@@ -9,6 +9,7 @@ import { PlanLimitBanner } from '@/components/billing/plan-limit-banner';
 import { PhoneNav } from '@/components/shell/phone-nav';
 import { DataTableLabels } from '@/components/shell/data-table-labels';
 import { PushOffer } from '@/components/pwa/push-offer';
+import { AppSwitchSheet } from '@/components/pwa/app-switch-sheet';
 
 /**
  * The standard app shell: sidebar + a padded, max-width content column; on a
@@ -51,8 +52,9 @@ export default function ProtectedLayout({
           <MaintenanceNotice />
           {/* TplPlanLimit (BM.11): past a plan limit, for people who can change the plan. */}
           <PlanLimitBanner />
-          {/* Gutters 16px on phones, 24 from 640, 32 from 768 (register 4.5). */}
-          <div className="p-4 sm:p-6 md:p-8 max-w-7xl">
+          {/* Gutters 16px on phones, 24 from 640, 32 from 768 (register 4.5).
+              A page marked data-full-width (the calendar, CV.1) takes the whole width. */}
+          <div className="p-4 sm:p-6 md:p-8 max-w-7xl has-[[data-full-width]]:max-w-none">
             {/* WHIT-1077: the notifications ask, after sign-in on any page, until answered. */}
             <PushOffer className="mb-6" />
             <DataTableLabels>{children}</DataTableLabels>
@@ -60,6 +62,8 @@ export default function ProtectedLayout({
         </main>
         <AppCommandPalette />
         <PhoneNav />
+        {/* WHIT-1155: on a phone's browser, open the installed app or install it. */}
+        <AppSwitchSheet />
       </div>
     </AuthGate>
   );

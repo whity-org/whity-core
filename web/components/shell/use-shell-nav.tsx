@@ -131,7 +131,7 @@ function prettifyGroupId(groupId: string): string {
  * summed over its sources (`GET /api/me/inbox/sources` carries each source's
  * open count for exactly this badge), the agent proposals waiting for
  * their approval (`GET /api/me/agent-proposals?status=waiting`), and unread
- * chat messages (`GET /api/v1/chat/chats`, the phone tab bar's Chat count). Re-read on every page change, so acting
+ * chat messages (`GET /api/v1/chat/inbox`, the sidebar's and the phone tab bar's Chat count). Re-read on every page change, so acting
  * on an item and moving on updates the count. A failed read shows no count
  * rather than a wrong one.
  */
@@ -153,7 +153,7 @@ export function useWaitingCounts(pathname: string | null): Record<string, number
       const [sources, proposals, chats] = await Promise.all([
         api.GET('/api/v1/me/inbox/sources').catch(() => null),
         api.GET('/api/v1/me/agent-proposals', { params: { query: { status: 'waiting' } } }).catch(() => null),
-        api.GET('/api/v1/chat/chats').catch(() => null),
+        api.GET('/api/v1/chat/inbox').catch(() => null),
       ]);
       const list = (result: { data?: unknown } | null): Record<string, unknown>[] => {
         const body = result?.data as { data?: unknown } | undefined;
@@ -161,9 +161,12 @@ export function useWaitingCounts(pathname: string | null): Record<string, number
       };
       const sum = (rows: Record<string, unknown>[], key: string) =>
         rows.reduce((total, row) => total + (typeof row[key] === 'number' ? (row[key] as number) : 0), 0);
-      const inbox = sum(list(sources), 'open_count');
       const approvals = list(proposals).length;
-      // Chat (CH.3): unread messages over every chat the person is in.
+      // The Inbox's Waiting for me holds agents' proposals too (owner, 16 Nov
+      // 2026), so its count does; Approvals keeps its own count of them.
+      const inbox = sum(list(sources), 'open_count') + approvals;
+      // Chat (CH.3, UC.1): unread messages over every chat the person is in,
+      // customer conversations included for people who may read them.
       const chat = sum(list(chats), 'unread');
       if (!cancelled) setCounts((prev) => ({ ...prev, inbox, approvals, chat }));
     })();

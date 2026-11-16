@@ -16,8 +16,8 @@ import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
 import { createFormsApi } from "./api"
 import { ResponseDialog, routingVariant, useRoutingLabel } from "./responses-tab"
-import { pickText } from "./text"
 import type { FormDraftRow, FormsScreenEnv, SubmissionRow } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 type Row = { kind: "draft"; id: string; draft: FormDraftRow } | { kind: "sent"; id: string; submission: SubmissionRow }
 
@@ -58,8 +58,8 @@ export function MySubmissionsScreen({ env }: { env: FormsScreenEnv }) {
     void load()
   }, [load])
 
-  const nameOfSent = useCallback((row: SubmissionRow) => pickText(row.form_name, currentLanguage) || row.form_key || "", [currentLanguage])
-  const nameOfDraft = useCallback((row: FormDraftRow) => pickText(row.form_name, currentLanguage) || t("mine.draft.untitled", "Form"), [currentLanguage, t])
+  const nameOfSent = useCallback((row: SubmissionRow) => localizedText(row.form_name, currentLanguage) || row.form_key || "", [currentLanguage])
+  const nameOfDraft = useCallback((row: FormDraftRow) => localizedText(row.form_name, currentLanguage) || t("mine.draft.untitled", "Form"), [currentLanguage, t])
 
   const rows = useMemo<Row[]>(() => {
     const term = search.trim().toLowerCase()

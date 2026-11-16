@@ -533,7 +533,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the tenant's audit entries (newest first, paginated) */
+        /**
+         * List the tenant's audit entries (newest first, paginated)
+         * @description Besides the audit log, the list reads what agents did with their tools (`agent.action.ran`) and the decisions people made on routes (`route.approved`, `route.rejected`, `route.signed`, `route.declined`, `route.sent_back`). A target filter, or `source=audit`, reads the audit log alone. The CSV export is the audit log.
+         */
         get: operations["get_api_v1_audit_logs"];
         put?: never;
         post?: never;
@@ -851,6 +854,47 @@ export interface paths {
         get: operations["get_api_v1_away_periods"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/cash-payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a workspace's cash payments
+         * @description Operator only. ?workspace=<id>.
+         */
+        get: operations["get_api_v1_billing_cash_payments"];
+        put?: never;
+        /**
+         * Record a cash payment for a paid plugin plan
+         * @description Operator only. Covers the workspace from the date paid, or the end of its current cash cover if later, for the plan's period.
+         */
+        post: operations["post_api_v1_billing_cash_payments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/cash-payments/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Void a cash payment, saying why */
+        post: operations["post_api_v1_billing_cash_payments_id_void"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1394,6 +1438,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/day-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count live bookings a day, by person, room and service, for up to a year
+         * @description For the Year view: each row is one day, person, room and service with its count. Days are the workspace's calendar dates.
+         */
+        get: operations["get_api_v1_calendar_day_counts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/events": {
         parameters: {
             query?: never;
@@ -1431,6 +1495,64 @@ export interface paths {
         head?: never;
         /** Change an event; fields left out keep their value */
         patch: operations["patch_api_v1_calendar_events_id"];
+        trace?: never;
+    };
+    "/api/v1/calendar/events/{id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Say whether you'll come to an event you are invited to */
+        post: operations["post_api_v1_calendar_events_id_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everything on the calendar in a range, in one list
+         * @description Bookings, events, meetings, time off and synced events with one shape (ADR 0018). `can` says what you may do with each. Someone else's time off reads "Away" and their synced events "Busy".
+         */
+        get: operations["get_api_v1_calendar_items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/my-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read your own calendar choices: view, Colour by, people and rooms shown */
+        get: operations["get_api_v1_calendar_my_view"];
+        /**
+         * Change your own calendar choices; fields left out keep their value, null forgets one
+         * @description Only changes what you see. Everyone else keeps their own choices.
+         */
+        put: operations["put_api_v1_calendar_my_view"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/calendar/rooms": {
@@ -1656,6 +1778,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/attachments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a file sent in a chat you are in */
+        get: operations["get_api_v1_chat_attachments_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set the words of a voice message you have not sent yet */
+        patch: operations["patch_api_v1_chat_attachments_id"];
+        trace?: never;
+    };
+    "/api/v1/chat/blocked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Everyone the workspace blocked (messages.manage) */
+        get: operations["get_api_v1_chat_blocked"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/blocked/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unblock a sender (messages.manage) */
+        delete: operations["delete_api_v1_chat_blocked_id"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/bots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's bots: away reply, welcome and hand-over (messages.manage) */
+        get: operations["get_api_v1_chat_bots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/bots/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Turn a bot on or off and set its rule (messages.manage) */
+        put: operations["put_api_v1_chat_bots_kind"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat/chats": {
         parameters: {
             query?: never;
@@ -1671,6 +1879,26 @@ export interface paths {
         put?: never;
         /** Start a group chat, or open a direct chat with a person or one of your agents */
         post: operations["post_api_v1_chat_chats"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/chats/discuss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open the chat about a board, a meeting or a record, starting it if new
+         * @description One group chat per linked board, meeting or record, named after it. You join it if you are not in it yet. 201 when the chat was started, 200 when it was already there; `created` says the same.
+         */
+        post: operations["post_api_v1_chat_chats_discuss"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1698,6 +1926,26 @@ export interface paths {
         patch: operations["patch_api_v1_chat_chats_id"];
         trace?: never;
     };
+    "/api/v1/chat/chats/{id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a photo, video, voice message or file to a chat, to send with your next message
+         * @description multipart/form-data with the file in `file`, up to 25 MB. Photos, videos, voice (webm, ogg, mp4, mp3), PDF, Word, Excel, PowerPoint, text, CSV and zip; the type is read from the file itself.
+         */
+        post: operations["post_api_v1_chat_chats_id_attachments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat/chats/{id}/focus": {
         parameters: {
             query?: never;
@@ -1712,6 +1960,23 @@ export interface paths {
          * @description While a person looks at a chat, its new lines are not pushed to their devices (WHIT-1077).
          */
         post: operations["post_api_v1_chat_chats_id_focus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/chats/{id}/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A chat's photos and files, newest first */
+        get: operations["get_api_v1_chat_chats_id_media"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1816,6 +2081,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/chats/{id}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search a chat's messages by words and by who wrote them */
+        get: operations["get_api_v1_chat_chats_id_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/chats/{id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What an open chat polls for: new and changed lines, read marks, typing and pins */
+        get: operations["get_api_v1_chat_chats_id_state"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/chats/{id}/typing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Say you are typing in this chat (every few seconds while you type) */
+        post: operations["post_api_v1_chat_chats_id_typing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat/directory": {
         parameters: {
             query?: never;
@@ -1831,6 +2147,150 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The one Chat list: your team chats and the workspace's customer conversations
+         * @description Customer conversations are included for people who may read them (messages.read): open and waiting ones, closed ones for 30 days, and any you pinned. Newest activity first.
+         */
+        get: operations["get_api_v1_chat_inbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox/{id}/block": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether a customer conversation's contact is blocked, and since when */
+        get: operations["get_api_v1_chat_inbox_id_block"];
+        put?: never;
+        /** Block a customer conversation's number or address: what they send is dropped (messages.manage) */
+        post: operations["post_api_v1_chat_inbox_id_block"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox/{id}/block-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What a customer chat can send: booking times (services) and forms (messages.reply) */
+        get: operations["get_api_v1_chat_inbox_id_block_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox/{id}/mute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mute a chat for yourself, or unmute it; mentions still reach you */
+        post: operations["post_api_v1_chat_inbox_id_mute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox/{id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pin a chat or customer conversation to the top of your list, or unpin it */
+        post: operations["post_api_v1_chat_inbox_id_pin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a customer conversation read up to a message, for you */
+        post: operations["post_api_v1_chat_inbox_id_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox/{id}/send-block": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a customer booking times, a form or a payment link: they get words and the link (messages.reply) */
+        post: operations["post_api_v1_chat_inbox_id_send_block"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/messages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete your own message for everyone, up to 2 days after sending it
+         * @description It stays in the chat as "This message was deleted".
+         */
+        delete: operations["delete_api_v1_chat_messages_id"];
+        options?: never;
+        head?: never;
+        /** Edit your own message; "edited" shows on it */
+        patch: operations["patch_api_v1_chat_messages_id"];
         trace?: never;
     };
     "/api/v1/chat/messages/{id}/approve": {
@@ -1861,6 +2321,126 @@ export interface paths {
         put?: never;
         /** Decline an agent's held message (the person it works for) */
         post: operations["post_api_v1_chat_messages_id_decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/messages/{id}/forward": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Forward a message, with its files, poll or record, to another chat you are in */
+        post: operations["post_api_v1_chat_messages_id_forward"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/messages/{id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pin a message to the top of its chat for everyone in it, or unpin it */
+        post: operations["post_api_v1_chat_messages_id_pin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/messages/{id}/reactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** React to a message with an emoji, or take your reaction back */
+        post: operations["post_api_v1_chat_messages_id_reactions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/messages/{id}/thread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A message and the replies in its thread */
+        get: operations["get_api_v1_chat_messages_id_thread"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/messages/{id}/vote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vote in a poll, or change your vote */
+        post: operations["post_api_v1_chat_messages_id_vote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your chat layout: bubbles or compact rows */
+        get: operations["get_api_v1_chat_preferences"];
+        /** Choose bubbles or compact rows for your chats */
+        put: operations["put_api_v1_chat_preferences"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Find a booking or a document to put in a message */
+        get: operations["get_api_v1_chat_records"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2042,6 +2622,26 @@ export interface paths {
          * @description `tags`, when sent, replaces the contact's tags.
          */
         patch: operations["patch_api_v1_contacts_id"];
+        trace?: never;
+    };
+    "/api/v1/contacts/{id}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What a customer did here: their bookings, chats, forms and requests to join
+         * @description Newest first, up to 50 of each. A section shows only to someone who may read that kind of record (bookings: calendar:read; chats: messages:reply; forms: forms:read; join requests: signup:manage). A service's or form's name comes in both languages.
+         */
+        get: operations["get_api_v1_contacts_id_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/contacts/{id}/archive": {
@@ -4295,30 +4895,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/form-submissions/{id}/review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * What the office recorded about a submission
-         * @description The current review, every earlier one, and the staff fields they answer. The applicant has no route to this.
-         */
-        get: operations["get_api_v1_form_submissions_id_review"];
-        put?: never;
-        /**
-         * Record the office's decision on a submission
-         * @description Checked against the form's staff fields as a submission is checked against its own, and sent whole. Each save is a new row and the newest is current, so changing a decision leaves the old one readable. The submission itself is never changed. Works on a closed form. `meta.ignored_keys` names answers that matched no staff field.
-         */
-        post: operations["post_api_v1_form_submissions_id_review"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/forms": {
         parameters: {
             query?: never;
@@ -5276,6 +5852,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/agent-proposals/{id}/identity-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start "confirm it's you" before approving a Needs verifying proposal
+         * @description Names the check (an authenticator code, or a code sent by email) and sends the email code when that is the check. The code then goes with the approval.
+         */
+        post: operations["post_api_v1_me_agent_proposals_id_identity_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/agent-toolsets": {
         parameters: {
             query?: never;
@@ -5926,6 +6522,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/notification-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's notifications in each workspace they belong to: push devices, and whether email and push are on, off or on for some kinds (read-only) */
+        get: operations["get_api_v1_me_notification_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/notifications": {
         parameters: {
             query?: never;
@@ -5933,7 +6546,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the caller's in-app notifications (newest first, paginated) + unread count */
+        /**
+         * List the caller's in-app notifications (newest first, paginated) + unread count
+         * @description The Inbox's Mentions and Updates tabs (M.43): `tab=mentions` is someone naming you in a chat or a comment; `tab=updates` is every other notice except those whose item is already in Waiting for me (GET /api/me/waiting). Without a tab, every notice. `unread` counts each tab.
+         */
         get: operations["get_api_v1_me_notifications"];
         put?: never;
         post?: never;
@@ -6507,7 +7123,7 @@ export interface paths {
         put?: never;
         /**
          * Reply to the customer in a conversation
-         * @description Sent on the conversation's channel from a background job. An agent's reply waits five minutes and can be cancelled in that time.
+         * @description Sent from a background job on the channel the customer last wrote on, or on `channel` when it names another they have (`send_by`). An agent's reply waits five minutes and can be cancelled in that time.
          */
         post: operations["post_api_v1_messages_conversations_id_replies"];
         delete?: never;
@@ -6866,6 +7482,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/password-resets/identity-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start the approver's "confirm it's you" check for a password reset: names it, and sends a code by email when that is the check */
+        post: operations["post_api_v1_password_resets_identity_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/password-resets/pending": {
         parameters: {
             query?: never;
@@ -6892,7 +7525,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Apply the staged password (tenant-scoped) */
+        /** Apply the staged password once the approver has confirmed it is them (tenant-scoped) */
         post: operations["post_api_v1_password_resets_id_approve"];
         delete?: never;
         options?: never;
@@ -7528,6 +8161,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plugins/workspace-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List who can use each installed plugin
+         * @description Operator only (the system workspace).
+         */
+        get: operations["get_api_v1_plugins_workspace_access"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/plugins/{id}/re-enable": {
         parameters: {
             query?: never;
@@ -7658,6 +8311,26 @@ export interface paths {
         put?: never;
         /** Drop a waiting update and stay on this version */
         post: operations["post_api_v1_plugins_name_update_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{plugin}/workspace-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose who can use an installed plugin
+         * @description Operator only. all: on for every workspace. choose: each workspace turns it on. operator: only the system workspace.
+         */
+        put: operations["put_api_v1_plugins_plugin_workspace_access"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8840,7 +9513,7 @@ export interface paths {
         put?: never;
         /**
          * Let a waiting person join as a customer
-         * @description Creates the customer membership with the current starting role. A rejected request can be approved later.
+         * @description Creates the customer membership with the current starting role. A rejected request can be approved later. A request on its route is answered there: your step's approval, which decides it unless the workspace's route has more steps (202).
          */
         post: operations["post_api_v1_signup_requests_id_approve"];
         delete?: never;
@@ -10279,6 +10952,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspace/code-plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the installed plugins this workspace can use
+         * @description Plugins installed for the whole installation that the operator lets workspaces use, each with whether it is on here, whether this workspace can switch it, and the last change.
+         */
+        get: operations["get_api_v1_workspace_code_plugins"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/code-plugins/{plugin}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn an installed plugin off for this workspace
+         * @description Its data is kept; turning it back on brings everything back.
+         */
+        post: operations["post_api_v1_workspace_code_plugins_plugin_disable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/code-plugins/{plugin}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn an installed plugin on for this workspace */
+        post: operations["post_api_v1_workspace_code_plugins_plugin_enable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/code-plugins/{plugin}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who turned an installed plugin on or off in this workspace, and when
+         * @description Newest first, at most 50.
+         */
+        get: operations["get_api_v1_workspace_code_plugins_plugin_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/code-plugins/{plugin}/trial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start this workspace's free trial of a paid plugin
+         * @description Once per workspace and plugin. Turns the plugin on until the trial ends; then 7 days of grace, then read-only unless it was bought.
+         */
+        post: operations["post_api_v1_workspace_code_plugins_plugin_trial"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the guided setups of the plugins on in this workspace
+         * @description Each plugin's step-by-step setup the caller may run, in the caller's language, with the plugin route that says which steps are done (SDK 1.109).
+         */
+        get: operations["get_api_v1_workspace_onboarding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -10778,6 +11568,11 @@ export interface components {
         };
         AuditLogEntry: {
             id: number;
+            /**
+             * @description audit (the audit log), agents (what an agent did with a tool) or routes (a decision on a route).
+             * @enum {string}
+             */
+            source?: "audit" | "agents" | "routes";
             tenantId: number;
             actorUserId: number | null;
             action: string;
@@ -10959,6 +11754,17 @@ export interface components {
             currency: string;
             paid_at?: string | null;
             issued_at?: string | null;
+            /**
+             * @description cash: recorded by the operator, not paid through a provider
+             * @enum {string}
+             */
+            source?: "cash";
+            /** @description Cash only: the plugin plan paid for */
+            plan_key?: string;
+            /** @description Cash only: how many seats */
+            quantity?: number;
+            /** @description Cash only: the end of what it pays for */
+            covers_until?: string;
         };
         BillingReceiptListResponse: {
             data: components["schemas"]["BillingReceipt"][];
@@ -11067,6 +11873,12 @@ export interface components {
             customer: components["schemas"]["CalendarBookingCustomer"];
             /** @description Refuse a time outside working hours. Always on for agents. */
             keep_to_hours?: boolean;
+            /** @description Email the customer a confirmation. Default true. */
+            notify?: boolean;
+            /** @description Book even though the person is busy then (a taken room or closed hours still refuse). Never for agents. */
+            book_anyway?: boolean;
+            /** @description Refuse a time outside the person's working hours, without the booking window's notice rules. */
+            within_hours?: boolean;
         };
         CalendarBookingCustomer: {
             /** @description An existing customer or member of this workspace. */
@@ -11083,12 +11895,26 @@ export interface components {
             profile_id?: number;
             /** @description Refuse a time outside working hours. Always on for agents. */
             keep_to_hours?: boolean;
+            /** @description Email the customer the new time. Default true. */
+            notify?: boolean;
+            /** @description Move even though the person is busy then (a taken room or closed hours still refuse). Never for agents. */
+            book_anyway?: boolean;
+            /** @description Refuse a time outside the person's working hours, without the booking window's notice rules. */
+            within_hours?: boolean;
         };
         CalendarBookingSuggestRequest: {
             /** @description The time to suggest, ISO 8601 with an offset. */
             starts_at: string;
             /** @description Suggest another person. Default: the same one. */
             profile_id?: number;
+        };
+        CalendarDayCount: {
+            /** @description The workspace's calendar date, YYYY-MM-DD. */
+            date: string;
+            profile_id: number;
+            room_id: number | null;
+            service_id: number;
+            count: number;
         };
         CalendarEvent: {
             id: number;
@@ -11101,6 +11927,30 @@ export interface components {
             busy: boolean;
             status: string;
             external_ref?: string | null;
+            /**
+             * @description A team event or everyday meeting, a formal meeting, time off, one synced from an outside calendar, or extra working hours (never shown on the calendar).
+             * @enum {string}
+             */
+            kind: "event" | "meeting" | "time_off" | "external" | "open_hours";
+            room_id?: number | null;
+            location?: string;
+            meeting_id?: number | null;
+            /** @description Who is invited besides the organiser (profile_id). */
+            people: components["schemas"]["CalendarEventPerson"][];
+        };
+        CalendarEventAnswerRequest: {
+            /**
+             * @description Whether you'll come. Declining frees your time.
+             * @enum {string}
+             */
+            response: "accepted" | "declined" | "tentative";
+        };
+        CalendarEventPerson: {
+            profile_id: number;
+            /** @enum {string} */
+            role: "required" | "optional";
+            /** @enum {string} */
+            response: "invited" | "accepted" | "declined" | "tentative";
         };
         CalendarEventRequest: {
             /** @description Whose calendar. Default: yours. */
@@ -11117,6 +11967,12 @@ export interface components {
             all_day?: boolean;
             /** @description Blocks bookings. Default true. */
             busy?: boolean;
+            /** @description Staff invited besides the organiser; they are busy for it unless they decline. Sending it replaces the list. */
+            people?: number[];
+            /** @description The room it is held in, which it blocks. */
+            room_id?: number | null;
+            /** @description Where, in words: a place or a video link. */
+            location?: string;
         };
         CalendarEventResponse: {
             data: components["schemas"]["CalendarEvent"];
@@ -11133,6 +11989,43 @@ export interface components {
         CalendarHoursRequest: {
             /** @description Every working-hours row for the week; the list replaces what is there. */
             hours: components["schemas"]["CalendarHours"][];
+        };
+        CalendarItem: {
+            /** @description The kind and the record: "booking:7", "event:12", "time_off:5". */
+            id: string;
+            /** @enum {string} */
+            kind: "booking" | "event" | "meeting" | "time_off" | "external" | "task_due";
+            /** @description What it is. Someone else's time off reads "Away" and their synced events "Busy". */
+            title: string;
+            starts_at: string;
+            ends_at: string;
+            all_day: boolean;
+            busy: boolean;
+            status: string;
+            /** @description Whose calendar it is on: the booked person, or the event's organiser. */
+            organiser_id: number;
+            people: components["schemas"]["CalendarEventPerson"][];
+            room_id: number | null;
+            location: string;
+            /** @description The booking, for kind booking. */
+            booking: components["schemas"]["CalendarBooking"] | null;
+            event: {
+                id: number;
+                notes: string;
+                meeting_id: number | null;
+                external_ref: string | null;
+            } | null;
+            /** @description The Taskaat task, for kind task_due. */
+            task?: {
+                id: string;
+                short_id: string | null;
+            } | null;
+            can: {
+                open: boolean;
+                move: boolean;
+                resize: boolean;
+                cancel: boolean;
+            };
         };
         CalendarRoom: {
             id: number;
@@ -11200,6 +12093,8 @@ export interface components {
             needs_approval?: boolean;
         };
         CalendarSettings: {
+            /** @description The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only. */
+            booking_page_url?: string | null;
             /** @description The workspace time zone (IANA). */
             time_zone: string;
             booking_page_enabled: boolean;
@@ -11298,11 +12193,80 @@ export interface components {
             /** @description Reminders sent that day. */
             reminders_sent: number;
         };
+        CalendarViewChoices: {
+            /**
+             * @description The view last chosen: Day, 4 days, Week, Month, Year, or 3 days on a phone.
+             * @enum {string}
+             */
+            view?: "day" | "four_days" | "week" | "month" | "year" | "three_days";
+            /**
+             * @description What colours mean for this person: the person, the service, or the room or branch.
+             * @enum {string}
+             */
+            colour_by?: "person" | "service" | "room";
+            /** @description The date in view, YYYY-MM-DD. */
+            date?: string;
+            /** @description Staff profile ids unticked in the panel. */
+            hidden_people?: number[];
+            /** @description Room ids unticked in the panel. */
+            hidden_rooms?: number[];
+            /** @description Service ids unticked in the panel. */
+            hidden_services?: number[];
+            /** @description What else the calendar shows besides bookings. */
+            also_show?: ("team_events" | "time_off" | "cancelled" | "meetings" | "tasks_due")[];
+            /** @description The person opened the app's sidebar on the calendar, so it stays open there. */
+            sidebar_open?: boolean;
+        };
         CapabilityDenial: {
             /** @enum {string} */
             code: "no-resource" | "no-route" | "forbidden";
             reason: string;
             detail: string | null;
+        };
+        CashPayment: {
+            id: number;
+            tenant_id: number;
+            plan_key: string;
+            quantity: number;
+            amount_minor: number;
+            currency: string;
+            receipt_number: string;
+            note?: string | null;
+            paid_on: string;
+            period_start: string;
+            period_end: string;
+            recorded_by?: string | null;
+            recorded_at?: string;
+            voided_at?: string | null;
+            void_reason?: string | null;
+        };
+        CashPaymentCreateRequest: {
+            /** @description The workspace that paid */
+            workspace: number;
+            /** @description A paid plugin plan, such as plugin.salons.monthly */
+            planKey: string;
+            /** @description How many seats (chairs); 1 when the plugin is not sold per seat */
+            quantity?: number;
+            /** @description The amount paid, as written: 15 or 15.000 */
+            amount: string;
+            /** @description Three letters; JOD when left out */
+            currency?: string;
+            /** @description The paper receipt's number; once per workspace */
+            receiptNumber: string;
+            /** @description Anything worth keeping */
+            note?: string;
+            /** @description The date paid, like 2026-11-16 */
+            paidOn: string;
+        };
+        CashPaymentListResponse: {
+            data: components["schemas"]["CashPayment"][];
+        };
+        CashPaymentResponse: {
+            data: components["schemas"]["CashPayment"];
+        };
+        CashPaymentVoidRequest: {
+            /** @description Why it is voided */
+            reason: string;
         };
         Chat: {
             id: number;
@@ -11337,6 +12301,29 @@ export interface components {
                 [key: string]: "off" | "ask" | "allowed";
             };
         };
+        ChatAttachment: {
+            id: number;
+            /** @enum {string} */
+            kind: "image" | "video" | "file" | "voice";
+            content_type: string;
+            byte_size: number;
+            filename?: string | null;
+            width?: number | null;
+            height?: number | null;
+            duration_ms?: number | null;
+            /** @description A voice message's words. */
+            transcript?: string | null;
+            /** @description Empty until the message it goes on is sent. */
+            message_id?: number | null;
+            /** @description Where its bytes are read, signed in. */
+            url: string;
+        };
+        ChatAttachmentResponse: {
+            data: components["schemas"]["ChatAttachment"];
+        };
+        ChatAttachmentsResponse: {
+            data: components["schemas"]["ChatAttachment"][];
+        };
         ChatAuthor: {
             /** @enum {string} */
             type: "person" | "agent";
@@ -11344,6 +12331,50 @@ export interface components {
             agent_id?: number;
             name: string;
             works_for?: components["schemas"]["ChatPerson"];
+        };
+        /** @description type poll: question, options [{text, votes, mine, people}], multiple, voters, closes_at, closed. type record: record (booking or document), id, title, status, href, and its times or number; missing when it no longer exists. */
+        ChatBlock: {
+            [key: string]: unknown;
+        };
+        ChatBlockRequest: {
+            /** @description Also report them as spam where the channel takes reports. */
+            report_spam?: boolean;
+        };
+        ChatBlockedSender: {
+            id: number;
+            channel: string;
+            address: string;
+            name?: string | null;
+            reported_spam: boolean;
+            blocked_by?: string | null;
+            created_at?: string | null;
+        };
+        ChatBlockedSenderResponse: {
+            data: components["schemas"]["ChatBlockedSender"] | null;
+        };
+        ChatBlockedSendersResponse: {
+            data: components["schemas"]["ChatBlockedSender"][];
+        };
+        ChatBot: {
+            /** @enum {string} */
+            kind: "away" | "welcome" | "handover";
+            enabled: boolean;
+            /** @description away: text, timezone, days (1 Monday to 7 Sunday), from, to. welcome: text. handover: people (ids, in turn). */
+            settings: {
+                [key: string]: unknown;
+            };
+        };
+        ChatBotRequest: {
+            enabled: boolean;
+            settings?: {
+                [key: string]: unknown;
+            };
+        };
+        ChatBotResponse: {
+            data: components["schemas"]["ChatBot"];
+        };
+        ChatBotsResponse: {
+            data: components["schemas"]["ChatBot"][];
         };
         ChatCreateRequest: {
             /**
@@ -11360,6 +12391,63 @@ export interface components {
             /** @description For a direct chat with one of your agents. */
             agent_id?: number;
             link?: components["schemas"]["ChatLink"];
+        };
+        ChatCustomerBlock: {
+            /** @enum {string} */
+            type: "booking_times" | "form" | "payment";
+            /** @description The link the customer got. */
+            url: string;
+            service?: {
+                id: number;
+                name: string;
+                minutes: number;
+            };
+            times?: string[];
+            /** @description The calendar's zone, which the customer's text uses. */
+            time_zone?: string;
+            form?: {
+                id: number;
+                title: string;
+            };
+            description?: string;
+            /** @description In normal units, as a decimal string. */
+            amount?: string;
+            currency?: string;
+            reference?: string | null;
+        };
+        ChatCustomerBlockOptionsResponse: {
+            data: {
+                booking_page: boolean;
+                /** @description The calendar's zone: times are picked in it. */
+                time_zone: string;
+                services: {
+                    id: number;
+                    name: string;
+                    minutes: number;
+                }[];
+                forms: {
+                    id: number;
+                    title: string;
+                }[];
+            };
+        };
+        ChatCustomerBlockRequest: {
+            /** @enum {string} */
+            type: "booking_times" | "form" | "payment";
+            /** @description Your words above the link. */
+            text?: string;
+            service_id?: number;
+            /** @description Up to six future times (ISO 8601). */
+            times?: string[];
+            form_id?: number;
+            /** @description A payment link (https), from Whity Pay. */
+            url?: string;
+            reference?: string;
+            amount?: string;
+            currency?: string;
+            description?: string;
+            /** @description Send by this channel (one from the conversation's send_by). Default: where the customer last wrote. */
+            channel?: string;
         };
         ChatDetailResponse: {
             data: components["schemas"]["Chat"] & {
@@ -11387,14 +12475,74 @@ export interface components {
                 }[];
             };
         };
+        ChatDiscussRequest: {
+            link: components["schemas"]["ChatLink"];
+        };
+        ChatDiscussResponse: {
+            data: components["schemas"]["Chat"] & {
+                members: components["schemas"]["ChatMember"][];
+                messages: components["schemas"]["ChatMessage"][];
+                has_earlier?: boolean;
+                my_member_id?: number;
+                last_read_message_id?: number;
+                /** @description True when this call started the chat. */
+                created: boolean;
+            };
+        };
         ChatDoneResponse: {
             data: {
                 [key: string]: boolean;
             };
         };
+        ChatEditRequest: {
+            /** @description The new words, at most 4000 characters. */
+            body: string;
+        };
         ChatFocusRequest: {
             /** @description True while the chat is open in a focused window; false when it stops. */
             focused?: boolean;
+        };
+        ChatForwardRequest: {
+            /** @description The chat to forward to; you must be in it. */
+            chat_id: number;
+        };
+        ChatInboxItem: {
+            /** @description The conversation id; /chat?c=<id> opens it whatever its kind. */
+            id: number;
+            /** @enum {string} */
+            kind: "team" | "customer";
+            /** @enum {string} */
+            type: "group" | "direct" | "customer";
+            title?: string | null;
+            pinned: boolean;
+            unread: number;
+            with?: components["schemas"]["ChatMember"] | null;
+            people_count?: number;
+            agents_count?: number;
+            link?: components["schemas"]["ChatLink"] | null;
+            /** @description Customer conversations: email, webchat or a plugin channel. */
+            channel?: string;
+            /** @enum {string} */
+            status?: "open" | "pending" | "closed";
+            subject?: string | null;
+            contact?: {
+                name?: string | null;
+                address: string;
+            };
+            customer?: components["schemas"]["MessagingPerson"] | null;
+            assignee?: components["schemas"]["MessagingPerson"] | null;
+            /** @description The customer wrote last and nobody has answered since. */
+            waiting_since?: string | null;
+            last_message?: {
+                [key: string]: unknown;
+            } | null;
+            last_message_at?: string | null;
+            created_at?: string | null;
+        };
+        ChatInboxResponse: {
+            data: components["schemas"]["ChatInboxItem"][];
+            /** @description Whether the list includes customer conversations (messages.read). */
+            customers: boolean;
         };
         ChatLink: {
             /** @enum {string} */
@@ -11443,10 +12591,45 @@ export interface components {
             author?: components["schemas"]["ChatAuthor"] | null;
             mentions?: {
                 /** @enum {string} */
-                type: "person" | "agent";
+                type: "person" | "agent" | "everyone";
                 id: number;
                 name: string;
             }[];
+            reply_to?: {
+                id: number;
+                author_name: string;
+                /** @description The first 160 characters; empty when it was deleted. */
+                body: string;
+                deleted: boolean;
+            } | null;
+            /** @description Set on a reply in a thread: the message it is under. */
+            thread_root_id?: number | null;
+            /** @description False for a thread reply that was not also sent to the chat. */
+            in_chat?: boolean;
+            thread?: {
+                count: number;
+                last_at?: string | null;
+                people?: string[];
+            } | null;
+            reactions?: {
+                emoji: string;
+                count: number;
+                mine: boolean;
+                people?: string[];
+            }[];
+            /** @description Photos (an album when several), videos, files and voice (UC.10). */
+            attachments?: components["schemas"]["ChatAttachment"][];
+            /** @description A poll, or a Whity record with its live status (UC.5). */
+            block?: components["schemas"]["ChatBlock"] | null;
+            /** @description Forwarded from another chat: who wrote it there (UC.9). */
+            forwarded_from?: string | null;
+            pinned?: boolean;
+            edited?: boolean;
+            /** @description Shown as "This message was deleted"; the body is empty. */
+            deleted?: boolean;
+            can_edit?: boolean;
+            /** @description Your own message, sent less than 2 days ago. */
+            can_delete?: boolean;
             /**
              * @description held: an agent's line waiting for the person it works for.
              * @enum {string}
@@ -11474,17 +12657,32 @@ export interface components {
         ChatMessageResponse: {
             data: components["schemas"]["ChatMessage"];
         };
+        ChatMessagesResponse: {
+            data: components["schemas"]["ChatMessage"][];
+        };
+        ChatMuteRequest: {
+            /** @description False unmutes; true by default. */
+            muted?: boolean;
+        };
         ChatPerson: {
             id: number;
             name: string;
         };
+        ChatPinMessageRequest: {
+            /** @description False unpins; true by default. */
+            pinned?: boolean;
+        };
+        ChatPinRequest: {
+            /** @description False unpins; true by default. */
+            pinned?: boolean;
+        };
         ChatPostRequest: {
             /** @description The message, in plain words, at most 4000 characters. */
             body: string;
-            /** @description People (user id) and agents (agent id) in the chat this message mentions. */
+            /** @description People (user id) and agents (agent id) in the chat this message mentions; everyone in a group. */
             mentions?: {
                 /** @enum {string} */
-                type: "person" | "agent";
+                type: "person" | "agent" | "everyone";
                 id: number;
             }[];
             /**
@@ -11492,10 +12690,39 @@ export interface components {
              * @enum {string}
              */
             style?: "message" | "line";
+            /** @description A message in this chat that this one answers; it is quoted above it. */
+            reply_to?: number;
+            /** @description Reply in the thread under this message. */
+            thread_root?: number;
+            /** @description With thread_root: also show the reply in the chat. */
+            also_to_chat?: boolean;
+            /** @description Files you uploaded to this chat and have not sent yet; the body may then be empty. */
+            attachments?: number[];
+            /** @description A poll ({type: poll, question, options[2-10], multiple, closes_at}) or a record ({type: record, record: booking|document, id}); the body may then be empty. */
+            block?: {
+                [key: string]: unknown;
+            };
+        };
+        ChatPreferencesRequest: {
+            /** @enum {string} */
+            layout: "bubbles" | "rows";
+        };
+        ChatPreferencesResponse: {
+            data: {
+                /** @enum {string} */
+                layout: "bubbles" | "rows";
+            };
+        };
+        ChatReactRequest: {
+            /** @description One emoji. Sending one you already gave takes it back. */
+            emoji: string;
         };
         ChatReadRequest: {
             /** @description The newest message you have read. */
             message_id: number;
+        };
+        ChatRecordsResponse: {
+            data: components["schemas"]["ChatBlock"][];
         };
         ChatShareProposalRequest: {
             /** @description One of your waiting proposals (from an Ask-first call). */
@@ -11503,21 +12730,83 @@ export interface components {
             /** @description What to say with it; the proposal's summary when empty. */
             body?: string;
         };
+        ChatStateResponse: {
+            data: {
+                /** @description New lines after `after`. */
+                messages: components["schemas"]["ChatMessage"][];
+                /** @description Lines edited, deleted, reacted to, pinned or replied to since `since`. */
+                changed: components["schemas"]["ChatMessage"][];
+                read_marks: {
+                    member_id: number;
+                    profile_id: number;
+                    name: string;
+                    last_read_message_id: number;
+                }[];
+                /** @description Names of the people typing now. */
+                typing: string[];
+                pinned: components["schemas"]["ChatMessage"][];
+                /** @description Pass back as `since` on the next poll. */
+                now?: string | null;
+            };
+        };
+        ChatThreadResponse: {
+            data: {
+                root: components["schemas"]["ChatMessage"];
+                replies: components["schemas"]["ChatMessage"][];
+            };
+        };
+        ChatTranscriptRequest: {
+            /** @description The words of the voice message, at most 4000 characters. */
+            transcript: string;
+        };
+        ChatTranscriptResponse: {
+            data: {
+                id: number;
+                transcript: string;
+            };
+        };
         ChatUpdateRequest: {
             /** @description A group's new name. */
             title?: string;
             /** @description What the chat is about, or null to remove the link. */
             link?: components["schemas"]["ChatLink"] | null;
         };
+        ChatVoteRequest: {
+            /** @description The answers you pick, by position; empty takes your vote back. */
+            choices: number[];
+        };
         CheckoutStartRequest: {
             plan_key: string;
             /** @enum {string} */
-            billing_period?: "month" | "year" | "once";
+            billing_period?: "month" | "half_year" | "year" | "once";
         };
         CheckoutStartResponse: {
             data: {
                 url: string;
             };
+        };
+        CodePluginAccess: {
+            name: string;
+            version?: string;
+            /** @enum {string} */
+            access: "all" | "choose" | "operator";
+            /** @description A paid plugin is free for every workspace */
+            freeForAll: boolean;
+        };
+        CodePluginAccessListResponse: {
+            data: components["schemas"]["CodePluginAccess"][];
+        };
+        CodePluginAccessRequest: {
+            /**
+             * @description Who can use it: all (on for every workspace), choose (each workspace turns it on) or operator (the system workspace only)
+             * @enum {string}
+             */
+            access: "all" | "choose" | "operator";
+            /** @description For a paid plugin: free for every workspace, with no plan, add-on or trial needed. Left out: unchanged. */
+            freeForAll?: boolean;
+        };
+        CodePluginAccessResponse: {
+            data: components["schemas"]["CodePluginAccess"];
         };
         Contact: {
             id: number;
@@ -12379,8 +13668,12 @@ export interface components {
             body: {
                 [key: string]: unknown;
             }[];
-            /** @description Profile ids @mentioned; members who can read the document are told in-app */
-            mentions?: number[];
+            /** @description The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox › Mentions and a push */
+            mentions?: (number | {
+                /** @enum {string} */
+                type: "person" | "agent" | "everyone";
+                id?: number;
+            })[];
         };
         DocumentCommentMessageResponse: {
             data: components["schemas"]["DocumentCommentMessage"];
@@ -12412,8 +13705,12 @@ export interface components {
             body: {
                 [key: string]: unknown;
             }[];
-            /** @description Profile ids @mentioned; members who can read the document are told in-app */
-            mentions?: number[];
+            /** @description The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox › Mentions and a push */
+            mentions?: (number | {
+                /** @enum {string} */
+                type: "person" | "agent" | "everyone";
+                id?: number;
+            })[];
         };
         DocumentCommentThreadListResponse: {
             data: components["schemas"]["DocumentCommentThread"][];
@@ -12695,7 +13992,7 @@ export interface components {
             steps: components["schemas"]["DocumentRouteStep"][];
             edges: components["schemas"]["DocumentRouteEdge"][];
             /** @enum {string} */
-            default_quorum: "all" | "any" | "majority";
+            default_quorum: "all" | "any" | "majority" | "first";
             values?: components["schemas"]["RouteStepValue"][];
         };
         DocumentRouteActionRequest: {
@@ -12742,7 +14039,7 @@ export interface components {
                 label?: string | null;
                 decision?: boolean | null;
                 /** @enum {string|null} */
-                decision_quorum?: "all" | "any" | "majority" | null;
+                decision_quorum?: "all" | "any" | "majority" | "first" | null;
                 on_approved?: number | null;
                 on_rejected?: number | null;
                 /** @enum {string} */
@@ -12813,7 +14110,7 @@ export interface components {
             label?: string | null;
             decision: boolean;
             /** @enum {string|null} */
-            decision_quorum?: "all" | "any" | "majority" | null;
+            decision_quorum?: "all" | "any" | "majority" | "first" | null;
             /** @enum {string} */
             satisfied_by: "act" | "delivery";
             /** @enum {string} */
@@ -13761,6 +15058,7 @@ export interface components {
             /** @enum {string|null} */
             resume_from?: "sender" | "start" | null;
             occurred_at: string;
+            on_behalf_of_profile_id?: number | null;
             prev_hash?: string | null;
             entry_hash?: string | null;
         };
@@ -14039,8 +15337,6 @@ export interface components {
             section_key?: string | null;
             position: number;
             visible_when?: components["schemas"]["FormFieldCondition"];
-            /** @enum {string} */
-            audience?: "applicant" | "staff";
             multi_valued?: boolean;
             created_at?: string;
             updated_at?: string;
@@ -14089,11 +15385,6 @@ export interface components {
             section_key?: string;
             /** @description Show this question only when another answer matches; null means always. */
             visible_when?: components["schemas"]["FormFieldCondition"];
-            /**
-             * @description Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review.
-             * @enum {string}
-             */
-            audience?: "applicant" | "staff";
             /** @description Position in the form; omitted appends it at the end. */
             position?: number;
         };
@@ -14140,11 +15431,6 @@ export interface components {
             section_key?: string;
             /** @description Show this question only when another answer matches; null means always. */
             visible_when?: components["schemas"]["FormFieldCondition"];
-            /**
-             * @description Who answers it. A staff field is never shown to the applicant.
-             * @enum {string}
-             */
-            audience?: "applicant" | "staff";
             /** @description New position in the form. */
             position?: number;
         };
@@ -14367,28 +15653,6 @@ export interface components {
                 ignored_keys: string[];
             };
         };
-        FormSubmissionReview: {
-            id: number;
-            submission_id: number;
-            data: {
-                [key: string]: unknown;
-            };
-            recorded_by_profile_id?: number | null;
-            recorded_at: string;
-        };
-        FormSubmissionReviewDetailResponse: {
-            data: {
-                current: components["schemas"]["FormSubmissionReview"];
-                history: components["schemas"]["FormSubmissionReview"][];
-                fields: components["schemas"]["FormField"][];
-            };
-        };
-        FormSubmissionReviewResponse: {
-            data: components["schemas"]["FormSubmissionReview"];
-            meta?: {
-                ignored_keys?: string[];
-            };
-        };
         FormSubmissionWithdrawnResponse: {
             data: components["schemas"]["FormSubmission"];
         };
@@ -14444,6 +15708,12 @@ export interface components {
         FrontendFeature: {
             id: string;
             plugin: string;
+            pluginAccess?: {
+                /** @enum {string} */
+                state?: "on" | "read_only";
+                reason?: string | null;
+                graceUntil?: string | null;
+            } | null;
             label: string;
             icon: string | null;
             group: string;
@@ -14488,6 +15758,10 @@ export interface components {
         FrontendFeatureListResponse: {
             data: components["schemas"]["FrontendFeature"][];
             dropped?: components["schemas"]["DroppedFrontendFeature"][];
+        };
+        GatedApprovalRequest: {
+            /** @description The code from the approver's authenticator, or the one emailed by the identity check */
+            code: string;
         };
         GenericMessageDataResponse: {
             data: {
@@ -14606,8 +15880,10 @@ export interface components {
         IdentityCheckResponse: {
             data: {
                 /** @enum {string} */
-                method: "totp" | "email_code";
+                method: "totp" | "email_code" | "fresh_sign_in";
                 email_hint: string | null;
+                provider_key?: string | null;
+                purpose?: string | null;
             };
         };
         IdentityProvider: {
@@ -15365,6 +16641,11 @@ export interface components {
         MessagingConversationDetailResponse: {
             data: components["schemas"]["MessagingConversation"] & {
                 messages: components["schemas"]["MessagingMessage"][];
+                /** @description The channels a reply can go on (UC.3): those the customer wrote on, the last first. */
+                send_by?: {
+                    channel: string;
+                    address: string;
+                }[];
             };
         };
         MessagingConversationListResponse: {
@@ -15394,9 +16675,13 @@ export interface components {
             status: "received" | "queued" | "sent" | "delivered" | "read" | "failed" | "cancelled" | "noted";
             status_detail?: string | null;
             attachments_not_shown?: number;
+            /** @description Booking times, a form or a payment link the team sent (UC.5). Only the team sees it; the customer got words and the link. */
+            block?: components["schemas"]["ChatCustomerBlock"] | null;
             send_after?: string | null;
             sent_at?: string | null;
             created_at: string;
+            /** @description The channel this message came or went on; one conversation can span channels (C5). */
+            channel?: string | null;
         };
         MessagingMessageResponse: {
             data: components["schemas"]["MessagingMessage"];
@@ -15561,6 +16846,10 @@ export interface components {
             data: components["schemas"]["NotificationEntry"][];
             pagination: components["schemas"]["Pagination"];
             unread_count: number;
+            unread: {
+                mentions: number;
+                updates: number;
+            };
         };
         NotificationMetrics: {
             total: number;
@@ -15596,6 +16885,18 @@ export interface components {
         NotificationPreferencesUpdateRequest: {
             /** @description Entries of `{type, channel, enabled}` to set for the signed-in user. Transactional notification types cannot be turned off. */
             preferences: components["schemas"]["NotificationPreferenceEntry"][];
+        };
+        NotificationSummaryResponse: {
+            data: components["schemas"]["NotificationSummaryWorkspace"][];
+        };
+        NotificationSummaryWorkspace: {
+            tenant_id: number;
+            current: boolean;
+            push_devices: number;
+            /** @enum {string} */
+            email: "on" | "off" | "some";
+            /** @enum {string} */
+            push: "on" | "off" | "some";
         };
         OAuthWorkspace: {
             id: number;
@@ -16007,7 +17308,7 @@ export interface components {
             currency: string;
             unit_amount: number;
             /** @enum {string} */
-            billing_period: "month" | "year" | "once";
+            billing_period: "month" | "half_year" | "year" | "once";
             is_per_seat: boolean;
             is_per_device: boolean;
             is_active: boolean;
@@ -16018,7 +17319,7 @@ export interface components {
             currency: string;
             unit_amount: number;
             /** @enum {string} */
-            billing_period: "month" | "year" | "once";
+            billing_period: "month" | "half_year" | "year" | "once";
             is_per_seat?: boolean;
             is_per_device?: boolean;
         };
@@ -16645,7 +17946,7 @@ export interface components {
             unit_amount: number;
             currency: string;
             /** @enum {string} */
-            billing_period: "month" | "year" | "once";
+            billing_period: "month" | "half_year" | "year" | "once";
             is_per_seat?: boolean;
             is_per_device?: boolean;
             is_addon: boolean;
@@ -17596,6 +18897,8 @@ export interface components {
             customer_invites: boolean;
             /** @description How many people one customer may invite; 0 is no limit (WHIT-1043). */
             invites_per_customer: number;
+            /** @description The route template join requests travel on; null is the default, one step for everyone who can manage sign-ups. */
+            route_template_id?: number | null;
             eligible_roles: components["schemas"]["SignupEligibleRole"][];
             pending_count: number;
             workspace_slug: string | null;
@@ -17621,6 +18924,8 @@ export interface components {
             customer_invites?: boolean;
             /** @description How many people one customer may invite, 0 to 1000; 0 is no limit. Open, accepted and not-sent invitations take a place; withdrawn and expired ones free it (WHIT-1043). */
             invites_per_customer?: number;
+            /** @description One of this workspace's route templates for join requests to travel on, or null for the default: one step for everyone who can manage sign-ups. */
+            route_template_id?: number | null;
         };
         SimpleMessageResponse: {
             message: string;
@@ -18903,6 +20208,95 @@ export interface components {
                 received: number;
                 settled: number;
             };
+        };
+        WorkspaceCodePlugin: {
+            /** @description The plugin's name */
+            name: string;
+            version: string;
+            /**
+             * @description all: on for every workspace; choose: this workspace decides
+             * @enum {string}
+             */
+            access: "all" | "choose";
+            canSwitch: boolean;
+            /** @description Whether it is on in this workspace */
+            enabled: boolean;
+            changedAt?: string | null;
+            changedBy?: {
+                id?: number;
+                name?: string;
+            } | null;
+            /**
+             * @description read_only: a paid plugin whose access ended; reads work, writes are refused
+             * @enum {string}
+             */
+            state: "on" | "read_only" | "off";
+            /** @enum {string|null} */
+            reason?: "free_for_all" | "entitled" | "cash" | "trial" | "grace" | "lapsed" | "installation_unlicensed" | "installation_grace" | null;
+            graceUntil?: string | null;
+            trialEndsAt?: string | null;
+            paid: boolean;
+            /** @description What the workspace buys, plugin.<slug> */
+            product?: string | null;
+            trialDays?: number;
+            trialAvailable: boolean;
+            /** @description Free, included in the plan or an add-on, free for every workspace, or in a trial */
+            mayTurnOn: boolean;
+            /** @description It has a guided setup at /admin/setup/{plugin} */
+            onboarding?: boolean;
+            /** @description Plugins turned on with it in this workspace */
+            dependsOn?: string[];
+            /** @description Sold per seat (SDK 1.110): how many this workspace has, and what one is called */
+            seats?: {
+                count?: number;
+                unit?: components["schemas"]["LocalizedLabel"];
+                units?: components["schemas"]["LocalizedLabel"];
+            } | null;
+        };
+        WorkspaceCodePluginHistoryResponse: {
+            data: {
+                /** @enum {string} */
+                action: "enabled" | "disabled" | "trial_started";
+                at: string;
+                by?: {
+                    id?: number;
+                    name?: string;
+                } | null;
+            }[];
+        };
+        WorkspaceCodePluginListResponse: {
+            data: components["schemas"]["WorkspaceCodePlugin"][];
+        };
+        WorkspaceCodePluginSwitchResponse: {
+            data: {
+                name: string;
+                enabled: boolean;
+            };
+        };
+        WorkspaceCodePluginTrialResponse: {
+            data: {
+                name: string;
+                enabled: boolean;
+                trialEndsAt?: string | null;
+            };
+        };
+        WorkspaceOnboarding: {
+            plugin: string;
+            title?: string | null;
+            description?: string | null;
+            /** @description The plugin's GET route answering {data: {steps: {<id>: bool}}} */
+            status: string;
+            steps: {
+                id: string;
+                title?: string | null;
+                description?: string | null;
+                blocks: {
+                    [key: string]: unknown;
+                }[];
+            }[];
+        };
+        WorkspaceOnboardingListResponse: {
+            data: components["schemas"]["WorkspaceOnboarding"][];
         };
         WorkspacePlugin: {
             /** @description The name in lower case, used in routes */
@@ -21677,6 +23071,8 @@ export interface operations {
     get_api_v1_audit_logs: {
         parameters: {
             query?: {
+                /** @description `audit` for the audit log alone; otherwise everything */
+                source?: string;
                 /** @description Exact action match (e.g. users:create) */
                 action?: string;
                 /** @description Filter by actor user id */
@@ -23137,6 +24533,251 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_billing_cash_payments: {
+        parameters: {
+            query?: {
+                /** @description The workspace. */
+                workspace?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Its cash payments, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashPaymentListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_billing_cash_payments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashPaymentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashPaymentResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Something is missing or wrong; the message says what */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_billing_cash_payments_id_void: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The cash payment. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashPaymentVoidRequest"];
+            };
+        };
+        responses: {
+            /** @description Voided */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CashPaymentResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No reason, no such payment, or already voided */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -25631,7 +27272,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description That time was just taken */
+            /** @description That time was just taken; `reason` says why when known: person_busy (Book anyway is possible), room_taken or closed */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -25741,6 +27382,87 @@ export interface operations {
                 };
             };
             /** @description Not a request */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_day_counts: {
+        parameters: {
+            query: {
+                /** @description Start of the range, ISO 8601 with an offset, such as `2026-11-16T00:00:00+03:00`. */
+                from: string;
+                /** @description End of the range (exclusive), with an offset. At most 62 days after `from`. */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarDayCount"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A missing or reversed range, or more than a year */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -25973,6 +27695,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description A formal meeting: cancel it on the meeting (code meeting) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Internal server error */
             500: {
                 headers: {
@@ -26006,6 +27737,344 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CalendarEventResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A formal meeting: change it on the meeting (code meeting) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_events_id_answer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarEventAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description The event */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarEvent"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such event, or you are not invited */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description An unknown answer */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_items: {
+        parameters: {
+            query: {
+                /** @description Start of the range, ISO 8601 with an offset, such as `2026-11-16T00:00:00+03:00`. */
+                from: string;
+                /** @description End of the range (exclusive), with an offset. At most 62 days after `from`. */
+                to: string;
+                /** @description Whose calendars, as comma-separated profile ids (people invited count). All when omitted. */
+                people?: string;
+                /** @description Which kinds, comma-separated: booking, event, meeting, time_off, external, task_due. All but task_due when omitted; tasks due come from Taskaat only when named, and only with tasks:read. */
+                kinds?: string;
+                /** @description 1 to include cancelled bookings. */
+                cancelled?: string;
+                /** @description Only bookings in this branch. */
+                unit_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The items, oldest start first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarItem"][];
+                        /** @description Kinds that could not be read just now (task_due when Taskaat did not answer); everything else is complete. */
+                        unavailable: string[];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A bad range, id list or kind */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_my_view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your choices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarViewChoices"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_calendar_my_view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarViewChoices"];
+            };
+        };
+        responses: {
+            /** @description Your choices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarViewChoices"];
+                    };
                 };
             };
             /** @description Invalid request body */
@@ -27514,6 +29583,437 @@ export interface operations {
             };
         };
     };
+    get_api_v1_chat_attachments_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file's bytes, with its type */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_chat_attachments_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatTranscriptRequest"];
+            };
+        };
+        responses: {
+            /** @description The words */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatTranscriptResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_blocked: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Blocked senders */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatBlockedSendersResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Needs messages.manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_chat_blocked_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDoneResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Needs messages.manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_bots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bots */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatBotsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Needs messages.manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_chat_bots_kind: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatBotRequest"];
+            };
+        };
+        responses: {
+            /** @description The bot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatBotResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Needs messages.manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a bot Chat has */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_chat_chats: {
         parameters: {
             query?: never;
@@ -27647,6 +30147,102 @@ export interface operations {
                 };
             };
             /** @description No name, someone who is not in this workspace, or an agent that does not work for you */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_chats_discuss: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatDiscussRequest"];
+            };
+        };
+        responses: {
+            /** @description The chat it already had */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDiscussResponse"];
+                };
+            };
+            /** @description The chat, just started */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDiscussResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The link is not a board, a meeting or a record with an id and a name */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -27822,6 +30418,89 @@ export interface operations {
             };
         };
     };
+    post_api_v1_chat_chats_id_attachments: {
+        parameters: {
+            query?: {
+                /** @description A voice message or video: its length */
+                duration_ms?: number;
+                /** @description A photo: its width */
+                width?: number;
+                /** @description A photo: its height */
+                height?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file, not sent yet */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAttachmentResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Empty, too large or not a type Chat takes */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_chat_chats_id_focus: {
         parameters: {
             query?: never;
@@ -27853,6 +30532,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_chats_id_media: {
+        parameters: {
+            query?: {
+                /** @description photos or files; both when empty */
+                kind?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Photos and files */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAttachmentsResponse"];
                 };
             };
             /** @description Missing or invalid authentication */
@@ -28382,6 +31131,217 @@ export interface operations {
             };
         };
     };
+    get_api_v1_chat_chats_id_search: {
+        parameters: {
+            query?: {
+                /** @description Words in the message */
+                q?: string;
+                /** @description Only messages this person wrote */
+                from?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching messages, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessagesResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_chats_id_state: {
+        parameters: {
+            query?: {
+                /** @description The newest message id you have */
+                after?: number;
+                /** @description The `now` of your last poll */
+                since?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The chat's state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatStateResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_chats_id_typing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDoneResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_chat_directory: {
         parameters: {
             query?: {
@@ -28422,6 +31382,770 @@ export interface operations {
                 };
             };
             /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_inbox: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatInboxResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_inbox_id_block: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The block, or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatBlockedSenderResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_inbox_id_block: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatBlockRequest"];
+            };
+        };
+        responses: {
+            /** @description The block */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatBlockedSenderResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Needs messages.manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_inbox_id_block_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Services and forms */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatCustomerBlockOptionsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Needs messages.reply */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_inbox_id_mute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatMuteRequest"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDoneResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_inbox_id_pin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatPinRequest"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDoneResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_inbox_id_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatReadRequest"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDoneResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_inbox_id_send_block: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatCustomerBlockRequest"];
+            };
+        };
+        responses: {
+            /** @description The reply */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagingMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Needs messages.reply */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not something that can be sent */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_chat_messages_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The message */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not your message */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Older than 2 days */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_chat_messages_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatEditRequest"];
+            };
+        };
+        responses: {
+            /** @description The message */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not your message */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -28584,6 +32308,615 @@ export interface operations {
             };
             /** @description The message is not waiting */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_messages_id_forward: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatForwardRequest"];
+            };
+        };
+        responses: {
+            /** @description The copy, in the other chat */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_messages_id_pin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatPinMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description The message */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_messages_id_reactions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatReactRequest"];
+            };
+        };
+        responses: {
+            /** @description The message */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_messages_id_thread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The thread */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatThreadResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_messages_id_vote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatVoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The message */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Chat not found, or you are not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Closed, or more answers than the poll takes */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_preferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your preference */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatPreferencesResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_chat_preferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatPreferencesRequest"];
+            };
+        };
+        responses: {
+            /** @description Your preference */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatPreferencesResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_chat_records: {
+        parameters: {
+            query?: {
+                /** @description booking or document */
+                type?: string;
+                /** @description Words in its name */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Records */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatRecordsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -29546,6 +33879,108 @@ export interface operations {
             };
             /** @description A value that doesn't look right */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_contacts_id_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            bookings?: {
+                                id: number;
+                                title: string | {
+                                    [key: string]: string;
+                                };
+                                status: string;
+                                at: string;
+                            }[];
+                            chats?: {
+                                id: number;
+                                title: string | {
+                                    [key: string]: string;
+                                };
+                                status: string;
+                                at: string;
+                            }[];
+                            forms?: {
+                                id: number;
+                                title: string | {
+                                    [key: string]: string;
+                                };
+                                status: string;
+                                at: string;
+                            }[];
+                            join_requests?: {
+                                id: number;
+                                title: string | {
+                                    [key: string]: string;
+                                };
+                                status: string;
+                                at: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -41559,162 +45994,6 @@ export interface operations {
             };
         };
     };
-    get_api_v1_form_submissions_id_review: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The review and its history */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FormSubmissionReviewDetailResponse"];
-                };
-            };
-            /** @description Missing or invalid authentication */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Submission not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Method not allowed */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    post_api_v1_form_submissions_id_review: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FormSubmissionCreateRequest"];
-            };
-        };
-        responses: {
-            /** @description The recorded review */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FormSubmissionReviewResponse"];
-                };
-            };
-            /** @description Invalid request body */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Missing or invalid authentication */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Submission not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Method not allowed */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description The form has no staff fields, or an answer failed validation */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal server error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
     get_api_v1_forms: {
         parameters: {
             query?: {
@@ -46854,6 +51133,8 @@ export interface operations {
                     arguments?: {
                         [key: string]: unknown;
                     };
+                    /** @description For a Needs verifying (tier 3) proposal: the code from the person's authenticator, or the one emailed after identity-check. */
+                    code?: string;
                     /** @description Needed for a Whity Builder publish or roll back that stops showing data people entered: the person ticked that they understand what is lost. */
                     acknowledgedDestructive?: boolean;
                 };
@@ -47027,6 +51308,101 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_agent_proposals_id_identity_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the proposal. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The check to make */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityCheckResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such proposal made on your behalf */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This proposal needs no check */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many codes were sent lately */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Confirming it is you is not available */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -50459,9 +54835,76 @@ export interface operations {
             };
         };
     };
+    get_api_v1_me_notification_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One row per workspace the caller is an active member of */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSummaryResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_me_notifications: {
         parameters: {
             query?: {
+                /** @description mentions or updates; every notice when omitted */
+                tab?: string;
                 /** @description Restrict to unread notifications when truthy */
                 unread?: boolean;
                 /** @description 1-indexed page (default 1) */
@@ -51389,7 +55832,7 @@ export interface operations {
     get_api_v1_me_waiting: {
         parameters: {
             query?: {
-                /** @description How many rows (default 6, max 50) */
+                /** @description How many rows (default 6, max 200: the Inbox reads the whole list) */
                 limit?: number;
             };
             header?: never;
@@ -53261,7 +57704,12 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MessagingBodyRequest"];
+                "application/json": {
+                    /** @description The text, in plain words. */
+                    body: string;
+                    /** @description Send by this channel (one from the conversation's send_by). Default: where the customer last wrote. */
+                    channel?: string;
+                };
             };
         };
         responses: {
@@ -55420,6 +59868,114 @@ export interface operations {
             };
         };
     };
+    post_api_v1_password_resets_identity_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The password-reset request about to be approved */
+                    request_id: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The check to make */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityCheckResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A request_id is required */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many codes were sent lately */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Confirming it is you is not available */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_password_resets_pending: {
         parameters: {
             query?: never;
@@ -55494,7 +60050,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GatedApprovalRequest"];
+            };
+        };
         responses: {
             /** @description Approved */
             200: {
@@ -55503,6 +60063,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApprovalStatusResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Missing or invalid authentication */
@@ -55543,6 +60112,15 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Confirming it is you is not available */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -58825,6 +63403,71 @@ export interface operations {
             };
         };
     };
+    get_api_v1_plugins_workspace_access: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Each active plugin and its workspace access */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodePluginAccessListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_plugins_id_re_enable: {
         parameters: {
             query?: never;
@@ -59446,6 +64089,96 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_plugins_plugin_workspace_access: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The installed plugin's name, as it gives it (FrontOffice). */
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodePluginAccessRequest"];
+            };
+        };
+        responses: {
+            /** @description The access as it now stands */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodePluginAccessResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not an active plugin */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description access must be all, choose or operator */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -65523,6 +70256,13 @@ export interface operations {
                     "application/json": components["schemas"]["SignupDecisionResponse"];
                 };
             };
+            /** @description Your step is answered; the route has more to decide */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Missing or invalid authentication */
             401: {
                 headers: {
@@ -65599,6 +70339,13 @@ export interface operations {
                     "application/json": components["schemas"]["SignupDecisionResponse"];
                 };
             };
+            /** @description Your step is answered; the route has more to decide */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Missing or invalid authentication */
             401: {
                 headers: {
@@ -65628,6 +70375,15 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request's route refused the answer (for example, it is not your step) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -74379,6 +79135,444 @@ export interface operations {
             };
             /** @description The version no longer passes the checks; details.errors lists why */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_workspace_code_plugins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plugins */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceCodePluginListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_code_plugins_plugin_disable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The installed plugin's name, as it gives it (FrontOffice). */
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Turned off */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceCodePluginSwitchResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a plugin this workspace can use */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The plugin is on for every workspace and has no switch */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_code_plugins_plugin_enable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The installed plugin's name, as it gives it (FrontOffice). */
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Turned on */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceCodePluginSwitchResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A paid plugin needs a plan that includes it, a purchase or a trial; details.reason is needs_purchase */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a plugin this workspace can use */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The plugin is on for every workspace and has no switch */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_workspace_code_plugins_plugin_history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The installed plugin's name, as it gives it (FrontOffice). */
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The changes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceCodePluginHistoryResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a plugin this workspace can use */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_code_plugins_plugin_trial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The installed plugin's name, as it gives it (FrontOffice). */
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The trial started */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceCodePluginTrialResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a plugin this workspace can use */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already had its trial, or the plugin offers none */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_workspace_onboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The guided setups */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceOnboardingListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

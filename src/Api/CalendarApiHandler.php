@@ -8,9 +8,12 @@ use DateTimeImmutable;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Calendar\BookingRepository;
 use Whity\Core\Calendar\BookingService;
+use Whity\Core\Calendar\CalendarItems;
+use Whity\Core\Taskaat\TaskDueDates;
 use Whity\Core\Calendar\CalendarRejectedException;
 use Whity\Core\Calendar\CalendarRepository;
 use Whity\Core\Calendar\CalendarSettings;
+use Whity\Core\Calendar\EventPlace;
 use Whity\Core\Calendar\Interval;
 use Whity\Core\Calendar\RoomRepository;
 use Whity\Core\Calendar\ServiceRepository;
@@ -45,7 +48,14 @@ use Whity\Mcp\Auth\McpPrincipal;
  */
 final class CalendarApiHandler
 {
+    /** The most people one event invites (ADR 0018). */
+    public const MAX_EVENT_PEOPLE = 200;
+
+    private ?TaskDueDates $taskDueDates = null;
+
     private const MAX_RANGE_DAYS = 62;
+    /** Year asks for a whole year; a leap year and a clock change fit. */
+    private const MAX_COUNT_DAYS = 367;
 
     public function __construct(
         private readonly CalendarRepository $calendar,
@@ -95,10 +105,39 @@ final class CalendarApiHandler
 
     // ── settings ────────────────────────────────────────────────────────
 
+    /**
+     * What the caller last chose on the calendar here (design 3.5, CV.2,
+     * CV.4, CV.7): the view, Colour by, unticked people and rooms, Also show.
+     * Only ever the caller's own.
+     */
+    public function getMyView(Request $request): Response
+    {
+        return $this->run($request, 'view', function (int $tenantId, int $actor): Response {
+            return Response::json(['data' => (object) $this->viewPreferences()->get($tenantId, $actor)]);
+        });
+    }
+
+    /** Change the caller's own choices; keys left out keep their value, null forgets one. */
+    public function putMyView(Request $request): Response
+    {
+        return $this->run($request, 'view', function (int $tenantId, int $actor) use ($request): Response {
+            if ($actor === 0) {
+                throw new CalendarRejectedException('Only a signed-in person has calendar choices', 422);
+            }
+
+            return Response::json(['data' => (object) $this->viewPreferences()->update($tenantId, $actor, JsonBody::parsed($request))]);
+        });
+    }
+
+    private function viewPreferences(): \Whity\Core\Calendar\ViewPreferences
+    {
+        return new \Whity\Core\Calendar\ViewPreferences($this->calendar->db());
+    }
+
     public function getSettings(Request $request): Response
     {
         return $this->run($request, 'settings', function (int $tenantId): Response {
-            return Response::json(['data' => $this->booking->settingsFor($tenantId)->toApi()]);
+            return Response::json(['data' => $this->settingsOut($tenantId)]);
         });
     }
 
@@ -140,7 +179,7 @@ final class CalendarApiHandler
                 $this->settings->setTenant($tenantId, $key, $value);
             }
 
-            return Response::json(['data' => $this->booking->settingsFor($tenantId)->toApi()]);
+            return Response::json(['data' => $this->settingsOut($tenantId)]);
         });
     }
 
@@ -367,6 +406,28 @@ final class CalendarApiHandler
         });
     }
 
+    /**
+     * How many live bookings each day has, by person, room and service, for
+     * up to a year at a time (design 3.5, CV.7: the Year view). Days are the
+     * workspace's calendar dates.
+     */
+    public function dayCounts(Request $request): Response
+    {
+        return $this->run($request, 'bookings', function (int $tenantId) use ($request): Response {
+            $q = $this->query($request);
+            $from = Interval::fromApi($q['from'] ?? null);
+            $to = Interval::fromApi($q['to'] ?? null);
+            if ($from === null || $to === null || $to <= $from) {
+                throw new CalendarRejectedException('from and to are required, as dates and times with an offset, and from must be before to', 422);
+            }
+            if ($to->getTimestamp() - $from->getTimestamp() > self::MAX_COUNT_DAYS * 86400) {
+                throw new CalendarRejectedException('Ask for at most ' . self::MAX_COUNT_DAYS . ' days at a time', 422);
+            }
+
+            return Response::json(['data' => $this->bookings->dayCounts($tenantId, $from, $to, $this->booking->settingsFor($tenantId)->zone)]);
+        });
+    }
+
     /** @param array<string, string> $params */
     public function showBooking(Request $request, array $params): Response
     {
@@ -397,7 +458,7 @@ final class CalendarApiHandler
                 // an agent keeps to them.
                 'enforce_hours' => $isAgent || ($body['keep_to_hours'] ?? false) === true,
                 'public' => false,
-            ]);
+            ] + self::gridOptions($body, $isAgent));
 
             unset($booking['manage_token']);
 
@@ -412,7 +473,18 @@ final class CalendarApiHandler
             $body = JsonBody::parsed($request);
             $start = Interval::fromApi($body['starts_at'] ?? null) ?? throw new CalendarRejectedException('starts_at must be a date and time with an offset', 422);
             $profileId = is_int($body['profile_id'] ?? null) ? $body['profile_id'] : null;
-            $booking = $this->booking->move($tenantId, (int) $params['id'], $start, $profileId, self::isAgent($request) || ($body['keep_to_hours'] ?? false) === true);
+            $isAgent = self::isAgent($request);
+            $options = self::gridOptions($body, $isAgent);
+            $booking = $this->booking->move(
+                $tenantId,
+                (int) $params['id'],
+                $start,
+                $profileId,
+                $isAgent || ($body['keep_to_hours'] ?? false) === true,
+                $options['notify'],
+                $options['book_anyway'],
+                $options['within_hours'],
+            );
             // The customer's new link goes to the customer, by email, not to staff.
             unset($booking['manage_token']);
 
@@ -486,13 +558,98 @@ final class CalendarApiHandler
 
     // ── events ──────────────────────────────────────────────────────────
 
+    /**
+     * GET /api/calendar/items?from&to[&people=1,2][&kinds=booking,meeting][&cancelled=1][&unit_id]
+     *
+     * Everything on the calendar in one list with one shape (ADR 0018):
+     * bookings, events, meetings, time off and synced events, each with a
+     * `kind`, an `id` of the form "booking:7", who is invited and what the
+     * viewer may do with it (`can`). Someone else's time off reads "Away" and
+     * their synced events "Busy".
+     */
+    public function items(Request $request): Response
+    {
+        return $this->run($request, 'items', function (int $tenantId, int $actor) use ($request): Response {
+            [$from, $to] = $this->range($request);
+            $q = $this->query($request);
+            $people = self::idList($q['people'] ?? '', 'people');
+            $kinds = array_values(array_filter(explode(',', $q['kinds'] ?? ''), static fn (string $k): bool => $k !== ''));
+            $allowed = [...CalendarItems::KINDS, TaskDueDates::KIND];
+            foreach ($kinds as $kind) {
+                if (!in_array($kind, $allowed, true)) {
+                    throw new CalendarRejectedException('kinds are ' . implode(', ', $allowed), 422);
+                }
+            }
+            // Tasks due come from Taskaat only when asked for by name (Also show,
+            // off by default) and only for someone who may read tasks.
+            $withTasks = in_array(TaskDueDates::KIND, $kinds, true);
+            $kinds = array_values(array_diff($kinds, [TaskDueDates::KIND]));
+            $manages = $actor > 0 && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::CALENDAR_MANAGE, $tenantId);
+            // Asking for tasks due alone reads nothing else.
+            $items = $withTasks && $kinds === [] ? [] : (new CalendarItems($this->bookings, $this->calendar))->between(
+                $tenantId,
+                $actor,
+                $from,
+                $to,
+                $people,
+                $kinds,
+                ($q['cancelled'] ?? '') === '1',
+                $manages,
+                $this->optionalInt($request, 'unit_id'),
+            );
+            $unavailable = [];
+            if ($withTasks && $this->taskDueDates !== null && $actor > 0
+                && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::TASKS_READ, $tenantId)) {
+                $zone = CalendarSettings::fromSettings($this->settings->effective($tenantId))->zone;
+                $tasks = $this->taskDueDates->between($tenantId, $from, $to, $zone, $people);
+                if ($tasks === null) {
+                    $unavailable[] = TaskDueDates::KIND;
+                } else {
+                    $items = [...$items, ...$tasks];
+                    usort($items, static fn (array $a, array $b): int => [$a['starts_at'], $a['id']] <=> [$b['starts_at'], $b['id']]);
+                }
+            }
+
+            return Response::json(['data' => $items, 'unavailable' => $unavailable]);
+        });
+    }
+
+    /** ADR 0018: tasks due on the calendar, read from Taskaat. */
+    public function setTaskDueDates(TaskDueDates $taskDueDates): void
+    {
+        $this->taskDueDates = $taskDueDates;
+    }
+
+    /** @return list<int> */
+    private static function idList(string $raw, string $name): array
+    {
+        if ($raw === '') {
+            return [];
+        }
+        $ids = [];
+        foreach (explode(',', $raw) as $part) {
+            if (preg_match('/^\d+$/', $part) !== 1) {
+                throw new CalendarRejectedException("{$name} is a comma-separated list of ids", 422);
+            }
+            $ids[] = (int) $part;
+        }
+        if (count($ids) > self::MAX_EVENT_PEOPLE) {
+            throw new CalendarRejectedException("Ask for at most " . self::MAX_EVENT_PEOPLE . " {$name} at a time", 422);
+        }
+
+        return array_values(array_unique($ids));
+    }
+
     public function listEvents(Request $request): Response
     {
         return $this->run($request, 'events', function (int $tenantId) use ($request): Response {
             [$from, $to] = $this->range($request);
             $profileId = $this->optionalInt($request, 'profile_id');
 
-            return Response::json(['data' => $this->calendar->listEvents($tenantId, $profileId !== null ? [$profileId] : [], $from, $to)]);
+            // Time off and extra hours have their own route; meetings arrive with T4.
+            return Response::json(['data' => $this->calendar->listEvents($tenantId, $profileId !== null ? [$profileId] : [], $from, $to, [
+                CalendarRepository::KIND_EVENT, CalendarRepository::KIND_EXTERNAL, CalendarRepository::KIND_MEETING,
+            ])]);
         });
     }
 
@@ -503,7 +660,11 @@ final class CalendarApiHandler
             $profileId = $this->staffOr404($tenantId, is_int($body['profile_id'] ?? null) ? $body['profile_id'] : $actor);
             $this->assertOwnOrManage($tenantId, $actor, $profileId);
             [$title, $notes, $when, $allDay, $busy] = $this->eventValues($body);
-            $result = $this->booking->createEvent($tenantId, $profileId, $title, $notes, $when, $allDay, $busy, $actor);
+            $result = $this->booking->createEvent(
+                $tenantId, $profileId, $title, $notes, $when, $allDay, $busy, $actor,
+                place: $this->eventPlace($tenantId, $body) ?? new EventPlace(),
+                people: $this->eventPeople($tenantId, $body),
+            );
 
             return Response::json(['data' => $result['event'], 'overlapping_bookings' => $result['overlapping_bookings']], 201);
         });
@@ -514,13 +675,19 @@ final class CalendarApiHandler
     {
         return $this->run($request, 'events', function (int $tenantId, int $actor) use ($request, $params): Response {
             $existing = $this->calendar->findEvent($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Event');
+            self::assertNotAMeeting($existing);
             $this->assertOwnOrManage($tenantId, $actor, (int) $existing['profile_id']);
-            [$title, $notes, $when, $allDay, $busy] = $this->eventValues(JsonBody::parsed($request) + [
+            $body = JsonBody::parsed($request);
+            [$title, $notes, $when, $allDay, $busy] = $this->eventValues($body + [
                 'title' => $existing['title'], 'notes' => $existing['notes'],
                 'starts_at' => $existing['starts_at'], 'ends_at' => $existing['ends_at'],
                 'all_day' => $existing['all_day'], 'busy' => $existing['busy'],
             ]);
-            $result = $this->booking->updateEvent($tenantId, (int) $existing['id'], $title, $notes, $when, $allDay, $busy);
+            $result = $this->booking->updateEvent(
+                $tenantId, (int) $existing['id'], $title, $notes, $when, $allDay, $busy,
+                place: $this->eventPlace($tenantId, $body + ['room_id' => $existing['room_id'], 'location' => $existing['location']], array_key_exists('room_id', $body) || array_key_exists('location', $body)),
+                people: $this->eventPeople($tenantId, $body),
+            );
 
             return Response::json(['data' => $result['event'], 'overlapping_bookings' => $result['overlapping_bookings']]);
         });
@@ -531,6 +698,7 @@ final class CalendarApiHandler
     {
         return $this->run($request, 'events', function (int $tenantId, int $actor) use ($params): Response {
             $existing = $this->calendar->findEvent($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Event');
+            self::assertNotAMeeting($existing);
             $this->assertOwnOrManage($tenantId, $actor, (int) $existing['profile_id']);
             $this->booking->cancelEvent($tenantId, (int) $existing['id']);
 
@@ -538,7 +706,93 @@ final class CalendarApiHandler
         });
     }
 
+    /**
+     * POST /api/calendar/events/{id}/answer `{ "response": "accepted" }`: an
+     * invited person says whether they'll come (ADR 0018). Declining frees
+     * their time. Only someone invited can answer, and only for themselves.
+     *
+     * @param array<string, string> $params
+     */
+    public function answerEvent(Request $request, array $params): Response
+    {
+        return $this->run($request, 'events', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $response = JsonBody::parsed($request)['response'] ?? null;
+            if (!is_string($response) || !in_array($response, ['accepted', 'declined', 'tentative'], true)) {
+                throw new CalendarRejectedException('response is accepted, declined or tentative', 422);
+            }
+            $existing = $this->calendar->findEvent($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Event');
+            if ($actor <= 0 || !$this->calendar->answerEvent($tenantId, (int) $existing['id'], $actor, $response)) {
+                throw CalendarRejectedException::notFound('Invitation');
+            }
+
+            return Response::json(['data' => $this->calendar->findEvent($tenantId, (int) $existing['id'])]);
+        });
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * A formal meeting is changed on the meeting (its date, place and guests
+     * are the meeting's record, ADR 0018), never through the events API.
+     *
+     * @param array<string, mixed> $event
+     */
+    private static function assertNotAMeeting(array $event): void
+    {
+        if (($event['kind'] ?? null) === CalendarRepository::KIND_MEETING) {
+            throw new CalendarRejectedException('This is a meeting. Change its date, place or guests on the meeting itself.', 409, ['code' => 'meeting']);
+        }
+    }
+
+    /**
+     * Where an event happens, from `room_id` and `location` (ADR 0018). Null
+     * when the body says nothing about it and `$required` is false.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function eventPlace(int $tenantId, array $body, bool $required = true): ?EventPlace
+    {
+        if (!$required) {
+            return null;
+        }
+        $roomId = $body['room_id'] ?? null;
+        if ($roomId !== null && (!is_int($roomId) || $this->roomRepo()->find($tenantId, $roomId) === null)) {
+            throw CalendarRejectedException::notFound('Room');
+        }
+        $location = $body['location'] ?? '';
+        if (!is_string($location) || mb_strlen($location) > EventPlace::LOCATION_MAX) {
+            throw new CalendarRejectedException('location is text, up to ' . EventPlace::LOCATION_MAX . ' characters', 422);
+        }
+
+        return new EventPlace($roomId, trim($location));
+    }
+
+    /**
+     * Who is invited, from `people` (staff of this workspace), or null when
+     * the body doesn't say.
+     *
+     * @param array<string, mixed> $body
+     * @return list<int>|null
+     */
+    private function eventPeople(int $tenantId, array $body): ?array
+    {
+        if (!array_key_exists('people', $body)) {
+            return null;
+        }
+        $raw = $body['people'];
+        if (!is_array($raw) || count($raw) > self::MAX_EVENT_PEOPLE) {
+            throw new CalendarRejectedException('people is a list of up to ' . self::MAX_EVENT_PEOPLE . ' people', 422);
+        }
+        $people = [];
+        foreach ($raw as $id) {
+            if (!is_int($id)) {
+                throw new CalendarRejectedException('people is a list of people\'s ids', 422);
+            }
+            $people[] = $this->staffOr404($tenantId, $id);
+        }
+
+        return array_values(array_unique($people));
+    }
 
     /** @param callable(int, int): Response $work */
     private function run(Request $request, string $area, callable $work): Response
@@ -561,6 +815,47 @@ final class CalendarApiHandler
 
             return Response::error('Failed to update the calendar', 500);
         }
+    }
+
+    /**
+     * What the calendar grid adds to a create or a move (design 3.5, CV.8,
+     * CV.9): "Email the customer" (default on), Book anyway when the person is
+     * busy, and keeping to the person's hours. An agent never books over
+     * someone's time. A booking's length is its service's (owner, Q35.7), so
+     * a length of its own is refused rather than ignored.
+     *
+     * @param array<string, mixed> $body
+     * @return array{notify: bool, book_anyway: bool, within_hours: bool}
+     */
+    private static function gridOptions(array $body, bool $isAgent): array
+    {
+        if (array_key_exists('duration_minutes', $body)) {
+            throw new CalendarRejectedException('A booking lasts as long as its service. Choose another service to change its length.', 422);
+        }
+
+        return [
+            'notify' => ($body['notify'] ?? true) !== false,
+            'book_anyway' => !$isAgent && ($body['book_anyway'] ?? false) === true,
+            'within_hours' => ($body['within_hours'] ?? false) === true,
+        ];
+    }
+
+    /**
+     * The settings, and the public booking page's address so staff can share
+     * it (WHIT-1117): `{app}/book/{workspace}`, the same link the booking
+     * emails use for "Book again". Null when the workspace has no slug or no
+     * app address is configured.
+     *
+     * @return array<string, mixed>
+     */
+    private function settingsOut(int $tenantId): array
+    {
+        $out = $this->booking->settingsFor($tenantId)->toApi();
+        $slug = (new \Whity\Core\Branding\TenantHostRepository($this->calendar->db()))->findSlugById($tenantId);
+        $base = rtrim($this->feedUrlBase, '/');
+        $out['booking_page_url'] = $slug !== null && $slug !== '' && $base !== '' ? $base . '/book/' . rawurlencode($slug) : null;
+
+        return $out;
     }
 
     private static function isAgent(Request $request): bool
