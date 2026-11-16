@@ -15,7 +15,7 @@ use Whity\Core\Chat\ChatViewer;
 
 /**
  * Blocks inside chat messages on the real schema (design 3.5, UC.5,
- * WHIT-1096; migration 284): a poll's counts are live and a vote can change,
+ * WHIT-1096; migration 280): a poll's counts are live and a vote can change,
  * a closed poll takes no votes, and a Whity record shows its current status
  * and only from this workspace.
  */

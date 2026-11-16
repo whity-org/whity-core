@@ -222,7 +222,7 @@ final class CoreTables
         // Files, photos and voice sent in Chat (UC.10).
         'chat_attachments' => '279_create_chat_attachments.php',
         // Votes in chat polls (UC.5).
-        'chat_poll_votes' => '284_create_chat_poll_votes.php',
+        'chat_poll_votes' => '280_create_chat_poll_votes.php',
         'tenant_settings' => '025_create_tenant_settings.php',
         'tenant_storage_config' => '053_create_tenant_storage_config.php',
         'tenants' => '001_create_users_roles.php',

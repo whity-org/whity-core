@@ -160,7 +160,7 @@ final class TenantOwnedTables
         // Files, photos and voice sent in Chat (UC.10).
         'chat_attachments' => '279_create_chat_attachments.php',
         // Votes in chat polls (UC.5).
-        'chat_poll_votes' => '284_create_chat_poll_votes.php',
+        'chat_poll_votes' => '280_create_chat_poll_votes.php',
 
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says
