@@ -763,6 +763,26 @@ jobs:
       - name: Changelog fragment guard
         run: php scripts/changelog-assemble.php --check
 
+  # WHIT-1167: no AI attribution in commits, PR titles or PR descriptions.
+  # Every PR and merge group, whatever paths it touches: a docs-only PR can
+  # carry a co-author trailer as easily as a code one. v0.2.29 shipped seven.
+  no-ai-attribution:
+    name: No AI attribution in commits or PR text
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v7
+        with:
+          # The base commit must be present, or the range reads as empty and
+          # passes. The script refuses to answer from a shallow clone.
+          fetch-depth: 0
+
+      - name: The check catches what it should (self-test)
+        run: bash scripts/ci-no-ai-attribution.sh --self-test
+
+      - name: No AI attribution
+        run: bash scripts/ci-no-ai-attribution.sh
+
   # The English translation catalogue must stay a faithful projection of the
   # t() calls that produce it. A converted screen whose keys were never
   # extracted degrades silently and looks successful: the fallback renders, the
@@ -2017,6 +2037,7 @@ jobs:
       - coverage
       - static-analysis
       - history-guards
+      - no-ai-attribution
       - sdk-coverage
       - i18n-catalogue
       - date-display
