@@ -239,7 +239,11 @@ final class QueueWorkCommand implements CliCommand
                 )),
                 false
             );
-            $runner ??= new JobRunner($repo, $registry, $this->logger);
+            if ($runner === null) {
+                $runner = new JobRunner($repo, $registry, $this->logger);
+                // WHIT-1123: a plugin's jobs don't run where it is off.
+                $runner->setWorkspaceActivation(new \Whity\Core\Plugin\Workspace\CodePluginActivation($pdo));
+            }
         }
         $this->repo = $repo;
         $this->runner = $runner;

@@ -92,12 +92,27 @@ final class MessageChannelRegistry implements HostWiredService
 
     public function get(string $key): ?MessageChannel
     {
-        return $this->channels[$key] ?? null;
+        return $this->hidden($key) ? null : ($this->channels[$key] ?? null);
     }
 
     public function has(string $key): bool
     {
-        return isset($this->channels[$key]);
+        return isset($this->channels[$key]) && !$this->hidden($key);
+    }
+
+    private ?\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $workspaceGate = null;
+
+    /** A plugin switched off for the current workspace has no channels there (WHIT-1123). */
+    public function setWorkspaceGate(\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $gate): void
+    {
+        $this->workspaceGate = $gate;
+    }
+
+    private function hidden(string $key, ?int $tenantId = null): bool
+    {
+        $origin = $this->originByKey[$key] ?? self::CORE_SOURCE;
+
+        return $origin !== self::CORE_SOURCE && $this->workspaceGate?->isPluginOffForWorkspace($origin, $tenantId) === true;
     }
 
     /** Core's or the plugin name that registered it; null when unknown. */
@@ -109,7 +124,7 @@ final class MessageChannelRegistry implements HostWiredService
     /** @return list<string> sorted */
     public function keys(): array
     {
-        $keys = array_keys($this->channels);
+        $keys = array_values(array_filter(array_keys($this->channels), fn (string $key): bool => !$this->hidden($key)));
         sort($keys);
 
         return $keys;
@@ -126,6 +141,9 @@ final class MessageChannelRegistry implements HostWiredService
     {
         $out = [];
         foreach ($this->keys() as $key) {
+            if ($this->hidden($key, $tenantId)) {
+                continue;
+            }
             $channel = $this->channels[$key];
             try {
                 $label = $channel->label();
