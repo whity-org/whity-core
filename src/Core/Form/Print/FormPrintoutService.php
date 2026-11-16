@@ -137,7 +137,7 @@ final class FormPrintoutService
 
     /**
      * @param list<array<string, mixed>> $fields
-     * @return array{status: string, decidedAt: ?string, approvals: list<array{name: string, role: ?string, at: string}>, notCounted: list<array{name: string, question: ?string}>, conditions?: string}
+     * @return array{status: string, decidedAt: ?string, approvals: list<array{name: string, role: ?string, at: string}>, notCounted: list<array{name: string, question: ?string}>, conditions?: string, word?: string}
      */
     private function decision(int $tenantId, int $routeId, string $state, bool $approved, array $fields, string $lang): array
     {
@@ -178,6 +178,19 @@ final class FormPrintoutService
                 break;
             }
         }
+        // WHIT-1164: a stage's decision picked from a list (WHIT-1163), such as
+        // "Conditionally approved", is the word the printout carries. Only once
+        // the route has decided: a choice made before then is not the outcome.
+        if (in_array($status, ['approved', 'rejected'], true)) {
+            foreach ($this->stepInputs($tenantId, $routeId) as $key => $input) {
+                $chosen = $values[$key] ?? null;
+                if (($input['type'] ?? null) !== RouteStepInputs::TYPE_CHOICE || !self::isDecisionKey($key) || !is_string($chosen) || $chosen === '') {
+                    continue;
+                }
+                $decision['word'] = RouteStepInputs::display($input, $chosen, $lang);
+                $decision['status'] = self::statusOf($chosen, $status);
+            }
+        }
 
         return $decision;
     }
@@ -187,11 +200,15 @@ final class FormPrintoutService
      * steps, the latest for each value, with who entered it and when. A person
      * prints as their name. The decision's conditions print with the decision.
      *
-     * @return list<array{label: array<string, string>, value: string, by: ?string, at: ?string}>
+     * @return list<array{label: array<string, string>, value: string, by: ?string, at: ?string, stage: string}>
      */
     private function office(int $tenantId, int $routeId, string $lang = 'en'): array
     {
         $labels = $this->stepInputs($tenantId, $routeId);
+        $stages = [];
+        foreach ((new RouteStepRepository($this->db))->listForRoute($routeId, $tenantId) as $step) {
+            $stages[(int) $step['id']] = ['label' => trim((string) ($step['label'] ?? '')), 'position' => (int) $step['position']];
+        }
         $out = [];
         foreach ((new RouteStepValueRepository($this->db))->currentForRoute($tenantId, $routeId) as $key => $entry) {
             if (in_array($key, self::CONDITIONS_KEYS, true) || trim($entry['value']) === '') {
@@ -209,10 +226,40 @@ final class FormPrintoutService
                 'value' => $value,
                 'by' => $entry['entered_by'] !== null ? $this->name($tenantId, 'profile', $entry['entered_by']) : null,
                 'at' => $entry['entered_at'],
+                'stage' => $stages[$entry['step_id']]['label'] ?? '',
+                'position' => $stages[$entry['step_id']]['position'] ?? 0,
             ];
         }
+        // In the order the stages come, so the faculty prints before the dean.
+        usort($out, static fn (array $a, array $b): int => $a['position'] <=> $b['position']);
 
-        return $out;
+        return array_map(static function (array $e): array {
+            unset($e['position']);
+
+            return $e;
+        }, $out);
+    }
+
+    /** A stage value that records the decision: `decision`, or a key ending `_decision`. */
+    public static function isDecisionKey(string $key): bool
+    {
+        return $key === 'decision' || str_ends_with($key, '_decision');
+    }
+
+    /**
+     * The printed status of a decision picked from a list, read from the
+     * option's value: approved, conditionally approved, revisions required or
+     * not approved. Anything else keeps the route's own outcome.
+     */
+    public static function statusOf(string $value, string $fallback): string
+    {
+        return match (true) {
+            str_contains($value, 'condition') => 'conditional',
+            str_contains($value, 'revision') => 'revisions',
+            str_starts_with($value, 'not_') || str_contains($value, 'reject') => 'rejected',
+            $value === 'approved' || str_starts_with($value, 'approve') => 'approved',
+            default => $fallback,
+        };
     }
 
     /**

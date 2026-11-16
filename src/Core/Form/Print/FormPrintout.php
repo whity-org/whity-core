@@ -38,6 +38,8 @@ final class FormPrintout
     private const NO_WORDS = ['no', 'لا', 'false'];
 
     private FormPrintLabels $t;
+    /** Attachments numbered through one printout (WHIT-1164). */
+    private int $attachments = 0;
     /** @var array<string, mixed> */
     private array $style;
     /** @var callable(string, int): ?string */
@@ -51,9 +53,9 @@ final class FormPrintout
      *   workspace: array{name: string, lines?: list<string>, logo?: ?string, nameAr?: ?string, linesAr?: list<string>},
      *   form: array{title: mixed, description?: mixed, sections?: list<array<string, mixed>>, fields: list<array<string, mixed>>},
      *   answers: array<string, mixed>,
-     *   office?: list<array{label: mixed, value: string, by?: ?string, at?: ?string}>,
+     *   office?: list<array{label: mixed, value: string, by?: ?string, at?: ?string, stage?: string}>,
      *   submission: array{reference?: ?string, submittedAt?: ?string, submittedBy?: ?string},
-     *   decision?: ?array{status: string, decidedAt?: ?string, approvals?: list<array{name: string, role?: ?string, at?: ?string}>, notCounted?: list<array{name: string, question?: ?string}>},
+     *   decision?: ?array{status: string, word?: string, decidedAt?: ?string, approvals?: list<array{name: string, role?: ?string, at?: ?string}>, notCounted?: list<array{name: string, question?: ?string}>},
      *   verify?: ?array{url: string, reference?: ?string},
      *   marks?: list<array{src: string, alt?: string}>,
      *   names?: callable(string, int): ?string,
@@ -63,6 +65,7 @@ final class FormPrintout
     public function build(array $in): array
     {
         $this->t = new FormPrintLabels($in['lang']);
+        $this->attachments = 0;
         $this->style = $in['style'];
         $this->names = $in['names'] ?? static fn (string $type, int $id): ?string => null;
         $t = $this->t;
@@ -81,7 +84,7 @@ final class FormPrintout
 
         $atTop = in_array($this->style['decision'], ['topAndEnd', 'top'], true);
         // The full block is the certificate: only once there is a decision.
-        $decided = $decision !== null && in_array($decision['status'], ['approved', 'rejected'], true);
+        $decided = $decision !== null && in_array($decision['status'], ['approved', 'conditional', 'rejected'], true);
         $atEnd = $decided && in_array($this->style['decision'], ['topAndEnd', 'end'], true);
         $office = $this->officeItems($reference, $in['submission']['submittedAt'] ?? null, $decision);
         if ($this->style['officeDetails'] === 'strip') {
@@ -147,7 +150,9 @@ final class FormPrintout
             $end['qr'] = ['value' => $verify['url']];
         }
         $start = $footer['reference'] && $reference !== '' ? $reference . '   ' . $pageOf : $pageOf;
-        $header = ['start' => ['text' => $workspace['name'], 'subtext' => $title], 'end' => $reference, 'fromPage' => 2];
+        // The name at the start, the form's title in the middle, the reference at
+        // the end: three short lines, so none of them wraps (WHIT-1164).
+        $header = ['start' => ['text' => $workspace['name']], 'center' => $title, 'end' => $reference, 'fromPage' => 2];
         if (($workspace['logo'] ?? null) !== null) {
             $header['start']['image'] = ['src' => $workspace['logo'], 'alt' => $workspace['name'], 'heightMm' => 7];
         }
@@ -219,7 +224,7 @@ final class FormPrintout
         }
         $items[] = ['label' => $t->get('received'), 'value' => $t->date($receivedAt)];
         if ($decision !== null) {
-            $items[] = ['label' => $t->get('decision'), 'value' => $this->statusWord($decision['status']), 'status' => $this->status($decision['status'])];
+            $items[] = ['label' => $t->get('decision'), 'value' => ($decision['word'] ?? $this->statusWord($decision['status'])), 'status' => $this->status($decision['status'])];
             if (($decision['decidedAt'] ?? null) !== null) {
                 $items[] = ['label' => $t->get('decided'), 'value' => $t->date($decision['decidedAt'])];
             }
@@ -236,7 +241,7 @@ final class FormPrintout
     private function decisionLine(?array $decision, array $items, bool $pointToEnd): array
     {
         $status = $decision === null ? 'waiting' : $this->status($decision['status']);
-        $word = $decision === null ? $this->t->get('received') : $this->statusWord($decision['status']);
+        $word = $decision === null ? $this->t->get('received') : ($decision['word'] ?? $this->statusWord($decision['status']));
         if ($decision === null) {
             $items = array_values(array_filter($items, fn (array $i): bool => $i['label'] !== $this->t->get('received')));
         }
@@ -273,7 +278,7 @@ final class FormPrintout
         }
         // FP.5: conditions always print, even "None".
         $rows[] = ['label' => $t->get('conditions'), 'value' => trim((string) ($decision['conditions'] ?? '')) ?: $t->get('none')];
-        $block = ['type' => 'decisionBlock', 'status' => $this->status($decision['status']), 'word' => $this->statusWord($decision['status']), 'rows' => $rows];
+        $block = ['type' => 'decisionBlock', 'status' => $this->status($decision['status']), 'word' => ($decision['word'] ?? $this->statusWord($decision['status'])), 'rows' => $rows];
         if ($verify !== null) {
             $block['qr'] = ['value' => $verify['url'], 'caption' => $t->get('scanToVerify')];
             if (($verify['reference'] ?? '') !== '') {
@@ -323,6 +328,7 @@ final class FormPrintout
     {
         return match ($status) {
             'approved' => 'approved',
+            'conditional' => 'conditional',
             'rejected' => 'rejected',
             'revisions' => 'revisions',
             default => 'waiting',
@@ -333,6 +339,7 @@ final class FormPrintout
     {
         return $this->t->get(match ($status) {
             'approved' => 'approved',
+            'conditional' => 'conditional',
             'rejected' => 'rejected',
             'revisions' => 'revisions',
             default => 'waiting',
@@ -443,11 +450,11 @@ final class FormPrintout
         }
         $prefix = $section['title'] !== '' ? $number . '.' : '';
         $q = 0;
-        /** @var list<array{block: array<string, mixed>, text: string, value: string, word: string}> $run */
+        /** @var list<array{block: array<string, mixed>, key: string, text: string, value: string, word: string}> $run */
         $run = [];
-        $flush = function () use (&$run, &$content): void {
-            if (count($run) >= self::YES_NO_RUN || ($run !== [] && $this->style['yesNo'] === 'threeColumns')) {
-                $content[] = $this->yesNoRows($run);
+        $flush = function (?array $heading = null) use (&$run, &$content): void {
+            if (count($run) >= self::YES_NO_RUN || ($run !== [] && ($this->style['yesNo'] === 'threeColumns' || $heading !== null))) {
+                $content[] = $this->yesNoRows($run, $heading);
             } else {
                 foreach ($run as $item) {
                     $content[] = $item['block'];
@@ -455,11 +462,35 @@ final class FormPrintout
             }
             $run = [];
         };
+        // Questions sharing a print group (validation.printGroup) print together.
+        $units = [];
         foreach ($fields as $field) {
+            $group = $this->printGroup($field);
+            $last = count($units) - 1;
+            if ($group !== null && $last >= 0 && ($units[$last]['group'] ?? null) === $group) {
+                $units[$last]['fields'][] = $field;
+                continue;
+            }
+            $units[] = ['group' => $group, 'fields' => [$field]];
+        }
+        foreach ($units as $unit) {
+            if ($unit['group'] !== null && count($unit['fields']) > 1) {
+                $flush();
+                $this->group($content, $unit['group'], $unit['fields'], $answers, $prefix, $q, $flush, $run);
+                continue;
+            }
+            $field = $unit['fields'][0];
             $answer = $answers[(string) $field['field_key']] ?? null;
             if (($field['field_type'] ?? '') === FieldType::SIGNATURE) {
                 $flush();
+                // An optional signature slot nobody signed is not a signer.
+                if (!($field['is_required'] ?? false) && $this->isBlank($answer)) {
+                    continue;
+                }
                 $content[] = $this->signature($field, $answer, count(array_filter($fields, static fn (array $f): bool => ($f['field_type'] ?? '') === FieldType::SIGNATURE)) > 1);
+                continue;
+            }
+            if ($this->foldAttachment($field, $answer, $run)) {
                 continue;
             }
             if ($this->isBlank($answer) && $empty === 'hide') {
@@ -469,7 +500,7 @@ final class FormPrintout
             $block = $this->question($prefix . $q, $field, $answer);
             $isYesNo = ($block['answer']['kind'] ?? '') === 'yesNo' && !isset($block['guidance']);
             if ($isYesNo) {
-                $run[] = ['block' => $block, 'text' => $block['text'], 'value' => $block['answer']['value'], 'word' => $block['answer']['word']];
+                $run[] = ['block' => $block, 'key' => (string) $field['field_key'], 'text' => $block['text'], 'value' => $block['answer']['value'], 'word' => $block['answer']['word']];
                 continue;
             }
             $flush();
@@ -479,10 +510,140 @@ final class FormPrintout
     }
 
     /**
-     * @param list<array{block: array<string, mixed>, text: string, value: string, word: string}> $run
+     * A print group (WHIT-1164): questions authored apart that read as one, such
+     * as an applicant's name, ID, email and phone, or a checklist. Short answers
+     * print as one block of facts under the group's number and title; a group of
+     * Yes / No / N/A questions prints as one list, its files folded into their
+     * rows; anything longer prints after, as its own question.
+     *
+     * @param list<array<mixed>> $content
+     * @param list<array<string, mixed>> $fields
+     * @param array<string, mixed> $answers
+     * @param list<array{block: array<string, mixed>, key: string, text: string, value: string, word: string}> $run
+     */
+    private function group(array &$content, string $title, array $fields, array $answers, string $prefix, int &$q, \Closure $flush, array &$run): void
+    {
+        $t = $this->t;
+        $own = self::numbered($t->pick($fields[0]['label'] ?? null))[0];
+        $q++;
+        $number = $own !== null ? (preg_replace('/[a-z]+$/', '', $own) ?? $own) : $prefix . $q;
+        $facts = [];
+        $after = [];
+        $allYesNo = true;
+        foreach ($fields as $field) {
+            $answer = $answers[(string) $field['field_key']] ?? null;
+            if ($this->foldAttachment($field, $answer, $run)) {
+                continue;
+            }
+            if (($field['field_type'] ?? '') === FieldType::SIGNATURE) {
+                $allYesNo = false;
+                if (($field['is_required'] ?? false) || !$this->isBlank($answer)) {
+                    $after[] = $this->signature($field, $answer, true);
+                }
+                continue;
+            }
+            if ($this->isBlank($answer) && $this->style['empty'] === 'hide') {
+                continue;
+            }
+            $block = $this->question($number, $field, $answer);
+            $kind = $block['answer']['kind'] ?? '';
+            if ($kind === 'yesNo') {
+                $run[] = ['block' => $block, 'key' => (string) $field['field_key'], 'text' => $block['text'], 'value' => $block['answer']['value'], 'word' => $block['answer']['word']];
+                continue;
+            }
+            $allYesNo = false;
+            $short = match ($kind) {
+                'text' => count($block['answer']['paragraphs']) === 1 && mb_strlen($block['answer']['paragraphs'][0]) <= 160 && !isset($block['answer']['wordCount']) ? $block['answer']['paragraphs'][0] : null,
+                'empty' => $block['answer']['text'],
+                'choices' => count($block['answer']['options']) <= 3 ? implode(', ', array_column(array_filter($block['answer']['options'], static fn (array $o): bool => $o['chosen']), 'text')) : null,
+                default => null,
+            };
+            if ($short !== null && count($facts) < 24) {
+                $facts[] = ['label' => mb_substr($block['text'], 0, 120), 'value' => $short === '' ? $t->get('notAnswered') : mb_substr($short, 0, 300)];
+                continue;
+            }
+            $after[] = $block;
+        }
+        $heading = ['number' => $number, 'text' => mb_substr($title, 0, 600)];
+        if ($run !== [] && $allYesNo && $facts === []) {
+            $flush($heading);
+        } else {
+            $flush();
+            if ($facts !== []) {
+                $content[] = ['type' => 'formQuestion', 'number' => $number, 'text' => $heading['text'], 'answer' => ['kind' => 'facts', 'items' => $facts]];
+            } elseif ($after !== []) {
+                $content[] = ['type' => 'formQuestion', 'number' => $number, 'text' => $heading['text'], 'answer' => ['kind' => 'empty', 'text' => '']];
+            }
+        }
+        foreach ($after as $block) {
+            $block['number'] = '';
+            $content[] = $block;
+        }
+    }
+
+    /**
+     * A file asked for only when a Yes / No / N/A question just above says Yes
+     * (a checklist's "attach it"): folded into that question's row as
+     * "Yes · Attachment 3", numbered through the printout (WHIT-1164).
+     *
+     * @param array<string, mixed> $field
+     * @param list<array{block: array<string, mixed>, key: string, text: string, value: string, word: string}> $run
+     */
+    private function foldAttachment(array $field, mixed $answer, array &$run): bool
+    {
+        if (($field['field_type'] ?? '') !== FieldType::FILE || $run === []) {
+            return false;
+        }
+        $controller = is_array($field['visible_when'] ?? null) ? ($field['visible_when']['field'] ?? null) : null;
+        $last = count($run) - 1;
+        if ($controller === null || $run[$last]['key'] !== $controller) {
+            return false;
+        }
+        if (!$this->isBlank($answer)) {
+            $count = is_array($answer) ? count($answer) : 1;
+            $names = [];
+            for ($i = 0; $i < $count && $i < 5; $i++) {
+                $names[] = $this->t->get('attachmentN', ['n' => ++$this->attachments]);
+            }
+            $run[$last]['word'] .= ' · ' . implode(', ', $names);
+        }
+
+        return true;
+    }
+
+    /**
+     * A table cell as a reader reads it: a choice column's option label
+     * (WHIT-1164), anything else as it was typed.
+     */
+    private function cellText(mixed $column, string $value): string
+    {
+        if (!is_array($column) || !is_array($column['options'] ?? null)) {
+            return $value;
+        }
+        foreach ($column['options'] as $option) {
+            if (is_array($option) && (string) ($option['value'] ?? '') === $value) {
+                return $this->t->pick($option['label'] ?? null) ?: $value;
+            }
+        }
+
+        return $value;
+    }
+
+    /** @param array<string, mixed> $field */
+    private function printGroup(array $field): ?string
+    {
+        $rules = is_array($field['validation'] ?? null) ? $field['validation'] : [];
+        $group = $this->t->pick($rules['printGroup'] ?? null);
+
+        return $group !== '' ? $group : null;
+    }
+
+    /**
+     * @param list<array{block: array<string, mixed>, key: string, text: string, value: string, word: string}> $run
+     * @param array{number: string, text: string}|null $heading
      * @return array<string, mixed>
      */
-    private function yesNoRows(array $run): array
+    private function yesNoRows(array $run, ?array $heading = null): array
     {
         $t = $this->t;
         $rows = array_map(static fn (array $r): array => ['text' => $r['text'], 'value' => $r['value'], 'word' => $r['word']], $run);
@@ -491,7 +652,7 @@ final class FormPrintout
             $answer['style'] = 'threeColumns';
             $answer['headers'] = ['item' => $t->get('item'), 'yes' => $t->get('yes'), 'no' => $t->get('no'), 'na' => $t->get('na')];
         }
-        return ['type' => 'formQuestion', 'number' => '', 'text' => '', 'answer' => $answer];
+        return ['type' => 'formQuestion', 'number' => (string) ($heading['number'] ?? ''), 'text' => (string) ($heading['text'] ?? ''), 'answer' => $answer];
     }
 
     /* ----------------------------------------------------------- questions */
@@ -628,7 +789,7 @@ final class FormPrintout
             $cells = [];
             foreach ($columns as $c) {
                 $v = is_array($c) ? ($row[(string) ($c['key'] ?? '')] ?? null) : null;
-                $cells[] = is_bool($v) ? $t->get($v ? 'yes' : 'no') : (is_scalar($v) ? mb_substr((string) $v, 0, 500) : '');
+                $cells[] = is_bool($v) ? $t->get($v ? 'yes' : 'no') : (is_scalar($v) ? mb_substr($this->cellText($c, (string) $v), 0, 500) : '');
             }
             $out[] = $cells;
         }
@@ -682,22 +843,41 @@ final class FormPrintout
      * steps, with who entered it and when.
      *
      * @param list<array<mixed>> $content
-     * @param list<array{label: mixed, value: string, by?: ?string, at?: ?string}> $office
+     * @param list<array{label: mixed, value: string, by?: ?string, at?: ?string, stage?: string}> $office
      */
     private function officialUse(array &$content, array $office): void
     {
         $t = $this->t;
         $content[] = $this->sectionHeading('i', $t->get('officeUse'), null);
+        // WHIT-1164: one block per stage (Faculty committee, Dean, IRB), with
+        // each value it asked for and who entered them, when.
+        $stages = [];
         foreach ($office as $entry) {
-            $label = mb_substr($t->pick($entry['label']) ?: '—', 0, 600);
-            $items = [['label' => $t->get('answer'), 'value' => mb_substr($entry['value'], 0, 500)]];
-            if (($entry['by'] ?? '') !== '') {
-                $items[] = ['label' => $t->get('by'), 'value' => (string) $entry['by']];
+            $stage = trim((string) ($entry['stage'] ?? ''));
+            $key = $stage !== '' ? 'stage:' . $stage : 'value:' . count($stages);
+            $stages[$key] ??= ['title' => $stage, 'entries' => []];
+            $stages[$key]['entries'][] = $entry;
+        }
+        foreach ($stages as $stage) {
+            $items = [];
+            $by = null;
+            $at = null;
+            foreach ($stage['entries'] as $entry) {
+                $items[] = ['label' => mb_substr($t->pick($entry['label']) ?: '—', 0, 120), 'value' => mb_substr($entry['value'], 0, 300)];
+                $by = ($entry['by'] ?? '') !== '' ? (string) $entry['by'] : $by;
+                $at = ($entry['at'] ?? '') !== '' ? (string) $entry['at'] : $at;
             }
-            if (($entry['at'] ?? '') !== '') {
-                $items[] = ['label' => $t->get('date'), 'value' => $t->date((string) $entry['at'])];
+            if ($by !== null) {
+                $items[] = ['label' => $t->get('by'), 'value' => $by];
             }
-            $content[] = ['type' => 'formQuestion', 'number' => '', 'text' => $label, 'answer' => ['kind' => 'facts', 'items' => $items]];
+            if ($at !== null) {
+                $items[] = ['label' => $t->get('date'), 'value' => $t->date($at)];
+            }
+            $title = $stage['title'] !== '' ? $stage['title'] : (string) ($items[0]['label'] ?? '—');
+            if ($stage['title'] === '' && count($stage['entries']) === 1) {
+                $items[0]['label'] = $t->get('answer');
+            }
+            $content[] = ['type' => 'formQuestion', 'number' => '', 'text' => mb_substr($title, 0, 600), 'answer' => ['kind' => 'facts', 'items' => array_slice($items, 0, 24)]];
         }
     }
 
@@ -802,7 +982,7 @@ final class FormPrintout
      */
     public static function numbered(string $label): array
     {
-        if (preg_match('/^\s*(\d{1,3}(?:\.\d{1,3}){0,3})\.?\s+(\S.*)$/su', $label, $m) === 1) {
+        if (preg_match('/^\s*(\d{1,3}(?:\.\d{1,3}){0,3}[a-z]?)\.?\s+(\S.*)$/su', $label, $m) === 1) {
             return [$m[1], trim($m[2])];
         }
 
