@@ -214,7 +214,9 @@ export interface RouteStepInput {
   required: boolean;
   max_length: number;
   /** Merge map A3: `person` is someone in the workspace, sent as their user id. */
-  type?: 'text' | 'person';
+  type?: 'text' | 'person' | 'choice';
+  /** WHIT-1163: a choice's options; the value is sent, the label shows. */
+  options?: { value: string; label: string; label_ar: string | null }[];
 }
 
 /** WHIT-1016: a value entered on a route, each key's latest. */

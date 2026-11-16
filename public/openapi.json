@@ -101108,6 +101108,41 @@
                     "max_length": {
                         "type": "integer",
                         "description": "Longest value, 1 to 200. 100 when absent."
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "text",
+                            "person",
+                            "choice"
+                        ],
+                        "description": "A line of text (the default), a person in the workspace (their user id), or one of `options` (WHIT-1163)."
+                    },
+                    "options": {
+                        "type": "array",
+                        "maxItems": 12,
+                        "description": "For a choice: 2 to 12 options. The value is stored; the label prints.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "value": {
+                                    "type": "string",
+                                    "description": "Small letters, digits and _, up to 40 characters."
+                                },
+                                "label": {
+                                    "type": "string",
+                                    "description": "At most 80 characters."
+                                },
+                                "label_ar": {
+                                    "type": "string",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "value",
+                                "label"
+                            ]
+                        }
                     }
                 },
                 "required": [

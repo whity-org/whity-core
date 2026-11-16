@@ -990,6 +990,7 @@
         "routing.act.quorum.onStep": "هذه الخطوة تسمّي تلك القاعدة بنفسها.",
         "routing.act.reject": "رفض",
         "routing.act.return": "أعِد إلى المُرسِل",
+        "routing.act.values.choose": "اختر واحدًا",
         "routing.act.values.decisionTitle": "عبّئ قبل الموافقة",
         "routing.act.values.optional": "(اختياري)",
         "routing.act.values.personChange": "تغيير",

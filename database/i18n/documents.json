@@ -989,6 +989,7 @@
         "routing.act.quorum.onStep": "This step names that rule itself.",
         "routing.act.reject": "Reject",
         "routing.act.return": "Return to sender",
+        "routing.act.values.choose": "Choose one",
         "routing.act.values.decisionTitle": "Fill in before you approve",
         "routing.act.values.optional": "(optional)",
         "routing.act.values.personChange": "Change",
