@@ -64,7 +64,7 @@ final class ChatBotsAndBlockingRealEngineTest extends TestCase
     {
         $first = $this->write('visitor:ahmad', 'Hello');
         self::assertNotNull($first);
-        $conversation = (int) $first['conversation_id'];
+        $conversation = $this->idOf($first);
 
         $block = $this->blocking->blockConversation(self::A, $conversation, true, self::AMRO);
         self::assertTrue($block['reported_spam']);
@@ -82,7 +82,7 @@ final class ChatBotsAndBlockingRealEngineTest extends TestCase
     {
         $this->bots->save(self::A, 'welcome', true, ['text' => 'Hello from Example Bakery!'], self::AMRO);
         $first = $this->write('visitor:sara', 'Hi');
-        $conversation = (int) $first['conversation_id'];
+        $conversation = $this->idOf($first);
         $this->write('visitor:sara', 'Are you open?', $conversation);
 
         self::assertSame(['Hi', 'Hello from Example Bakery!', 'Are you open?'], $this->bodies($conversation));
@@ -94,7 +94,7 @@ final class ChatBotsAndBlockingRealEngineTest extends TestCase
         // Closed every day: no opening days at all.
         $this->bots->save(self::A, 'away', true, ['text' => 'We are closed now.', 'days' => [], 'timezone' => 'Asia/Amman'], self::AMRO);
         $first = $this->write('visitor:lina', 'Hello?');
-        $conversation = (int) $first['conversation_id'];
+        $conversation = $this->idOf($first);
         $this->write('visitor:lina', 'Anyone?', $conversation);
 
         self::assertSame(['Hello?', 'We are closed now.', 'Anyone?'], $this->bodies($conversation));
@@ -109,9 +109,9 @@ final class ChatBotsAndBlockingRealEngineTest extends TestCase
         $saved = $this->bots->save(self::A, 'handover', true, ['people' => [self::AMRO, self::CUSTOMER, self::AWSS]], self::AMRO);
         self::assertSame([self::AMRO, self::AWSS], $saved['settings']['people'], 'a customer is never handed conversations');
 
-        $a = (int) $this->write('visitor:one', 'One')['conversation_id'];
-        $b = (int) $this->write('visitor:two', 'Two')['conversation_id'];
-        $c = (int) $this->write('visitor:three', 'Three')['conversation_id'];
+        $a = $this->conversation('visitor:one', 'One');
+        $b = $this->conversation('visitor:two', 'Two');
+        $c = $this->conversation('visitor:three', 'Three');
 
         self::assertSame([self::AMRO, self::AWSS, self::AMRO], [$this->assignee($a), $this->assignee($b), $this->assignee($c)]);
     }
@@ -136,7 +136,7 @@ final class ChatBotsAndBlockingRealEngineTest extends TestCase
         $stmt = $this->pdo->prepare('SELECT body_text FROM messages WHERE conversation_id = :c ORDER BY id');
         $stmt->execute([':c' => $conversationId]);
 
-        return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        return array_values(array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN)));
     }
 
     /** @return list<string> */
@@ -145,7 +145,20 @@ final class ChatBotsAndBlockingRealEngineTest extends TestCase
         $stmt = $this->pdo->prepare('SELECT source FROM messages WHERE conversation_id = :c ORDER BY id');
         $stmt->execute([':c' => $conversationId]);
 
-        return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        return array_values(array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN)));
+    }
+
+    private function conversation(string $from, string $body): int
+    {
+        return $this->idOf($this->write($from, $body));
+    }
+
+    /** @param array<string, mixed>|null $message */
+    private function idOf(?array $message): int
+    {
+        self::assertNotNull($message, 'the message was filed');
+
+        return (int) $message['conversation_id'];
     }
 
     private function assignee(int $conversationId): ?int
