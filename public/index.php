@@ -882,19 +882,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     // the permission its own screen's primary fetch requires, so a link somebody
     // can see is a link that works.
     //
-    // The hrefs point at `/admin/x/{featureId}`, the descriptor host, because
-    // these screens are `screen:'blocks'` descriptors rather than hand-written
-    // pages ({@see \Whity\Core\Form\FormFrontendFeatures}) — which is what lets
-    // the desktop and mobile clients render them at all.
+    // The hrefs keep their `/admin/x/...` addresses, which the web app's own
+    // form pages answer. The `screen:'blocks'` descriptors that once drew these
+    // screens are gone (WHIT-1049): every client draws the React pages.
     //
     // Registered HERE rather than left to PluginNavigationBridge: that bridge
-    // reads PluginLoader, and these descriptors are core's, not a plugin's. The
+    // reads PluginLoader, and these screens are core's, not a plugin's. The
     // ids therefore carry no `plugin-` prefix, and cannot collide with one.
     $items[] = [
         'id' => 'forms-builder',
         'label' => 'Form Builder',
         'icon' => 'forms',
-        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::BUILDER_ID,
+        'href' => '/admin/x/forms-builder',
         'group' => 'documents',
         // Group-local, a unique positive integer (#1007/#1010 — a fractional
         // order is silently skipped by a regroup that matches integers, and a
@@ -911,7 +910,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'id' => 'forms-catalog',
         'label' => 'Forms',
         'icon' => 'clipboard-list',
-        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::CATALOG_ID,
+        'href' => '/admin/x/forms-catalog',
         'group' => 'documents',
         'order' => 6,
         // Mirrors GET /api/v1/forms and /api/v1/form-submissions, both gated
@@ -922,7 +921,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'id' => 'my-form-submissions',
         'label' => 'My Submissions',
         'icon' => 'file-check',
-        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::MY_SUBMISSIONS_ID,
+        'href' => '/admin/x/my-form-submissions',
         'group' => 'overview',
         // In `overview` beside Dashboard (1) and Inbox (2) rather than in
         // `records`: this is a surface a person opens about THEIR OWN work, like
@@ -938,7 +937,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // their workspace has opened a form to them. Same page, so never both.
         'id' => 'member-forms',
         'label' => 'Forms',
-        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::CATALOG_ID,
+        'href' => '/admin/x/forms-catalog',
         'icon' => 'forms',
         'group' => 'overview',
         'order' => 5,
@@ -2214,14 +2213,6 @@ $router->register('POST', '/api/me/permitted-actions', [$permittedActionsHandler
 // fails host validation is dropped fail-closed with a structured, secret-free
 // reason (feature id + validator errors) — never leaked to the client.
 
-// FORMS (migrations 127/128): core's own `screen:'blocks'` descriptors — the
-// form builder, the form catalogue, and one person's own submissions. They are
-// passed as the fifth argument rather than being hand-written React pages
-// because the desktop and mobile clients render descriptors and cannot render a
-// bespoke page, and they go through the SAME per-caller permission filter and
-// the same fail-closed block validation as any plugin's. See
-// FormFrontendFeatures and FrontendFeaturesApiHandler::allFeatures().
-
 // #convening: CORE-declared `screen:'blocks'` features. The loader's validator
 // refuses any PLUGIN descriptor gated on a core permission ("core names are not
 // plugin-ownable"), which is right for a plugin and left core with nowhere to
@@ -2263,10 +2254,7 @@ $frontendFeaturesHandler = new FrontendFeaturesApiHandler(
     // #1044: core's own declarations answer in the caller's language.
     $serverLabels,
     $logger,
-    array_merge(
-        \Whity\Core\Form\FormFrontendFeatures::all(),
-        \Whity\Core\Convening\ConveningFeatures::all($router)
-    ),
+    \Whity\Core\Convening\ConveningFeatures::all($router),
     $tenantManifestHost
 );
 $router->register('GET', '/api/frontend/features', [$frontendFeaturesHandler, 'list'], null);
@@ -5821,6 +5809,8 @@ $router->register('GET',    '/api/chat/bots',                                   
 $router->register('PUT',    '/api/chat/bots/{kind:[a-z]+}',                     [$chatHandler, 'bots'],          null);
 $router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null);
 $router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null);
+// Merge map C2: "Discuss in chat" opens the record's one chat, or starts it.
+$router->register('POST',   '/api/chat/chats/discuss',                          [$chatHandler, 'discuss'],       null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null);
 $router->register('PATCH',  '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'update'],        null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'messages'],      null);

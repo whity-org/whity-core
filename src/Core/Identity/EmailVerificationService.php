@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Identity;
 
 use PDO;
+use Whity\Core\Security\PublicToken;
 
 /**
  * Issues and consumes email-verification tokens (WC-235).
@@ -50,8 +51,8 @@ final class EmailVerificationService
      */
     public function issue(int $profileEmailId, int $ttlSeconds = self::DEFAULT_TTL_SECONDS): string
     {
-        $rawToken  = bin2hex(random_bytes(self::TOKEN_BYTES));
-        $tokenHash = hash('sha256', $rawToken);
+        $rawToken  = PublicToken::make(self::TOKEN_BYTES);
+        $tokenHash = PublicToken::hash($rawToken);
         // UTC throughout so expiry comparison is DB/timezone-independent; the
         // string form sorts lexically the same on Postgres and the SQLite shim.
         $expiresAt = gmdate('Y-m-d H:i:s', time() + $ttlSeconds);
@@ -107,7 +108,7 @@ final class EmailVerificationService
             return null;
         }
 
-        $tokenHash = hash('sha256', $rawToken);
+        $tokenHash = PublicToken::hash($rawToken);
         $now       = gmdate('Y-m-d H:i:s');
 
         $ownTx = !$this->db->inTransaction();
