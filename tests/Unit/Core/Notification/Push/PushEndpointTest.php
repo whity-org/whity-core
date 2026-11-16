@@ -75,7 +75,9 @@ final class PushEndpointTest extends TestCase
     public function testKeysMustHaveTheRightShape(): void
     {
         $endpoint = 'https://fcm.googleapis.com/fcm/send/x';
-        self::assertNotNull(PushEndpoint::problem($endpoint, Base64Url::encode(random_bytes(65)), self::auth()), 'not a point');
+        // 65 bytes that don't start with 0x04, the uncompressed-point marker.
+        // Fully random bytes started with it one run in 256 and passed.
+        self::assertNotNull(PushEndpoint::problem($endpoint, Base64Url::encode("" . random_bytes(64)), self::auth()), 'not a point');
         self::assertNotNull(PushEndpoint::problem($endpoint, Base64Url::encode("\x04" . random_bytes(32)), self::auth()), 'short');
         self::assertNotNull(PushEndpoint::problem($endpoint, self::p256dh(), Base64Url::encode(random_bytes(8))), 'short auth');
         self::assertNotNull(PushEndpoint::problem($endpoint, 'not base64!', self::auth()));

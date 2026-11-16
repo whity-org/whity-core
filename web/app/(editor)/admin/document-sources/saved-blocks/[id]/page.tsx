@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from '@whity/features/i18n';
 import { useEditorLabels } from '@whity/features/document-editor';
 import { Button } from '@whity/ui/button';
+import { ConfirmAction } from '@whity/ui/confirm-action';
 import type { Block, WhityDocument } from '@whity/ui/editor/contract';
 import { DocEditor } from '@whity/ui/editor/doc-editor';
 import { assignPartKeys, perDocumentParts } from '@whity/ui/editor/saved-parts';
@@ -75,9 +76,16 @@ export default function EditSavedBlockPage({ params }: { params: Promise<{ id: s
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty]);
 
+  // Leaving with unsaved changes asks in the kit's dialog, like every other
+  // confirmation (WHIT-1052), not the browser's own box.
+  const [leaving, setLeaving] = useState(false);
+  const leave = () => router.push('/admin/document-sources/saved-blocks');
   const back = () => {
-    if (dirty && !window.confirm(t('savedBlocks.leaveUnsaved', 'Leave without saving your changes?'))) return;
-    router.push('/admin/document-sources/saved-blocks');
+    if (dirty) {
+      setLeaving(true);
+      return;
+    }
+    leave();
   };
 
   const save = async () => {
@@ -151,6 +159,16 @@ export default function EditSavedBlockPage({ params }: { params: Promise<{ id: s
           </Button>
         </div>
       )}
+      <ConfirmAction
+        open={leaving}
+        onOpenChange={setLeaving}
+        title={t('savedBlocks.leaveTitle', 'Leave without saving?')}
+        description={t('savedBlocks.leaveUnsaved', 'Leave without saving your changes?')}
+        confirmLabel={t('savedBlocks.leaveConfirm', 'Leave')}
+        cancelLabel={t('savedBlocks.leaveCancel', 'Keep editing')}
+        variant="destructive"
+        onConfirm={leave}
+      />
     </div>
   );
 }
