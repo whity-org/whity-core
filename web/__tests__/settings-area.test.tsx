@@ -330,3 +330,16 @@ describe('SettingsArea: the phone menu search reads the settings index (WHIT-108
     }
   });
 });
+
+describe('SettingsArea: the cards’ frame (TplSettings*)', () => {
+  it('puts "Settings › Page" above both columns, linking back to Settings', async () => {
+    mockPathname = '/admin/settings/branding';
+    mockGet.mockResolvedValue(tabs(['general', 'branding']));
+    render(<SettingsArea>page</SettingsArea>);
+    const crumb = await screen.findByTestId('settings-breadcrumb');
+    expect(crumb).toHaveTextContent('SettingsBranding');
+    expect(within(crumb).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings');
+    // The sub-nav no longer carries its own "Settings" heading.
+    expect(within(screen.getByTestId('settings-area-nav')).queryByText('Settings', { selector: 'p' })).toBeNull();
+  });
+});
