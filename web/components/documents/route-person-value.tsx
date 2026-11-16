@@ -34,15 +34,13 @@ export function RoutePersonValue({
   const [people, setPeople] = useState<Person[]>([]);
   const [chosen, setChosen] = useState<Person | null>(null);
 
-  useEffect(() => {
-    if (value === '' || chosen !== null) return undefined;
-    // A value set before this field knew the name: show the id until found.
-    setChosen({ id: Number(value), name: `#${value}` });
-    return undefined;
-  }, [value, chosen]);
+  // A value set before this field knew the name shows its id until changed.
+  const shown: Person | null = value === '' ? null : (chosen ?? { id: Number(value), name: `#${value}` });
+
+  const picked = shown !== null;
 
   useEffect(() => {
-    if (chosen !== null && value !== '') return undefined;
+    if (picked) return undefined;
     let live = true;
     const timer = setTimeout(() => {
       api
@@ -58,12 +56,12 @@ export function RoutePersonValue({
       live = false;
       clearTimeout(timer);
     };
-  }, [query, chosen, value]);
+  }, [query, picked]);
 
-  if (chosen !== null && value !== '') {
+  if (shown !== null) {
     return (
       <div className="flex items-center justify-between gap-2 rounded-control border border-border px-3 py-2">
-        <span className="text-sm">{chosen.name}</span>
+        <span className="text-sm">{shown.name}</span>
         <Button
           type="button"
           variant="outline"
