@@ -350,6 +350,7 @@ final class TeamInvitationsRealEngineTest extends TestCase
         }
         $over = $this->invite(self::CLINIC_OWNER, 'p11@example-clinic.com');
         self::assertSame(429, $over->getStatusCode());
+        self::assertSame('rate_limited', $this->decode($over)['details']['code']);
     }
 
     /** WHIT-1043 (SC.11): each customer invites up to the number the workspace set; withdrawing frees a place. */

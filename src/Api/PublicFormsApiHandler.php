@@ -15,6 +15,8 @@ use Whity\Core\Form\PublicFormLink;
 use Whity\Core\Form\PublicFormView;
 use Whity\Core\Form\SubmissionIssuer;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimitRule;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
@@ -156,7 +158,7 @@ use Whity\Storage\StorageException;
  * than argued away — the same posture point 6 takes about volume:
  *
  *   - a per-IP hourly ceiling on uploads, TIGHTER than the submit ceiling
- *     (`UPLOAD_IP_MAX`), because an upload costs storage where a submission
+ *     (`RateLimits::publicFormUploadPerAddress()`), because an upload costs storage where a submission
  *     costs rows;
  *   - a per-FORM hourly ceiling that holds across many addresses, so a
  *     distributed flood is bounded too;
@@ -186,73 +188,23 @@ use Whity\Storage\StorageException;
  */
 final class PublicFormsApiHandler
 {
-    /**
-     * Per-IP throttles: fixed window, one namespace each, shared with nothing.
+    /*
+     * The limits live in RateLimits (publicForm*). Why they are sized as they are:
      *
-     * DEFENCE IN DEPTH BEHIND THE SLUG'S ENTROPY, exactly as the same shape is on
-     * {@see DocumentVerificationApiHandler} and {@see InvitationAcceptHandler}.
-     * At 256 bits, working through the namespace is not a threat model, so these
-     * numbers are not sized against guessing — their real job is bounding the
-     * work one address can commission, and in the submit case the number of
-     * documents and route steps one address can cause a tenant to store.
+     * Per address, they are defence in depth behind the slug's 256-bit entropy,
+     * so they are not sized against guessing: they bound the work one address
+     * can commission. Render is loose (a person reloads, leaves, comes back on a
+     * phone); submit is tight because the honest use is once. Uploads are
+     * tighter still because they cost metered storage (ten an hour at 5 MiB is
+     * 50 MiB), but more than one so a person can retry a wrong file.
      *
-     * The render ceiling is the looser of the two: a person filling in a form
-     * reloads it, goes away, comes back, opens it on a phone. The submit ceiling
-     * is tight because the honest use is once — a person who legitimately files
-     * twelve applications in an hour is not a case this feature was built for,
-     * and 429 with a `Retry-After` tells them exactly what to do.
+     * Per form, across every address, they bound what a distributed flood can
+     * do to the organisation that opened the form: each submission costs a
+     * `documents` row, a route and an inbox entry. Uploads per form are sized
+     * against submissions per form plus room for retries. Keyed on the tenant
+     * and form id, never the slug, so the credential that is the link is never
+     * copied into the shared store.
      */
-    private const WINDOW_SECONDS = 3600;
-    private const RENDER_IP_MAX = 120;
-    private const SUBMIT_IP_MAX = 20;
-
-    /**
-     * Per-IP ceiling on UPLOADS, tighter than the submit ceiling.
-     *
-     * Tighter because the two cost the tenant different things. A submission
-     * costs rows and one person's attention; an upload costs STORAGE, which is
-     * metered, billed, and not reclaimed by the tenant noticing. Ten an hour
-     * against a 5 MiB ceiling bounds one address to 50 MiB an hour, which is
-     * generous for an applicant attaching one paper and useless as a way to fill
-     * somebody's bucket.
-     *
-     * It is deliberately HIGHER than one: a person who picks the wrong file, or
-     * whose upload times out on a phone, must be able to try again without being
-     * locked out of the application they came to file.
-     */
-    private const UPLOAD_IP_MAX = 10;
-
-    /**
-     * Per-FORM ceiling on uploads, across every address — the distributed-flood
-     * half, exactly as {@see self::SUBMIT_FORM_MAX} is for submissions.
-     *
-     * Sized against SUBMIT_FORM_MAX rather than independently: a form that
-     * accepts 300 submissions an hour and asks for one attachment each needs
-     * room for about that many uploads, plus slack for the re-tries a per-IP
-     * limit deliberately allows.
-     */
-    private const UPLOAD_FORM_MAX = 400;
-
-    /**
-     * Per-FORM ceiling on submissions, across every address.
-     *
-     * The per-IP limit alone is not enough for the one thing that actually
-     * matters here: a distributed flood does not reuse an address, and each
-     * accepted submission costs the tenant a `documents` row, a route, and an
-     * inbox entry in front of a real person. This bounds what ONE open form can
-     * do to the organisation that opened it, whoever is sending.
-     *
-     * Counted per hour per form, generously — a genuinely busy application
-     * deadline is dozens an hour, not hundreds — and the refusal is a 429, which
-     * is honest: this is throttling, not rejection, and the person should come
-     * back.
-     *
-     * Keyed on the tenant and form ID rather than the slug: a shared-store key is
-     * readable by anybody with database access, and putting the credential that
-     * IS the link into one would leave copies of it somewhere nobody thinks of as
-     * holding secrets.
-     */
-    private const SUBMIT_FORM_MAX = 300;
 
     public function __construct(
         private readonly FormRepository $forms,
@@ -285,7 +237,7 @@ final class PublicFormsApiHandler
      */
     public function render(Request $request, array $params): Response
     {
-        $throttled = $this->throttle($request, 'render', self::RENDER_IP_MAX);
+        $throttled = $this->throttle($request, 'render', RateLimits::publicFormRenderPerAddress());
         if ($throttled instanceof Response) {
             return $throttled;
         }
@@ -343,7 +295,7 @@ final class PublicFormsApiHandler
      */
     public function upload(Request $request, array $params): Response
     {
-        $throttled = $this->throttle($request, 'upload', self::UPLOAD_IP_MAX);
+        $throttled = $this->throttle($request, 'upload', RateLimits::publicFormUploadPerAddress());
         if ($throttled instanceof Response) {
             return $throttled;
         }
@@ -374,7 +326,7 @@ final class PublicFormsApiHandler
                 return Response::error('This form does not ask for a file', 422);
             }
 
-            $ceiling = $this->count('pubform:upload:form:' . $tenantId . ':' . $formId, self::UPLOAD_FORM_MAX);
+            $ceiling = RateLimits::publicFormUploadPerForm()->take($this->store, 'pubform:upload:form:' . $tenantId . ':' . $formId);
             if ($ceiling instanceof Response) {
                 return $ceiling;
             }
@@ -444,7 +396,7 @@ final class PublicFormsApiHandler
      */
     public function submit(Request $request, array $params): Response
     {
-        $throttled = $this->throttle($request, 'submit', self::SUBMIT_IP_MAX);
+        $throttled = $this->throttle($request, 'submit', RateLimits::publicFormSubmitPerAddress());
         if ($throttled instanceof Response) {
             return $throttled;
         }
@@ -656,14 +608,14 @@ final class PublicFormsApiHandler
      * already fails closed on that case with a shared `unknown` bucket, and
      * duplicating the decision in two places is how the two come to disagree.
      */
-    private function throttle(Request $request, string $namespace, int $max): ?Response
+    private function throttle(Request $request, string $namespace, RateLimitRule $rule): ?Response
     {
         $ip = ClientIp::fromRequest($request);
         if ($ip === null) {
             return null;
         }
 
-        return $this->count('pubform:' . $namespace . ':ip:' . $ip, $max);
+        return $rule->take($this->store, 'pubform:' . $namespace . ':ip:' . $ip);
     }
 
     /**
@@ -673,24 +625,6 @@ final class PublicFormsApiHandler
      */
     private function throttleForm(int $tenantId, int $formId): ?Response
     {
-        return $this->count('pubform:submit:form:' . $tenantId . ':' . $formId, self::SUBMIT_FORM_MAX);
-    }
-
-    /**
-     * One fixed-window counter, checked then incremented.
-     *
-     * Checked BEFORE incrementing so the limit is a ceiling rather than a
-     * ceiling-minus-one, matching the two existing public throttles exactly.
-     */
-    private function count(string $key, int $max): ?Response
-    {
-        if ($this->store->count($key) >= $max) {
-            return Response::error('Too many attempts. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
-        }
-
-        $this->store->increment($key, self::WINDOW_SECONDS);
-
-        return null;
+        return RateLimits::publicFormSubmitPerForm()->take($this->store, 'pubform:submit:form:' . $tenantId . ':' . $formId);
     }
 }

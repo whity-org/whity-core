@@ -14,6 +14,7 @@ use Whity\Core\Http\AfterResponse;
 use Whity\Core\Identity\CustomerSafeRole;
 use Whity\Core\Identity\InvitationMailer;
 use Whity\Core\Identity\InvitationService;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\SettingsRegistry;
@@ -58,12 +59,6 @@ use Whity\Sdk\Hooks\HookVetoException;
  */
 final class TeamInvitationsApiHandler
 {
-    private const HOUR = 3600;
-    private const DAY = 86400;
-    private const INVITER_PER_HOUR = 10;
-    private const INVITER_PER_DAY = 30;
-    private const WORKSPACE_PER_HOUR = 100;
-
     private const ACCEPTED = 'If this address can join, we sent an invitation to it.';
 
     public function __construct(
@@ -320,20 +315,20 @@ final class TeamInvitationsApiHandler
      */
     private function throttle(int $tenantId, int $profileId): ?Response
     {
-        $keys = [
-            ['team-invite:hour:' . $tenantId . ':' . $profileId, self::INVITER_PER_HOUR, self::HOUR],
-            ['team-invite:day:' . $tenantId . ':' . $profileId, self::INVITER_PER_DAY, self::DAY],
-            ['team-invite:tenant:' . $tenantId, self::WORKSPACE_PER_HOUR, self::HOUR],
+        $limits = [
+            ['team-invite:hour:' . $tenantId . ':' . $profileId, RateLimits::teamInvitationsPerInviterHour()],
+            ['team-invite:day:' . $tenantId . ':' . $profileId, RateLimits::teamInvitationsPerInviterDay()],
+            ['team-invite:tenant:' . $tenantId, RateLimits::teamInvitationsPerWorkspace()],
         ];
 
-        foreach ($keys as [$key, $max]) {
-            if ($this->store->count($key) >= $max) {
-                return Response::error('You have sent a lot of invitations. Try again later.', 429, ['code' => 'too_many'])
-                    ->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
+        foreach ($limits as [$key, $rule]) {
+            $limited = $rule->blocked($this->store, $key);
+            if ($limited !== null) {
+                return $limited;
             }
         }
-        foreach ($keys as [$key, , $window]) {
-            $this->store->increment($key, $window);
+        foreach ($limits as [$key, $rule]) {
+            $rule->record($this->store, $key);
         }
 
         return null;
